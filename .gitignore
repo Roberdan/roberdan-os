@@ -1,0 +1,11 @@
+# Dossier Microsoft-confidenziale — mai in git (NDA-split, installato in ~/.roberdan-os/private/)
+private/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Generated per-platform wrappers (rigenerati da bin/sync.sh)
+.agent-state/
