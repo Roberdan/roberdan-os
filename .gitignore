@@ -7,5 +7,8 @@ private/
 .idea/
 .vscode/
 
-# Generated per-platform wrappers (rigenerati da bin/sync.sh)
+# Loop cursor state (durevole, non versionato)
 .agent-state/
+
+# Bundle incollabile generato on-demand da bin/make-bundle.sh (derivato dal canone)
+platforms/chatgpt/bundle.md
