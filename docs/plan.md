@@ -11,7 +11,7 @@ Il sistema cattura **due facce complementari** di Roberto, non una:
 - **Operating / engineering** (`behavior/roberto-mode.md`, già costruito da 15.849 messaggi): come gli agenti *operano* sul codice — autonomia, evidence-first, done-criteria, quality gate.
 - **Voice / relationship** (nuovo, dal Copilot aziendale Microsoft — `~/Downloads/SKILL.md` + `profile.md`): come gli agenti *comunicano nella sua voce* e *decidono come lui* — drafting email/Teams, follow-up clienti, triage, decision-lens (relationship-before-transaction, bias-to-action, protect family/teaching, right-altitude), M.I.R.R.O.R.S., sign-off "Roberdan"/"Roberto", bilingue IT/EN/ES.
 
-**Gate privacy (decisione utente — "split"):** lo *stile/voce* (non sensibile) entra nel canone committato (`behavior/roberto-voice.md`); il *dossier* con clienti/deal/persone Microsoft-confidenziali (Naturalis, Fresenius, HUMAIN+TAMM, IE University, CWAA/SPA, UPN @microsoft.com) **NON entra in git** — vive solo in `~/.roberdan-os/private/roberto-profile.md` (gitignored, local-only), letto a runtime ma mai committato né incluso in alcun bundle pubblico.
+**Gate privacy (decisione utente — "split"):** lo *stile/voce* (non sensibile) entra nel canone committato (`behavior/roberto-voice.md`); il *dossier* con clienti/deal/persone Microsoft-confidenziali (i nomi reali — clienti, deal, contratti, UPN — restano solo nel dossier) **NON entra in git** — vive solo in `~/.roberdan-os/private/roberto-profile.md` (gitignored, local-only), letto a runtime ma mai committato né incluso in alcun bundle pubblico. La denylist concreta vive in `private/.denylist` (anch'essa local-only).
 
 **Outcome atteso:** un'unica fonte versionata da cui ogni tool consuma lo stesso comportamento; agenti che si auto-verificano e auto-rilanciano senza polling manuale; affidabilità garantita da stato durevole su file (Convergio resta orchestratore *opzionale*, non dipendenza).
 
@@ -184,6 +184,6 @@ Autonomia ≠ black box. Questi passano **sempre** da Roberto (messaggio diretto
 4. **Codex:** in un repo con `AGENTS.md` → conferma che Codex lo rispetta.
 5. **ChatGPT/Claude web:** `make-bundle.sh` → incolla il bundle in un Project → conferma comportamento allineato. **Verifica privacy:** `grep` nel bundle generato conferma 0 nomi cliente/persona reali (nessun leak da `private/`).
 6. **Twin:** invoca `roberdan-twin` con un task di drafting → conferma voce corretta (warm-open, next-step, sign-off), draft-not-send rispettato, dossier letto da `~/.roberdan-os/private/` (o degrado pulito se assente).
-7. **Privacy gate:** `git status`/`git log` di roberdan-os non mostrano mai `private/`; `.gitignore` lo esclude; `git grep -i naturalis` (o altri nomi deal) = 0 risultati.
+7. **Privacy gate:** `git status`/`git log` di roberdan-os non mostrano mai `private/`; `.gitignore` lo esclude; `test/leak-check.sh` (grep `-iE -f private/.denylist`) = 0 risultati su canone e bundle.
 8. **Loop:** task reale con `/loop` su Claude Code → uccidi il processo a metà → verifica resume da checkpoint, post-task-sync, e update evidence-first.
 9. **Drift:** `test/validate.sh` verde (wrapper in sync col canone).
