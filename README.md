@@ -10,9 +10,23 @@ unificato. `AGENTS.md` è l'entry universale; i wrapper runtime sono generati da
 
 ## Stato
 
-Bootstrap (Fase 0). Il piano completo è in [`docs/plan.md`](docs/plan.md) — in
-rifinitura su Ultraplan. L'implementazione (Fasi 1-6) parte dopo l'approvazione
-del piano.
+Canone costruito (Fasi 0-5). `test/validate.sh` verde: frontmatter, link, drift,
+shellcheck, leak-check. Piano completo in [`docs/plan.md`](docs/plan.md).
+
+| Componente | Dove |
+|---|---|
+| Entry universale | [`AGENTS.md`](AGENTS.md) |
+| Behavior | `behavior/roberto-mode.md` (engineering) + `behavior/roberto-voice.md` (voce) |
+| Rules | `rules/constitution.md` + `rules/best-practices.md` |
+| Agents | `agents/` — baccio, rex, luca, thor, socrates, wanda, roberdan-twin |
+| Skills | `skills/` — verify-done, ship, review, sync, auto-checkpoint |
+| Hooks | `hooks/` — main-guard, bash-guard, verify-done, autofmt, post-task-sync |
+| Loop | `loop/loop-protocol.md` |
+| Wrapper per-platform | `platforms/` (generati da `bin/sync.sh --emit-only`) |
+| Bundle web | `bin/make-bundle.sh` → doc incollabile (esclude `private/`) |
+
+**Install (gated):** `bin/sync.sh --install` non sovrascrive un `~/.claude/CLAUDE.md`
+esistente — stampa il blocco-puntatore da aggiungere a mano. Push su GitHub: deferred.
 
 ## Privacy
 
