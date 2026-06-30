@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- evolve watcher — settimanale (lunedì 09:00). Vedi evolve/evolve-protocol.md.
+     Install: cp in ~/Library/LaunchAgents/ + launchctl load. Path repo da adattare se diverso. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.roberdan.rda-evolve</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>"$HOME/GitHub/roberdan-os/evolve/watch.sh"</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key><integer>1</integer>
+    <key>Hour</key><integer>9</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key><string>/tmp/rda-evolve.log</string>
+  <key>StandardErrorPath</key><string>/tmp/rda-evolve.log</string>
+  <key>RunAtLoad</key><false/>
+</dict>
+</plist>

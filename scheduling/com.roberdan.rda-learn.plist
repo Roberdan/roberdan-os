@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- learn distill + ontology curate — giornaliero (02:30). Vedi learn/ + ontology/ protocol.
+     distill stage i candidati; curate promuove SOLO gli approvati (gate umano). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.roberdan.rda-learn</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>"$HOME/GitHub/roberdan-os/learn/distill.sh"; "$HOME/GitHub/roberdan-os/ontology/curate.sh"</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>2</integer>
+    <key>Minute</key><integer>30</integer>
+  </dict>
+  <key>StandardOutPath</key><string>/tmp/rda-learn.log</string>
+  <key>StandardErrorPath</key><string>/tmp/rda-learn.log</string>
+  <key>RunAtLoad</key><false/>
+</dict>
+</plist>
