@@ -53,6 +53,18 @@ sopra questa base.
 su file, terminal-condition empirica, checkpoint per fase, escalation, resume idempotente.
 Il loop è affidabile senza daemon; Convergio è osservatore **opzionale**, mai single point of failure.
 
+## Memory & Self-Improvement (meta-loop)
+
+Sistema auto-**proponente**, mai auto-**applicante** sul comportamento. → [`docs/adr/0001-self-improving.md`](docs/adr/0001-self-improving.md).
+
+- **Memoria durevole = vault** (cross-platform), non silo per-tool → [`memory/memory-protocol.md`](memory/memory-protocol.md).
+  Recall: `gbrain search` keyword prima (il semantico droppa i topic sparsi).
+- **`learn/`** — capture (inbox, no lock) → distill batch → quarantena → [`learn/learn-protocol.md`](learn/learn-protocol.md).
+- **`ontology/`** — promozione single-writer nel vault + igiene human-gated → [`ontology/ontology-protocol.md`](ontology/ontology-protocol.md).
+- **`evolve/`** — watcher settimanale changelog Claude/Copilot/Codex → solo draft in `proposals/` → [`evolve/evolve-protocol.md`](evolve/evolve-protocol.md).
+
+Scheduling = **launchd** (scatta anche con Claude chiuso). Mai auto-commit su `behavior/ rules/ agents/ AGENTS.md`.
+
 ## Skills
 
 Logica in markdown puro, tool-agnostica (i wrapper si generano):
