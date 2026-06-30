@@ -19,6 +19,8 @@ I due emisferi complementari del canone comportamentale:
   Come gli agenti *operano* sul codice: autonomia totale, evidence-first, done-criteria, quality gate.
 - **Voice / relationship** → [`behavior/roberto-voice.md`](behavior/roberto-voice.md)
   Come gli agenti *comunicano nella sua voce* e *decidono come lui*: drafting, follow-up, triage, decision-lens.
+- **Thinking / reasoning** → [`behavior/thinking-toolkit.md`](behavior/thinking-toolkit.md)
+  Motore cognitivo condiviso: first-principles, stile Feynman, repertoire selettivo di framework (no cargo-cult).
 
 ## Rules
 
@@ -36,9 +38,10 @@ etico è **riferito** a `rules/constitution.md`, non copia-incollato.
 | [`rex`](agents/rex.md) | Code + ecosystem review | sonnet |
 | [`luca`](agents/luca.md) | Security (advisory) | opus |
 | [`thor`](agents/thor.md) | QA / verify-done guardian — unico gate per `done` | sonnet |
-| [`socrates`](agents/socrates.md) | First-principles (pre-decisione) | opus |
+| [`socrates`](agents/socrates.md) | First-principles: scava una verità | opus |
+| [`board`](agents/board.md) | Sounding board + adversarial red-team sulle decisioni | opus |
 | [`wanda`](agents/wanda.md) | Orchestrator del loop | sonnet |
-| [`roberdan-twin`](agents/roberdan-twin.md) | Digital twin: drafting/triage nella voce di Roberto | sonnet |
+| [`roberdan-twin`](agents/roberdan-twin.md) | Digital twin: voce + motore cognitivo (sa quando convocare board/framework) | opus |
 
 ## Loop Protocol
 
