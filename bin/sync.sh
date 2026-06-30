@@ -41,7 +41,7 @@ emit_claude() {
 Questo è un puntatore thin. La fonte canonica del comportamento è
 [\`AGENTS.md\`](../../AGENTS.md) in roberdan-os. Leggi quello.
 
-- Behavior: \`behavior/roberto-mode.md\` (engineering) + \`behavior/roberto-voice.md\` (voce)
+- Behavior: \`behavior/roberto-mode.md\` (engineering) + \`behavior/roberto-voice.md\` (voce) + \`behavior/thinking-toolkit.md\` (ragionamento)
 - Rules: \`rules/constitution.md\` + \`rules/best-practices.md\`
 - Agents: \`agents/*.md\` · Loop: \`loop/loop-protocol.md\`
 EOF
@@ -116,6 +116,7 @@ Loop Protocol, Gate umani).
 ## Behavior
 - Engineering: `behavior/roberto-mode.md` — autonomia, evidence-first, done-criteria, quality gate.
 - Voice: `behavior/roberto-voice.md` — drafting/triage nella voce di Roberto.
+- Thinking: `behavior/thinking-toolkit.md` — first-principles, Feynman, framework selettivi.
 
 ## Rules
 - `rules/constitution.md` · `rules/best-practices.md`

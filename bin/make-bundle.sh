@@ -21,6 +21,7 @@ trap 'rm -f "$TMP"' EXIT
 SECTIONS=(
   "behavior/roberto-mode.md"
   "behavior/roberto-voice.md"
+  "behavior/thinking-toolkit.md"
   "rules/constitution.md"
   "rules/best-practices.md"
 )

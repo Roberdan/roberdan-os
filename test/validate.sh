@@ -59,11 +59,13 @@ if [ -f "/tmp/rda-linkcheck.$$" ]; then broken=$(wc -l < "/tmp/rda-linkcheck.$$"
 # --- 3) Drift check (emit deterministico == committato) ----------------------
 section "drift check — wrapper rigenerati == committati"
 bash bin/sync.sh --emit-only >/dev/null 2>&1
-if git diff --quiet -- platforms/ 2>/dev/null; then
-  ok "nessun drift (platforms/ in sync col canone)"
+# git status --porcelain cattura sia i tracked modificati sia i nuovi untracked (bundle.md è gitignored, escluso).
+drift_out="$(git status --porcelain -- platforms/ 2>/dev/null)"
+if [ -z "$drift_out" ]; then
+  ok "nessun drift (platforms/ in sync col canone, inclusi file nuovi)"
 else
   err "drift: platforms/ diverge dal canone. Esegui bin/sync.sh --emit-only e committa."
-  git --no-pager diff --stat -- platforms/ 2>/dev/null | sed 's/^/    /'
+  printf '%s\n' "$drift_out" | sed 's/^/    /'
 fi
 
 # --- 4) Shellcheck -----------------------------------------------------------

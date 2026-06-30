@@ -45,6 +45,10 @@ etico è **riferito** a `rules/constitution.md`, non copia-incollato.
 
 ## Loop Protocol
 
+**Il loop engineering è la modalità operativa di default** per qualsiasi lavoro multi-step —
+codice **e** business. Default = `roberto-mode` + loop; il twin e gli agenti si attivano
+sopra questa base.
+
 → [`loop/loop-protocol.md`](loop/loop-protocol.md) — contratto loop standard: state durevole
 su file, terminal-condition empirica, checkpoint per fase, escalation, resume idempotente.
 Il loop è affidabile senza daemon; Convergio è osservatore **opzionale**, mai single point of failure.
@@ -77,5 +81,8 @@ Autonomia ≠ black box. Questi passano **sempre** da Roberto (messaggio diretto
 Il dossier confidenziale (clienti, deal, persone) vive **solo** in
 `~/.roberdan-os/private/roberto-profile.md` (gitignored, local-only), letto a runtime
 da `roberdan-twin`. Non entra mai in git né in alcun bundle. Il gate è
-[`test/leak-check.sh`](test/leak-check.sh) (denylist in `private/.denylist`), eseguito
-prima di ogni commit e bundle.
+[`test/leak-check.sh`](test/leak-check.sh) (denylist in `private/.denylist`).
+**Limite onesto:** la denylist è local-only (anch'essa in `private/`), quindi il gate è
+**enforced in locale** prima di commit/bundle — in CI o su una clone senza dossier degrada a
+no-op (non può verificare). La sicurezza del bundle poggia anche sul fatto che le sue fonti
+(canone committato) sono già scrubbate.

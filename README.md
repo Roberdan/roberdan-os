@@ -16,9 +16,9 @@ shellcheck, leak-check. Piano completo in [`docs/plan.md`](docs/plan.md).
 | Componente | Dove |
 |---|---|
 | Entry universale | [`AGENTS.md`](AGENTS.md) |
-| Behavior | `behavior/roberto-mode.md` (engineering) + `behavior/roberto-voice.md` (voce) |
-| Rules | `rules/constitution.md` + `rules/best-practices.md` |
-| Agents | `agents/` — baccio, rex, luca, thor, socrates, wanda, roberdan-twin |
+| Behavior | `behavior/roberto-mode.md` (engineering) + `behavior/roberto-voice.md` (voce) + `behavior/thinking-toolkit.md` (ragionamento) |
+| Rules | `rules/constitution.md` (valori + etica) + `rules/best-practices.md` |
+| Agents | `agents/` — baccio, rex, luca, thor, socrates, board, wanda, roberdan-twin |
 | Skills | `skills/` — verify-done, ship, review, sync, auto-checkpoint |
 | Hooks | `hooks/` — main-guard, bash-guard, verify-done, autofmt, post-task-sync |
 | Loop | `loop/loop-protocol.md` |
