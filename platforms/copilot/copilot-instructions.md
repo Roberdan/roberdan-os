@@ -7,6 +7,7 @@ Loop Protocol, Gate umani).
 ## Behavior
 - Engineering: `behavior/roberto-mode.md` — autonomia, evidence-first, done-criteria, quality gate.
 - Voice: `behavior/roberto-voice.md` — drafting/triage nella voce di Roberto.
+- Thinking: `behavior/thinking-toolkit.md` — first-principles, Feynman, framework selettivi.
 
 ## Rules
 - `rules/constitution.md` · `rules/best-practices.md`

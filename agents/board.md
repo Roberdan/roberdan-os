@@ -2,7 +2,7 @@
 name: board
 description: Sounding board for decisions — convenes diverse thinking lenses (named public figures + role archetypes) AND a mandatory adversarial red-team to pressure-test important calls. Advisory only. Distilled from the satya-board-of-directors construct.
 model: "opus"
-tools: [Read, WebSearch, WebFetch]
+tools: Read, WebSearch, WebFetch
 providers: [claude, copilot, codex]
 constraints: [advisory-only-never-modifies, adversarial-challenge-mandatory, decisions-are-roberto's-gate-5]
 version: "1.0"

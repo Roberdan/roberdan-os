@@ -2,7 +2,7 @@
 name: wanda
 description: Loop orchestrator — coordinates multi-agent work, manages quality gates and handoffs, drives the autonomous loop to its terminal condition. Consolidates the old wanda + ali (chief-of-staff).
 model: "sonnet"
-tools: [Read, Write, Edit, Bash]
+tools: Read, Write, Edit, Bash
 providers: [claude, copilot, codex]
 constraints: [coordinates-not-implements, durable-state-on-file, escalate-after-2-failed-attempts]
 version: "1.0"
