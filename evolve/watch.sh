@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# evolve/watch.sh — watcher settimanale: rileva novità nei changelog dei tool e
-# PROPONE draft (mai applica). Stato durevole in seen (flat KEY=FP). Vedi evolve/evolve-protocol.md.
-# Lanciato da launchd com.roberdan.rda-evolve. Idempotente, non-blocking.
+# evolve/watch.sh — weekly watcher: detects novelties in tool changelogs and
+# PROPOSES a draft (never applies). Durable state in seen (flat KEY=FP). See evolve/evolve-protocol.md.
+# Launched by launchd com.roberdan.rda-evolve. Idempotent, non-blocking.
 set -euo pipefail
 
 state_dir="${RDA_EVOLVE_STATE:-$HOME/.roberdan-os/evolve}"
 repo_root="$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null || echo "$HOME/GitHub/roberdan-os")"
 proposals="$repo_root/proposals"
-seen="$state_dir/seen"            # flat: una riga "nome=sha256" per fonte
+seen="$state_dir/seen"            # flat: one line "name=sha256" per source
 mkdir -p "$state_dir" "$proposals"
 touch "$seen"
 
-# Fonti: nome → URL changelog (versionato). Espandibile.
+# Sources: name → changelog URL (versioned). Expandable.
 sources_names=(claude-code copilot codex)
 sources_urls=(
   "https://docs.anthropic.com/en/release-notes/claude-code"
@@ -27,8 +27,8 @@ for i in "${!sources_names[@]}"; do
   body="$(curl -fsSL --max-time 20 "$url" 2>/dev/null || true)"
   [ -n "$body" ] || { echo "watch: $name unreachable, skip" >&2; continue; }
 
-  # Fingerprint del contenuto: cambio = possibile novità. Il capability-diff lo fa
-  # un agente sul draft; qui rileviamo solo il delta.
+  # Content fingerprint: a change = possible novelty. The capability-diff is done
+  # by an agent on the draft; here we only detect the delta.
   fp="$(printf '%s' "$body" | shasum -a 256 | cut -d' ' -f1)"
   prev="$(awk -F= -v k="$name" '$1==k{print $2}' "$seen" 2>/dev/null || true)"
   [ "$fp" = "$prev" ] && continue
@@ -38,18 +38,18 @@ for i in "${!sources_names[@]}"; do
   {
     echo "# evolve proposal — $name ($now)"
     echo
-    echo "**Fonte:** $url"
-    echo "**Stato:** DRAFT — richiede review umana (mai auto-applicato al canone)."
+    echo "**Source:** $url"
+    echo "**Status:** DRAFT — requires human review (never auto-applied to the canon)."
     echo
-    echo "## Novità rilevata"
-    echo "Changelog cambiato dall'ultima scansione. Un agente deve:"
-    echo "1. estrarre le novità concrete (con versione + data),"
-    echo "2. valutarne l'impatto su roberdan-os (hook/skill/agent/scheduling/MCP/memoria),"
-    echo "3. proporre la patch + **citare la fonte**. Niente citazione → niente proposta."
+    echo "## Novelty detected"
+    echo "Changelog changed since the last scan. An agent must:"
+    echo "1. extract the concrete novelties (with version + date),"
+    echo "2. assess their impact on roberdan-os (hook/skill/agent/scheduling/MCP/memory),"
+    echo "3. propose the patch + **cite the source**. No citation → no proposal."
   } > "$draft"
-  echo "watch: NUOVA proposta → $draft" >&2
+  echo "watch: NEW proposal → $draft" >&2
 
-  # Aggiorna seen atomico: rimuovi la vecchia riga, aggiungi la nuova.
+  # Atomically update seen: remove the old line, add the new one.
   grep -v "^${name}=" "$seen" > "$seen.tmp" 2>/dev/null || true
   printf '%s=%s\n' "$name" "$fp" >> "$seen.tmp"
   mv "$seen.tmp" "$seen"

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# learn/distill.sh — batch periodico: legge la staging inbox, fa dedup-check via
-# gbrain (keyword, affidabile), e stage i segnali come CANDIDATI in quarantena —
-# mai diretto nel vault. Classifica/promozione = gated (curate.sh + umano).
-# Vedi learn/learn-protocol.md. Lanciato da launchd. Non-blocking.
+# learn/distill.sh — periodic batch: reads the staging inbox, does a dedup-check via
+# gbrain (keyword, reliable), and stages signals as CANDIDATES in quarantine —
+# never directly into the vault. Classify/promote = gated (curate.sh + human).
+# See learn/learn-protocol.md. Launched by launchd. Non-blocking.
 set -euo pipefail
 
 inbox="${RDA_INBOX:-$HOME/.roberdan-os/learnings/inbox}"
@@ -11,7 +11,7 @@ done_dir="$inbox/_processed"
 mkdir -p "$quar" "$done_dir"
 shopt -s nullglob
 
-gbrain_search() {  # dedup-check keyword sul vault; vuoto se gbrain assente
+gbrain_search() {  # keyword dedup-check on the vault; empty if gbrain is absent
   command -v gbrain >/dev/null 2>&1 || { echo ""; return; }
   ( cd "$HOME/.gbrain" 2>/dev/null && unset DATABASE_URL && \
     gbrain search "$1" --source vault --limit 3 2>/dev/null | head -3 ) || echo ""
@@ -21,7 +21,7 @@ n=0
 for f in "$inbox"/*.md; do
   [ -e "$f" ] || continue
   while IFS= read -r line; do
-    sig="${line#*] }"                       # togli il timestamp "- [ts] "
+    sig="${line#*] }"                       # strip the timestamp "- [ts] "
     [ -n "${sig// /}" ] || continue
     case "$sig" in *"/.roberdan-os/private/"*) continue ;; esac   # privacy hard-gate
 
@@ -32,20 +32,20 @@ for f in "$inbox"/*.md; do
     {
       echo "---"
       echo "class: TODO    # tool-quirk|correction|decision|capability-gap|voice"
-      echo "approved: false   # umano/curate gate — vedi learn-protocol"
+      echo "approved: false   # human/curate gate — see learn-protocol"
       echo "source_inbox: $(basename "$f")"
       echo "---"
       echo
-      echo "## Segnale"
+      echo "## Signal"
       echo "$sig"
       echo
-      echo "## Possibili duplicati nel vault (dedup-check keyword)"
+      echo "## Possible duplicates in the vault (keyword dedup-check)"
       if [ -n "$dupes" ]; then echo '```'; echo "$dupes"; echo '```'
-        echo "→ se match: MERGE/supersedes, non nota nuova."
-      else echo "(nessun match — candidato a nota nuova)"; fi
+        echo "→ if match: MERGE/supersedes, not a new note."
+      else echo "(no match — candidate for a new note)"; fi
     } > "$cand"
   done < "$f"
   mv "$f" "$done_dir/" 2>/dev/null || true
 done
 
-echo "distill: $n candidati → $quar (quarantena, gated)" >&2
+echo "distill: $n candidates → $quar (quarantine, gated)" >&2

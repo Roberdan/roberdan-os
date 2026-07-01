@@ -1,71 +1,71 @@
 ---
 name: focus-group
-description: "Simula un focus group / validazione con utenti reali: crea un pool di agenti-persona sul profilo richiesto + un moderatore + un consolidatore. Valida problemi, definizioni, ipotesi, app, feature, usabilità, feedback. Multi-modo (focus group, interviste 1:1, usability test, micro-survey). TRIGGER: 'valida questa ipotesi/idea/feature', 'cosa ne pensano gli utenti', 'simula un focus group', 'testa l'usabilità', 'crea un panel di early adopter', 'feedback da utenti reali su X'. SÌ quando serve la voce dell'utente prima di costruire/decidere."
+description: "Simulates a focus group / validation with real users: creates a pool of persona-agents matching the requested profile + a moderator + a consolidator. Validates problems, definitions, hypotheses, apps, features, usability, feedback. Multi-mode (focus group, 1:1 interviews, usability test, micro-survey). TRIGGER: 'validate this hypothesis/idea/feature', 'valida questa ipotesi/idea/feature', 'what do users think', 'cosa ne pensano gli utenti', 'simulate a focus group', 'simula un focus group', 'test the usability', 'testa l'usabilità', 'create an early adopter panel', 'crea un panel di early adopter', 'real user feedback on X', 'feedback da utenti reali su X'. YES when you need the user's voice before building/deciding."
 providers: [claude, copilot, codex]
 ---
 
 # focus-group
 
-Dato un **tema + contesto**, genera un panel di **agenti-persona** che si comportano come
-utenti reali del profilo richiesto, un **moderatore** che conduce, e un **consolidatore** che
-sintetizza. Serve a portare la voce dell'utente *prima* di costruire o decidere.
+Given a **topic + context**, generates a panel of **persona-agents** that behave like real
+users of the requested profile, a **moderator** who runs the session, and a **consolidator**
+who synthesizes. Used to bring the user's voice *before* building or deciding.
 
-## Il rischio #1 — anti-sycophancy (non negoziabile)
+## Risk #1 — anti-sycophancy (non-negotiable)
 
-Gli utenti simulati sono **compiacenti per default**: direbbero "bella app!". È teatro inutile.
-Ogni persona DEVE essere ancorata a:
-- **frustrazioni reali, alternative già in uso, budget, tempo, scetticismo**, costo di switch;
-- il diritto di dire "non lo userei", "non capisco perché dovrei", "già lo faccio con X";
-- **niente lode senza motivo concreto** — un "mi piace" vale solo con il perché e il contesto d'uso.
-Il moderatore **scava la frizione**, non raccoglie applausi. Il consolidatore **pesa il segnale
-negativo** più di quello positivo (il negativo specifico è più informativo).
+Simulated users are **sycophantic by default**: they'd say "nice app!". That's useless theater.
+Every persona MUST be anchored to:
+- **real frustrations, alternatives already in use, budget, time, skepticism**, switching cost;
+- the right to say "I wouldn't use this," "I don't see why I would," "I already do this with X";
+- **no praise without a concrete reason** — an "I like it" only counts with the why and the use context.
+The moderator **digs for friction**, not applause. The consolidator **weighs negative signal**
+more than positive (specific negatives are more informative).
 
-## Panel: persistenti + ad-hoc
+## Panel: persistent + ad-hoc
 
-- **Persistenti** (riusabili, coerenza cross-sessione): salvati nel vault come note
-  `type: focus-persona` in `focus-panels/<panel>/` (es. `caregiver-fts`, `early-adopter-tech`).
-  Riusa un panel esistente quando il tema combacia → confronti longitudinali.
-- **Ad-hoc:** genera personas fresche dal tema/contesto quando non c'è panel adatto.
-  A fine sessione, **proponi** (gate umano) di promuovere le personas utili a panel persistente.
+- **Persistent** (reusable, cross-session consistency): saved in the vault as
+  `type: focus-persona` notes in `focus-panels/<panel>/` (e.g. `caregiver-fts`, `early-adopter-tech`).
+  Reuse an existing panel when the topic matches → longitudinal comparisons.
+- **Ad-hoc:** generate fresh personas from the topic/context when no matching panel exists.
+  At the end of the session, **propose** (human gate) promoting useful personas to a persistent panel.
 
-### Generare personas (diverse, non cloni)
-Da una audience-spec se fornita (es. "caregiver di bambini con disabilità, 30-45, Italia"),
-altrimenti derivate dal tema. Diversifica sugli assi che contano: bisogno/job-to-be-done,
-competenza tecnica, budget, contesto d'uso, **livello di scetticismo**, alternativa attuale.
-Default **5-8** personas. Ognuna: nome, 1-riga di background, goal reale, frustrazione,
-alternativa attuale, cosa la farebbe dire di no. Grounding dal vault se pertinente (gbrain).
+### Generating personas (diverse, not clones)
+From an audience spec if provided (e.g. "caregivers of children with disabilities, 30-45, Italy"),
+otherwise derived from the topic. Diversify along axes that matter: need/job-to-be-done,
+technical competence, budget, use context, **skepticism level**, current alternative.
+Default **5-8** personas. Each one: name, 1-line background, real goal, frustration,
+current alternative, what would make them say no. Ground in the vault where relevant (gbrain).
 
-## Modi (scegli in base all'intento)
+## Modes (choose based on intent)
 
-| Modo | Quando | Come |
+| Mode | When | How |
 |---|---|---|
-| **Focus group** moderato | esplorare percezioni, far emergere temi, dinamica di gruppo | moderatore pone stimoli, personas rispondono e **reagiscono tra loro** (accordo/disaccordo) |
-| **Interviste 1:1** | profondità, evitare groupthink, temi sensibili | moderatore ↔ una persona per volta, in parallelo (Agent tool) |
-| **Usability test** task-based | testare app/feature/flusso | dai un task concreto; la persona "prova", riporta friction/blocchi/confusione, non opinioni |
-| **Micro-survey** quant | segnale numerico rapido | domande chiuse a tutte le personas → distribuzione (es. 6/8 non pagherebbero) |
+| **Moderated focus group** | exploring perceptions, surfacing themes, group dynamics | moderator poses prompts, personas respond and **react to each other** (agree/disagree) |
+| **1:1 interviews** | depth, avoiding groupthink, sensitive topics | moderator ↔ one person at a time, in parallel (Agent tool) |
+| **Task-based usability test** | testing app/feature/flow | give a concrete task; the persona "tries," reports friction/blockers/confusion, not opinions |
+| **Quant micro-survey** | quick numeric signal | closed questions to all personas → distribution (e.g. 6/8 wouldn't pay) |
 
-## Flusso
+## Flow
 
-1. **Setup:** chiarisci tema, intento (validare problema? definizione? ipotesi? usabilità?),
-   audience, e **cosa conta come successo/kill**. Scegli il modo. Cerca un panel esistente.
-2. **Panel:** riusa o genera personas (in parallelo se molte).
-3. **Sessione:** il moderatore conduce nel modo scelto. Personas **in-character**, ancorate,
-   libere di dissentire. Group-mode: fai emergere accordi/disaccordi reali.
-4. **Consolidamento:** il consolidatore produce il report.
+1. **Setup:** clarify topic, intent (validating a problem? a definition? a hypothesis? usability?),
+   audience, and **what counts as success/kill**. Choose the mode. Look for an existing panel.
+2. **Panel:** reuse or generate personas (in parallel if there are many).
+3. **Session:** the moderator runs it in the chosen mode. Personas stay **in-character**, anchored,
+   free to disagree. Group mode: surface real agreements/disagreements.
+4. **Consolidation:** the consolidator produces the report.
 
-## Output — report strutturato
+## Output — structured report
 
-`~/.claude/reports/focus-group-<tema>-<data>.md`:
-- **Verdetto** in 3 righe: il problema/l'ipotesi regge? segnale netto.
-- **Temi** (ordinati per forza del segnale) con **quote verbatim** delle personas.
-- **Accordi vs disaccordi** (dove il panel diverge — spesso il pezzo interessante).
-- **Severità/frequenza** del problema percepito; **willingness** (userebbe? pagherebbe?).
-- **Kill-signals** emersi (cosa farebbe fallire l'idea).
-- **Azioni** concrete + **confidenza** (è simulazione: dillo — orienta, non sostituisce utenti veri).
+`~/.claude/reports/focus-group-<topic>-<date>.md`:
+- **Verdict** in 3 lines: does the problem/hypothesis hold up? net signal.
+- **Themes** (ranked by signal strength) with **verbatim quotes** from personas.
+- **Agreements vs disagreements** (where the panel diverges — often the interesting part).
+- **Severity/frequency** of the perceived problem; **willingness** (would use it? pay for it?).
+- **Kill signals** that emerged (what would make the idea fail).
+- **Actions** concrete + **confidence** (it's a simulation: say so — it guides, doesn't replace real users).
 
-## Note
+## Notes
 
-- **Onestà sul limite:** è simulazione. Ottima per *scoprire domande, ipotesi, blind-spot e
-  friction*; **non** un sostituto di utenti reali per numeri di conversione. Dillo nel report.
-- Si compone con [[premortem]] (stress-test della soluzione) dentro [[problem-validation]].
-- Personas mai basate su persone reali identificabili senza consenso; rispetta i blocchi privacy.
+- **Honesty about the limit:** it's a simulation. Great for *discovering questions, hypotheses,
+  blind spots and friction*; **not** a substitute for real users for conversion numbers. Say so in the report.
+- Composes with [[premortem]] (stress-testing the solution) inside [[problem-validation]].
+- Personas must never be based on identifiable real people without consent; respect privacy blocks.

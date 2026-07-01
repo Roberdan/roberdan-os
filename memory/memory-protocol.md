@@ -1,36 +1,39 @@
-# memory-protocol — memoria durevole cross-platform
+# memory-protocol — durable cross-platform memory
 
-Contratto unico di memoria per **ogni** platform (Claude/Copilot/Codex/web). La memoria
-NON vive in silo per-tool. Vedi [[ADR-0001]].
+Single memory contract for **every** platform (Claude/Copilot/Codex/web). Memory does
+NOT live in per-tool silos. See [[ADR-0001]].
 
-## Dove vive
+## Where it lives
 
-| Layer | Path | Ruolo |
+| Layer | Path | Role |
 |---|---|---|
-| Source-of-truth | **vault** `~/Obsidian/Roberdan's Vault`, note `type: agent-learning`, cartella `agent-learnings/` | Durevole, tipata, versionata, cross-tool |
-| Staging | `~/.roberdan-os/learnings/inbox/*.md` | Capture per-sessione, no lock |
-| Index/recall | gbrain (semantic + keyword) | Ritrovo on-demand, mai caricato tutto in contesto |
-| Hot-core | `agent-learnings/_core.md` (≤20 righe) | Le poche verità caricate ovunque |
+| Source-of-truth | **vault** `~/Obsidian/Roberdan's Vault`, notes `type: agent-learning`, folder `agent-learnings/` | Durable, typed, versioned, cross-tool |
+| Staging | `~/.roberdan-os/learnings/inbox/*.md` | Per-session capture, no lock |
+| Index/recall | gbrain (semantic + keyword) | On-demand retrieval, never loaded whole into context |
+| Hot-core | `agent-learnings/_core.md` (≤20 lines) | The few truths loaded everywhere |
 
-`~/.claude/.../memory/` = **cache deprecata**. Contenuti migrati nel vault; non è più source-of-truth.
+`~/.claude/.../memory/` = **deprecated cache**. Content migrated to the vault; it is no
+longer the source-of-truth.
 
-## Tassonomia (5 classi)
+## Taxonomy (5 classes)
 
-| Classe | Cos'è | Auto-eligibile? |
+| Class | What it is | Auto-eligible? |
 |---|---|---|
-| `tool-quirk` | un tool si comporta diversamente dal previsto | sì, se riprodotto ≥2× |
-| `correction` | l'utente ha corretto un comportamento | sì, con citazione diretta |
-| `decision` | scelta presa con l'utente, non derivabile dal codice | sì, se impatto multi-sessione |
-| `capability-gap` | manca qualcosa nel sistema | **no — gate umano** |
-| `voice` | come l'utente comunica/decide | **no — gate #6, mai auto-evoluta** |
+| `tool-quirk` | a tool behaves differently than expected | yes, if reproduced ≥2x |
+| `correction` | the user corrected a behavior | yes, with direct quote |
+| `decision` | a choice made with the user, not derivable from the code | yes, if multi-session impact |
+| `capability-gap` | something is missing in the system | **no — human gate** |
+| `voice` | how the user communicates/decides | **no — gate #6, never auto-evolved** |
 
-## Recall (regola operativa)
+## Recall (operating rule)
 
-1. **`gbrain search` keyword PRIMA** (affidabile). `query` semantico droppa i topic sparsi — vedi [[reference-gbrain-semantic-recall-gap]].
-2. Scope alla source giusta (`vault` per la memoria), `--detail low`, limit piccolo.
-3. Markdown greppabile come fallback finché il recall semantico non è risanato.
+1. **`gbrain search` keyword FIRST** (reliable). Semantic `query` drops sparse topics —
+   see [[reference-gbrain-semantic-recall-gap]].
+2. Scope to the right source (`vault` for memory), `--detail low`, small limit.
+3. Greppable markdown as fallback until semantic recall is fixed.
 
-## Privacy (hard gate, come codice)
+## Privacy (hard gate, like code)
 
-Mai scrivere in memoria contenuto da `~/.roberdan-os/private/` o dati personali/medici
-Fight the Stroke / nomi terzi. Check pattern **prima** del write, non a discrezione.
+Never write to memory content from `~/.roberdan-os/private/` or personal/medical data
+of Fight the Stroke / third-party names. Check the pattern **before** the write, not at
+discretion.

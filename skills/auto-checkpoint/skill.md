@@ -4,36 +4,36 @@ description: Portable "loop kit" — inject durable state, terminal-condition, a
 providers: [claude, copilot, codex]
 ---
 
-# auto-checkpoint — il kit loop portatile
+# auto-checkpoint — the portable loop kit
 
-Kit iniettabile in qualsiasi sessione per renderla loop-affidabile **senza daemon**.
-Implementa il contratto di [`loop/loop-protocol.md`](../../loop/loop-protocol.md):
-stato durevole, terminal-condition, auto-resume, auto-escalation.
+A kit injectable into any session to make it loop-reliable **without a daemon**.
+Implements the contract in [`loop/loop-protocol.md`](../../loop/loop-protocol.md):
+durable state, terminal-condition, auto-resume, auto-escalation.
 
-## Cosa fa
-- **Scrive/legge stato durevole** — `state.db` a path noto + `.agent-state/<task>.jsonl` (cursor append-only).
-- **Definisce la terminal-condition** — un check empirico su ground truth, non una stima.
-- **Abilita auto-resume** — all'avvio rilegge lo stato, riparte dall'ultimo step `done`.
-- **Abilita auto-escalation** — 2 fail sullo stesso problema → opus + log del motivo.
+## What it does
+- **Writes/reads durable state** — `state.db` at a known path + `.agent-state/<task>.jsonl` (append-only cursor).
+- **Defines the terminal-condition** — an empirical check against ground truth, not an estimate.
+- **Enables auto-resume** — on startup, re-reads the state, resumes from the last `done` step.
+- **Enables auto-escalation** — 2 failures on the same problem → opus + log the reason.
 
-## Stato (daemon-optional)
+## State (daemon-optional)
 ```
-state store:  ~/.convergio/v3/state.db  (se presente)
+state store:  ~/.convergio/v3/state.db  (if present)
               ~/.roberdan-os/state.db    (fallback)
-cursor:       .agent-state/<task>.jsonl  (gitignored, 1 record/step + evidenza)
+cursor:       .agent-state/<task>.jsonl  (gitignored, 1 record/step + evidence)
 timestamp:    RFC3339
 ```
-Convergio, se attivo, **legge** lo stesso state — osservatore opzionale, mai dipendenza.
+Convergio, if active, **reads** the same state — optional observer, never a dependency.
 
 ## Loop (pseudo)
 ```
 on start:
-  state = read(state.db, cursor)         # resume idempotente
+  state = read(state.db, cursor)         # idempotent resume
   step  = last_done(state) + 1
 loop:
   result = execute(step)
-  append(cursor, {step, result, evidence})   # checkpoint = 1 commit/fase, evidence-first
-  if terminal_condition(): break              # verifica empirica (thor / check job-specific)
+  append(cursor, {step, result, evidence})   # checkpoint = 1 commit/phase, evidence-first
+  if terminal_condition(): break              # empirical verification (thor / job-specific check)
   if failed_twice(step): escalate(opus); log(reason)
   if no_progress(2 passes): STOP; report_wedged(); break
   step += 1
@@ -41,11 +41,11 @@ on each phase end:
   post_task_sync()                             # vault + cvg + repo
 ```
 
-## Driver per-platform
-- **Claude Code:** `/loop` + `ScheduleWakeup` per attese esterne (CI/deploy/embed) —
+## Per-platform driver
+- **Claude Code:** `/loop` + `ScheduleWakeup` for external waits (CI/deploy/embed) —
   `submit → wakeup +Nmin → check terminal-condition → done | re-arm`.
-- **Altri:** `launchd`/`cron` rileggono il cursor e rilanciano fino alla terminal-condition.
+- **Others:** `launchd`/`cron` re-read the cursor and relaunch until the terminal-condition.
 
-## Segnalazione
-Ogni checkpoint = update evidence-first: `[fase N/M ✓] commit <sha> · <check> · next: …`.
-Mai "sto lavorando".
+## Reporting
+Every checkpoint = an evidence-first update: `[phase N/M ✓] commit <sha> · <check> · next: …`.
+Never "still working."

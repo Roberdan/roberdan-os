@@ -4,38 +4,38 @@ description: Evidence-first done-gate. Refuses to mark work complete without con
 providers: [claude, copilot, codex]
 ---
 
-# verify-done — il done-gate evidence-first
+# verify-done — the evidence-first done-gate
 
-**Done non è "dovrebbe funzionare".** È il principio cardine di Roberto. Usa questa
-skill prima di dichiarare completo qualsiasi task.
+**Done is not "should work."** It's Roberto's cardinal principle. Use this
+skill before declaring any task complete.
 
-## Le 3 condizioni obbligatorie
-1. **Evidence** — artefatti concreti allegati: commit SHA, PR link, file path, output test.
-2. **Verificato empiricamente** — testato davvero, non stimato. Mostra l'output, non la stima.
-3. **Sistemi sincronizzati** — vault (Obsidian) + Convergio twin plan + docs in-repo allineati.
+## The 3 mandatory conditions
+1. **Evidence** — concrete artifacts attached: commit SHA, PR link, file path, test output.
+2. **Verified empirically** — actually tested, not estimated. Show the output, not the estimate.
+3. **Systems in sync** — vault (Obsidian) + Convergio twin plan + in-repo docs aligned.
 
 ## Checklist (NON-NEGOTIABLE)
-- [ ] 0 errori di compilazione
-- [ ] 0 warnings (trattati come errori)
-- [ ] 0 technical debt lasciato aperto
-- [ ] Coverage ≥ 80% su business logic, 100% sui critical path
-- [ ] Test eseguiti — **output mostrato**, non descritto
-- [ ] Docs aggiornate se hai cambiato API/interfacce
-- [ ] Commit per ogni fase completata
-- [ ] CI verde (o wontfix esplicito documentato)
+- [ ] 0 build errors
+- [ ] 0 warnings (treated as errors)
+- [ ] 0 technical debt left open
+- [ ] Coverage ≥ 80% on business logic, 100% on critical paths
+- [ ] Tests run — **output shown**, not described
+- [ ] Docs updated if you changed an API/interface
+- [ ] Commit for every completed phase
+- [ ] CI green (or explicit documented wontfix)
 
-## Verifica per tipo di claim
-| Claim | Evidenza richiesta |
+## Verification per claim type
+| Claim | Evidence required |
 |---|---|
-| "Compila" | output di build |
-| "I test passano" | output dei test |
-| "Funziona" | esecuzione dimostrata |
-| "È sicuro" | security scan |
-| "È deployato" | deploy confermato |
+| "It builds" | build output |
+| "Tests pass" | test output |
+| "It works" | demonstrated execution |
+| "It's secure" | security scan |
+| "It's deployed" | confirmed deploy |
 
-**Claims without evidence are rejected.** In Convergio: solo `thor` setta `done`
-(gli executor propongono `submitted`). Vedi [`agents/thor.md`](../../agents/thor.md).
+**Claims without evidence are rejected.** In Convergio: only `thor` sets `done`
+(executors propose `submitted`). See [`agents/thor.md`](../../agents/thor.md).
 
-## Se hai sbagliato
-Riconosci, correggi, non giustificare:
-`Fatto — era un errore mio. Ho corretto X. Commit abc123.`
+## If you got it wrong
+Acknowledge, fix, don't justify:
+`Done — that was my mistake. Fixed X. Commit abc123.`

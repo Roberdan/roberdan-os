@@ -4,34 +4,34 @@ description: Platform-agnostic ship workflow — local CI gate, commit per phase
 providers: [claude, copilot, codex]
 ---
 
-# ship — porta il lavoro in produzione (git + gh)
+# ship — get the work into production (git + gh)
 
-Workflow di ship indipendente dalla piattaforma. Niente bypass, niente scorciatoie.
+Platform-independent ship workflow. No bypasses, no shortcuts.
 
-## Pre-push: pipeline CI locale (tutto verde prima di pushare)
+## Pre-push: local CI pipeline (everything green before pushing)
 1. **Format** — `cargo fmt --check` / `prettier --check` / `ruff format --check`
 2. **Lint** — `cargo clippy -- -D warnings` / `eslint` / `ruff check`
 3. **Type-check** — `cargo check` / `npx tsc --noEmit`
-4. **Test** — `cargo test` / `npm test` / `pytest` (output mostrato)
+4. **Test** — `cargo test` / `npm test` / `pytest` (output shown)
 5. **Build** — `cargo build` / `npm run build`
 
-Se un passo fallisce: fixa e **ri-esegui tutti** i check. Mai pushare con failure noti.
+If a step fails: fix and **re-run all** checks. Never push with known failures.
 
-## Sequenza
-1. Branch dedicato (mai lavorare direttamente su `main`).
-2. Commit **per fase**, messaggi conventional + evidence-first (SHA/PR/CI).
-3. `git push` del branch.
-4. Apri PR: **Summary + Test plan** (template a 5 sezioni se il repo lo usa).
-5. Watch CI: `gh pr checks <n>` — tutti SUCCESS prima di procedere.
-6. Merge: **merge-commit only** (mai squash, mai rebase — preserva la history per gli agenti paralleli).
-7. Post-merge: cancella il branch, fast-forward `main` locale, riporta lo SHA del merge commit.
+## Sequence
+1. Dedicated branch (never work directly on `main`).
+2. Commit **per phase**, conventional + evidence-first messages (SHA/PR/CI).
+3. `git push` the branch.
+4. Open PR: **Summary + Test plan** (5-section template if the repo uses one).
+5. Watch CI: `gh pr checks <n>` — all SUCCESS before proceeding.
+6. Merge: **merge-commit only** (never squash, never rebase — preserves history for parallel agents).
+7. Post-merge: delete the branch, fast-forward local `main`, report the merge commit SHA.
 
-## Gate umani (STOP — chiedi prima)
-- Merge su `main` con impatto su branch-protection / security / license / release-infra (#1)
-- Force-push su `main` (#2) — **sempre vietato senza conferma esplicita**
-- CI non completamente verde → non mergiare nulla di pending/failing
+## Human gates (STOP — ask first)
+- Merge to `main` impacting branch-protection / security / license / release-infra (#1)
+- Force-push to `main` (#2) — **always forbidden without explicit confirmation**
+- CI not fully green → don't merge anything pending/failing
 
 ## Review comments
-Ogni commento (umano o bot) va analizzato, capito e risolto bene — mai silent-resolve,
-mai "fix" che tocca solo la riga citata ignorando la sostanza. Rispondi sul thread con
-cosa hai fatto e perché, poi risolvi. Vedi [`skills/review`](../review/skill.md).
+Every comment (human or bot) must be analyzed, understood, and resolved well — never
+silent-resolve, never a "fix" that only touches the quoted line while ignoring the substance.
+Reply on the thread with what you did and why, then resolve. See [`skills/review`](../review/skill.md).

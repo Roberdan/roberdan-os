@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# ontology/curate.sh — SINGLE-WRITER: promuove i candidati APPROVATI dalla quarantena
-# a note tipate nel vault (type: agent-learning), con retry sul lock Tolaria AutoGit.
-# Mai auto-promuove (richiede approved: true). Produce anche un report d'igiene.
-# Vedi ontology/ontology-protocol.md. Lanciato da launchd. bash-3.2 + BSD-safe.
+# ontology/curate.sh — SINGLE-WRITER: promotes APPROVED candidates from quarantine
+# to typed notes in the vault (type: agent-learning), with retry on the Tolaria AutoGit lock.
+# Never auto-promotes (requires approved: true). Also produces a hygiene report.
+# See ontology/ontology-protocol.md. Launched by launchd. bash-3.2 + BSD-safe.
 set -euo pipefail
 
 quar="${RDA_QUARANTINE:-$HOME/.roberdan-os/learnings/quarantine}"
-default_vault="$HOME/Obsidian/Roberdan's Vault"   # apostrofo ok in doppi apici semplici
-vault="${RDA_VAULT:-$default_vault}"              # ...ma NON dentro ${:-} (rompe bash)
+default_vault="$HOME/Obsidian/Roberdan's Vault"   # apostrophe is fine in plain double quotes
+vault="${RDA_VAULT:-$default_vault}"              # ...but NOT inside ${:-} (breaks bash)
 dest="$vault/agent-learnings"
 state="${RDA_EVOLVE_STATE:-$HOME/.roberdan-os/evolve}"
 report="$state/hygiene-$(date +%Y-%m-%d).md"
 mkdir -p "$dest" "$state"
 
-# Lock guard: un solo writer sul vault. Retry su .git/index.lock.
+# Lock guard: a single writer on the vault. Retry on .git/index.lock.
 git_safe() {
   local tries=0
   while [ -f "$vault/.git/index.lock" ] && [ "$tries" -lt 10 ]; do sleep 3; tries=$((tries+1)); done
@@ -26,15 +26,15 @@ for c in "$quar"/*.md; do
   grep -qE '^approved:[[:space:]]*true' "$c" || continue
   cls="$(grep -E '^class:' "$c" | head -1 | sed -E 's/^class:[[:space:]]*//;s/[[:space:]]*#.*//')"
   [ -n "$cls" ] && [ "$cls" != "TODO" ] || continue
-  body="$(awk '/^## Segnale/{f=1;next} /^## /{f=0} f && NF' "$c")"
+  body="$(awk '/^## Signal/{f=1;next} /^## /{f=0} f && NF' "$c")"
   [ -n "$body" ] || continue
-  # Privacy hard-gate prima di scrivere nel vault (deny-list reale, defense-in-depth).
+  # Privacy hard-gate before writing to the vault (real deny-list, defense-in-depth).
   denylist=""
   for d in "$HOME/.roberdan-os/private/.denylist" "$(dirname "$0")/../private/.denylist"; do
     [ -f "$d" ] && { denylist="$d"; break; }
   done
   if [ -n "$denylist" ] && printf '%s' "$body" | grep -iEf <(grep -vE '^[[:space:]]*($|#)' "$denylist") >/dev/null 2>&1; then
-    echo "curate: blocco privacy (deny-list) su $c, skip" >&2; continue
+    echo "curate: privacy block (deny-list) on $c, skip" >&2; continue
   fi
 
   slug="agent-learning-$(date +%Y%m%d-%H%M%S)-$promoted"
@@ -47,17 +47,17 @@ done
 
 if [ "$promoted" -gt 0 ]; then
   git_safe add "agent-learnings" 2>/dev/null || true
-  git_safe commit -m "chore(memory): promuovi $promoted agent-learning dalla quarantena" 2>/dev/null || true
+  git_safe commit -m "chore(memory): promote $promoted agent-learning from quarantine" 2>/dev/null || true
 fi
 
-# conteggi robusti: find non fallisce su dir vuota (a differenza di ls glob + set -e)
+# robust counts: find doesn't fail on an empty dir (unlike ls glob + set -e)
 total="$(find "$dest" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
 pending=0
 for q in "$quar"/*.md; do
   [ -e "$q" ] || continue
   grep -qE '^approved:[[:space:]]*true' "$q" || pending=$((pending+1))
 done
-printf -- '# igiene memoria — %s\n\n- promossi questo run: %s\n- note agent-learning totali: %s\n- candidati quarantena non approvati: %s\n\n## Proposte (gated, umano decide)\n- dedup semantico near-dup quando il provider embedding è attivo\n- tombstone retire: note RISOLTO/pre-v3 → agent-learnings/_archive/\n' \
+printf -- '# memory hygiene — %s\n\n- promoted this run: %s\n- total agent-learning notes: %s\n- unapproved quarantine candidates: %s\n\n## Proposals (gated, human decides)\n- semantic near-dup dedup once the embedding provider is active\n- tombstone retire: RESOLVED/pre-v3 notes → agent-learnings/_archive/\n' \
   "$(date +%Y-%m-%d)" "$promoted" "$total" "$pending" > "$report"
-echo "curate: $promoted promossi · report → $report" >&2
+echo "curate: $promoted promoted · report → $report" >&2
 exit 0

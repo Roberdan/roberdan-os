@@ -1,53 +1,53 @@
-# Loop Protocol — contratto standard del loop autonomo
+# Loop Protocol — the autonomous loop's standard contract
 
-> Incluso (per riferimento) in ogni `AGENTS.md` loop-aware. Definisce come un agente
-> opera in **loop autonomo** allineato al modo di lavorare di Roberto: autonomia totale
-> + evidence-first + verifica empirica. **Affidabile senza daemon**: lo stato è durevole
-> su file, il resume è idempotente, le terminal-condition sono verificate su ground truth.
+> Included (by reference) in every loop-aware `AGENTS.md`. Defines how an agent
+> operates in **autonomous loop** mode, aligned with Roberto's way of working: total
+> autonomy + evidence-first + empirical verification. **Reliable without a daemon**: state is
+> durable on file, resume is idempotent, terminal-conditions are verified against ground truth.
 
 ---
 
-## Il contratto
+## The contract
 
 ```
-state:              <state.db strutturato> + .agent-state/<task>.jsonl (cursor)
-terminal-condition: <check empirico job-specific — es. "cargo test green + CI #N pass">
-checkpoint:         1 commit per fase, messaggio evidence-first (SHA/PR/CI in ogni update)
-escalation:         2 tentativi falliti sullo stesso problema → opus, logga il motivo
-sync-on-iteration:  post-task-sync (vault + cvg + repo) a fine di OGNI fase
-resume:             leggi lo stato all'avvio, riparti dall'ultimo step done, mai rifare
-stuck:              2 pass senza progresso → STOP, segnala cosa è wedged, non loopare
+state:              <structured state.db> + .agent-state/<task>.jsonl (cursor)
+terminal-condition: <job-specific empirical check — e.g. "cargo test green + CI #N pass">
+checkpoint:         1 commit per phase, evidence-first message (SHA/PR/CI in every update)
+escalation:         2 failed attempts on the same problem → opus, log the reason
+sync-on-iteration:  post-task-sync (vault + cvg + repo) at the end of EVERY phase
+resume:             read the state at startup, resume from the last done step, never redo
+stuck:              2 passes with no progress → STOP, report what's wedged, don't loop
 ```
 
-## Componenti
+## Components
 
-### 1. Stato durevole (daemon-optional)
-- **State store:** SQLite a path noto — `~/.convergio/v3/state.db` se presente, altrimenti
-  `~/.roberdan-os/state.db`. Timestamp RFC3339.
-- **Cursor per task:** `.agent-state/<task>.jsonl` (append-only) — un record per step con
-  esito ed evidenza. `.agent-state/` è gitignored.
-- Leggibile sia dagli hook sia da Convergio se attivo. **Il loop non dipende dal daemon:**
-  Convergio è osservatore opzionale che *legge* lo stesso state file, mai single point of failure.
+### 1. Durable state (daemon-optional)
+- **State store:** SQLite at a known path — `~/.convergio/v3/state.db` if present, otherwise
+  `~/.roberdan-os/state.db`. RFC3339 timestamps.
+- **Per-task cursor:** `.agent-state/<task>.jsonl` (append-only) — one record per step with
+  outcome and evidence. `.agent-state/` is gitignored.
+- Readable both by hooks and by Convergio if active. **The loop doesn't depend on the daemon:**
+  Convergio is an optional observer that *reads* the same state file, never a single point of failure.
 
-### 2. Terminal-condition (verifica empirica)
-Mai "dovrebbe funzionare". La condizione di fine è un check su **ground truth**:
-`cargo test` verde, `gh run` SUCCESS, file esistente su disco, `0 unembedded chunks`.
-La verifica la fa `thor` (vedi `agents/thor.md`) o un check job-specific.
+### 2. Terminal-condition (empirical verification)
+Never "should work." The end condition is a check against **ground truth**:
+`cargo test` green, `gh run` SUCCESS, file existing on disk, `0 unembedded chunks`.
+Verification is done by `thor` (see `agents/thor.md`) or a job-specific check.
 
-### 3. Resume idempotente
-All'avvio: leggi `state.db` + il cursor jsonl, identifica l'ultimo step `done`, **riparti da lì**.
-Un task ben costruito legge lo stato persistito e continua — un task killed/stallato si
-**rilancia, non si rifà da capo**.
+### 3. Idempotent resume
+At startup: read `state.db` + the jsonl cursor, identify the last `done` step, **resume from there**.
+A well-built task reads the persisted state and continues — a killed/stalled task gets
+**relaunched, not redone from scratch**.
 
 ### 4. Escalation
-2 tentativi falliti sullo stesso problema → scala il modello (Opus per analisi critica) e
-**logga il motivo** nel cursor. Se 2 pass consecutivi non fanno progresso, è genuinamente
-bloccato: STOP, segnala cosa è wedged (riga oversize, chiave mancante, lock), non loopare.
+2 failed attempts on the same problem → escalate the model (Opus for critical analysis) and
+**log the reason** in the cursor. If 2 consecutive passes make no progress, it's genuinely
+stuck: STOP, report what's wedged (oversized row, missing key, lock), don't loop.
 
-### 5. Segnalazione proattiva (anti-polling)
-Ogni checkpoint è un update **evidence-first**:
-`[fase 3/7 ✓] commit a1b2c3d · CI #4821 green · next: applica migration`
-Mai "sto lavorando". Roberto si fida degli artefatti, non delle parole.
+### 5. Proactive reporting (anti-polling)
+Every checkpoint is an **evidence-first** update:
+`[phase 3/7 ✓] commit a1b2c3d · CI #4821 green · next: apply migration`
+Never "still working." Roberto trusts artifacts, not words.
 
 ---
 
@@ -55,17 +55,17 @@ Mai "sto lavorando". Roberto si fida degli artefatti, non delle parole.
 
 | Platform | Driver |
 |---|---|
-| **Claude Code** | `/loop` + `ScheduleWakeup` per attese esterne (CI/deploy/embed): `submit → wakeup +Nmin → check terminal-condition → done \| re-arm`. |
-| **Altri (Copilot/Codex)** | `launchd`/`cron` leggono lo stesso checkpoint file e rilanciano fino alla terminal-condition. |
+| **Claude Code** | `/loop` + `ScheduleWakeup` for external waits (CI/deploy/embed): `submit → wakeup +Nmin → check terminal-condition → done \| re-arm`. |
+| **Others (Copilot/Codex)** | `launchd`/`cron` read the same checkpoint file and relaunch until the terminal-condition. |
 
-Il kit iniettabile che implementa questo contratto in una sessione qualsiasi è
+The injectable kit that implements this contract in any session is
 [`skills/auto-checkpoint`](../skills/auto-checkpoint/skill.md).
 
 ---
 
-## Gate umani
+## Human gates
 
-Il loop **non automatizza mai** i [gate umani](../AGENTS.md#gate-umani). In particolare:
-merge su `main` con impatto su protezioni/security/release, force-push, spesa/email
-esterne, cancellazioni irreversibili, decisioni strategiche. Questi passano sempre da
-Roberto con un messaggio diretto — mai il relay di un coordinator.
+The loop **never automates** the [human gates](../AGENTS.md#gate-umani). In particular:
+merges to `main` impacting protections/security/release, force-push, external spend/emails,
+irreversible deletions, strategic decisions. These always go through Roberto with a
+direct message — never relayed by a coordinator.
