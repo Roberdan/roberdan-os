@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# PreToolUse Bash guard — solo la metà git/gh universale (sicurezza, non token-saving).
-# Le regole npm/test-runner sono per-repo e NON vivono qui (vedi hook repo-local).
-# Richiede `jq`.
+# PreToolUse Bash guard — only the universal git/gh half (security, not token-saving).
+# npm/test-runner rules are per-repo and do NOT live here (see repo-local hook).
+# Requires `jq`.
 set -euo pipefail
 
 input="$(cat)"
@@ -10,23 +10,23 @@ cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // ""')"
 deny() { jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'; exit 0; }
 ask()  { jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"ask",permissionDecisionReason:$r}}'; exit 0; }
 
-# Tronca il corpo heredoc (dati, non comandi) per evitare falsi positivi sui messaggi di commit.
+# Truncate the heredoc body (data, not commands) to avoid false positives on commit messages.
 cmd_head="${cmd%%<<*}"
 norm="$(printf '%s' "$cmd_head" | tr -s ' \t\n' ' ' | sed 's/^ //;s/ $//')"
 
-# 1) Push pericolosi: --force / -f / --no-verify → sempre vietati (azione irreversibile).
+# 1) Dangerous pushes: --force / -f / --no-verify → always forbidden (irreversible action).
 if printf '%s' "$norm" | grep -qE 'git[[:space:]]+push.*(--no-verify|(^|[[:space:]])-f([[:space:]]|$)|--force)'; then
-  deny "--no-verify / --force su git push vietati. Risolvi la causa (hook fallito, conflitto), non bypassare. Gate umano #2 per il force-push su main."
+  deny "--no-verify / --force on git push are forbidden. Fix the cause (failed hook, conflict), don't bypass it. Human gate #2 for force-push on main."
 fi
 
-# 2) gh pr merge → richiede approvazione umana esplicita (gate umano #1).
+# 2) gh pr merge → requires explicit human approval (human gate #1).
 if printf '%s' "$norm" | grep -qE '^gh[[:space:]]+pr[[:space:]]+merge'; then
-  ask "Prima di mergiare: 'gh pr checks <n>', incolla output, conferma tutti SUCCESS, e ottieni 'sì' esplicito dell'utente. Vedi skills/ship."
+  ask "Before merging: 'gh pr checks <n>', paste the output, confirm all SUCCESS, and get an explicit 'yes' from the user. See skills/ship."
 fi
 
-# 3) Reset/clean distruttivi su history o working tree → conferma.
+# 3) Destructive reset/clean on history or working tree → confirm.
 if printf '%s' "$norm" | grep -qE 'git[[:space:]]+(reset[[:space:]]+--hard|clean[[:space:]]+-[a-z]*f)'; then
-  ask "git reset --hard / clean -f distrugge modifiche non committate. Conferma esplicita prima di procedere."
+  ask "git reset --hard / clean -f destroys uncommitted changes. Explicit confirmation required before proceeding."
 fi
 
 exit 0

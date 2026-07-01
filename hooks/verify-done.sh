@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Stop hook. Verifica soft — avvisa su stderr, non blocca mai (exit 0 sempre).
-# Fa emergere: repo dirty, version drift, commit su main senza bump.
-# Parametrico: nessun path hardcoded. Repo-root = CWD; version-file via RDA_VERSION_FILE
-# (default: primo tra VERSION, VERSION.md, package.json, Cargo.toml, pyproject.toml).
+# Stop hook. Soft verification — warns on stderr, never blocks (always exit 0).
+# Surfaces: dirty repo, version drift, commit on main without a bump.
+# Parametric: no hardcoded paths. Repo-root = CWD; version-file via RDA_VERSION_FILE
+# (default: first among VERSION, VERSION.md, package.json, Cargo.toml, pyproject.toml).
 set -u
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
