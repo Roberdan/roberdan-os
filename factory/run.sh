@@ -10,6 +10,12 @@ mkdir -p "$Q" "$DONE" "$LOG"
 DEFAULT_DIR="${RDA_FACTORY_WORKDIR:-$HOME/GitHub}"
 MAX="${RDA_FACTORY_MAX:-8}"
 DEFAULT_TIMEOUT="${RDA_FACTORY_TIMEOUT:-1800}"
+PRIMER="${RDA_PRIMER:-$HOME/GitHub/roberdan-os/handoff/context-primer.md}"
+
+# BILLING SAFETY (verified w/ Claude Code docs): in `-p` headless mode, an
+# ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN is ALWAYS used → per-token API billing.
+# Unset both so auth falls through to the Max subscription OAuth (no API charges).
+unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN 2>/dev/null || true
 
 # locate claude (avoid the interactive alias; call the binary in headless mode)
 CLAUDE="$(command -v claude || echo claude)"
@@ -26,10 +32,13 @@ run_task() {
   tmo="$(field "$f" timeout)"; tmo="${tmo:-$DEFAULT_TIMEOUT}"
   log="$LOG/${ts}-${name}.log"
   body="$(prompt_of "$f")"; [ -n "$body" ] || body="$(cat "$f")"
+  # Inject the context-primer so every agent loads the right context before acting.
+  local primer=""; [ -f "$PRIMER" ] && primer="$(cat "$PRIMER")"$'\n\n=== YOUR TASK ===\n'
+  local full="${primer}${body}"
 
   echo "[factory] START $name (dir=$dir timeout=${tmo}s) -> $log"
   set +e
-  timeout "$tmo" "$CLAUDE" -p "$body" --dangerously-skip-permissions --add-dir "$dir" > "$log" 2>&1
+  timeout "$tmo" "$CLAUDE" -p "$full" --dangerously-skip-permissions --add-dir "$dir" > "$log" 2>&1
   local rc=$?
   set -e
   { echo; echo "=== factory: exit=$rc at $(date) ==="; } >> "$log"
