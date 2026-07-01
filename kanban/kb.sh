@@ -68,7 +68,8 @@ case "$cmd" in
     ;;
 
   show)
-    id="${1:?id required}"; f=$(ls "$KB"/*/"$id".md 2>/dev/null | head -1)
+    id="${1:?id required}"; f=""
+    for c in todo doing done; do [ -e "$KB/$c/$id.md" ] && f="$KB/$c/$id.md"; done
     [ -n "$f" ] && cat "$f" || { echo "no card $id" >&2; exit 1; }
     ;;
 
@@ -93,8 +94,10 @@ case "$cmd" in
 
   block)
     id="${1:?id required}"; reason="${2:?reason required}"
-    f=$(ls "$KB"/todo/"$id".md "$KB"/doing/"$id".md 2>/dev/null | head -1)
-    [ -n "$f" ] && [ -e "$f" ] || { echo "no todo/doing card $id" >&2; exit 1; }
+    f=""
+    [ -e "$KB/todo/$id.md" ] && f="$KB/todo/$id.md"
+    [ -e "$KB/doing/$id.md" ] && f="$KB/doing/$id.md"
+    [ -n "$f" ] || { echo "no todo/doing card $id" >&2; exit 1; }
     sed -i '' 's/^status:.*/status: blocked/' "$f"
     { echo "blocked_reason: \"$reason\""; echo "blocked_at: $(date +%Y-%m-%d)"; } >> "$f"
     [ "$(dirname "$f")" = "$KB/todo" ] || mv "$f" "$KB/todo/"
@@ -117,7 +120,12 @@ case "$cmd" in
     mv "$f" "$KB/done/"; echo "done/$id verified by @thor ($ev)"
     ;;
 
-  edit) id="${1:?id required}"; f=$(ls "$KB"/*/"$id".md 2>/dev/null | head -1); "${EDITOR:-open}" "$f" ;;
+  edit)
+    id="${1:?id required}"; f=""
+    for c in todo doing done; do [ -e "$KB/$c/$id.md" ] && f="$KB/$c/$id.md"; done
+    [ -n "$f" ] || { echo "no card $id" >&2; exit 1; }
+    "${EDITOR:-open}" "$f"
+    ;;
 
   *) usage ;;
 esac

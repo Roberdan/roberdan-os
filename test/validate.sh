@@ -81,6 +81,10 @@ fi
 section "leak check (privacy gate)"
 if bash test/leak-check.sh >/dev/null 2>&1; then ok "0 termini confidenziali"; else err "LEAK confidenziale — vedi test/leak-check.sh"; fi
 
+# --- 6) Factory + kb gates (assertion reali, non smoke-test) -----------------
+section "factory + kb gates"
+if bash test/test-factory-kb.sh >/dev/null 2>&1; then ok "kb gates + factory guardrails verdi"; else err "test-factory-kb — vedi bash test/test-factory-kb.sh"; fi
+
 # --- Esito -------------------------------------------------------------------
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "validate: ✅ TUTTO VERDE"; exit 0; else echo "validate: ❌ FAIL (vedi sopra)"; exit 1; fi
