@@ -15,12 +15,14 @@ _list() {
     [ -e "$f" ] || continue; any=1
     printf '  [%s] %s\n' "$(basename "$f" .md)" "$(_field "$f" title)"
   done
-  [ "$any" -eq 0 ] && echo "  (empty)"
+  if [ "$any" -eq 0 ]; then echo "  (empty)"; fi
+  return 0
 }
 
 usage() {
   echo 'kb — gated kanban. Commands:'
-  echo '  kb                            view board (fast)'
+  echo '  kb                            view whole board (todo+doing+done)'
+  echo '  kb todo | kb doing | kb done  view one column'
   echo '  kb show <id>                  show a card'
   echo '  kb add "<title>" [dod] [acc]  new card in todo'
   echo '  kb edit <id>                  edit a card (fill dod/acceptance)'
@@ -60,7 +62,10 @@ case "$cmd" in
     mv "$f" "$KB/doing/"; echo "doing/$id started (approved by $by)"
     ;;
 
-  finish|done)
+  todo|doing) echo "$(echo "$cmd" | tr a-z A-Z):"; _list "$cmd" ;;
+  done) n=$(ls "$KB/done"/*.md 2>/dev/null | wc -l | tr -d ' '); echo "DONE ($n):"; _list done ;;
+
+  finish)
     id="${1:?id required}"; ev=""; [ "${2:-}" = "--thor" ] && ev="${3:-}"
     f="$KB/doing/$id.md"; [ -e "$f" ] || { echo "no doing card $id" >&2; exit 1; }
     if [ -z "$ev" ]; then
