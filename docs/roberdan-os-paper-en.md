@@ -266,6 +266,17 @@ and irreversible (violating the human gate). 90% of the value comes from **one t
 (`agent-learning`) + **one human-gated hygiene job** that *reuses* the vault's existing ontology.
 Structure lives in **curation**, not in the **automation of judgement**.
 
+### 6.1 Governance: a durable, token-bounded goal ledger
+
+A long session revealed a concrete failure: goals get *lost* when tracking relies on the
+conversation (volatile) or session-scoped task tools (not durable). The fix is a **durable,
+auditable goal ledger** — a two-file kanban: an *active board* (`To Do` + `Doing` only, kept small
+so it loads every session cheaply) and an append-only *archive* (`Done`/`verified`, read only on
+demand, so it can grow without burning tokens). The rule: read the board at session start, update
+per phase, and move a goal to the archive only when it is `verified` (by the done-gate agent). This
+makes "don't lose work" a mechanical property of durable file state, not a hope pinned on the
+model's memory — and it retired the need for a heavyweight orchestration daemon just for tracking.
+
 ---
 
 ## 7. Discovery layer: which problems are worth solving
@@ -459,8 +470,10 @@ judgement.
 
 ### Reproducibility and artefacts
 
-Code and canon: git repository `roberdan-os` (~16 commits as of 1 July 2026). Memory: Obsidian vault
-(local-first) + gbrain (local Postgres/pgvector); embedding **local** `ollama:bge-m3`@1024 (via a
-patch to gbrain's Ollama recipe, commit `f7376b11`). Scheduling: `launchd`. Canon, memory,
+Code and canon: git repository `roberdan-os` (private remote `github.com/Roberdan/roberdan-os`,
+~24 commits as of 1 July 2026), entirely in English. Memory: Obsidian vault (local-first) + gbrain
+(local Postgres/pgvector); embedding **local** `ollama:bge-m3`@1024 (via a patch to gbrain's Ollama
+recipe, commit `f7376b11`). Scheduling: `launchd`. Governance: durable goal-ledger kanban. The
+optional heavyweight orchestrator (Convergio) was retired (idle, reversible). Canon, memory,
 orchestration **and** embedding are local-first — no cloud service or API key for core operation.
 Empirical checks and audit reproducible via `test/validate.sh`, `ollama ps`, and `gbrain` queries.
