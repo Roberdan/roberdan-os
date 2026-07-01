@@ -72,6 +72,11 @@ Logica in markdown puro, tool-agnostica (i wrapper si generano):
 [`review`](skills/review/skill.md) · [`sync`](skills/sync/skill.md) ·
 [`auto-checkpoint`](skills/auto-checkpoint/skill.md).
 
+**Discovery & validazione** (capire *quali problemi valgono*, non solo risolverli — auto-trigger):
+[`premortem`](skills/premortem/skill.md) — "è già fallito tra 6 mesi, perché?" (agenti-fallimento paralleli) ·
+[`focus-group`](skills/focus-group/skill.md) — pool di personas-utente + moderatore + consolidatore, multi-modo, anti-sycophancy ·
+[`problem-validation`](skills/problem-validation/skill.md) — orchestratore: focus-group → prioritizzazione → premortem, sfrutta gstack.
+
 ---
 
 ## Gate umani
