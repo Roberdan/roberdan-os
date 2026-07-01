@@ -20,13 +20,14 @@ consumabile da qualunque strumento; (3) *assenza di auto-miglioramento* — un *
 che cattura apprendimenti, li consolida sotto gate umano, e sorveglia settimanalmente le novità
 degli strumenti proponendo (mai applicando) adattamenti. Documentiamo inoltre uno strato di
 *discovery* che sposta il sistema dal "risolvere problemi" al "capire quali problemi valgono".
-Riportiamo un risultato empirico e un fallimento istruttivo, entrambi verificati da un audit
-interno. Il recall semantico in italiano è stato ripristinato da 0 a risultati utili — ma non,
-come inizialmente creduto, migrando a un modello locale: la causa reale era un **disallineamento
-di modello** tra query e storage, risolto ri-allineandoli. Il tentativo di migrare a un embedding
-**locale** (`bge-m3` via Ollama) è **fallito**: il motore (gbrain) fissa il modello di embedding
-all'inizializzazione e ignora la riconfigurazione a runtime — un limite che documentiamo
-onestamente e che lascia gli embedding ancora su un provider hosted. Il sistema è, per costruzione,
+Riportiamo un caso empirico completo — ipotesi errata, audit, diagnosi, fix — sulla migrazione
+a un embedding **locale**. Il recall semantico in italiano falliva (0 risultati); la prima
+"soluzione" (migrare a `bge-m3` locale) sembrava funzionare ma un audit interno ha rivelato che
+il modello locale **non era attivo** e il miglioramento veniva da un banale ri-allineamento di
+modello. La causa del blocco era una **limitazione risolvibile del motore** (gbrain non
+riconosceva la dimensione nativa di `bge-m3`); una patch mirata di due righe alla sua *recipe*
+Ollama ha reso l'embedding **davvero locale** — on-device, gratuito, senza chiave API, su GPU.
+Il sistema è, per costruzione,
 **auto-proponente, mai auto-applicante** sul comportamento: la metafora guida è *Remì*, il topo
 di *Ratatouille* che guida lo chef — un'intelligenza che suggerisce dall'interno, mentre la mano
 resta umana.
@@ -175,21 +176,29 @@ modello**: prima, la *query* veniva embeddata con un modello (openai) diverso da
 completo ha reso query e storage **lo stesso modello** (zembed-1@1024) → match → risultati. Un
 bug di coerenza, non di capacità linguistica.
 
-**Implicazioni oneste:**
+**La diagnosi della radice.** L'audit ha spinto una diagnosi più profonda: la *recipe* Ollama di
+gbrain elencava solo `nomic-embed-text` (768-dim) e derivati, con `default_dims: 768`. Il modello
+scelto, `bge-m3`, non era in lista e la sua dimensione nativa (1024) non era nota al motore, che
+ripiegava sul default globale (1280) e **rifiutava** l'embed per incoerenza dimensionale. Non un
+limite fondamentale: un **valore mancante in un registro**.
 
-| Dimensione | Stato dichiarato (errato) | **Stato reale (verificato)** |
+**Il fix e l'esito.** Due righe nella recipe (`ollama.ts`: aggiungere `bge-m3`, portare
+`default_dims` a 1024) + ricompilazione del motore. Verifica: `ollama ps` mostra `bge-m3` caricato
+al 100% su GPU e l'embed procede **senza alcuna chiave API**. L'embedding è ora davvero **locale**:
+
+| Dimensione | Prima (hosted) | **Dopo il fix (locale)** |
 |---|---|---|
-| Modello di embedding | locale bge-m3 | **hosted zembed-1 (ZeroEntropy)** |
-| Privacy | on-device | **i dati escono verso il provider** |
-| Costo/rate-limit | zero/nessuno | dipende dal provider |
-| Recall italiano | "funziona" | **non più a 0, ma rilevanza mediocre** (top-hit spesso off-topic) |
+| Modello | zembed-1 (ZeroEntropy, hosted) | **ollama:bge-m3 (on-device, GPU)** |
+| Privacy | i dati escono | **restano on-device** |
+| Costo / chiave API | a consumo / richiesta | **zero / nessuna** |
+| Multilingue (IT) | debole | **forte (bge-m3)** |
 
-**Lezioni.** (1) Un miglioramento osservato non prova il *meccanismo* ipotizzato — la rilevanza
-va misurata, non dedotta dal "0 → qualcosa". (2) La migrazione a embedding locale, benché
-architetturalmente desiderabile (privacy, costo, multilingue), richiede una **re-inizializzazione**
-del brain (re-index di tutte le sorgenti), non una riconfigurazione — è *future work* (Sezione 12),
-non un fatto acquisito. (3) Il valore di un **audit avversariale interno** che misura invece di
-fidarsi: senza di esso, questo paper avrebbe pubblicato un claim falso.
+**Lezioni.** (1) Un miglioramento osservato non prova il meccanismo ipotizzato — misurare, non
+dedurre. (2) Un audit avversariale interno che *misura* è ciò che ha smascherato il claim falso e
+condotto alla radice vera. (3) A volte l'ostacolo a una scelta architettonica corretta è un difetto
+*risolvibile* di una dipendenza, non un vincolo: vale la pena diagnosticarlo fino in fondo prima di
+rinunciare. *(Nota di stato: al momento della stesura il re-embedding locale dell'intero corpus è
+in corso; la qualità del recall multilingue post-migrazione va confermata a completamento.)*
 
 ---
 
@@ -257,8 +266,8 @@ poi corretto) tre difetti reali, documentati sotto: è esso stesso parte del ris
 
 | Claim | Misura reale | Esito |
 |---|---|---|
-| Recall italiano non più a zero | 3/3 query IT → 3 risultati (score 0.83–0.90) | ✓ (ma rilevanza mediocre: top-hit spesso off-topic) |
-| Embedding a 1024-dim, coerente | 51.602 chunk, tutti `zembed-1@1024`, 6 NULL (<0,02%) | ✓ coerente, ✗ **non locale** (hosted) |
+| Recall italiano non più a zero | 3/3 query IT → 3 risultati (score 0.83–0.90) | ✓ (rilevanza da riconfermare post re-embed bge-m3) |
+| Embedding locale attivo | `ollama ps`: `bge-m3` 100% GPU; embed keyless; patch gbrain `f7376b11` | ✓ **locale**; re-embed corpus in corso |
 | Memoria migrata al vault | 19 note `type: agent-learning`, committate, indicizzate, recuperabili | ✓ |
 | Meta-loop pipeline | capture→distill→curate testata end-to-end; launchd exit 0 | ✓ |
 | Privacy gate come codice | capture/curate bloccano i nomi della deny-list, passano il contenuto normale | ✓ **dopo il fix** (vedi sotto) |
@@ -279,10 +288,10 @@ poi corretto) tre difetti reali, documentati sotto: è esso stesso parte del ris
 
 ## 10. Limitazioni
 
-- **Embedding non locale.** Nonostante l'obiettivo, gli embedding restano su un provider hosted
-  (ZeroEntropy `zembed-1`); la migrazione a un modello locale richiede una re-inizializzazione del
-  brain, non fatta. Il recall italiano è "non più a zero" ma di **rilevanza mediocre**, limitata
-  dalla qualità del modello sull'italiano (Sezione 5.2).
+- **Embedding locale appena raggiunto, non ancora consolidato.** Dopo la patch (Sezione 5.2)
+  l'embedder è locale (`bge-m3` su GPU), ma il re-embedding dell'intero corpus (~51k chunk) è in
+  corso al momento della stesura; la qualità del recall multilingue va misurata a completamento.
+  La patch vive in un fork locale di gbrain e va ri-applicata dopo un update del motore.
 - **Costruito ≠ attivo (in parte sanato).** In questa sessione il meta-loop è stato *attivato*
   (launchd caricati, hook wired, memoria migrata), ma le pipeline sono in **bootstrap** (inbox e
   quarantena con pochi elementi), non a regime; le metriche longitudinali mancano.
@@ -319,9 +328,9 @@ poi corretto) tre difetti reali, documentati sotto: è esso stesso parte del ris
 
 ## 12. Lavori futuri
 
-- **Embedding locale reale:** re-inizializzare il brain con `ollama:bge-m3` dall'origine
-  (re-index di tutte le sorgenti), per ottenere davvero privacy on-device, costo-zero e forza
-  multilingue — l'obiettivo mancato in questa sessione.
+- **Consolidare l'embedding locale:** completare il re-embed `bge-m3` dell'intero corpus,
+  misurare la qualità del recall multilingue, e proporre la patch upstream a gbrain (registrare
+  `bge-m3`@1024) così non serva un fork locale.
 - Verifica della portabilità reale su Copilot e Codex (non solo progettata).
 - Capture automatico a partire dai transcript di sessione (oggi agent-driven).
 - Panel di focus-group calibrati su audience reali con consenso.
@@ -339,7 +348,8 @@ gate giusti — Remì nel cappello, con il gusto giusto e la mano che resta uman
 ### Riproducibilità e artefatti
 
 Codice e canone: repository git `roberdan-os` (~15 commit al 1 luglio 2026). Memoria: vault
-Obsidian (local-first) + gbrain (Postgres/pgvector locale); embedding **hosted** su ZeroEntropy
-`zembed-1`@1024 (la migrazione a `ollama:bge-m3` locale è *future work*, Sezione 12). Scheduling:
-`launchd`. Il canone, la memoria e l'orchestrazione sono local-first; l'embedding no, ancora.
-Verifiche empiriche e audit riproducibili via `test/validate.sh` e query `gbrain`.
+Obsidian (local-first) + gbrain (Postgres/pgvector locale); embedding **locale** `ollama:bge-m3`@1024
+(via patch alla recipe Ollama di gbrain, commit `f7376b11`; re-embed del corpus in corso alla
+stesura). Scheduling: `launchd`. Canone, memoria, orchestrazione **e** embedding sono ora
+local-first — nessun servizio cloud né chiave API per il funzionamento core. Verifiche empiriche
+e audit riproducibili via `test/validate.sh`, `ollama ps`, e query `gbrain`.
