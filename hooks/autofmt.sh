@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# PostToolUse auto-format. Silenzioso su successo. Non blocca mai.
-# Parametrico: repo-root detection invece di path frontend hardcoded.
+# PostToolUse auto-format. Silent on success. Never blocks.
+# Parametric: repo-root detection instead of a hardcoded frontend path.
 set -u
 FILE="${CLAUDE_FILE_PATH:-}"
 [ -z "$FILE" ] || [ ! -f "$FILE" ] && exit 0
 
-# Repo-root del file (worktree-aware) per risolvere il toolchain JS locale.
+# Repo-root of the file (worktree-aware) to resolve the local JS toolchain.
 repo_root="$(git -C "$(dirname "$FILE")" rev-parse --show-toplevel 2>/dev/null || true)"
 
 case "$FILE" in
@@ -17,7 +17,7 @@ case "$FILE" in
     command -v rustfmt >/dev/null 2>&1 && rustfmt --edition 2021 "$FILE" >/dev/null 2>&1 || true
     ;;
   *.ts|*.tsx|*.js|*.jsx|*.svelte|*.json|*.md|*.css|*.html)
-    # Trova il package.json più vicino (file dir → repo root) per usare prettier locale.
+    # Find the nearest package.json (file dir → repo root) to use the local prettier.
     pkg_dir=""
     d="$(dirname "$FILE")"
     while [ -n "$d" ] && [ "$d" != "/" ]; do

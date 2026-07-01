@@ -55,4 +55,4 @@ for i in "${!sources_names[@]}"; do
   mv "$seen.tmp" "$seen"
 done
 
-echo "watch: $new_count novità → $proposals" >&2
+echo "watch: $new_count novelties → $proposals" >&2

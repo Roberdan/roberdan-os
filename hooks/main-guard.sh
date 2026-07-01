@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# PreToolUse Edit|Write guard — blocca le scritture quando il branch è `main`/`master`,
-# forzando la disciplina branch/worktree. Worktree-aware: risolve il repo del FILE,
-# non della CWD (i worktree hanno HEAD propri).
-# Escape hatch (solo hotfix d'emergenza): RDA_ALLOW_MAIN_WRITES=1
+# PreToolUse Edit|Write guard — blocks writes when the branch is `main`/`master`,
+# enforcing branch/worktree discipline. Worktree-aware: resolves the FILE's repo,
+# not the CWD's (worktrees have their own HEAD).
+# Escape hatch (emergency hotfix only): RDA_ALLOW_MAIN_WRITES=1
 set -euo pipefail
 
 [ "${RDA_ALLOW_MAIN_WRITES:-0}" = "1" ] && exit 0
@@ -19,14 +19,14 @@ repo_root="$(git -C "${lookup_dir:-.}" rev-parse --show-toplevel 2>/dev/null || 
 
 branch="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
 
-# Carve-out: meta/docs editabili su main (markdown, .claude/**, config, ADR).
+# Carve-out: meta/docs editable on main (markdown, .claude/**, config, ADR).
 case "$fp" in
   *.md|*/.claude/*|*/docs/*|*/.env.example|*/.gitignore)
     exit 0 ;;
 esac
 
 if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
-  jq -cn --arg reason "MainGuard: scritture su $branch bloccate. Crea un worktree o un feature branch. Override: RDA_ALLOW_MAIN_WRITES=1 (solo emergenza)." '{
+  jq -cn --arg reason "MainGuard: writes on $branch are blocked. Create a worktree or a feature branch. Override: RDA_ALLOW_MAIN_WRITES=1 (emergency only)." '{
     hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason }
   }'
   exit 0
