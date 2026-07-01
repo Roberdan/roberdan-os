@@ -55,6 +55,7 @@ usage() {
   echo '  kb edit <id>                  edit a card (fill dod/acceptance)'
   echo '  kb start <id> --by roberto    GATE: todo->doing (needs your approval)'
   echo '  kb finish <id> --thor "<ev>"  GATE: doing->done (@thor validates + evidence)'
+  echo '  kb block <id> "<reason>"      mark a card blocked, move back to todo/'
 }
 
 case "$cmd" in
@@ -88,6 +89,16 @@ case "$cmd" in
     sed -i '' 's/^status:.*/status: doing/' "$f"
     { echo "approved_by: $by"; echo "approved_at: $(date +%Y-%m-%d)"; } >> "$f"
     mv "$f" "$KB/doing/"; echo "doing/$id started (approved by $by)"
+    ;;
+
+  block)
+    id="${1:?id required}"; reason="${2:?reason required}"
+    f=$(ls "$KB"/todo/"$id".md "$KB"/doing/"$id".md 2>/dev/null | head -1)
+    [ -n "$f" ] && [ -e "$f" ] || { echo "no todo/doing card $id" >&2; exit 1; }
+    sed -i '' 's/^status:.*/status: blocked/' "$f"
+    { echo "blocked_reason: \"$reason\""; echo "blocked_at: $(date +%Y-%m-%d)"; } >> "$f"
+    [ "$(dirname "$f")" = "$KB/todo" ] || mv "$f" "$KB/todo/"
+    echo "todo/$id blocked: $reason"
     ;;
 
   todo|doing) echo "$(echo "$cmd" | tr a-z A-Z):"; _list "$cmd" ;;
