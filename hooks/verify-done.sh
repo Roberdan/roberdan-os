@@ -11,12 +11,12 @@ cd "$repo_root" || exit 0
 
 WARN=""
 
-# 1. Modifiche non committate
+# 1. Uncommitted changes
 if [ -n "$(git status --porcelain 2>/dev/null | head -1)" ]; then
-  WARN+="• modifiche non committate presenti\n"
+  WARN+="• uncommitted changes present\n"
 fi
 
-# 2. Version drift — confronta il version-file canonico con eventuale manifest.
+# 2. Version drift — compares the canonical version-file against any manifest.
 vfile="${RDA_VERSION_FILE:-}"
 if [ -z "$vfile" ]; then
   for c in VERSION VERSION.md package.json Cargo.toml pyproject.toml; do
@@ -35,14 +35,14 @@ if [ -n "$vfile" ] && [ -f "$vfile" ]; then
   done
 fi
 
-# 3. Ultimo commit su main senza bump version/changelog
+# 3. Last commit on main without a version/changelog bump
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
   LAST=$(git log -1 --name-only --pretty=format: 2>/dev/null)
   if ! printf '%s' "$LAST" | grep -qiE '(VERSION|CHANGELOG)'; then
-    WARN+="• ultimo commit su $BRANCH senza update VERSION/CHANGELOG\n"
+    WARN+="• last commit on $BRANCH without a VERSION/CHANGELOG update\n"
   fi
 fi
 
-[ -n "$WARN" ] && printf "\n[verify-done] Rivedi prima di dichiarare done:\n%b\n" "$WARN" >&2
+[ -n "$WARN" ] && printf "\n[verify-done] Review before declaring done:\n%b\n" "$WARN" >&2
 exit 0
