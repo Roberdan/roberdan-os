@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Autonomous agent factory — runs nightly at 01:00, processes the task queue.
+     Install: cp to ~/Library/LaunchAgents/ + launchctl load. On-demand: factory/run.sh -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.roberdan.rda-factory</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>"$HOME/GitHub/roberdan-os/factory/run.sh"</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>1</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key><string>/tmp/rda-factory.log</string>
+  <key>StandardErrorPath</key><string>/tmp/rda-factory.log</string>
+  <key>RunAtLoad</key><false/>
+</dict>
+</plist>
