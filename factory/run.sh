@@ -14,6 +14,7 @@ MAX="${RDA_FACTORY_MAX:-8}"
 DEFAULT_TIMEOUT="${RDA_FACTORY_TIMEOUT:-1800}"
 PRIMER="${RDA_PRIMER:-$HOME/GitHub/roberdan-os/handoff/context-primer.md}"
 HANDOFF="${RDA_HANDOFF:-$HOME/GitHub/roberdan-os/handoff/latest.md}"
+KB="${RDA_KANBAN:-$HOME/GitHub/roberdan-os/kanban}"
 MAX_ATTEMPTS=2
 
 # BILLING SAFETY (verified w/ Claude Code docs): in `-p` headless mode, an
@@ -47,6 +48,16 @@ frontmatter() { sed -n '/^---$/,/^---$/p' "$1"; }
 field() { frontmatter "$1" | grep -m1 "^$2:" | sed "s/^$2:[[:space:]]*//" | tr -d '"' || true; }
 prompt_of() { awk 'BEGIN{f=0} /^---$/{f++; next} f>=2{print}' "$1"; }  # body after 2nd ---
 
+# If a task names its originating kanban card (`card: <id>` in frontmatter), append the
+# factory result to that card so kanban/doing/ and factory queue/->done/|failed/ don't
+# drift apart — this closes the gap that let two "doing" cards go silently stale.
+note_card() {
+  local cid="$1" line="$2" cf=""
+  for c in todo doing done; do [ -e "$KB/$c/$cid.md" ] && cf="$KB/$c/$cid.md"; done
+  [ -n "$cf" ] || return 0
+  printf -- '\nfactory_result: "%s"\n' "$line" >> "$cf"
+}
+
 run_task() {
   local f="$1" name ts dir tmo log body attempts_file attempts
   name="$(basename "$f" .md)"
@@ -72,11 +83,14 @@ run_task() {
   set -e
   { echo; echo "=== factory: exit=$rc at $(date) ==="; } >> "$log"
 
+  local card; card="$(field "$f" card)"
+
   if [ "$rc" -eq 0 ]; then
     rm -f "$attempts_file"
     mv "$f" "$DONE/${ts}-${name}.md"
     printf -- '\n---\nfactory_exit: %s\nfactory_log: %s\nfactory_completed: %s\n' "$rc" "$log" "$(date)" >> "$DONE/${ts}-${name}.md"
     echo "[factory] DONE  $name (exit $rc)"
+    [ -n "$card" ] && note_card "$card" "exit=$rc log=$log at=$(date +%Y-%m-%d\ %H:%M) — succeeded, still needs @thor to reach kanban done/"
     return 0
   fi
 
@@ -85,12 +99,14 @@ run_task() {
     echo "$attempts" > "$attempts_file"
     mv "$f" "$Q/${name}.md"
     echo "[factory] RETRY $name (attempt $attempts/$MAX_ATTEMPTS, exit $rc) -> requeued, see $log"
+    [ -n "$card" ] && note_card "$card" "exit=$rc log=$log at=$(date +%Y-%m-%d\ %H:%M) — retrying (attempt $attempts/$MAX_ATTEMPTS)"
   else
     rm -f "$attempts_file"
     mv "$f" "$FAILED/${ts}-${name}.md"
     printf -- '\n---\nfactory_exit: %s\nfactory_log: %s\nfactory_failed_at: %s\nattempts: %s\nescalate: true\n' \
       "$rc" "$log" "$(date)" "$attempts" >> "$FAILED/${ts}-${name}.md"
     echo "[factory] FAILED $name (exit $rc, attempts=$attempts) -> $FAILED/${ts}-${name}.md — escalate"
+    [ -n "$card" ] && note_card "$card" "exit=$rc log=$log at=$(date +%Y-%m-%d\ %H:%M) — FAILED after $attempts attempts, escalate:true, see $FAILED/${ts}-${name}.md"
   fi
   FAILURES=$((FAILURES+1))
 }

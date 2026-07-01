@@ -34,9 +34,17 @@ Convergio, daemon-optional.
 ---
 dir: ~/GitHub/roberdan-os      # working dir the agent gets (--add-dir); default ~/GitHub/roberdan-os
 timeout: 1800                  # seconds (optional)
+card: T-example-id             # optional: kanban card id this task fulfills
 ---
 <the task / goal, in natural language — the agent reads AGENTS.md and works in roberto-mode>
 ```
+
+If `card:` is set, `run.sh` appends a `factory_result:` line to that kanban card (wherever it
+currently lives — todo/doing/done) after every attempt: success, retry, or final failure. This is
+the only thing that keeps kanban `doing/` and the factory's `queue/ → done/|failed/` from drifting
+apart — without it, a card can say "doing" while the factory says "failed" and nothing points from
+one to the other. **A factory exit 0 is not a kanban done: it only proves the process didn't crash,**
+not that the DoD/acceptance was met — `@thor` still has to validate before `kb finish`.
 
 Always set `dir:` explicitly for tasks outside roberdan-os — the default is scoped to roberdan-os
 itself, not the whole `~/GitHub` tree, since `--dangerously-skip-permissions` grants write access

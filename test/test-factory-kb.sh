@@ -170,6 +170,35 @@ else
   err "a succeeding task did not reach done/"
 fi
 
+section "factory: card: field syncs the result back onto the kanban card"
+FAC4="$TMP/factory-sync"; KB4="$TMP/kanban-sync"
+mkdir -p "$FAC4/queue" "$FAC4/bin" "$KB4/doing"
+cat > "$FAC4/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$FAC4/bin/claude"
+cat > "$KB4/doing/probe-sync.md" <<'EOF'
+---
+title: probe sync card
+dod: "real dod"
+acceptance: "real acceptance"
+status: doing
+approved_by: roberto
+created: 2026-07-01
+---
+body
+EOF
+printf -- '---\ndir: %s\ntimeout: 5\ncard: probe-sync\n---\nprobe task\n' "$TMP" > "$FAC4/queue/synced.md"
+env -i PATH="$FAC4/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FAC4" RDA_KANBAN="$KB4" RDA_HANDOFF=/dev/null \
+  bash factory/run.sh >/dev/null 2>&1
+if grep -q 'factory_result:' "$KB4/doing/probe-sync.md" 2>/dev/null; then
+  ok "factory result synced onto the referenced kanban card"
+else
+  err "card: field did not sync a factory_result: line onto the kanban card"
+fi
+
 section "factory: claude binary resolved even without the interactive alias in PATH"
 FAC3="$TMP/factory-resolve"
 mkdir -p "$FAC3/queue" "$FAC3/home/.local/bin"
