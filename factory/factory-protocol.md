@@ -10,26 +10,37 @@ Convergio, daemon-optional.
 ```
 ~/.roberdan-os/factory/
   queue/   *.md   ← drop a task here (one file = one autonomous task)
-  done/    *.md   ← finished tasks (moved here with result + log pointer)
+  done/    *.md   ← succeeded tasks (exit 0), moved here with result + log pointer
+  failed/  *.md   ← exhausted tasks (exit≠0 after MAX_ATTEMPTS), escalate: true
+  state/   *.attempts ← per-task retry counter (deleted on success or final failure)
   logs/    *.log  ← full agent transcript per task
 ```
 
 - `factory/enqueue.sh "<task text or file>" [name]` — add a task to the queue.
 - `factory/run.sh` — process the queue: for each task, dispatch a headless agent
-  (`claude -p "<task>" --dangerously-skip-permissions --add-dir <dir>`), capture the log, move the
-  task to `done/` with its exit code. **Resumable:** state lives in the filesystem (queue/ → done/),
-  so a killed run just re-processes what's left. Loops until the queue is empty or `MAX` is hit.
-- launchd `com.roberdan.rda-factory` runs `run.sh` nightly (or on demand).
+  (`claude -p "<task>" --dangerously-skip-permissions --add-dir <dir>`), capture the log.
+  **A task only reaches `done/` on exit 0.** On failure it is requeued once (attempt 2/2); if
+  it fails again it moves to `failed/` with `escalate: true` — never silently marked done.
+  **Resumable:** state lives in the filesystem (queue/ → done/ or failed/), so a killed run just
+  re-processes what's left. Loops until the queue is empty or `MAX` is hit.
+- If any task fails in a run, a summary is appended to `handoff/latest.md` so the next session
+  sees it — a failure that only lives in `logs/` is a failure nobody sees.
+- launchd `com.roberdan.rda-factory` runs `run.sh` nightly (or on demand). **Check `failed/` in the
+  morning** — do not assume the queue being empty means everything succeeded.
 
 ## Task file format
 
 ```
 ---
-dir: ~/GitHub/roberdan-os      # working dir the agent gets (--add-dir); default ~/GitHub
+dir: ~/GitHub/roberdan-os      # working dir the agent gets (--add-dir); default ~/GitHub/roberdan-os
 timeout: 1800                  # seconds (optional)
 ---
 <the task / goal, in natural language — the agent reads AGENTS.md and works in roberto-mode>
 ```
+
+Always set `dir:` explicitly for tasks outside roberdan-os — the default is scoped to roberdan-os
+itself, not the whole `~/GitHub` tree, since `--dangerously-skip-permissions` grants write access
+to whatever `--add-dir` points at.
 
 ## Guardrails (autonomous ≠ reckless)
 
