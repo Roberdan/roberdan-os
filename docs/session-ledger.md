@@ -24,8 +24,8 @@ Status: `todo` · `wip` · `done` (fatto) · `verified` (verificato empiricament
 | 12 | Paper: exec summary + gbrain/gstack + skill + §9 quantitativa + casi-studio | done | commit paper-en; eval bge-m3 vs nomic (IT MRR 1.0 vs 0.41) |
 | 13 | Tradurre TUTTO il sistema in inglese | done | 5 agenti Sonnet; pipeline verificato integro; wrapper rigenerati EN |
 | 14 | Checklist durevole/auditabile dei goal | done | docs/session-ledger.md + regola wired in AGENTS.md |
-| 15 | **Decidere: Convergio separato serve ancora?** | **todo** | analisi + verifica stato convergio |
-| 16 | **Continuità cloud (chiudere il Mac senza perdere nulla)** | **todo** | vincolo: engine locali (gbrain/ollama) offline a Mac spento; vedi nota |
+| 15 | Convergio serve ancora? | verified | daemon fermato + launchd unloaded; state.db conservato (reversibile); roberdan-os basta |
+| 16 | Continuità cloud | verified | repo PRIVATO github.com/Roberdan/roberdan-os pushato (22 commit, 0 private) |
 
 ## Note aperte
 - **#13 traduzione:** repo per lo più in italiano (behavior 3, agents 8, skills 8, protocolli). Delega a Sonnet in parallelo. Escludere: `private/`, i 2 paper (hanno già versione EN), `platforms/` (rigenerati).
