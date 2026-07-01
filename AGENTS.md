@@ -53,16 +53,21 @@ activate on top of this base.
 state on file, empirical terminal-condition, per-phase checkpoints, escalation, idempotent resume.
 The loop is reliable without a daemon; Convergio is an **optional** observer, never a single point of failure.
 
-**Goal tracking = [`kanban/`](kanban/) (durable, auditable, token-bounded — default).** A real
-kanban board in three files: [`kanban/todo.md`](kanban/todo.md) (queued) ·
-[`kanban/doing.md`](kanban/doing.md) (in progress) · [`kanban/done.md`](kanban/done.md)
-(completed/verified, append-only).
+**Goal tracking = [`kanban/`](kanban/) (durable, auditable, token-bounded, GATED — default).**
+Card-files in `todo/ doing/ done/`. Fast CLI: **`kb`** (`kb` view · `kb add "<title>" [dod] [acc]` ·
+`kb start <id> --by roberto` · `kb finish <id> --thor "<evidence>"`).
 
-**Rule:** read `todo`+`doing` at session start before acting (they're small → cheap); move cards
-left→right per phase; a card reaches `done` **only when `verified` by `@thor`**. Only `todo`+`doing`
-are "hot" (loaded); `done` is the audit archive, read **on demand** so it can grow without burning
-tokens. Trust durable file state, not the conversation — this is what prevents losing goals across a
-long session.
+- **Every card carries a Definition of Done (`dod:`) + Acceptance criteria (`acceptance:`)** — a card
+  can't start without them.
+- **Gate `todo → doing`:** human — needs **Roberto's approval** (`kb start … --by roberto`).
+- **Gate `doing → done`:** **`@thor` validates** against the acceptance criteria with **evidence**
+  (`kb finish … --thor "<commit/test/output>"`) — never a rubber-stamp.
+- Only `todo`+`doing` are "hot" (small, loaded at session start via the `SessionStart` context-inject
+  hook); `done` is the audit archive, read **on demand** so it can grow without burning tokens.
+
+Trust durable file state, not the conversation — this is what prevents losing goals across a long
+session. Session context is auto-injected at start ([`hooks/context-inject.sh`](hooks/context-inject.sh)):
+handoff + primer + the live board, so every session (and the orchestrator) starts oriented.
 
 ## Memory & Self-Improvement (meta-loop)
 
