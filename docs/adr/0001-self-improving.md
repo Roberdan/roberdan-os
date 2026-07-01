@@ -33,8 +33,9 @@ Sostituiti da: **1 type + 1 job di igiene human-gated** che riusa i tipi esisten
 ## Invarianti (enforcement meccanico, non promessa)
 
 1. **Mai auto-applicare** cambi a `behavior/ rules/ agents/ AGENTS.md` — evolve produce
-   **solo draft**. Path-allowlist in `test/validate.sh`: auto-commit consentito solo su
-   `platforms/` (wrapper deterministici).
+   **solo draft**. Enforcement reale in `hooks/post-task-sync.sh` (`git add -- platforms/`,
+   opt-in `RDA_AUTOSYNC=1`): l'auto-commit è scoped ai soli wrapper deterministici in
+   `platforms/`; `test/validate.sh` fa il **drift-check** (wrapper ≡ canone), non l'allowlist.
 2. **Single-writer sul vault** (Tolaria AutoGit `.git/index.lock`) — capture concorrente
    scrive solo nella staging inbox; un solo processo seriale fa flush.
 3. **Privacy come codice:** deny-list pattern (dossier `~/.roberdan-os/private/`, dati

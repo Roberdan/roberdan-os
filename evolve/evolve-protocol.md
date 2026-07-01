@@ -20,7 +20,7 @@ launchd `com.roberdan.rda-evolve`, **settimanale**. Scatta a prescindere dal too
 ## Invarianti (hard)
 
 - **Mai** auto-commit su `behavior/ rules/ agents/ AGENTS.md` — solo draft in `proposals/`.
-- Enforcement meccanico: path-allowlist in `test/validate.sh` (auto-commit solo `platforms/`).
+- Enforcement meccanico: `hooks/post-task-sync.sh` auto-committa **solo** `platforms/` (git add scoped, opt-in). `test/validate.sh` fa drift-check.
 - No-hallucination: ogni claim ha una fonte verificabile.
 
 ## Done
