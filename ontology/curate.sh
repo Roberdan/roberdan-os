@@ -28,6 +28,14 @@ for c in "$quar"/*.md; do
   [ -n "$cls" ] && [ "$cls" != "TODO" ] || continue
   body="$(awk '/^## Segnale/{f=1;next} /^## /{f=0} f && NF' "$c")"
   [ -n "$body" ] || continue
+  # Privacy hard-gate prima di scrivere nel vault (deny-list reale, defense-in-depth).
+  denylist=""
+  for d in "$HOME/.roberdan-os/private/.denylist" "$(dirname "$0")/../private/.denylist"; do
+    [ -f "$d" ] && { denylist="$d"; break; }
+  done
+  if [ -n "$denylist" ] && printf '%s' "$body" | grep -iEf <(grep -vE '^[[:space:]]*($|#)' "$denylist") >/dev/null 2>&1; then
+    echo "curate: blocco privacy (deny-list) su $c, skip" >&2; continue
+  fi
 
   slug="agent-learning-$(date +%Y%m%d-%H%M%S)-$promoted"
   note="$dest/$slug.md"
