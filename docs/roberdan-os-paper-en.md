@@ -5,6 +5,42 @@
 
 ---
 
+## Executive summary
+
+**The vision.** As AI assistants become the primary way we work, each of us is accumulating a
+scattered, tool-specific "brain" — instructions here, memory there, habits re-explained to every
+new tool. roberdan-os turns that scattered brain into **one coherent, private, self-improving
+operating system** that follows you across every AI tool you use. Not another assistant, but a
+*second brain* — Remy in the chef's hat: it remembers who you are and what you decided, it works
+the way you work, it gets better every week, and it never takes an irreversible decision out of
+your hands.
+
+**Why it matters — the problem it kills.** A founder or leader juggling code, business and
+relationships across Claude, Copilot and Codex faces three silent taxes: (1) **re-explaining
+yourself** to each tool, forever; (2) **memory that isn't yours** — siloed per-tool, lost on
+switch, or sent to a vendor's cloud; (3) **a system that never improves** — it forgets every
+lesson the moment the session ends. These taxes compound: the more you rely on AI, the more you
+pay them.
+
+**The benefit — concretely.**
+- **Say it once.** Behaviour is written once and consumed by every tool. No more divergent copies.
+- **Your memory, private, on-device.** Durable knowledge lives in your own vault, indexed locally
+  (no API key, nothing leaves the machine), searchable in your own language (measured: Italian
+  recall on par with English — see *Evaluation*).
+- **It compounds.** A gated meta-loop captures what you learn, watches your tools' weekly releases,
+  and *proposes* improvements — you approve, it never self-applies to your behaviour.
+- **It helps you choose the right problems, not just solve them.** A discovery layer (premortem,
+  simulated focus-group, problem-validation) stress-tests a decision *before* you build — the case
+  studies in the *Case studies* section show, on a realistic business launch, how it surfaces the killer objection and the
+  most likely failure that a gut-feel "build it and see" would only discover after the money is spent.
+
+**The value.** For an individual, roberdan-os converts AI tools from a set of clever-but-amnesiac
+assistants into a single, private, compounding capability that is unmistakably *yours* — and that
+raises its hand at exactly the moments where being wrong is expensive. The taste is the machine's;
+the hand, and the decision, stay human.
+
+---
+
 ## Abstract
 
 LLM-based coding assistants (Claude Code, GitHub Copilot, OpenAI Codex) are becoming the primary
@@ -134,6 +170,17 @@ Feynman, decision frameworks) in `behavior/thinking-toolkit.md`. Eight specialis
 (architect, security, review, done-gate, first-principles, red-team, twin, loop-orchestrator)
 activate *at the right moment* rather than being invoked by hand. `bin/sync.sh` generates the
 per-platform wrappers from this single canon, eliminating divergence.
+
+## The engines beneath: gbrain and gstack
+
+roberdan-os is not monolithic: it *orchestrates* two pre-existing local engines rather than reinventing them.
+
+**gbrain — the local semantic memory engine.** gbrain is a local knowledge engine (Postgres + pgvector) that indexes the vault, the user's code repositories, and session transcripts into a searchable semantic store, exposed via both a CLI and an MCP interface so any agent can query it. Retrieval combines dense vector search (HNSW, cosine) with keyword full-text search and an optional reranker. Its embedding provider is pluggable through a *recipe* system — the exact locus of the local-embedding migration (§5.2). gbrain is what makes the vault's knowledge *findable by meaning*, not just by filename; it is the retrieval substrate of the whole memory layer.
+
+**gstack — the skill library it leverages.** gstack is a broad suite of workflow skills (browse/QA a web app, turn a vague intent into an executable spec, YC-style office-hours, CEO/eng/design plan reviews, make-pdf, ship, investigate, health, retro, benchmark, and more). roberdan-os deliberately does not duplicate it: the discovery layer calls gstack *downstream* — `spec` to sharpen a vague intent, `office-hours` to pressure-test go-to-market — while roberdan-os stays *upstream* ("is this problem worth solving?") and contributes what gstack lacks (premortem, simulated focus-group). The principle is reuse over reinvention.
+
+**The skill inventory.** roberdan-os ships two families of skills, all tool-agnostic Markdown from which per-platform wrappers are generated: **operating skills** — `verify-done` (the done-gate), `ship`, `review`, `sync`, `auto-checkpoint` (the portable, daemon-optional loop kit); and **discovery skills (new)** — `premortem`, `focus-group`, `problem-validation`. Skills auto-invoke on linguistic triggers; *installing* them into the runtime (e.g. `~/.claude/skills/`) is what makes "by default" real — a distinction that itself became a lesson (§10 limitations).
+
 
 ---
 
@@ -283,9 +330,64 @@ three real defects, documented below: it is itself part of the result.
 4. **MEDIUM — doc/impl mismatch**: ADR/evolve cited `validate.sh` for the path-allowlist; the real
    enforcement is in `post-task-sync.sh` (scoped git add). Corrected.
 
-**Honest note on rigour.** This is a systems/experience paper: comprehensive in breadth and honest,
-but not quantitatively rigorous — no formal benchmarks, ablations, or measured recall metrics beyond
-spot checks. Strong on *what/why and honesty*, light on *how much*.
+### 9.1 Retrieval evaluation (quantitative)
+
+To move beyond spot-checks we built a labelled query set: **20 queries (10 Italian, 10 English)**,
+each with a known ground-truth vault note (specific agent-learnings and career-profile pages). We
+report two experiments.
+
+**(a) Deployed system** — real `gbrain` retrieval (bge-m3, chunk-level, HNSW + reranker + autocut,
+over the full ~51k-chunk corpus):
+
+| Set | R@1 | R@3 | R@5 | MRR | mean rank | found@10 |
+|---|---|---|---|---|---|---|
+| All (20) | 0.70 | 0.90 | 0.95 | 0.817 | 1.7 | 20/20 |
+| Italian (10) | 0.70 | 0.90 | **1.00** | 0.820 | 1.6 | 10/10 |
+| English (10) | 0.70 | 0.90 | 0.90 | 0.814 | 1.8 | 10/10 |
+
+The ground-truth note is retrieved in the top-10 for **100%** of queries, top-3 for 90%, and
+**Italian and English perform essentially identically** (MRR 0.820 vs 0.814) — the core claim that
+a local multilingual model closes the Italian gap.
+
+**(b) Model ablation** — same 20 queries, same corpus, **pure cosine, page-level** (isolating the
+embedding model; both models served locally by Ollama):
+
+| Model | IT MRR | IT mean rank | EN MRR | EN mean rank |
+|---|---|---|---|---|
+| **bge-m3** (multilingual, 1024) | **1.000** | **1.0** | 0.920 | 1.4 |
+| nomic-embed-text (English-centric, 768) | 0.412 | **31.8** | 0.883 | 1.3 |
+
+This is the decisive result. On **English**, the two local models are comparable (0.920 vs 0.883).
+On **Italian**, bge-m3 is near-perfect (mean rank 1.0) while nomic is effectively unusable (mean
+rank **31.8**). The multilingual advantage that motivated the whole migration is real and large —
+not a matter of taste but of ~30 positions of rank on the user's own language. (The intended hosted
+baselines, ZeroEntropy `zembed-1` and OpenAI, could not be re-measured under identical conditions:
+no valid ZeroEntropy key was present and the OpenAI account was quota-exhausted — an honest gap.)
+
+**Method note.** The deployed numbers (a) are lower than the clean page-level cosine (b) because the
+production path is harder: chunk-level over 51k chunks with reranking and autocut, versus a 291-page
+pure-cosine pool. Both are reported; neither is cherry-picked.
+
+## Case studies: without vs with the system
+
+To validate *value* (not just retrieval), we ran two discovery skills on a realistic business decision — a nonprofit about to launch a paid EUR 297, 8-week online coaching programme ("Fight Camp") for Italian parents of children with cerebral palsy, 50 seats. Both are real agent outputs, condensed and illustrative.
+
+### Case A - premortem: would this launch fail, and why?
+
+**Without the system:** the founder decides on gut ("parents need it, EUR 297 is fair"), opens enrolment, and discovers post-launch that 11 signed up, three asked for refunds, and renewal was never designed - learning at full cost.
+
+**With the system:** failure is simulated first. The premortem surfaced 7 genuine failure modes; the three critical: (1) *not filling 50 seats* - the base is activists/donors, not coaching buyers, with no proven paid funnel; (2) *price backlash* - "a nonprofit charging me to help my disabled child" - a moral, not merely economic, friction; (3) *completion & renewal* - start 50, finish ~22, and nothing exists to renew. Hidden assumption: **"a warm audience equals purchase demand."** Revised plan (concrete): sell a 12-seat EUR 149 pilot first; add a pay-what-you-can scholarship communicated up front; cut to 6 weeks; design a EUR 19/month membership as the renewal object; rewrite the promise as an observable outcome ("a personalised home plan for your child in 6 weeks").
+
+### Case B - simulated focus-group: would parents pay EUR 297?
+
+**Without the system:** the founder assumes yes, builds 8 weeks of content, launches, and meets the "no" at an empty cart - after burning months.
+
+**With the system:** five diverse parent personas (grounded in real frustrations, budgets, alternatives, scepticism) were interrogated for friction, not applause. **Verdict: the hypothesis does not hold as stated.** The barrier is not price but *clinical credibility*, *time load*, and *proof of results*. Representative voices: Ahmed - "I've paid for promises three times"; Laura - "the problem isn't information, it's time and energy - another commitment sinks me"; Giulia - "I'd pay more for a real community, not to feel alone." Real willingness-to-pay: ~2 of 5 at EUR 297 upfront. Kill-signals: upfront 8-week payment, no real physiotherapists, no measurable outcome, rigid live format, "motivational" positioning. Actions: tiered/monthly pricing; lead with clinical credentials and a data-backed case; sell *community + on-demand* rather than "coaching"; validate with 12-15 real interviews before building.
+
+### What the two cases show together
+
+Run independently, premortem and focus-group **converged** on the same core insight - the risk is not the price but credibility, time and proof - from two different methods. That convergence is itself a validation signal. Both delivered, in minutes and before any code, exactly the objections a gut-feel launch would have found only after spending the money. Honest caveat: the focus-group is a *simulation* - it orients the questions and exposes blind spots; it does not replace 12-15 real interviews or measure true conversion. The system's value is not to *replace* evidence but to make you seek the right evidence, cheaply, first.
+
 
 ---
 
