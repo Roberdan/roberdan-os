@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
-# learn/capture.sh — appende UN segnale di apprendimento alla staging inbox.
-# Economico, no-lock, no-giudizio. Chiamabile da qualsiasi platform (hook Stop,
-# fine-task, o a mano). Il giudizio (classifica/dedup/promozione) avviene dopo,
-# in distill.sh + curate.sh. Vedi learn/learn-protocol.md.
+# learn/capture.sh — appends ONE learning signal to the staging inbox.
+# Cheap, no-lock, no-judgment. Callable from any platform (Stop hook,
+# end-of-task, or by hand). Judgment (classify/dedup/promote) happens later,
+# in distill.sh + curate.sh. See learn/learn-protocol.md.
 set -euo pipefail
 
 inbox="${RDA_INBOX:-$HOME/.roberdan-os/learnings/inbox}"
 mkdir -p "$inbox"
 
-# Segnale da $1 (testo) o stdin.
+# Signal from $1 (text) or stdin.
 signal="${1:-$(cat)}"
-[ -n "${signal// /}" ] || { echo "capture: segnale vuoto, skip" >&2; exit 0; }
+[ -n "${signal// /}" ] || { echo "capture: empty signal, skip" >&2; exit 0; }
 
-# Privacy hard-gate (come CODICE, non discrezione):
-# 1) mai catturare riferimenti al path del dossier
+# Privacy hard-gate (as CODE, not discretion):
+# 1) never capture references to the dossier path
 case "$signal" in
-  *"/.roberdan-os/private/"*) echo "capture: blocco privacy (path dossier), skip" >&2; exit 0 ;;
+  *"/.roberdan-os/private/"*) echo "capture: privacy block (dossier path), skip" >&2; exit 0 ;;
 esac
-# 2) mai catturare contenuto che matcha la deny-list reale (nomi/entità confidenziali).
-#    Deny-list runtime: ~/.roberdan-os/private/.denylist, fallback al repo.
+# 2) never capture content matching the real deny-list (confidential names/entities).
+#    Runtime deny-list: ~/.roberdan-os/private/.denylist, fallback to the repo.
 denylist=""
 for d in "$HOME/.roberdan-os/private/.denylist" "$(dirname "$0")/../private/.denylist"; do
   [ -f "$d" ] && { denylist="$d"; break; }
 done
-# NB: filtra righe vuote/commento della deny-list (un pattern vuoto in grep -f matcha tutto).
+# NB: filter blank/comment lines from the deny-list (an empty pattern in grep -f matches everything).
 if [ -n "$denylist" ] && printf '%s' "$signal" | grep -iEf <(grep -vE '^[[:space:]]*($|#)' "$denylist") >/dev/null 2>&1; then
-  echo "capture: blocco privacy (deny-list match), skip" >&2; exit 0
+  echo "capture: privacy block (deny-list match), skip" >&2; exit 0
 fi
 
 day="$(date +%Y-%m-%d)"
@@ -33,6 +33,6 @@ sess="${RDA_SESSION:-${CLAUDE_SESSION_ID:-local}}"
 ts="$(date +%Y-%m-%dT%H:%M:%S%z)"
 file="$inbox/${day}-${sess}.md"
 
-# 1 record/segnale, append-only.
+# 1 record/signal, append-only.
 printf -- '- [%s] %s\n' "$ts" "$signal" >> "$file"
-echo "capture: +1 segnale → $file" >&2
+echo "capture: +1 signal → $file" >&2

@@ -1,5 +1,5 @@
 # /problem-validation
 
-Aiuta a capire QUALI problemi vale la pena risolvere, non solo a risolverli. Orchestra: scoperta/validazione del problema con utenti (focus-group) → prioritizzazione (severità×frequenza×raggiungibilità×fit) → stress-test della soluzione (premortem). TRIGGER: 'vale la pena risolvere X', 'è un problema vero', 'quale problema attacco', 'dovrei costruire questo', 'validiamo prima di costruire', 'prioritizza questi problemi', 'is this worth building'. SÌ a monte di ogni build/investimento non banale.
+Helps figure out WHICH problems are worth solving, not just how to solve them. Orchestrates: problem discovery/validation with users (focus-group) → prioritization (severity×frequency×reachability×fit) → solution stress-test (premortem). TRIGGER: 'is it worth solving X', 'vale la pena risolvere X', 'is this a real problem', 'è un problema vero', 'which problem should I attack', 'quale problema attacco', 'should I build this', 'dovrei costruire questo', 'validate before building', 'validiamo prima di costruire', 'prioritize these problems', 'prioritizza questi problemi', 'is this worth building'. YES upstream of any non-trivial build/investment.
 
 Logica canonica: `skills/problem-validation/skill.md` in roberdan-os.

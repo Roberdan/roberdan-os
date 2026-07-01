@@ -1,6 +1,6 @@
 ---
 name: focus-group
-description: Simula un focus group / validazione con utenti reali: crea un pool di agenti-persona sul profilo richiesto + un moderatore + un consolidatore. Valida problemi, definizioni, ipotesi, app, feature, usabilità, feedback. Multi-modo (focus group, interviste 1:1, usability test, micro-survey). TRIGGER: 'valida questa ipotesi/idea/feature', 'cosa ne pensano gli utenti', 'simula un focus group', 'testa l'usabilità', 'crea un panel di early adopter', 'feedback da utenti reali su X'. SÌ quando serve la voce dell'utente prima di costruire/decidere.
+description: Simulates a focus group / validation with real users: creates a pool of persona-agents matching the requested profile + a moderator + a consolidator. Validates problems, definitions, hypotheses, apps, features, usability, feedback. Multi-mode (focus group, 1:1 interviews, usability test, micro-survey). TRIGGER: 'validate this hypothesis/idea/feature', 'valida questa ipotesi/idea/feature', 'what do users think', 'cosa ne pensano gli utenti', 'simulate a focus group', 'simula un focus group', 'test the usability', 'testa l'usabilità', 'create an early adopter panel', 'crea un panel di early adopter', 'real user feedback on X', 'feedback da utenti reali su X'. YES when you need the user's voice before building/deciding.
 ---
 
 # focus-group (wrapper)

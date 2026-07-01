@@ -1,6 +1,6 @@
 ---
 name: premortem
-description: Premortem su un piano/lancio/prodotto/assunzione/strategia/decisione. Assume che sia GIÀ fallito tra 6 mesi e lavora a ritroso per trovare ogni causa. Produce un piano rivisto con i blind-spot esposti. TRIGGER OBBLIGATORI: 'premortem this/questo', 'cosa può ucciderlo', 'stress-test questo piano', 'cosa mi sto perdendo', 'trova i blind spot'. TRIGGER FORTI: 'cosa può andare storto', 'buca questo piano', 'dove si rompe', 'fai l'avvocato del diavolo'. NON attivare su feedback semplici, domande fattuali. SÌ quando c'è un piano/impegno dove sbagliare costa caro.
+description: Premortem on a plan/launch/product/assumption/strategy/decision. Assumes it has ALREADY failed 6 months from now and works backward to find every cause. Produces a revised plan with the blind spots exposed. MANDATORY TRIGGERS: 'premortem this/questo', 'what could kill it', 'cosa può ucciderlo', 'stress-test this plan', 'stress-test questo piano', 'what am I missing', 'cosa mi sto perdendo', 'find the blind spots', 'trova i blind spot'. STRONG TRIGGERS: 'what could go wrong', 'cosa può andare storto', 'poke holes in this plan', 'buca questo piano', 'where does it break', 'dove si rompe', 'play devil's advocate', 'fai l'avvocato del diavolo'. Do NOT activate on simple feedback, factual questions. YES when there's a plan/commitment where being wrong is costly.
 ---
 
 # premortem (wrapper)

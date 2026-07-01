@@ -1,65 +1,65 @@
 ---
 name: problem-validation
-description: "Aiuta a capire QUALI problemi vale la pena risolvere, non solo a risolverli. Orchestra: scoperta/validazione del problema con utenti (focus-group) → prioritizzazione (severità×frequenza×raggiungibilità×fit) → stress-test della soluzione (premortem). TRIGGER: 'vale la pena risolvere X', 'è un problema vero', 'quale problema attacco', 'dovrei costruire questo', 'validiamo prima di costruire', 'prioritizza questi problemi', 'is this worth building'. SÌ a monte di ogni build/investimento non banale."
+description: "Helps figure out WHICH problems are worth solving, not just how to solve them. Orchestrates: problem discovery/validation with users (focus-group) → prioritization (severity×frequency×reachability×fit) → solution stress-test (premortem). TRIGGER: 'is it worth solving X', 'vale la pena risolvere X', 'is this a real problem', 'è un problema vero', 'which problem should I attack', 'quale problema attacco', 'should I build this', 'dovrei costruire questo', 'validate before building', 'validiamo prima di costruire', 'prioritize these problems', 'prioritizza questi problemi', 'is this worth building'. YES upstream of any non-trivial build/investment."
 providers: [claude, copilot, codex]
 ---
 
 # problem-validation
 
-Il sistema non deve solo risolvere problemi, ma dire **quali valgono**. Questo skill è
-l'orchestratore a monte: prima di costruire, valida che il problema sia reale, che valga,
-e che la soluzione reggerebbe. Si compone dagli altri due skill + gstack.
+The system shouldn't just solve problems, it should say **which ones are worth it**. This skill
+is the upstream orchestrator: before building, it validates that the problem is real, that it's
+worth solving, and that the solution would hold up. Composed from the other two skills + gstack.
 
-## Quando
+## When
 
-Prima di ogni build/investimento/pivot non banale. Se qualcuno dice "costruiamo X" → prima
-chiedi "il problema dietro X è reale, frequente, e vale?". Se è un'idea vaga → prima
-`gstack:spec` per renderla concreta, poi valida.
+Before any non-trivial build/investment/pivot. If someone says "let's build X" → first ask
+"is the problem behind X real, frequent, and worth it?". If it's a vague idea → first
+`gstack:spec` to make it concrete, then validate.
 
-## Pipeline (3 stadi, gate umano tra gli stadi importanti)
+## Pipeline (3 stages, human gate between the important stages)
 
-### 1. Il problema esiste? → [[focus-group]]
-Porta la voce dell'utente sul **problema**, non sulla soluzione. Modo tipico: focus group +
-interviste 1:1. Domande: il problema esiste davvero? quanto fa male? come lo risolvono oggi?
-Output: il problema è **reale/immaginato**, con evidenza (quote, disaccordi, kill-signals).
-*Se il problema non regge qui → STOP. Hai appena risparmiato un build inutile.*
+### 1. Does the problem exist? → [[focus-group]]
+Brings the user's voice on the **problem**, not the solution. Typical mode: focus group +
+1:1 interviews. Questions: does the problem really exist? how much does it hurt? how do people
+solve it today? Output: the problem is **real/imagined**, with evidence (quotes, disagreements,
+kill-signals). *If the problem doesn't hold up here → STOP. You just saved a useless build.*
 
-### 2. Vale la pena? → rubrica di prioritizzazione
-Se ci sono più problemi candidati, scora ognuno (1-5) e rendi il trade-off esplicito:
+### 2. Is it worth it? → prioritization rubric
+If there are multiple candidate problems, score each (1-5) and make the trade-off explicit:
 
-| Criterio | Domanda |
+| Criterion | Question |
 |---|---|
-| **Severità** | quanto fa male quando accade? |
-| **Frequenza** | quanto spesso accade / quante persone? |
-| **Raggiungibilità** | riesco davvero a raggiungere e servire chi ce l'ha? |
-| **Fit strategico** | è nella mia missione/leva unica? (per Roberto: disabilità/inclusione, Fight the Stroke) |
-| **Willingness** | pagherebbero / cambierebbero comportamento? (dal focus-group) |
-| **Costo di sbagliare** | se attacco il problema sbagliato, quanto perdo? |
+| **Severity** | how much does it hurt when it happens? |
+| **Frequency** | how often does it happen / how many people? |
+| **Reachability** | can I actually reach and serve the people who have it? |
+| **Strategic fit** | is it within my mission/unique leverage? (for Roberto: disability/inclusion, Fight the Stroke) |
+| **Willingness** | would they pay / change behavior? (from the focus-group) |
+| **Cost of being wrong** | if I attack the wrong problem, how much do I lose? |
 
-Score basso su Raggiungibilità o Fit → di solito è un no, anche se Severità è alta.
-Non sommare ciecamente: rendi visibile *dove* sta il rischio.
+Low score on Reachability or Fit → usually a no, even if Severity is high.
+Don't sum blindly: make visible *where* the risk lies.
 
-### 3. La soluzione reggerebbe? → [[premortem]]
-Sul problema vincente + la soluzione proposta, lancia il premortem: "è fra 6 mesi, la
-soluzione è fallita, perché?". Espone le assunzioni e produce il piano rivisto + checklist.
+### 3. Would the solution hold up? → [[premortem]]
+On the winning problem + the proposed solution, launch the premortem: "it's 6 months from now,
+the solution has failed, why?". Exposes assumptions and produces the revised plan + checklist.
 
-## Sfrutta gstack (non duplicare)
+## Leverage gstack (don't duplicate)
 
-- **`gstack:spec`** — trasforma l'intento vago in spec eseguibile *prima* di validare.
-- **`gstack:office-hours`** — pressione YC-style sul business/go-to-market *dopo* la validazione.
-- **`gstack:plan-ceo-review` / `plan-eng-review`** — quando la validazione diventa un piano.
-Questo skill sta **a monte** (il problema vale?); gstack aiuta a valle (come eseguirlo).
+- **`gstack:spec`** — turns vague intent into an executable spec *before* validating.
+- **`gstack:office-hours`** — YC-style pressure on the business/go-to-market *after* validation.
+- **`gstack:plan-ceo-review` / `plan-eng-review`** — once validation becomes a plan.
+This skill sits **upstream** (is the problem worth it?); gstack helps downstream (how to execute it).
 
 ## Output
 
-`~/.claude/reports/problem-validation-<tema>-<data>.md`:
-- **Raccomandazione netta:** costruisci / non costruire / prima raffina — con il perché.
-- Evidenza dal focus-group, tabella di prioritizzazione, sintesi del premortem.
-- **La verità irriducibile:** qual è la vera cosa da decidere (stile first-principles / `@socrates`).
+`~/.claude/reports/problem-validation-<topic>-<date>.md`:
+- **Clear recommendation:** build / don't build / refine first — with the why.
+- Evidence from the focus-group, prioritization table, premortem synthesis.
+- **The irreducible truth:** what's the real thing to decide (first-principles style / `@socrates`).
 
-## Note
+## Notes
 
-- **Bias-to-kill:** il default di questo skill è **scettico** — è più prezioso dire "non vale"
-  che confermare. Componilo con `@socrates` (verità irriducibile) e `@board` (red-team).
-- È simulazione + framework: **orienta la decisione, non la prende** (gate umano).
-- Voce/decisione "come Roberto" → si compone col twin ([[roberdan-twin]]).
+- **Bias-to-kill:** this skill's default is **skeptical** — it's more valuable to say "not worth it"
+  than to confirm. Compose it with `@socrates` (irreducible truth) and `@board` (red-team).
+- It's simulation + framework: **guides the decision, doesn't make it** (human gate).
+- Voice/decision "as Roberto" → composes with the twin ([[roberdan-twin]]).

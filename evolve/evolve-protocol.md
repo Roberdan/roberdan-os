@@ -1,29 +1,32 @@
-# evolve-protocol — watcher settimanale dei tool (draft-only)
+# evolve-protocol — weekly tool watcher (draft-only)
 
-Tiene roberdan-os aggiornato sulle novità di Claude Code / GitHub Copilot / Codex,
-**proponendo** patch — mai applicandole al comportamento. Vedi [[ADR-0001]].
+Keeps roberdan-os current on what's new in Claude Code / GitHub Copilot / Codex,
+**proposing** patches — never applying them to behavior. See [[ADR-0001]].
 
-## Cadenza
+## Cadence
 
-launchd `com.roberdan.rda-evolve`, **settimanale**. Scatta a prescindere dal tool aperto.
+launchd `com.roberdan.rda-evolve`, **weekly**. Fires regardless of which tool is open.
 
-## Flusso
+## Flow
 
 `evolve/watch.sh`:
-1. **Fetch** changelog/release note delle fonti (URL versionati) → confronta con l'ultima
-   versione vista (stato durevole `~/.roberdan-os/evolve/seen.json`).
-2. **Diff capability:** per ogni novità, valuta se tocca qualcosa che roberdan-os usa
-   (hook, skill, agent, scheduling, MCP, memoria).
-3. **Proponi** in `roberdan-os/proposals/<YYYY-MM-DD>-<slug>.md`: cosa cambia, perché,
-   patch suggerita, **citazione fonte (URL + versione + data)**. Niente citazione → niente proposta.
+1. **Fetch** changelogs/release notes from sources (versioned URLs) → compare against
+   the last seen version (durable state `~/.roberdan-os/evolve/seen.json`).
+2. **Diff capability:** for each novelty, assess whether it touches something
+   roberdan-os uses (hook, skill, agent, scheduling, MCP, memory).
+3. **Propose** in `roberdan-os/proposals/<YYYY-MM-DD>-<slug>.md`: what changes, why,
+   the suggested patch, **source citation (URL + version + date)**. No citation →
+   no proposal.
 
-## Invarianti (hard)
+## Invariants (hard)
 
-- **Mai** auto-commit su `behavior/ rules/ agents/ AGENTS.md` — solo draft in `proposals/`.
-- Enforcement meccanico: `hooks/post-task-sync.sh` auto-committa **solo** `platforms/` (git add scoped, opt-in). `test/validate.sh` fa drift-check.
-- No-hallucination: ogni claim ha una fonte verificabile.
+- **Never** auto-commit to `behavior/ rules/ agents/ AGENTS.md` — draft only in
+  `proposals/`.
+- Mechanical enforcement: `hooks/post-task-sync.sh` auto-commits **only**
+  `platforms/` (scoped git add, opt-in). `test/validate.sh` does the drift-check.
+- No-hallucination: every claim has a verifiable source.
 
 ## Done
 
-Una proposta è "pronta" quando Roberto la rivede e la promuove a PR/commit. Il watcher
-non chiude mai il cerchio da solo sul canone.
+A proposal is "ready" when Roberto reviews it and promotes it to a PR/commit. The
+watcher never closes the loop on the canon by itself.

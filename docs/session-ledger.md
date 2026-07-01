@@ -22,8 +22,8 @@ Status: `todo` · `wip` · `done` (fatto) · `verified` (verificato empiricament
 | 10 | Re-init bge-m3 locale + PDF LaTeX | verified | patch gbrain f7376b11; ollama ps GPU; PDF IT+EN |
 | 11 | Avvisami re-embed completo + test recall IT | verified | 6 NULL; IT MRR 0.82 (deployed) |
 | 12 | Paper: exec summary + gbrain/gstack + skill + §9 quantitativa + casi-studio | done | commit paper-en; eval bge-m3 vs nomic (IT MRR 1.0 vs 0.41) |
-| 13 | **Tradurre TUTTO il sistema in inglese** (readme/doc/agenti/skill) | **todo** | delega a Sonnet — NON ancora fatto |
-| 14 | **Checklist durevole/auditabile dei goal** | **wip** | QUESTO file |
+| 13 | Tradurre TUTTO il sistema in inglese | done | 5 agenti Sonnet; pipeline verificato integro; wrapper rigenerati EN |
+| 14 | Checklist durevole/auditabile dei goal | done | docs/session-ledger.md + regola wired in AGENTS.md |
 | 15 | **Decidere: Convergio separato serve ancora?** | **todo** | analisi + verifica stato convergio |
 | 16 | **Continuità cloud (chiudere il Mac senza perdere nulla)** | **todo** | vincolo: engine locali (gbrain/ollama) offline a Mac spento; vedi nota |
 

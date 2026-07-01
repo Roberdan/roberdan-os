@@ -1,35 +1,37 @@
-# learn-protocol — apprendimento continuo (capture → distill → quarantena)
+# learn-protocol — continuous learning (capture → distill → quarantine)
 
-Distilla cosa è cambiato nel modello del mondo, dopo le interazioni, in memoria
-classificata. **Capture ≠ distill** (disaccoppiati per portabilità + anti-rumore).
-Vedi [[ADR-0001]], [[memory-protocol]].
+Distill what changed in the world model, after interactions, into classified memory.
+**Capture ≠ distill** (decoupled for portability + anti-noise).
+See [[ADR-0001]], [[memory-protocol]].
 
-## 1. Capture (per-platform, economico)
+## 1. Capture (per-platform, cheap)
 
-Ogni platform appende a un cursor durevole, **senza giudizio**:
+Each platform appends to a durable cursor, **without judgment**:
 ```
-~/.roberdan-os/learnings/inbox/<YYYY-MM-DD>-<session>.md   # 1 record/segnale
+~/.roberdan-os/learnings/inbox/<YYYY-MM-DD>-<session>.md   # 1 record/signal
 ```
-Claude: hook `Stop` opt-in (`RDA_LEARN=1`). Altri: comando esplicito / fine-task.
-Nessun lock, nessuna scrittura nel vault qui.
+Claude: `Stop` hook, opt-in (`RDA_LEARN=1`). Others: explicit command / end-of-task.
+No lock, no writes to the vault here.
 
-## 2. Distill (batch periodico, launchd)
+## 2. Distill (periodic batch, launchd)
 
-`learn/distill.sh` → legge l'inbox accumulato → per ogni segnale:
-1. **Classifica** nella tassonomia (5 classi) + scarta l'effimero (contesto della singola
-   issue ≠ lezione riusabile).
-2. **Dedup-before-write:** `gbrain search` sulla source `vault` → se match, propone
-   **merge/supersedes**, non un file nuovo.
-3. **Privacy filter** (deny-list come codice) → redact o drop.
-4. Scrive **candidati in quarantena** `~/.roberdan-os/learnings/quarantine/`, mai nel vault diretto.
+`learn/distill.sh` → reads the accumulated inbox → for each signal:
+1. **Classify** into the taxonomy (5 classes) + discard the ephemeral (context of a
+   single issue ≠ a reusable lesson).
+2. **Dedup-before-write:** `gbrain search` on the `vault` source → if there's a match,
+   propose **merge/supersedes**, not a new file.
+3. **Privacy filter** (deny-list as code) → redact or drop.
+4. Writes **candidates to quarantine** `~/.roberdan-os/learnings/quarantine/`, never
+   directly to the vault.
 
-## 3. Gate (promozione)
+## 3. Gate (promotion)
 
-- `tool-quirk` (≥2×) e `correction` (con citazione) → auto-eligibili alla promozione.
-- `capability-gap`, `voice`, `decision` ambigui → **conferma umana** prima di promuovere.
-- La promozione vera nel vault la fa il job single-writer di [[ontology-protocol]].
+- `tool-quirk` (≥2x) and `correction` (with quote) → auto-eligible for promotion.
+- `capability-gap`, `voice`, ambiguous `decision` → **human confirmation** before promoting.
+- The actual promotion into the vault is done by the single-writer job of
+  [[ontology-protocol]].
 
-## Anti-degradazione
+## Anti-degradation
 
-Mai auto-scrittura cieca nel canone. Un learning mal interpretato che diventa "verità"
-si auto-rinforza: per questo **quarantena + corroborazione**, non commit diretto.
+Never auto-write blindly into the canon. A misinterpreted learning that becomes "truth"
+self-reinforces: this is why **quarantine + corroboration**, not direct commit.

@@ -1,28 +1,29 @@
-# ontology-protocol — promozione + igiene memoria (single-writer)
+# ontology-protocol — promotion + memory hygiene (single-writer)
 
-**Estende** l'ontologia del vault (Tolaria), non un nuovo store. Un solo processo seriale
-tocca il vault (lock AutoGit). Vedi [[ADR-0001]], [[memory-protocol]].
+**Extends** the vault's ontology (Tolaria), not a new store. A single serial process
+touches the vault (AutoGit lock). See [[ADR-0001]], [[memory-protocol]].
 
-## Promozione (quarantena → vault)
+## Promotion (quarantine → vault)
 
 `ontology/curate.sh` (launchd, single-writer):
-1. Legge `~/.roberdan-os/learnings/quarantine/`.
-2. Per ogni candidato eligibile (vedi [[learn-protocol]] gate): crea/aggiorna nota
-   `type: agent-learning` in `agent-learnings/`, con frontmatter Tolaria
-   (`belongs_to`/`workspace`/`supersedes`) → filtrabile/eliminabile in blocco.
-3. Commit AutoGit singolo, retry su `.git/index.lock`. Mai concorrente.
-4. Refresh gbrain (index della nota nuova).
+1. Reads `~/.roberdan-os/learnings/quarantine/`.
+2. For each eligible candidate (see [[learn-protocol]] gate): creates/updates a
+   `type: agent-learning` note in `agent-learnings/`, with Tolaria frontmatter
+   (`belongs_to`/`workspace`/`supersedes`) → filterable/deletable in bulk.
+3. Single AutoGit commit, retry on `.git/index.lock`. Never concurrent.
+4. Refresh gbrain (index the new note).
 
-## Igiene periodica (triggerata, human-gated)
+## Periodic hygiene (triggered, human-gated)
 
-NON auto-merge/auto-delete (lossy + irreversibile, gate #4). Il job **propone**:
-- **dedup** semantico (gbrain near-dup) → lista merge candidati.
-- **tombstone retire**: fatti `RISOLTO`/pre-v3 → archivio `agent-learnings/_archive/`.
-- **compressione hot-core**: `_core.md` ≤20 righe, le righe morte costano token ovunque.
-Merge/delete restano decisione umana. Output = un report di proposte, non azioni.
+NO auto-merge/auto-delete (lossy + irreversible, gate #4). The job **proposes**:
+- semantic **dedup** (gbrain near-dup) → list of merge candidates.
+- **tombstone retire**: facts that are `RESOLVED`/pre-v3 → archive to
+  `agent-learnings/_archive/`.
+- **hot-core compression**: `_core.md` ≤20 lines, dead lines cost tokens everywhere.
+Merge/delete remain a human decision. Output = a report of proposals, not actions.
 
-## Confini (cosa NON fa)
+## Boundaries (what it does NOT do)
 
-Niente relazioni auto-generate tra learning (edge spuri — vedi
-[[reference-gbrain-wikilink-gap]]). Niente motore-ontologia bespoke. Niente
-auto-aggiornamento real-time. **Riuso > struttura nuova.**
+No auto-generated relations between learnings (spurious edges — see
+[[reference-gbrain-wikilink-gap]]). No bespoke ontology engine. No real-time
+auto-update. **Reuse > new structure.**

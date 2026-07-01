@@ -1,60 +1,60 @@
-# ADR-0001 — roberdan-os auto-migliorante: evolve / learn / ontology
+# ADR-0001 — roberdan-os self-improving: evolve / learn / ontology
 
-**Status:** Accepted (2026-06-30) · **Decisori:** Roberto + advisor (baccio/socrates/rex)
+**Status:** Accepted (2026-06-30) · **Deciders:** Roberto + advisor (baccio/socrates/rex)
 
-## Contesto
+## Context
 
-roberdan-os ha il loop *per-task* (`loop/loop-protocol.md`, `skills/auto-checkpoint`) ma
-non un *meta-loop*: non si tiene aggiornato sui tool, non distilla learning dopo le
-interazioni, non riorganizza la memoria. Obiettivo: renderlo **auto-migliorante e lo
-standard di default**, senza violare il principio cardine — *conoscenza centralizzata,
-esecuzione per-platform, daemon-optional* — né i gate umani.
+roberdan-os has the *per-task* loop (`loop/loop-protocol.md`, `skills/auto-checkpoint`) but
+no *meta-loop*: it doesn't keep itself up to date on tools, doesn't distill learnings after
+interactions, doesn't reorganize memory. Goal: make it **self-improving and the
+default standard**, without violating the cardinal principle — *centralized knowledge,
+per-platform execution, daemon-optional* — nor the human gates.
 
-**Vincolo cross-platform (correzione Roberto):** la memoria durevole vive nel **vault
-Obsidian** (markdown leggibile da ogni tool, ontologia Tolaria, indicizzato gbrain),
-NON in `~/.claude/.../memory/` (silo Claude-only → deprecato a cache, contenuti migrati).
+**Cross-platform constraint (Roberto's correction):** durable memory lives in the **Obsidian
+vault** (markdown readable by every tool, Tolaria ontology, gbrain-indexed),
+NOT in `~/.claude/.../memory/` (Claude-only silo → demoted to cache, content migrated).
 
-## Decisioni
+## Decisions
 
-| Componente | Decisione | Razionale |
+| Component | Decision | Rationale |
 |---|---|---|
-| **Scheduling** | **launchd** invoca `run.sh` plain (cron-swappable). Mai `ScheduleWakeup`/`CronCreate` per job periodici | Deve scattare anche con Claude chiuso (Copilot/Codex). I job gbrain già usano launchd |
-| **learn/** | **Capture ≠ distill.** Capture = cursor `.jsonl` per-platform → flush in staging inbox `~/.roberdan-os/learnings/inbox/` (no lock). Distill = batch periodico → candidati in **quarantena** | Disaccoppia portabilità da rumore. NO distill per-`Stop` (Claude-only + invasivo) |
-| **ontology/** | **Estendi il vault, nessun nuovo store.** Tolaria = autorità schema (`type: agent-learning`); gbrain = dedup semantico. Job **single-writer** promuove candidati → note tipate | socrates: auto-ontologia = over-engineering + 4° store che drifta. Riuso > reinvenzione |
-| **Recall** | gbrain semantic search sul vault (+ markdown greppabile). Nessun indice caricato ogni sessione | Cross-platform, già wired |
-| **evolve/** | Watcher **settimanale**: changelog Claude/Copilot/Codex → diff vs capability → **solo draft** in `proposals/`, con citazione fonte (URL+versione+data) | Cross-platform via launchd |
+| **Scheduling** | **launchd** invokes plain `run.sh` (cron-swappable). Never `ScheduleWakeup`/`CronCreate` for periodic jobs | Must fire even with Claude closed (Copilot/Codex). The gbrain jobs already use launchd |
+| **learn/** | **Capture ≠ distill.** Capture = per-platform `.jsonl` cursor → flush to staging inbox `~/.roberdan-os/learnings/inbox/` (no lock). Distill = periodic batch → candidates in **quarantine** | Decouples portability from noise. NO distill on `Stop` (Claude-only + invasive) |
+| **ontology/** | **Extend the vault, no new store.** Tolaria = schema authority (`type: agent-learning`); gbrain = semantic dedup. **Single-writer** job promotes candidates → typed notes | socrates: auto-ontology = over-engineering + a 4th store that drifts. Reuse > reinvention |
+| **Recall** | gbrain semantic search on the vault (+ greppable markdown). No index loaded every session | Cross-platform, already wired |
+| **evolve/** | **Weekly** watcher: Claude/Copilot/Codex changelog → diff vs. capability → **draft only** in `proposals/`, with source citation (URL+version+date) | Cross-platform via launchd |
 
-## Tagliato (over-engineering — socrates)
+## Cut (over-engineering — socrates)
 
-Ontologia auto-aggiornante in tempo reale · relazioni auto-generate tra learning ·
-auto-merge/auto-compressione senza gate · motore-ontologia bespoke sopra Tolaria.
-Sostituiti da: **1 type + 1 job di igiene human-gated** che riusa i tipi esistenti.
+Real-time self-updating ontology · auto-generated relations between learnings ·
+auto-merge/auto-compression without a gate · bespoke ontology engine on top of Tolaria.
+Replaced by: **1 type + 1 human-gated hygiene job** that reuses existing types.
 
-## Invarianti (enforcement meccanico, non promessa)
+## Invariants (mechanical enforcement, not a promise)
 
-1. **Mai auto-applicare** cambi a `behavior/ rules/ agents/ AGENTS.md` — evolve produce
-   **solo draft**. Enforcement reale in `hooks/post-task-sync.sh` (`git add -- platforms/`,
-   opt-in `RDA_AUTOSYNC=1`): l'auto-commit è scoped ai soli wrapper deterministici in
-   `platforms/`; `test/validate.sh` fa il **drift-check** (wrapper ≡ canone), non l'allowlist.
-2. **Single-writer sul vault** (Tolaria AutoGit `.git/index.lock`) — capture concorrente
-   scrive solo nella staging inbox; un solo processo seriale fa flush.
-3. **Privacy come codice:** deny-list pattern (dossier `~/.roberdan-os/private/`, dati
-   personali/medici FtS) verificata **prima** di ogni write, non a discrezione del modello.
-4. **Promozione gated:** candidato → nota influente solo dopo corroborazione (N sightings
-   o conferma umana). Classe `voice` mai auto-evoluta (gate #6).
-5. **No-hallucination:** ogni proposta evolve cita la fonte o non esiste.
+1. **Never auto-apply** changes to `behavior/ rules/ agents/ AGENTS.md` — evolve produces
+   **draft only**. Real enforcement in `hooks/post-task-sync.sh` (`git add -- platforms/`,
+   opt-in `RDA_AUTOSYNC=1`): auto-commit is scoped only to the deterministic wrappers in
+   `platforms/`; `test/validate.sh` does the **drift-check** (wrapper ≡ canon), not the allowlist.
+2. **Single-writer on the vault** (Tolaria AutoGit `.git/index.lock`) — concurrent capture
+   only writes to the staging inbox; a single serial process does the flush.
+3. **Privacy as code:** deny-list pattern (dossier `~/.roberdan-os/private/`, personal/medical
+   FtS data) verified **before** every write, not at the model's discretion.
+4. **Gated promotion:** candidate → influential note only after corroboration (N sightings
+   or human confirmation). The `voice` class is never auto-evolved (gate #6).
+5. **No-hallucination:** every evolve proposal cites its source or doesn't exist.
 
-## Rischi → mitigazione
+## Risks → mitigation
 
-| Rischio | Mitigazione |
+| Risk | Mitigation |
 |---|---|
-| Drift identità/comportamento | evolve solo-draft + path-allowlist in validate.sh |
-| Learning poisoning (rinforzo errori) | corroborazione N-sightings + review periodica `@thor`/umana |
-| Inflazione/rumore memoria | dedup-before-write via `gbrain search`; igiene periodica; hot-index minimo |
-| Embedding provider down | **scoperto 2026-06-30:** openai=quota-zero, zembed=no-key → recall semantico fermo. Vedi [[provider locale Ollama]] come unica via sostenibile |
+| Identity/behavior drift | evolve draft-only + path-allowlist in validate.sh |
+| Learning poisoning (reinforcing errors) | N-sightings corroboration + periodic `@thor`/human review |
+| Memory inflation/noise | dedup-before-write via `gbrain search`; periodic hygiene; minimal hot-index |
+| Embedding provider down | **discovered 2026-06-30:** openai=zero-quota, zembed=no-key → semantic recall stalled. See [[local Ollama provider]] as the only sustainable path |
 
-## Conseguenza
+## Consequence
 
-Sistema auto-**proponente**, mai auto-**applicante** sul comportamento. Gate #6/#7
-preservati per costruzione. Tassonomia learning: `tool-quirk · correction · decision ·
+Self-**proposing** system, never self-**applying** on behavior. Gates #6/#7
+preserved by construction. Learning taxonomy: `tool-quirk · correction · decision ·
 capability-gap · voice`.
