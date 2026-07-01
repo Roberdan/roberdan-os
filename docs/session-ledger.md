@@ -1,32 +1,23 @@
-# Session Goal Ledger — durable, trackable, auditable
+# Goal Ledger — active board (kanban)
 
-Registro durevole dei goal (sopravvive a chiusura Mac / reset sessione; git-tracked = resumabile
-ovunque). **Regola:** ogni goal ha `status` + `evidence`. A inizio sessione, leggi questo file
-prima di agire. A fine fase, aggiorna la riga. `@thor` (done-gate) è l'unico che mette `verified`.
+Durable, auditable task board. **Only `To Do` + `Doing` live here** (small → loaded at session
+start without burning tokens). When a goal is `verified`, **move its row to**
+[`ledger-archive.md`](ledger-archive.md) (append-only, read only on demand). Only `@thor` marks
+`verified`. Keep this board ≤ ~20 rows: if `Doing`/`To Do` grow, split or defer.
 
-Status: `todo` · `wip` · `done` (fatto) · `verified` (verificato empiricamente) · `dropped`
+## 🔵 Doing
 
-## Sessione 2026-06-30 → 07-01 (roberdan-os hardening)
+| Goal | Owner | Evidence / next |
+|---|---|---|
+| Ingest Fight the Stroke documents into the vault (searchable locally, bge-m3) | main | privacy-aware: `workspace: fightthestroke`, local-first |
 
-| # | Goal | Status | Evidence |
-|---|---|---|---|
-| 1 | Chi sei / sei roberdan-os | verified | risposta data |
-| 2 | Aggiornare memoria durevole senza bruciare token | verified | ciclo dimostrato |
-| 3 | Ciclo salva→recupera dimostrato | verified | demo eseguita |
-| 4 | roberdan-os: loop, auto-update, apprendi ogni interazione, DI DEFAULT | verified | meta-loop attivo (launchd) + skill installati in ~/.claude/skills + RDA_LEARN=1 |
-| 5 | Memoria cross-platform nel vault (non silo Claude) | verified | 19+3 note migrate, indicizzate bge-m3 |
-| 6 | Ontologia auto-aggiornante? | verified | decisa NO (socrates); 1 type + igiene gated |
-| 7 | Finisci tutto + cancella backup + attiva + verifica cron | verified | launchd caricati, backup rm, cron ok (bge-m3 default) |
-| 8 | 3 skill (premortem/focus-group/problem-validation) auto-usati | verified | committati + INSTALLATI ~/.claude/skills (system-reminder li elenca) |
-| 9 | Review completa + paper scientifico | verified | 2 audit → 4 difetti corretti; paper IT+EN |
-| 10 | Re-init bge-m3 locale + PDF LaTeX | verified | patch gbrain f7376b11; ollama ps GPU; PDF IT+EN |
-| 11 | Avvisami re-embed completo + test recall IT | verified | 6 NULL; IT MRR 0.82 (deployed) |
-| 12 | Paper: exec summary + gbrain/gstack + skill + §9 quantitativa + casi-studio | done | commit paper-en; eval bge-m3 vs nomic (IT MRR 1.0 vs 0.41) |
-| 13 | Tradurre TUTTO il sistema in inglese | done | 5 agenti Sonnet; pipeline verificato integro; wrapper rigenerati EN |
-| 14 | Checklist durevole/auditabile dei goal | done | docs/session-ledger.md + regola wired in AGENTS.md |
-| 15 | Convergio serve ancora? | verified | daemon fermato + launchd unloaded; state.db conservato (reversibile); roberdan-os basta |
-| 16 | Continuità cloud | verified | repo PRIVATO github.com/Roberdan/roberdan-os pushato (22 commit, 0 private) |
+## ⚪ To Do
 
-## Note aperte
-- **#13 traduzione:** repo per lo più in italiano (behavior 3, agents 8, skills 8, protocolli). Delega a Sonnet in parallelo. Escludere: `private/`, i 2 paper (hanno già versione EN), `platforms/` (rigenerati).
-- **#16 cloud:** lo STATO (questo ledger + git committato/pushato) è resumabile ovunque. Ma gbrain/ollama/vault sono LOCALI: un agente cloud può continuare pianificazione/scrittura, non interrogare la memoria locale finché il Mac è spento.
+| Goal | Note |
+|---|---|
+| _(none pending)_ | — |
+
+## ✅ Done → archived
+
+16/16 goals of the 2026-06-30 → 07-01 hardening session are `verified` and moved to
+[`ledger-archive.md`](ledger-archive.md). This board stays lean by design.
