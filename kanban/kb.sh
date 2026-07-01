@@ -12,11 +12,38 @@ _field() { grep -m1 "^$2:" "$1" 2>/dev/null | sed "s/^$2:[[:space:]]*//; s/^\"//
 _list() {
   local c="$1" any=0 f
   for f in "$KB/$c"/*.md; do
-    [ -e "$f" ] || continue; any=1
+    [ -e "$f" ] || continue
+    case "$(basename "$f")" in _*) continue;; esac
+    any=1
     printf '  [%s] %s\n' "$(basename "$f" .md)" "$(_field "$f" title)"
   done
   if [ "$any" -eq 0 ]; then echo "  (empty)"; fi
   return 0
+}
+
+# visual kanban: three columns side by side
+_board() {
+  local W=26 f i
+  local -a T D N
+  for f in "$KB/todo"/*.md;  do [ -e "$f" ] && T+=("$(basename "$f" .md)"); done
+  for f in "$KB/doing"/*.md; do [ -e "$f" ] && D+=("$(basename "$f" .md)"); done
+  # done: show last 10 (newest first), skip the _archive narrative file
+  while IFS= read -r f; do [ -n "$f" ] && N+=("$(basename "$f" .md)"); done \
+    < <(ls -t "$KB/done"/*.md 2>/dev/null | grep -v '/_' | head -10)
+  local ntot; ntot=$(ls "$KB/done"/*.md 2>/dev/null | grep -vc '/_' || echo 0)
+  local nt=${#T[@]} nd=${#D[@]} nn=${#N[@]} rows
+  rows=$nt; [ $nd -gt $rows ] && rows=$nd; [ $nn -gt $rows ] && rows=$nn
+  [ $rows -eq 0 ] && rows=1
+  local ln; ln="$(printf '─%.0s' $(seq 1 $W))"
+  printf '┌%s┬%s┬%s┐\n' "$ln" "$ln" "$ln"
+  printf '│%-*s│%-*s│%-*s│\n' $W " 📋 TO DO ($nt)" $W " 🔵 DOING ($nd)" $W " ✅ DONE ($ntot, last 10)"
+  printf '├%s┼%s┼%s┤\n' "$ln" "$ln" "$ln"
+  local w=$((W-2))
+  for ((i=0; i<rows; i++)); do
+    printf '│ %-*.*s │ %-*.*s │ %-*.*s │\n' \
+      $w $w "${T[$i]:-}" $w $w "${D[$i]:-}" $w $w "${N[$i]:-}"
+  done
+  printf '└%s┴%s┴%s┘\n' "$ln" "$ln" "$ln"
 }
 
 usage() {
@@ -31,7 +58,8 @@ usage() {
 }
 
 case "$cmd" in
-  view|ls|"")
+  view|board|"") _board ;;        # visual kanban (default)
+  list|ls)                         # plain vertical list
     echo "TO DO:";  _list todo
     echo "DOING:";  _list doing
     n=$(ls "$KB/done"/*.md 2>/dev/null | wc -l | tr -d ' ')
