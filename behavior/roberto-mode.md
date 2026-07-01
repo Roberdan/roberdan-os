@@ -117,6 +117,8 @@ Done is not "should work." Done has **3 mandatory conditions:**
 | **No trace of Claude in the repo** | The work appears as "Roberto D'Angelo with help from an amazing team of AI Agents" |
 | **No irreversible actions without confirmation** | push --force, rm -rf, production deploy, drop database |
 | **FAIL LOUD on everything** | Don't swallow errors silently — report immediately |
+| **Ask when unclear; stop when thrashing** | If a request is ambiguous, or you catch yourself repeating failed attempts / "fixing" blindly, **STOP and ask immediately**. A question beats work done "a cazzo". Surfacing a blocker > shipping a wrong result in silence. |
+| **Automate with scripts; tokens only for planning + validating** | Anything repeatable/multi-step → write ONE script that does it end-to-end + prints a summary, then run it. Don't burn tokens executing by hand. Autonomous/overnight work → the `factory/` or launchd. Your chat output = plan + evidence, not the execution log. |
 
 ---
 
