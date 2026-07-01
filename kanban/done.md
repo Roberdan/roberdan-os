@@ -67,3 +67,11 @@ Convergio daemon stopped + launchd unloaded (idle 2 weeks, reversible); private 
 **Honest scars:** raised a false "17-day stale" alarm; called a bug "interesting"; wiped the brain
 chasing bge-m3 (recovered); mistook "committed" for "active-by-default" (fixed after Roberto caught it).
 Documented, not hidden — verification-over-trust is the method.
+
+## 2026-07-01 — 5-goal batch
+
+| Goal | Status | Evidence |
+|---|---|---|
+| G2 Agent factory (Convergio-like, no Convergio) | done | `factory/` built + smoke-tested (headless claude wrote haiku, exit 0); launchd nightly loaded |
+| G3 Kanban folder (todo/doing/done, not "ledger") | done | `kanban/` created, AGENTS.md wired |
+| G4 Cross-session context handoff | done | `handoff/` protocol + `handoff/latest.md` session brief |
