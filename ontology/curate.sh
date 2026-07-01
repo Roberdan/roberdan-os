@@ -42,8 +42,14 @@ if [ "$promoted" -gt 0 ]; then
   git_safe commit -m "chore(memory): promuovi $promoted agent-learning dalla quarantena" 2>/dev/null || true
 fi
 
-total="$(ls "$dest"/*.md 2>/dev/null | wc -l | tr -d ' ')"
-pending="$(grep -LE '^approved:[[:space:]]*true' "$quar"/*.md 2>/dev/null | wc -l | tr -d ' ')"
+# conteggi robusti: find non fallisce su dir vuota (a differenza di ls glob + set -e)
+total="$(find "$dest" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
+pending=0
+for q in "$quar"/*.md; do
+  [ -e "$q" ] || continue
+  grep -qE '^approved:[[:space:]]*true' "$q" || pending=$((pending+1))
+done
 printf -- '# igiene memoria — %s\n\n- promossi questo run: %s\n- note agent-learning totali: %s\n- candidati quarantena non approvati: %s\n\n## Proposte (gated, umano decide)\n- dedup semantico near-dup quando il provider embedding è attivo\n- tombstone retire: note RISOLTO/pre-v3 → agent-learnings/_archive/\n' \
   "$(date +%Y-%m-%d)" "$promoted" "$total" "$pending" > "$report"
 echo "curate: $promoted promossi · report → $report" >&2
+exit 0
