@@ -53,15 +53,16 @@ activate on top of this base.
 state on file, empirical terminal-condition, per-phase checkpoints, escalation, idempotent resume.
 The loop is reliable without a daemon; Convergio is an **optional** observer, never a single point of failure.
 
-**Goal ledger (durable, auditable, token-bounded — default).** A **kanban** in two files:
-- Active board [`docs/session-ledger.md`](docs/session-ledger.md) — **only `To Do` + `Doing`**,
-  kept ≤ ~20 rows. This is the only part read at session start (small → cheap).
-- Archive [`docs/ledger-archive.md`](docs/ledger-archive.md) — `Done`/`verified`, append-only,
-  **read only on demand** (audit/history) so it can grow without burning tokens.
+**Goal tracking = [`kanban/`](kanban/) (durable, auditable, token-bounded — default).** A real
+kanban board in three files: [`kanban/todo.md`](kanban/todo.md) (queued) ·
+[`kanban/doing.md`](kanban/doing.md) (in progress) · [`kanban/done.md`](kanban/done.md)
+(completed/verified, append-only).
 
-**Rule:** read the active board at session start before acting; update rows per phase; when a goal
-is `verified` (only `@thor` marks it), **move its row from the board to the archive**. Trust durable
-file state, not the conversation — this is what prevents losing goals across a long session.
+**Rule:** read `todo`+`doing` at session start before acting (they're small → cheap); move cards
+left→right per phase; a card reaches `done` **only when `verified` by `@thor`**. Only `todo`+`doing`
+are "hot" (loaded); `done` is the audit archive, read **on demand** so it can grow without burning
+tokens. Trust durable file state, not the conversation — this is what prevents losing goals across a
+long session.
 
 ## Memory & Self-Improvement (meta-loop)
 
