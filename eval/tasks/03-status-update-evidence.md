@@ -1,7 +1,7 @@
 ---
 id: 03-status-update-evidence
 category: status-update
-canon: behavior/roberto-mode.md
+canon: behavior/roberto-mode.md, behavior/roberto-voice.md
 ---
 
 # status-update-evidence
