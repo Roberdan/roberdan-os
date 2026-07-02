@@ -1,9 +1,0 @@
----
-name: premortem
-description: Premortem on a plan/launch/product/assumption/strategy/decision. Assumes it has ALREADY failed 6 months from now and works backward to find every cause. Produces a revised plan with the blind spots exposed. MANDATORY TRIGGERS: 'premortem this/questo', 'what could kill it', 'cosa può ucciderlo', 'stress-test this plan', 'stress-test questo piano', 'what am I missing', 'cosa mi sto perdendo', 'find the blind spots', 'trova i blind spot'. STRONG TRIGGERS: 'what could go wrong', 'cosa può andare storto', 'poke holes in this plan', 'buca questo piano', 'where does it break', 'dove si rompe', 'play devil's advocate', 'fai l'avvocato del diavolo'. Do NOT activate on simple feedback, factual questions. YES when there's a plan/commitment where being wrong is costly.
----
-
-# premortem (wrapper)
-
-Logica canonica: leggi `skills/premortem/skill.md` in roberdan-os. Questo è un wrapper
-generato da `bin/sync.sh` — non editarlo a mano.

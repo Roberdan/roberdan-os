@@ -33,9 +33,11 @@ Replaced by: **1 type + 1 human-gated hygiene job** that reuses existing types.
 ## Invariants (mechanical enforcement, not a promise)
 
 1. **Never auto-apply** changes to `behavior/ rules/ agents/ AGENTS.md` — evolve produces
-   **draft only**. Real enforcement in `hooks/post-task-sync.sh` (`git add -- platforms/`,
-   opt-in `RDA_AUTOSYNC=1`): auto-commit is scoped only to the deterministic wrappers in
-   `platforms/`; `test/validate.sh` does the **drift-check** (wrapper ≡ canon), not the allowlist.
+   **draft only**. `hooks/post-task-sync.sh` (opt-in `RDA_AUTOSYNC=1`) only regenerates the
+   `platforms/` wrappers locally on disk and never commits — `platforms/` is gitignored, not
+   tracked (2026-07-02 revision: wrappers were committed and diff-checked at ADR time; they
+   are now generated-only, verified by a determinism check in `test/validate.sh` instead of a
+   wrapper-vs-canon diff). Either way, evolve's own output stays confined to `proposals/`.
 2. **Single-writer on the vault** (Tolaria AutoGit `.git/index.lock`) — concurrent capture
    only writes to the staging inbox; a single serial process does the flush.
 3. **Privacy as code:** deny-list pattern (dossier `~/.roberdan-os/private/`, personal/medical
