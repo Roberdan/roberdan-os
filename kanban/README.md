@@ -39,3 +39,9 @@ way you'd treat a commit's author field — attributable, reviewable, not crypto
 
 Only `todo`+`doing` are loaded at session start (auto-injected by `hooks/context-inject.sh`); `done`
 is the audit archive → the board never bloats the context.
+
+## Meta-card budget
+
+Self-improvement cards (about roberdan-os itself) can crowd out external-facing ones if left
+unbounded — see the **Meta-Card Budget** rule in [`rules/best-practices.md`](../rules/best-practices.md)
+for the discipline norm (not a `kb.sh`-enforced gate).
