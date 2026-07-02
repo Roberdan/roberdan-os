@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # validate.sh — roberdan-os CI gate. Runs on every PR.
 # 1) frontmatter lint (agents vs skills: distinct schemas)  2) link check (exempts [[wikilink]])
-# 3) drift check (generation is deterministic)  4) shellcheck  5) leak check
+# 3) drift check (generation is deterministic)  4) shellcheck  5) leak check  8) sync.sh --install
+# skills symlink step (isolated, incl. emit-only must NOT touch it)
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
@@ -98,7 +99,11 @@ if bash test/test-factory-kb.sh >/dev/null 2>&1; then ok "kb gates + factory gua
 section "leak-check self-test — tier (b) salted-hash catches a planted leak"
 if bash test/test-leak-check.sh >/dev/null 2>&1; then ok "leak-check tiers verified (see bash test/test-leak-check.sh)"; else err "test-leak-check — see bash test/test-leak-check.sh"; fi
 
-# --- 8) eval/ harness (stub-mode pipeline test) -------------------------------
+# --- 8) sync.sh --install: skills symlink step (isolated, no real ~/.claude touched) ---
+section "sync.sh --install — skills symlink step (isolated via RDA_CLAUDE_SKILLS_DIR)"
+if bash test/test-sync-install.sh >/dev/null 2>&1; then ok "install symlink/skip logic verified (see bash test/test-sync-install.sh)"; else err "test-sync-install — see bash test/test-sync-install.sh"; fi
+
+# --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
 # eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The
 # actual with/without-canon comparison needs a real `claude` binary and Roberto's own machine —
 # what CI can verify is that the harness itself (run-eval.sh -> judge.sh -> report.sh) is
