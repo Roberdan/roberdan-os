@@ -12,6 +12,7 @@ behavior. `AGENTS.md` is the universal entry point; the runtime wrappers are gen
 
 Canon built (Phases 0-5). `test/validate.sh` green: frontmatter, links, drift,
 shellcheck, leak-check. Full plan in [`docs/plan.md`](docs/plan.md).
+Day-to-day operator guide (kb, factory, recall, gates): [`docs/USAGE.md`](docs/USAGE.md).
 
 | Component | Where |
 |---|---|
