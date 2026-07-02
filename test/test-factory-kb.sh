@@ -108,18 +108,54 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-section "factory: billing guard (no API-key billing on the Max plan)"
-if grep -q 'unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN' factory/run.sh; then
-  ok "factory/run.sh unsets ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN"
+# The two checks below started as `grep` on factory/run.sh source text — that only proves the
+# line exists, not that it works (e.g. a bug that wraps `unset ...` in a subshell would still
+# match the grep while silently breaking the guard for the actual child process). Verified this
+# empirically while writing these tests: a broken subshell version still passed the grep-only
+# check. Replaced with runtime assertions using a fake `claude` that reports what it actually saw.
+section "factory: billing guard is real (child process never sees the API-key env vars)"
+FAC5="$TMP/factory-billing"; mkdir -p "$FAC5/queue" "$FAC5/bin"
+cat > "$FAC5/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+env > "${CAPTURE_ENV:?}"
+exit 0
+EOF
+chmod +x "$FAC5/bin/claude"
+printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe\n' "$TMP" > "$FAC5/queue/billing.md"
+CAPENV="$TMP/billing-env.txt"
+env -i PATH="$FAC5/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FAC5" RDA_HANDOFF=/dev/null \
+  ANTHROPIC_API_KEY="probe-should-be-stripped" ANTHROPIC_AUTH_TOKEN="probe-should-be-stripped" \
+  CAPTURE_ENV="$CAPENV" \
+  bash factory/run.sh >/dev/null 2>&1
+if [ -f "$CAPENV" ] && ! grep -qE '^ANTHROPIC_(API_KEY|AUTH_TOKEN)=' "$CAPENV"; then
+  ok "billing guard verified at runtime: the child process env has no ANTHROPIC_API_KEY/AUTH_TOKEN"
 else
-  err "factory/run.sh does not unset the API-key env vars"
+  err "the child process COULD SEE ANTHROPIC_API_KEY/AUTH_TOKEN — billing guard is broken"
 fi
 
-section "factory: context-primer injection"
-if grep -q 'context-primer.md' factory/run.sh; then
-  ok "factory/run.sh references handoff/context-primer.md"
+section "factory: context-primer content actually reaches the prompt sent to claude"
+FAC6="$TMP/factory-primer"; mkdir -p "$FAC6/queue" "$FAC6/bin"
+cat > "$FAC6/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+# invoked as: claude -p "<prompt>" --dangerously-skip-permissions --add-dir <dir>
+printf '%s' "$2" > "${CAPTURE_PROMPT:?}"
+exit 0
+EOF
+chmod +x "$FAC6/bin/claude"
+PRIMER_FILE="$TMP/fake-primer.md"
+echo "SENTINEL-PRIMER-MARKER-98214" > "$PRIMER_FILE"
+printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe task body\n' "$TMP" > "$FAC6/queue/primer.md"
+CAPPROMPT="$TMP/received-prompt.txt"
+env -i PATH="$FAC6/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FAC6" RDA_HANDOFF=/dev/null RDA_PRIMER="$PRIMER_FILE" \
+  CAPTURE_PROMPT="$CAPPROMPT" \
+  bash factory/run.sh >/dev/null 2>&1
+if [ -f "$CAPPROMPT" ] && grep -q "SENTINEL-PRIMER-MARKER-98214" "$CAPPROMPT" \
+  && grep -q "probe task body" "$CAPPROMPT"; then
+  ok "primer content + task body both verified present in the actual prompt sent to claude -p"
 else
-  err "factory/run.sh does not inject the context-primer"
+  err "primer sentinel and/or task body missing from the prompt actually passed to claude -p"
 fi
 
 # ---------------------------------------------------------------------------
