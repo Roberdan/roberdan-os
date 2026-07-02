@@ -1,11 +1,11 @@
 # roberdan-os: a personal, cross-platform agentic operating system with local-first memory and a self-improving meta-loop
 
 **Author:** Roberto D'Angelo (Fight the Stroke Foundation) · developed in a human–agent pair with Claude (Anthropic)
-**Date:** 1 July 2026 · **Version:** 1.0 (English) · **Status:** operating system, single-user, single-machine
+**Date:** 2 July 2026 · **Version:** 1.1 (English) · **Status:** operating system, single-user, single-machine
 
-> **PDF:** not committed (build artifact — git history keeps old copies if ever needed). Regenerate
-> locally with pandoc + a LaTeX engine, e.g.
-> `pandoc docs/roberdan-os-paper-en.md -o roberdan-os-paper-en.pdf --pdf-engine=tectonic`.
+> **PDF:** not committed (build artifact — `docs/*.pdf` is gitignored). Regenerate locally with the
+> `make-pdf` skill: `~/.claude/skills/gstack/make-pdf/dist/pdf generate --cover --toc
+> docs/roberdan-os-paper-en.md docs/roberdan-os-paper-en.pdf`.
 
 ---
 
@@ -67,9 +67,14 @@ The attempt to migrate to a **local** embedding model (`bge-m3` via Ollama) init
 because the engine (gbrain) did not recognise the model's native dimensionality; a targeted
 two-line patch to its Ollama *recipe* made embedding genuinely **local** — on-device, free, no API
 key, GPU-served. The system is, by construction, **self-proposing, never self-applying** over
-behaviour. The guiding metaphor is *Remy*, the rat in *Ratatouille* who steers the chef from
-inside the hat: an intelligence that suggests, remembers, criticises and proposes from within the
-workflow, while the hands — and every irreversible decision — remain human.
+behaviour. A later evaluation round asked a harder, less flattering question — does the
+behavioural canon itself change agent output for the better — with a real (non-stubbed) A/B
+harness against a blind judge; we report the honest result (an even split, not a clean win) rather
+than the more convenient version, and trace the round's two worst scores to a defect in the
+evaluation method itself, not the canon, correcting both. The guiding metaphor is *Remy*, the rat
+in *Ratatouille* who steers the chef from inside the hat: an intelligence that suggests, remembers,
+criticises and proposes from within the workflow, while the hands — and every irreversible
+decision — remain human.
 
 ---
 
@@ -270,16 +275,47 @@ and irreversible (violating the human gate). 90% of the value comes from **one t
 (`agent-learning`) + **one human-gated hygiene job** that *reuses* the vault's existing ontology.
 Structure lives in **curation**, not in the **automation of judgement**.
 
-### 6.1 Governance: a durable, token-bounded goal ledger
+### 6.1 Governance: a durable, gated goal ledger
 
 A long session revealed a concrete failure: goals get *lost* when tracking relies on the
 conversation (volatile) or session-scoped task tools (not durable). The fix is a **durable,
-auditable goal ledger** — a two-file kanban: an *active board* (`To Do` + `Doing` only, kept small
-so it loads every session cheaply) and an append-only *archive* (`Done`/`verified`, read only on
-demand, so it can grow without burning tokens). The rule: read the board at session start, update
-per phase, and move a goal to the archive only when it is `verified` (by the done-gate agent). This
-makes "don't lose work" a mechanical property of durable file state, not a hope pinned on the
-model's memory — and it retired the need for a heavyweight orchestration daemon just for tracking.
+auditable goal ledger** — a file-per-card kanban (`todo/`, `doing/`, `done/`) with a small CLI
+(`kb`). Every card carries an explicit Definition of Done and Acceptance criteria, checked
+mechanically before it can move: `todo → doing` requires a human-supplied approval token
+(`kb start <id> --by roberto`); `doing → done` requires a done-gate agent's evidence string
+(`kb finish <id> --thor "<evidence>"`), never a bare status flip. The `--by` check is honestly
+documented as *discipline, not a security boundary* — any caller could type the approver's name —
+so every attempt, refused or not, is appended to the card as an audit line rather than silently
+trusted; the human gate's value is the visible trail, not an unforgeable lock. This makes "don't
+lose work" and "don't rubber-stamp completion" mechanical properties of durable file state, not a
+hope pinned on the model's memory — and it retired the need for a heavyweight orchestration daemon
+just for tracking.
+
+### 6.2 Autonomous execution: the agent factory
+
+Between sessions, a file-queue dispatcher (`factory/`) runs headless `claude -p` invocations
+against durable task files, unattended, on a schedule (`launchd`) or on demand — the same role a
+heavier daemon-based orchestrator would play, without requiring one running continuously. Its
+design absorbed two real failures from this evaluation round, both instructive beyond this one
+system:
+
+1. **A completed process is not a completed task.** The first live overnight run failed 4/4 (the
+   headless `claude` binary could not be resolved under the launcher's minimal environment) —  and
+   the dispatcher still filed every failed task as succeeded, because it moved files to `done/`
+   unconditionally rather than on the process's actual exit code. The kanban board kept reporting
+   "in progress" on tasks whose underlying process had died an hour earlier: a durable ledger is
+   only as honest as the process that writes to it. Fixed: a task only reaches `done/` on exit 0;
+   failure retries once, then escalates to a `failed/` state with an explicit flag, never silently
+   as success.
+2. **A successful process is not a correct one.** Exiting 0 proves the agent didn't crash, not that
+   its Definition of Done was met — the same "claims without evidence" gap the human-facing kanban
+   gate (§6.1) already closes for interactive work. Closing it for unattended work required a
+   second, independent headless pass: when a factory task names its originating kanban card, a
+   fresh `claude -p` call — with no memory of the first pass's claims — embodies the done-gate
+   agent and checks the card's actual Definition of Done against live repo state, ending in a
+   parsed `PASS`/`FAIL` verdict. A `FAIL` (or an unparseable verdict) is routed through the exact
+   same retry-then-escalate path a process crash already used, rather than a separate mechanism.
+   §9.3 documents a third, unrelated bug this same live-testing round surfaced through the factory.
 
 ---
 
@@ -383,6 +419,66 @@ no valid ZeroEntropy key was present and the OpenAI account was quota-exhausted 
 production path is harder: chunk-level over 51k chunks with reranking and autocut, versus a 291-page
 pure-cosine pool. Both are reported; neither is cherry-picked.
 
+### 9.2 Behavioural-canon A/B evaluation (quantitative, honest)
+
+§9.1 measures *retrieval* — whether the right memory is found. A separate question, asked for the
+first time in this evaluation round, is whether the *behavioural canon itself*
+(`behavior/roberto-mode.md`, `behavior/roberto-voice.md`, `rules/`, `skills/`) changes what a
+headless agent actually produces, and whether the change is an improvement. We built a small
+harness (`eval/`): **10 hand-written task fixtures** across six categories (code-fix, done-claim,
+status-update, email-draft, triage, code-review), each shipped with an explicit checklist of
+canon-compliant properties. Every fixture runs twice — condition A (no canon) and condition B
+(the declared canon file(s) prepended to the prompt) — against a real, non-stubbed `claude -p`
+call, then a third headless call blind-judges the pair on the checklist and holistically.
+
+**First run, honest result: the canon did not obviously win.** Across all 10 fixtures, 6/10
+preferred condition A (no canon) over B. Rather than discard or spin this, we read the actual
+transcripts (not just the scores) for the two worst cases and found the harness itself was at
+fault, not the canon: two fixtures declared `canon: skills/premortem/skill.md` and `canon:
+skills/focus-group/skill.md` — files written as a *procedure to execute* (a workflow with steps,
+sub-agent fan-out, a report structure), not passive background text. Prepending the whole file as
+inert context made the agent follow its literal ritual instead of answering the task directly —
+on the premortem fixture, condition B opened with a clarifying question ("how is success
+measured?") instead of the direct pushback the prompt asked for, scoring 2/10 against condition
+A's 9/10. This is an artefact of the injection method, not evidence the skill's content is bad; a
+skill is meant to be *invoked*, not pasted as context.
+
+**Fix and re-run.** `eval/report.sh` now separates skill-type canon (`skills/*/skill.md`) into a
+qualitative-only section, excluded from the aggregate score; a second, independent audit of all 10
+fixtures' `canon:` scoping (not just the flagged one) found one genuine gap — the
+`status-update-evidence` fixture declared only `roberto-mode.md` (the evidence/engineering canon)
+for a task that is as much about *voice* as evidence, and the judge had penalised the with-canon
+output for reading "more corporate/formal" than Roberto's characteristic brief warmth. Corrected
+to include `roberto-voice.md` alongside `roberto-mode.md`.
+
+**Core result, after both fixes, on the 8 remaining behaviour-file fixtures:** 4/8 preferred B
+(with canon), 4/8 preferred A — an even split, not a clean win. We report this without softening
+it. It is consistent with what the harness's own README states as a limit before any run: the
+judge is a third `claude` call from the same model family as the subject, not Roberto himself:
+compliance with a checklist is not proof of *his* preference. The honest reading is that the
+canon measurably changes output on small, targeted fixtures (all 10 tasks did produce different
+text, and the checklist-property scores — not just the holistic verdict — show real per-property
+shifts in both directions), but a same-model-family blind judge, on N=10, is not sufficient
+evidence that the change is net-positive. A sample of real transcripts read by Roberto himself is
+still the missing, non-delegable step (§10).
+
+### 9.3 A second audit finding, from realistic (non-stub) testing
+
+The same evaluation round ran the agent factory (§6, the autonomous headless-task dispatcher) end
+to end against a real `claude` binary for the first time — prior validation had only exercised it
+against scripted stub binaries. A single isolated probe task, asked to create a file "in the
+current working directory", wrote the file into the roberdan-os repository itself instead of its
+declared working directory. Root cause: the dispatcher passed `--add-dir <dir>` to the headless
+process, which grants filesystem *access* to that directory but does not change the process's
+actual working directory — every factory task ever run, including the one behind the retrieval
+numbers in this section, had been exposed to the same gap, masked only because most task prompts
+happen to use absolute paths. Fixed with an explicit `cd` before dispatch, verified by reverting
+the fix and confirming a new regression test reproduces the exact wrong-directory symptom, then
+restoring it. This is the same pattern as the §5.2 embedding-recipe defect: a logically-plausible
+mechanism (`--add-dir` "should" scope the process) that only breaks under a live run a stub or a
+code read cannot surface — reinforcing §11's principle that verification must be empirical, not
+inferred from reading code that looks correct.
+
 ## Case studies: without vs with the system
 
 To validate *value* (not just retrieval), we ran two discovery skills on a realistic business decision — a nonprofit about to launch a paid EUR 297, 8-week online coaching programme ("Fight Camp") for Italian parents of children with cerebral palsy, 50 seats. Both are real agent outputs, condensed and illustrative.
@@ -408,28 +504,54 @@ Run independently, premortem and focus-group **converged** on the same core insi
 
 ## 10. Limitations
 
-- **Local embedding just achieved, not yet consolidated.** After the patch (§5.2) the embedder is
-  local (`bge-m3` on GPU), and the full corpus re-embed completed; the multilingual recall *quality*
-  is content-limited (the vault holds mostly Microsoft career profiles, little stroke/disability
-  content). The patch lives in a local fork of gbrain and must be re-applied after an engine update.
-- **Built ≠ active-by-default (learned mid-session).** A recurring failure mode: mistaking "committed
-  to the repo" for "active in the live environment". Skills had to be *installed* to `~/.claude/skills/`
-  and capture *enabled* (`RDA_LEARN=1`) for the "by default" promise to hold — done, but only after
-  the gap was surfaced.
+- **Local embedding, now with a durability check.** The embedder is local (`bge-m3` on GPU); the
+  patch lives in a local fork of gbrain and must be re-applied after an engine update — the running
+  binary is a separately-published package, a different artefact from the fork's git history, so an
+  upgrade could silently drop the patch (config would still claim `bge-m3`; the code would silently
+  stop recognising it). A read-only durability check (`bin/check-embedder.sh`) now verifies both
+  agree, to be run after any upgrade — mitigation, not elimination, of the risk.
+- **Built ≠ active-by-default (a recurring failure mode, not a one-time lesson).** Mistaking
+  "committed to the repo" for "active in the live environment" surfaced repeatedly, in different
+  shapes: skills needing manual installation into `~/.claude/skills/`; a factory dispatcher whose
+  `--add-dir` flag *looked* like it scoped the process's working directory but didn't (§9.3); a
+  privacy check that existed as a script but was never wired to run automatically before a commit
+  (below). The generalisable lesson: a control that depends on someone remembering to invoke it is
+  not a control, and code that looks logically correct still needs a live run to confirm it behaves
+  as intended — reading the implementation is not sufficient evidence.
+- **A real privacy incident, and what it changed.** Mid-audit, a sub-agent verifying the privacy
+  split read the confidential local dossier and wrote real client names into a file that was then
+  committed and, briefly, pushed to the private remote before a later, unrelated CI run caught it.
+  The leak-check script that would have caught it already existed but only ran when manually
+  invoked. Remediated (corrected history, human-confirmed and human-executed remote rewrite — an
+  agent is not authorised to force-push, by design) and closed structurally: a `git` pre-commit hook
+  now runs the same check and blocks the commit itself, verified against both a planted leak (caught)
+  and a clean commit (passes). This is the sharpest instance of the "not a control until enforced"
+  lesson above, and the reason it is called out separately rather than folded into it.
+- **Canon compliance is not the same as canon preference.** §9.2's evaluation found the behavioural
+  canon an even 4/8 split against no-canon on blind-judged fixtures, after correcting two real
+  methodology defects in the harness itself. The result is reported without softening: a same-model
+  blind judge on a small, hand-written fixture set is real signal on whether output changes, but not
+  proof that the change is what Roberto himself would prefer. That verification is still owed and is
+  not delegable to another headless call (§12).
 - **Declared judgement seams.** `distill` writes `class: TODO` (no automatic classification) and
   `evolve` only fingerprint-diffs changelogs: both need an agent-in-the-loop. The design makes the
   gap harmless (curate rejects `TODO`; evolve is draft-only), but judgement is not automated — and
   should not be.
-- **Security must be tested, not assumed.** The audit showed the privacy invariant was a *textual
-  promise + human gate*, not code, until implemented. Invariants of a self-referential system must be
-  **tested**, because documentation can diverge from implementation.
 - **Residual sycophancy.** The focus-group mitigates but does not eliminate simulated-persona
   agreeableness; it is a tool for discovering questions and friction, not a substitute for real users.
 - **Single-user, single-machine.** Calibrated to one individual and one machine; cross-platform
   portability is designed but verified primarily on Claude Code.
 - **Self-modification risk.** A system that proposes changes to itself needs mechanical invariants
-  (draft-only, scoped git-add, human gates, deny-list); their robustness is an assumption to be
-  monitored continuously, not an acquired fact.
+  (draft-only, scoped git-add, human gates, deny-list, now a pre-commit privacy gate); their
+  robustness is an assumption to be monitored continuously, not an acquired fact — this evaluation
+  round is itself evidence that new instances of "looks enforced but isn't" keep surfacing as the
+  system grows, not that the last one found was the last one there is.
+- **The system still mostly audits itself.** Every closed goal-ledger item through this evaluation
+  round has been the system building, testing, or judging itself — none yet a delivered artefact in
+  Roberto's actual external work (his flagship project, the Foundation, his day job). Recognised
+  explicitly rather than hidden: the internal backlog is close to structurally exhausted (open items
+  are gated on his decisions, not on more internal work to invent), which is the intended exit
+  condition, not a stall — see §12.
 
 ---
 
@@ -452,14 +574,25 @@ Run independently, premortem and focus-group **converged** on the same core insi
 
 ## 12. Future work
 
-- **Consolidate local embedding:** measure post-migration multilingual recall quality, and propose
-  the patch upstream to gbrain (register `bge-m3`@1024) so a local fork is unnecessary.
+The single highest-value next step, named explicitly rather than deferred indefinitely: **point the
+system at real external work and measure it there**, not at itself. Three concrete, scoped pilots
+are already queued in the goal ledger, each requiring Roberto's own scoping decision before an
+agent can start (consistent with §6.1's human gate — this is not busywork the system invented for
+itself): a real contribution to his flagship engineering project using the system's evidence-first
+discipline, an output for the Foundation grounded in its own ingested documents rather than a
+demo fixture, and a single real day (not a full week, to de-risk the pilot's scope) of his actual
+inbox/communications triage assisted by the digital twin, assessed on his own subjective judgement
+of time and quality — not another internal audit.
+
+Remaining technical work:
+- **Close the canon-preference gap (§9.2/§10):** a sample of real, with-canon transcripts read by
+  Roberto himself — the step no headless judge can substitute for.
 - Verify real portability on Copilot and Codex (not merely designed).
 - Automatic capture from session transcripts (today agent-driven).
 - Focus-group panels calibrated on real audiences with consent.
 - Longitudinal meta-loop metrics (how many promoted learnings survive review).
-- Quantitative evaluation: measured recall/precision on a labelled query set; ablations of the
-  meta-loop components.
+- Propose the local-embedding patch upstream to gbrain (register `bge-m3`@1024 natively) so a
+  local fork and its durability check are no longer necessary.
 
 ## 13. Conclusion
 
@@ -475,9 +608,14 @@ judgement.
 ### Reproducibility and artefacts
 
 Code and canon: git repository `roberdan-os` (private remote `github.com/Roberdan/roberdan-os`,
-~24 commits as of 1 July 2026), entirely in English. Memory: Obsidian vault (local-first) + gbrain
+~72 commits as of 2 July 2026), entirely in English. Memory: Obsidian vault (local-first) + gbrain
 (local Postgres/pgvector); embedding **local** `ollama:bge-m3`@1024 (via a patch to gbrain's Ollama
-recipe, commit `f7376b11`). Scheduling: `launchd`. Governance: durable goal-ledger kanban. The
-optional heavyweight orchestrator (Convergio) was retired (idle, reversible). Canon, memory,
-orchestration **and** embedding are local-first — no cloud service or API key for core operation.
-Empirical checks and audit reproducible via `test/validate.sh`, `ollama ps`, and `gbrain` queries.
+recipe, commit `f7376b11`; durability verified by `bin/check-embedder.sh`). Scheduling: `launchd`.
+Governance: gated goal-ledger kanban (`kb`, §6.1) + an autonomous headless task factory with a
+process-verifying second pass (`factory/`, §6.2). Evaluation: a real (non-stubbed) A/B behavioural
+harness (`eval/`, §9.2) and a labelled retrieval query set (§9.1). The optional heavyweight
+orchestrator (Convergio) was retired (idle, reversible). Canon, memory, orchestration, evaluation
+**and** embedding are local-first — no cloud service or API key for core operation. Empirical checks
+reproducible via `test/validate.sh` (9 gates, including a privacy pre-commit hook and a factory/kb
+regression suite), `bash eval/run-eval.sh && bash eval/judge.sh && bash eval/report.sh`, `ollama ps`,
+and `gbrain` queries.
