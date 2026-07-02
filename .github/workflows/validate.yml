@@ -13,5 +13,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck jq
       - name: Run validate.sh
         run: bash test/validate.sh
-        # NB: leak-check degrades to no-op without private/.denylist (absent in CI):
-        # the denylist is local-only. The confidential gate runs locally pre-commit.
+        # NB: leak-check has 3 tiers (see test/leak-check.sh, AGENTS.md § Privacy):
+        # (a) private/.denylist — local-only, never present in CI, runs pre-commit instead.
+        # (b) test/denylist.sha256 — salted-hash check, CI-safe (checks without revealing the
+        #     denylist), activates once Roberto runs bin/update-denylist-hashes.sh locally and
+        #     commits the result.
+        # (c) neither present — no-op (today's default until (b) is committed).
