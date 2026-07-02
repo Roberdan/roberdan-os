@@ -4,7 +4,7 @@ Questo documento persiste l'analisi prodotta dal modello **Fable** a inizio sess
 di 10 azioni che ne è derivato, con lo stato di esecuzione di ciascuna — fino a qui esisteva solo
 nella conversazione, non sul filesystem. Vedi anche [`docs/adversarial-judgment-2026-07-01.md`](adversarial-judgment-2026-07-01.md)
 (due giudizi adversarial indipendenti successivi, che confermano/estendono questa analisi) e
-[`handoff/latest.md`](../handoff/latest.md) (narrativa di sessione).
+[`handoff/latest.md`](../../handoff/latest.md) (narrativa di sessione).
 
 ## Input: analisi Fable (verbatim, inizio sessione)
 
