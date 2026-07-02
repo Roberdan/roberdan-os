@@ -4,15 +4,25 @@
 #
 #   bin/sync.sh --emit-only   (safe DEFAULT) generates into platforms/{claude,copilot,codex}/
 #                             does NOT touch the live ~/.claude. Also used by post-task-sync.sh.
-#   bin/sync.sh --install     (GATED) installs the wrappers into the real targets. REFUSES to
-#                             overwrite an existing ~/.claude/CLAUDE.md: it only prints the
-#                             pointer block to add by hand.
+#   bin/sync.sh --install     (GATED) installs into the real targets, defensively:
+#                             - CLAUDE.md: REFUSES to overwrite an existing ~/.claude/CLAUDE.md;
+#                               only prints the pointer block to add by hand.
+#                             - skills: for each generated platforms/claude/skills/<name>/SKILL.md,
+#                               if ~/.claude/skills/<name>/ does NOT exist yet, creates it and
+#                               symlinks SKILL.md to the repo's generated wrapper (stays in sync
+#                               automatically as the canon changes — no static copy to drift).
+#                               If ~/.claude/skills/<name>/ already exists (e.g. same-named skill
+#                               from another skill system such as gstack), SKIPs it explicitly —
+#                               never a silent overwrite.
+#                             - agents/hooks: still NOT installed by this script (manual/approve).
 #
 # platforms/ is NOT committed to git (it's fully generated — see .gitignore). Run
 # --emit-only locally whenever you need the wrappers on disk; test/validate.sh's drift
 # check verifies generation is deterministic instead of diffing against committed output.
 #
 # Output dir override (for the determinism check in test/validate.sh): RDA_SYNC_OUT.
+# Skills install dir override (for the isolated install test): RDA_CLAUDE_SKILLS_DIR
+# (default $HOME/.claude/skills).
 #
 # Deterministic output: no timestamps, no unstable ordering.
 set -euo pipefail
@@ -200,6 +210,30 @@ if [ "$MODE" = "install" ]; then
     echo "Canonical behavior in ~/GitHub/roberdan-os/AGENTS.md — read that."
     echo "--->8---"
   fi
-  echo "Real install of skills/agents/hooks into ~/.claude: NOT performed by this script"
+
+  # Skills → symlink install (defensive: never overwrite, never delete). For each
+  # generated wrapper platforms/claude/skills/<name>/SKILL.md, if ~/.claude/skills/<name>/
+  # does not exist yet, create it and symlink SKILL.md to the repo's generated wrapper — so
+  # it stays in sync automatically whenever the canon changes (no static copy to drift).
+  # If ~/.claude/skills/<name>/ already exists (e.g. a same-named skill from another skill
+  # system such as gstack), SKIP it explicitly rather than silently overriding it.
+  SKILLS_DIR="${RDA_CLAUDE_SKILLS_DIR:-$CL/skills}"
+  echo ""
+  echo "--- skills install (symlink, into $SKILLS_DIR) ---"
+  mkdir -p "$SKILLS_DIR"
+  for w in $(list "$P/claude/skills" "SKILL.md" 2); do
+    sname="$(basename "$(dirname "$w")")"
+    target="$SKILLS_DIR/$sname"
+    if [ -e "$target" ]; then
+      echo "SKIP $sname: già presente in $target/ (verifica manualmente se è una collisione con un altro sistema di skill, es. gstack)"
+      continue
+    fi
+    mkdir -p "$target"
+    ln -s "$w" "$target/SKILL.md"
+    echo "INSTALL $sname: symlink $target/SKILL.md -> $w"
+  done
+
+  echo ""
+  echo "Real install of agents/hooks into ~/.claude: NOT performed by this script"
   echo "in unsupervised mode. Run the copies manually or approve the gate."
 fi
