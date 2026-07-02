@@ -1,7 +1,7 @@
 ---
 name: best-practices
-version: "3.0.0"
-last_updated: "2026-05-01"
+version: "3.1.0"
+last_updated: "2026-07-02"
 ---
 
 # Best Practices
@@ -49,6 +49,17 @@ Every changed line in a diff should trace directly to the user's request. Don't 
 ## Documentation
 
 JSDoc / docstrings for public APIs (WHY, not WHAT). CHANGELOG: `## [vX.Y.Z] - date` → `### Added | Changed | Fixed`. Keep TROUBLESHOOTING.md current.
+
+## Documentation Budget
+
+A system that documents itself more than it does the work is a smell. Keep meta-documentation to:
+
+- **One living plan**: `docs/plan.md`. Not a plan per session — the plan, updated in place.
+- **One living handoff**: `handoff/latest.md`. Not a handoff per session — overwritten each time, git history is the log.
+- **Dated session artifacts** (plans, judgments, test reports tied to a specific date) move to `docs/archive/` once their actions are closed. They stay for reference; nothing there is maintained going forward.
+- **No build artifacts** (PDF, generated bundles, compiled output) committed to git. Regenerate from source; git history keeps old copies if ever needed.
+
+The behavioral canon (`AGENTS.md`, `behavior/`, `rules/`, `agents/`) must always outweigh the system's self-documentation. If a repo has more words describing its own process than governing actual behavior, that's a sign the process writing has run away — prune it back to the living plan + living handoff, archive the rest.
 
 ## API Conventions
 
