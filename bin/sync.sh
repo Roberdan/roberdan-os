@@ -8,6 +8,12 @@
 #                             overwrite an existing ~/.claude/CLAUDE.md: it only prints the
 #                             pointer block to add by hand.
 #
+# platforms/ is NOT committed to git (it's fully generated — see .gitignore). Run
+# --emit-only locally whenever you need the wrappers on disk; test/validate.sh's drift
+# check verifies generation is deterministic instead of diffing against committed output.
+#
+# Output dir override (for the determinism check in test/validate.sh): RDA_SYNC_OUT.
+#
 # Deterministic output: no timestamps, no unstable ordering.
 set -euo pipefail
 
@@ -22,7 +28,7 @@ case "${1:-}" in
   *) echo "sync.sh: unknown flag '$1' (use --emit-only | --install)" >&2; exit 2 ;;
 esac
 
-P="$ROOT/platforms"
+P="${RDA_SYNC_OUT:-$ROOT/platforms}"
 
 # Extracts a simple YAML frontmatter field (name:/description:) from a file.
 fm() { grep -m1 -E "^$2:" "$1" 2>/dev/null | sed -E "s/^$2:[[:space:]]*//; s/^[\"']//; s/[\"']$//"; }
@@ -180,7 +186,7 @@ emit_copilot
 emit_codex
 emit_hermes
 emit_chatgpt
-echo "sync: wrappers emitted into platforms/ (claude, copilot, codex, chatgpt, hermes)."
+echo "sync: wrappers emitted into $P (claude, copilot, codex, chatgpt, hermes)."
 
 if [ "$MODE" = "install" ]; then
   echo ""

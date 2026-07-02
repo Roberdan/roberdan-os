@@ -3,7 +3,9 @@
 > **Universal entry point.** Every tool (Claude Code, GitHub Copilot CLI+VS Code, Codex,
 > ChatGPT/Claude web) reads this file as the single canonical source of Roberto D'Angelo's
 > agentic behavior. The logic lives here once; the per-platform runtime wrappers are
-> **generated** by [`bin/sync.sh`](bin/sync.sh), never copied by hand.
+> **generated** by [`bin/sync.sh`](bin/sync.sh), never copied by hand — and never committed
+> to the repo. Run `bin/sync.sh --emit-only` to generate them locally into `platforms/`
+> (gitignored), or `bin/sync.sh --install` to install them into the real per-tool targets.
 
 **Principle:** centralized knowledge, per-platform execution, behavior unified
 by `roberto-mode`. `AGENTS.md` is the universal standard; `CLAUDE.md` and
