@@ -6,6 +6,19 @@
 # Resumable: skips a task+condition pair whose output file already exists, unless --force.
 # Binary resolution + billing safety mirror factory/run.sh exactly (see eval/lib.sh).
 #
+# KNOWN LIMITATION — canon: skills/*/skill.md: this script prepends ANY declared canon file
+# verbatim as passive text, including skill files, purely for mechanical uniformity (one
+# injection code path for every canon type). That is a faithful mirror of how behavior/*.md and
+# rules/*.md canon actually reaches a real session, but NOT of how a skill file does — a skill is
+# meant to be INVOKED (Skill-tool procedure), not read as prose context. Prepending a skill file's
+# full procedural body ahead of a task can make the agent perform the skill's own intake ritual
+# (e.g. "clarify what success looks like first") even when the task wants a direct single-shot
+# answer. This is a known, already-observed effect (see eval/README.md and the "Skill-type canon
+# tasks" section of eval/report.sh's output) — it is not fixed here because the fix lives in
+# aggregation, not injection: eval/report.sh runs and judges these tasks like any other but
+# reports them separately and excludes them from the aggregate, rather than pretending
+# prepend-as-context is a fair test of a file meant to be invoked.
+#
 # --stub    : label outputs as stub runs. Does NOT itself provide a fake `claude` — the caller
 #             (a human, or eval/test-eval-pipeline.sh) is expected to have already put a fake
 #             `claude` earlier on PATH, exactly the way test/test-factory-kb.sh stubs

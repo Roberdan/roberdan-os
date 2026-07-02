@@ -60,9 +60,41 @@ def extract_json_block(text):
         return None
 
 
-rows = []          # per-task summary rows
-canon_stats = {}    # canon file -> {"n":..,"gap_sum":..,"b_wins":..,"a_wins":..,"ties":..}
-holistic_counts = {"output_b": 0, "output_a": 0, "tie": 0, "unparsed": 0}
+# --- skill-type canon detection --------------------------------------------------------
+# A task whose `canon:` points at a skills/<name>/skill.md (or SKILL.md) file is measured
+# differently from one pointing at behavior/*.md or rules/*.md. A skill file is a PROCEDURAL
+# WORKFLOW meant to be EXECUTED (Skill tool invocation: multi-step ritual, often parallel
+# sub-agents, file outputs) — not passive context meant to be READ before answering. run-eval.sh
+# still prepends the whole skill file verbatim as condition-B context (same injection as
+# behavior/rules canon, for mechanical uniformity), but that is a known mismatch: an agent that
+# faithfully follows a skill file read as context will perform the skill's *intake ritual*
+# (e.g. premortem's "clarify what success looks like first") even when the task calls for a
+# direct, single-shot answer — which is exactly what a real Skill-tool invocation would NOT do
+# for a task like "talk me through it" (the skill system decides whether/how to invoke, a raw
+# text prepend cannot). Scoring that against a checklist built for a direct answer isn't a fair
+# test of "does the canon help" — it's a test of "does dumping a workflow as text derail a
+# single-shot answer," which is a different, already-known-true claim. See eval/README.md.
+#
+# So: skill-type tasks are EXCLUDED from the aggregate summary and the per-canon-file ranking
+# (they would otherwise dominate/distort "which canon file mattered most" with a signal that
+# isn't about the canon's content). They are still run and judged (real, non-stub data) and
+# reported in a separate table below, for qualitative reference and to keep this limitation
+# visible rather than silently averaged away.
+#
+# Simplification: if a task lists MULTIPLE canon files and ANY of them is skill-type, the WHOLE
+# task is treated as skill-type (none of the 10 current fixtures mixes skill + non-skill canon,
+# so this doesn't currently bite — flagged here so it doesn't surprise a future fixture author).
+SKILL_CANON_RE = re.compile(r"^skills/[^/]+/skill\.md$", re.IGNORECASE)
+
+
+def is_skill_canon(canon_files):
+    return any(SKILL_CANON_RE.match(cf) for cf in canon_files)
+
+
+rows = []           # per-task summary rows (core, i.e. non-skill-type canon)
+skill_rows = []      # per-task summary rows for skill-type canon tasks (qualitative only)
+canon_stats = {}     # canon file -> {"n":..,"gap_sum":..,"b_wins":..,"a_wins":..,"ties":..} (core only)
+holistic_counts = {"output_b": 0, "output_a": 0, "tie": 0, "unparsed": 0}  # core only
 had_stub_marker = False
 
 task_files = sorted(glob.glob(os.path.join(tasks_dir, "*.md")))
@@ -72,14 +104,16 @@ for tf in task_files:
     category = fm.get("category", "?")
     canon = fm.get("canon", "")
     canon_files = [c.strip() for c in canon.split(",") if c.strip()]
+    skill_type = is_skill_canon(canon_files)
+    target_rows = skill_rows if skill_type else rows
 
     verdict_path = os.path.join(results_dir, tid, "verdict.md")
     a_path = os.path.join(results_dir, tid, "a.md")
     b_path = os.path.join(results_dir, tid, "b.md")
 
     if not os.path.exists(verdict_path):
-        rows.append({"id": tid, "category": category, "canon": canon,
-                     "score_a": "-", "score_b": "-", "winner": "no verdict"})
+        target_rows.append({"id": tid, "category": category, "canon": canon,
+                            "score_a": "-", "score_b": "-", "winner": "no verdict"})
         continue
 
     vtext = open(verdict_path, encoding="utf-8", errors="replace").read()
@@ -90,9 +124,10 @@ for tf in task_files:
 
     obj = extract_json_block(vtext)
     if not obj or not order1:
-        rows.append({"id": tid, "category": category, "canon": canon,
-                     "score_a": "-", "score_b": "-", "winner": "unparseable"})
-        holistic_counts["unparsed"] += 1
+        target_rows.append({"id": tid, "category": category, "canon": canon,
+                            "score_a": "-", "score_b": "-", "winner": "unparseable"})
+        if not skill_type:
+            holistic_counts["unparsed"] += 1
         continue
 
     props = obj.get("properties", [])
@@ -110,31 +145,36 @@ for tf in task_files:
     winner_cond = slot_to_cond.get(hv)
     if winner_cond == "b":
         winner = "B (with canon)"
-        holistic_counts["output_b"] += 1
+        if not skill_type:
+            holistic_counts["output_b"] += 1
     elif winner_cond == "a":
         winner = "A (no canon)"
-        holistic_counts["output_a"] += 1
+        if not skill_type:
+            holistic_counts["output_a"] += 1
     elif hv == "tie":
         winner = "tie"
-        holistic_counts["tie"] += 1
+        if not skill_type:
+            holistic_counts["tie"] += 1
     else:
         winner = "unparsed"
-        holistic_counts["unparsed"] += 1
+        if not skill_type:
+            holistic_counts["unparsed"] += 1
 
-    rows.append({"id": tid, "category": category, "canon": canon,
-                 "score_a": f"{score_a}/{max_possible}", "score_b": f"{score_b}/{max_possible}",
-                 "winner": winner})
+    target_rows.append({"id": tid, "category": category, "canon": canon,
+                        "score_a": f"{score_a}/{max_possible}", "score_b": f"{score_b}/{max_possible}",
+                        "winner": winner})
 
-    for cf in canon_files:
-        st = canon_stats.setdefault(cf, {"n": 0, "gap_sum": 0, "b_wins": 0, "a_wins": 0, "ties": 0})
-        st["n"] += 1
-        st["gap_sum"] += (score_b - score_a)
-        if winner_cond == "b":
-            st["b_wins"] += 1
-        elif winner_cond == "a":
-            st["a_wins"] += 1
-        elif hv == "tie":
-            st["ties"] += 1
+    if not skill_type:
+        for cf in canon_files:
+            st = canon_stats.setdefault(cf, {"n": 0, "gap_sum": 0, "b_wins": 0, "a_wins": 0, "ties": 0})
+            st["n"] += 1
+            st["gap_sum"] += (score_b - score_a)
+            if winner_cond == "b":
+                st["b_wins"] += 1
+            elif winner_cond == "a":
+                st["a_wins"] += 1
+            elif hv == "tie":
+                st["ties"] += 1
 
 lines = []
 lines.append("# eval report")
@@ -146,7 +186,7 @@ if stub or had_stub_marker:
     lines.append("> harness mechanics (see `eval/test-eval-pipeline.sh`). They are NOT a real")
     lines.append("> behavioral measurement — see `eval/README.md` for what has and hasn't been run.")
 lines.append("")
-lines.append("## Per-task results")
+lines.append("## Per-task results (core — behavior/rules canon, aggregated below)")
 lines.append("")
 lines.append("| Task | Category | Canon file(s) | Score A (no canon) | Score B (with canon) | Holistic winner |")
 lines.append("|---|---|---|---|---|---|")
@@ -154,17 +194,24 @@ for r in rows:
     lines.append(f"| {r['id']} | {r['category']} | {r['canon']} | {r['score_a']} | {r['score_b']} | {r['winner']} |")
 
 judged = holistic_counts["output_a"] + holistic_counts["output_b"] + holistic_counts["tie"]
+core_n = len(rows)
 lines.append("")
-lines.append("## Summary")
+lines.append("## Summary (core tasks only)")
 lines.append("")
-lines.append(f"- Tasks with a parsed verdict: **{judged}** / {len(task_files)}")
+lines.append(f"- Core tasks with a parsed verdict: **{judged}** / {core_n}")
 lines.append(f"- B (with canon) preferred: **{holistic_counts['output_b']}**")
 lines.append(f"- A (no canon) preferred: **{holistic_counts['output_a']}**")
 lines.append(f"- Tie: **{holistic_counts['tie']}**")
 if holistic_counts["unparsed"]:
     lines.append(f"- Unparseable / missing verdicts: **{holistic_counts['unparsed']}**")
+if skill_rows:
+    lines.append(f"- Plus **{len(skill_rows)}** skill-type canon task(s), judged but excluded from this")
+    lines.append("  summary and from the per-canon-file ranking below — see \"Skill-type canon tasks\" section.")
 lines.append("")
 lines.append("### Which canon file mattered most (avg score gap, B minus A)")
+lines.append("")
+lines.append("_Core (`behavior/*.md`, `rules/*.md`, `AGENTS.md`) canon files only — see methodology note below")
+lines.append("for why skill files are excluded from this ranking._")
 lines.append("")
 if canon_stats:
     lines.append("| Canon file | Tasks | Avg gap (B-A) | B wins | A wins | Tie |")
@@ -173,8 +220,45 @@ if canon_stats:
         avg_gap = st["gap_sum"] / st["n"] if st["n"] else 0
         lines.append(f"| {cf} | {st['n']} | {avg_gap:+.2f} | {st['b_wins']} | {st['a_wins']} | {st['ties']} |")
 else:
-    lines.append("_No judged tasks yet — run `eval/run-eval.sh` then `eval/judge.sh` first._")
+    lines.append("_No judged core tasks yet — run `eval/run-eval.sh` then `eval/judge.sh` first._")
 
+lines.append("")
+lines.append("## Skill-type canon tasks (qualitative only — NOT in the aggregate above)")
+lines.append("")
+lines.append("Tasks whose `canon:` points at a `skills/<name>/skill.md` file. Excluded from the")
+lines.append("core summary and per-canon-file ranking above — see the methodology note immediately")
+lines.append("below for why. Still run and judged for real (not stubbed out), and shown here so the")
+lines.append("data isn't hidden, just kept from silently distorting the aggregate.")
+lines.append("")
+if skill_rows:
+    lines.append("| Task | Category | Canon file(s) | Score A (no canon) | Score B (with canon) | Holistic winner |")
+    lines.append("|---|---|---|---|---|---|")
+    for r in skill_rows:
+        lines.append(f"| {r['id']} | {r['category']} | {r['canon']} | {r['score_a']} | {r['score_b']} | {r['winner']} |")
+else:
+    lines.append("_No skill-type canon tasks in this run._")
+lines.append("")
+lines.append("### Methodology note: why skill-type canon is excluded from the aggregate")
+lines.append("")
+lines.append("A file under `behavior/` or `rules/` is written to be **read as context** — prose")
+lines.append("guidance an agent should keep in mind while answering. A file under `skills/*/skill.md`")
+lines.append("is written to be **executed as a procedure** (a named Skill invocation: an explicit")
+lines.append("multi-step ritual, often parallel sub-agents, file outputs to `~/.claude/reports/`).")
+lines.append("Condition B in this harness prepends the canon file verbatim as passive text before")
+lines.append("the task — a faithful mirror of how `behavior/`/`rules/` canon actually reaches a real")
+lines.append("session, but NOT how a skill actually reaches one (a skill is invoked, not pasted).")
+lines.append("")
+lines.append("Observed effect on real (non-stub) runs: for `09-feature-bet-premortem`")
+lines.append("(canon: `skills/premortem/skill.md`), the agent followed the skill's intake ritual —")
+lines.append("which requires clarifying \"what does success look like\" before proceeding — and")
+lines.append("answered with a clarifying question instead of the direct, substantial take the task")
+lines.append("(\"Talk me through it\") asked for. Same dynamic suspected for")
+lines.append("`08-product-launch-signoff` (canon: `skills/focus-group/skill.md`). Both score A over B")
+lines.append("as a result. That is real signal, but about **the injection method**, not about")
+lines.append("whether the premortem/focus-group skills are good canon — it would recur for any")
+lines.append("procedural skill file pasted as passive context ahead of a single-shot-answer task.")
+lines.append("Treat these two rows as a demonstrated known limitation of prepend-as-context for")
+lines.append("skill-type canon, not as \"the canon lost.\"")
 lines.append("")
 lines.append("## What this does and doesn't prove")
 lines.append("")
@@ -194,6 +278,9 @@ lines.append("  is the same caveat the paper makes about focus-group persona syc
 lines.append("  simulated evaluator can still be systematically wrong in ways it can't see.")
 lines.append("- Robustness — each task ran once; no repeated trials to measure variance across")
 lines.append("  runs, and only one judge model was used (no cross-model judging).")
+lines.append("- Anything about skill-type canon (`skills/*/skill.md`) — see the dedicated section")
+lines.append("  above. Prepend-as-context is a known-bad fit for a file meant to be invoked, so")
+lines.append("  those 2 fixtures are reported qualitatively only, never averaged into the 8 above.")
 lines.append("")
 
 with open(out_path, "w", encoding="utf-8") as f:

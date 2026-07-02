@@ -34,8 +34,12 @@ sample worth showing him, it doesn't replace the showing.
    - **A — no canon.** The task prompt only, exactly as a naive agent with no `AGENTS.md`/
      `CLAUDE.md` pointer would see it.
    - **B — with canon.** The task's declared canon file(s) prepended verbatim, then the task —
-     mirroring how `AGENTS.md`/`CLAUDE.md` actually inject `behavior/`/`rules/`/`skills/`
-     content into a real session (see `bin/sync.sh`).
+     mirroring how `AGENTS.md`/`CLAUDE.md` actually inject `behavior/`/`rules/` content into a
+     real session (see `bin/sync.sh`). **Caveat for `skills/*/skill.md` canon:** a skill file is
+     written to be **invoked** (an explicit Skill-tool procedure — multi-step ritual, often
+     parallel sub-agents), not pasted as passive context; prepend-as-context is a known mismatch
+     for that file type, not a faithful mirror of real skill injection. `eval/report.sh` excludes
+     those tasks from the aggregate for this reason — see its "Skill-type canon tasks" section.
 
    Both conditions invoke the same headless `claude -p` call, resolved the same way
    `factory/run.sh` resolves it (PATH, then a fixed fallback list), with the same billing-safety
@@ -58,7 +62,11 @@ sample worth showing him, it doesn't replace the showing.
    task × property-scores-A × property-scores-B × holistic-verdict table, a win/loss/tie summary,
    a "which canon file mattered most" breakdown (average score gap B−A per canon file, so you can
    see whether e.g. `roberto-voice.md` moves the needle more than `thinking-toolkit.md`), and the
-   same "what this does and doesn't prove" section as this README.
+   same "what this does and doesn't prove" section as this README. Tasks whose `canon:` matches
+   `skills/*/skill.md` (case-insensitive) are run and judged like any other, but reported in a
+   **separate, qualitative-only table** and excluded from the aggregate summary and the
+   per-canon-file ranking — see the "Skill-type canon tasks" section `report.sh` generates, and
+   the caveat under condition B above.
 
 ## What's real vs. what's stub
 
