@@ -19,3 +19,7 @@ platforms/
 # Regenerate on demand; see eval/README.md. Commit a specific eval/results/report.md by hand
 # (force-add) if you want to keep a dated snapshot.
 eval/results/
+.gstack/
+
+# Build artifact — regenerate with the make-pdf skill against docs/roberdan-os-paper-en.md.
+docs/*.pdf
