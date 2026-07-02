@@ -1,13 +1,13 @@
 # Copilot instructions → roberdan-os
 
-La fonte canonica del comportamento è `AGENTS.md` in roberdan-os. Copilot legge questo
-file thin: per il comportamento completo segui `AGENTS.md` (Behavior, Rules, Agents,
-Loop Protocol, Gate umani).
+The canonical source of behavior is `AGENTS.md` in roberdan-os. Copilot reads this
+thin file: for the full behavior follow `AGENTS.md` (Behavior, Rules, Agents,
+Loop Protocol, Human gates).
 
 ## Behavior
-- Engineering: `behavior/roberto-mode.md` — autonomia, evidence-first, done-criteria, quality gate.
-- Voice: `behavior/roberto-voice.md` — drafting/triage nella voce di Roberto.
-- Thinking: `behavior/thinking-toolkit.md` — first-principles, Feynman, framework selettivi.
+- Engineering: `behavior/roberto-mode.md` — autonomy, evidence-first, done-criteria, quality gate.
+- Voice: `behavior/roberto-voice.md` — drafting/triage in Roberto's voice.
+- Thinking: `behavior/thinking-toolkit.md` — first-principles, Feynman, selective frameworks.
 
 ## Rules
 - `rules/constitution.md` · `rules/best-practices.md`

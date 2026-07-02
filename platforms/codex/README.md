@@ -1,7 +1,7 @@
 # Codex → roberdan-os
 
-Codex legge `AGENTS.md` nativamente dalla root del repo. Nessun wrapper necessario:
-punta Codex alla root di roberdan-os (o symlinka `AGENTS.md` nel repo target).
+Codex reads `AGENTS.md` natively from the repo root. No wrapper needed: point Codex
+at the roberdan-os root (or symlink `AGENTS.md` into the target repo).
 
-Config snippet (se serve un instructions-file esplicito):
+Config snippet (if an explicit instructions file is needed):
     codex --instructions "$RDA_OS/AGENTS.md"
