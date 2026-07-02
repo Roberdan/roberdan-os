@@ -1,50 +1,83 @@
-# Handoff — session 2026-06-30 → 07-01 (roberdan-os hardening)
+# Handoff — session 2026-07-01 → 07-02 (factory reliability + privacy hardening)
 
-**For a fresh agent:** read this + `kanban/todo.md`+`doing.md` + `MEMORY.md`, then `gbrain search`
+**For a fresh agent:** read this + `kanban/todo/`+`doing/` + `MEMORY.md`, then `gbrain search`
 what you need. You'll have the full working context without the (huge) original conversation.
 
 ## What this session did (the story so far)
 
-Started as "who are you / is the memory usable across tools?" and became a full hardening of
-**roberdan-os** into a real, active, English, private, self-improving personal agentic OS. Delivered:
-meta-loop (capture/distill/curate/evolve, launchd), memory migrated to the vault (cross-platform),
-**local embedding fixed** (gbrain patched for `ollama:bge-m3`@1024 — commit `f7376b11`; recall IT
-0→working, measured MRR 1.0 vs 0.41 for a non-multilingual local model), 3 discovery skills
-(premortem, focus-group, problem-validation) installed + auto-invoked, a scientific paper (EN, LaTeX
-PDF), full IT→EN translation, a **kanban** (`kanban/`), an **agent factory** (`factory/` — autonomous
-headless-Claude task loop, Convergio's job without Convergio), and this handoff mechanism.
+Started from a deep-analysis pass (model: Fable) over the whole system + the todo/doing kanban,
+which surfaced a real incident: the previous session's first overnight factory run had failed
+silently 4/4 (`exit 127`, `claude`/`timeout` binaries unresolved under launchd's minimal PATH) and
+`run_task()` filed every failed task as `done/` anyway — the kanban board kept showing two cards as
+"doing" for over an hour with no signal anything had broken. Fixed and verified end-to-end under a
+minimal, launchd-like PATH (`env -i`). Consolidated the overlapping `T-adversarial-judge` card with
+this session's own analyses instead of re-running it blind overnight.
+
+**Mid-session privacy incident (see Honest scars):** a subagent verifying the privacy split wrote
+real confidential client names into a committed doc; it was committed AND pushed to the private
+GitHub remote before being caught by `test/leak-check.sh` on a later, unrelated run. Remediated
+(amended the commit, human-confirmed + human-executed force-push to fix remote history) and closed
+structurally: `leak-check.sh` was never enforced at commit time, only run manually via
+`test/validate.sh` — now `hooks/pre-commit` (installed via `bin/install-git-hooks.sh`) blocks the
+commit itself on any hit. Verified: a probe commit with a denylisted term is refused.
 
 ## Key decisions (with rationale)
 
-- **Memory lives in the vault**, not a Claude silo (cross-platform). `.claude/memory` = deprecated cache.
-- **Local-first embedding** (bge-m3 via Ollama) — privacy, cost-zero, multilingual. Patch is a local
-  gbrain fork → **re-apply after any gbrain update**.
-- **Self-proposing, never self-applying** on behavior. Human gates in `AGENTS.md` hold.
-- **No auto-updating ontology** (socrates: over-engineering). 1 type + gated hygiene.
-- **Convergio stopped** (idle 2 weeks, reversible: `convergio start` + reload launchd). Its unique
-  capability (autonomous cross-session orchestration) is now reproduced lighter by `factory/`.
-- **English is canonical** (system + paper). No Italian paper needed.
+- **A factory task only reaches `done/` on exit 0**; failures retry once then land in `failed/`
+  with `escalate: true`. **Exit 0 ≠ kanban-done** — it only proves the process didn't crash, not
+  that the DoD/acceptance was met. `@thor` still gates `doing→done`. (Confirmed independently by
+  two adversarial reviews this session as the system's biggest unverified-autonomy risk.)
+- Factory tasks can declare `card: <id>` so results sync back onto the kanban card automatically —
+  closes the "two sources of truth" gap that let cards go stale silently.
+- Factory's default `--add-dir` is now scoped to `roberdan-os`, not all of `~/GitHub`
+  (`--dangerously-skip-permissions` grants write to whatever it points at).
+- Global `~/.claude/CLAUDE.md` claims gbrain's embedder "must stay `openai:text-embedding-3-large`"
+  — **verified wrong**: the live config is `ollama:bge-m3` (matches this repo's canon). Needs a
+  human-confirmed edit to that file (out of this repo's scope to change unilaterally).
+- `docs/adversarial-judgment-2026-07-01.md`: two independent adversarial passes agree the system's
+  core (kanban gates, privacy split, `validate.sh`) is honest and worth keeping; the
+  factory/meta-loop layer is unproven scaffolding, not yet earned trust. Also flagged (not yet
+  acted on): `behavior/roberto-mode.md` still names a Convergio sync step as a done-gate criterion
+  despite Convergio being stopped, a cargo-cult Convergio-agent roster in the same file, and a
+  "WCAG 2.2 AA" principle inherited from Convergio's product context that nothing in this personal
+  OS actually implements.
+- `docs/adr/adr-always-on-security.md`: G5-always-on's real security boundary is gbrain's
+  **per-remote source allowlist**, not a `workspace:` tag (not enforced at the data layer). FtS
+  confidential docs should land in an isolated `vault-fts` source, not the general `vault` source,
+  before any remote MCP endpoint is exposed.
 
 ## Current state (what's built/running)
 
-- Repo: private remote `github.com/Roberdan/roberdan-os`, English, CI green (`test/validate.sh`).
-- launchd active: `rda-evolve` (weekly), `rda-learn` (daily), `rda-factory` (nightly 01:00).
-- Skills installed in `~/.claude/skills/` (auto-invoked). Capture on (`RDA_LEARN=1`).
-- gbrain: local bge-m3, ~51.6k chunks embedded.
+- `test/validate.sh` green, now including a real `test/test-factory-kb.sh` (was smoke-test only).
+- `hooks/pre-commit` installed in this working copy — blocks confidential-term commits.
+- `bin/check-embedder.sh` — read-only durability check for the bge-m3 patch (verified OK now).
+- `docs/USAGE.md` — day-to-day operator guide, linked from README.
+- Commits this session (local `main`, some already pushed — see below): factory failure-semantics
+  fix, kanban state correction + `kb block`, security ADR, factory+kb test suite (+ 2 pre-existing
+  `kb.sh` bugs found and fixed under `set -e`/`pipefail`), adversarial judgment doc, factory→kanban
+  sync, pre-commit privacy gate, embedder check, usage guide.
 
-## Open threads (the 5 current goals — see kanban/todo.md)
+## Open threads / pending human gates (batched, not yet resolved)
 
-1. **Compound now** — largely realized via memory+kanban+handoff+learn-loop (this doc IS it). Verify learn-loop promotes real learnings over time.
-2. **Agent factory** — ✅ built + smoke-tested. Enqueue real overnight tasks with `factory/enqueue.sh`.
-3. **Kanban folder** — ✅ done (`kanban/todo|doing|done.md`).
-4. **Context handoff** — ✅ this mechanism (`handoff/`).
-5. **Always-on + iPhone** — DESIGN pending: needs gbrain+vault hosted on an always-on box + remote
-   MCP for the iPhone Claude app. See paper §12 / discuss with Roberto. Not built (infra decision).
-
-## Also in flight
-- **FtS document ingest** running in background (`workspace: fightthestroke`, ~214 docs, slow) — check
-  `~/.claude/jobs/.../fts-ingest.log` and `vault/reference/fightthestroke/`.
+1. **`kb start --by roberto`** for `T-tests-factory-kb` and `T-usage-guide` — the work (test suite,
+   USAGE.md) is done and verified; only the kanban transition needs Roberto's approval.
+2. **`kb finish --thor`** for the same two cards, plus re-annotated `T-adversarial-judge` /
+   `T-system-tests` — needs a `@thor` pass against each card's acceptance criteria.
+3. **FtS-ingest** — corrected root cause (it's an 8-15 min foreground job, not a TCC/background
+   problem), but confidential data entering the vault should happen with Roberto present. Not run
+   this session.
+4. **Global `~/.claude/CLAUDE.md` embedder correction** — diff ready, needs Roberto's confirmation
+   before editing a file outside this repo.
+5. **G5-always-on decision** — threat model now exists (`docs/adr/adr-always-on-security.md`);
+   decision itself is still Roberto's (spend + architecture + memory-exposure gate).
+6. **Push to remote** — most of this session's commits are local-only; confirm before pushing.
 
 ## Honest scars (don't repeat)
-Wiped the gbrain brain chasing bge-m3 (recovered). Called a bug "interesting". Mistook "committed"
-for "active-by-default". Lesson: verify in the live env; trust durable state, not the chat.
+
+Wiped the gbrain brain chasing bge-m3 (recovered, prior session). Called a bug "interesting" (prior
+session). Mistook "committed" for "active-by-default" (prior session, and recurred THIS session as
+"fix committed" ≠ "fix verified end-to-end" until actually tested under a launchd-like PATH).
+**New this session:** a safety check that isn't wired to run automatically is not a control — it's
+a hope. `leak-check.sh` existed the whole time and would have caught the leak; nothing forced it to
+run before the confidential commit was made and pushed. Any gate meant to prevent an
+irreversible/external-facing action must execute automatically at the point of that action.
