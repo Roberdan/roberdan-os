@@ -62,6 +62,10 @@ Card-files in `todo/ doing/ done/`. Fast CLI: **`kb`** (`kb` view · `kb add "<t
 - **Every card carries a Definition of Done (`dod:`) + Acceptance criteria (`acceptance:`)** — a card
   can't start without them.
 - **Gate `todo → doing`:** human — needs **Roberto's approval** (`kb start … --by roberto`).
+  **Honest limit:** `--by` is a **discipline gate, not a security boundary** — any caller can pass
+  `--by roberto`; there's no blocking check (it would break the "do all the todos" autonomous
+  flow). `kb start` appends an audit line to the card on every call, refused or not (timestamp,
+  the `--by` value given, whether stdin was a TTY) — see `kanban/README.md`.
 - **Gate `doing → done`:** **`@thor` validates** against the acceptance criteria with **evidence**
   (`kb finish … --thor "<commit/test/output>"`) — never a rubber-stamp.
 - Only `todo`+`doing` are "hot" (small, loaded at session start via the `SessionStart` context-inject
