@@ -94,6 +94,10 @@ if bash test/leak-check.sh >/dev/null 2>&1; then ok "0 confidential terms"; else
 section "factory + kb gates"
 if bash test/test-factory-kb.sh >/dev/null 2>&1; then ok "kb gates + factory guardrails green"; else err "test-factory-kb — see bash test/test-factory-kb.sh"; fi
 
+# --- 7) Leak-check self-test (salted-hash tier b) -----------------------------
+section "leak-check self-test — tier (b) salted-hash catches a planted leak"
+if bash test/test-leak-check.sh >/dev/null 2>&1; then ok "leak-check tiers verified (see bash test/test-leak-check.sh)"; else err "test-leak-check — see bash test/test-leak-check.sh"; fi
+
 # --- Result --------------------------------------------------------------
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "validate: ✅ ALL GREEN"; exit 0; else echo "validate: ❌ FAIL (see above)"; exit 1; fi
