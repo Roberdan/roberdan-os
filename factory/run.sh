@@ -53,9 +53,53 @@ prompt_of() { awk 'BEGIN{f=0} /^---$/{f++; next} f>=2{print}' "$1"; }  # body af
 # drift apart — this closes the gap that let two "doing" cards go silently stale.
 note_card() {
   local cid="$1" line="$2" cf=""
-  for c in todo doing done; do [ -e "$KB/$c/$cid.md" ] && cf="$KB/$c/$cid.md"; done
+  for c in todo doing "done"; do [ -e "$KB/$c/$cid.md" ] && cf="$KB/$c/$cid.md"; done
   [ -n "$cf" ] || return 0
   printf -- '\nfactory_result: "%s"\n' "$line" >> "$cf"
+}
+
+# Second headless pass, run only when a task exits 0 AND names a `card:` — an exit 0 only
+# proves the process didn't crash, not that the card's DoD/acceptance was met (see
+# factory-protocol.md). Embodies @thor (see agents/thor.md): fresh context, evidence-only,
+# no rubber-stamping. Same invocation conventions as run_task (timeout wrapper, billing-safe
+# env, logging). Echoes "PASS<TAB>evidence" or "FAIL<TAB>reason" on stdout — never anything
+# else, so callers can split on the first tab.
+verify_card() {
+  local cid="$1" dir="$2" tmo="$3" vlog="$4" cf="" dod="" acc="" vprompt="" vrc=0 verdict=""
+  for c in todo doing "done"; do [ -e "$KB/$c/$cid.md" ] && cf="$KB/$c/$cid.md"; done
+  if [ -z "$cf" ]; then
+    printf 'FAIL\tcard %s not found in kanban/ for verification\n' "$cid"
+    return 0
+  fi
+  dod="$(field "$cf" dod)"
+  acc="$(field "$cf" acceptance)"
+  vprompt="You are acting as @thor (see agents/thor.md): the QA / verify-done guardian, brutal
+quality validator, zero tolerance for incomplete work, fresh context, evidence-only — no
+rubber-stamping. Given these acceptance criteria — Definition of Done: \"$dod\" / Acceptance:
+\"$acc\" — and this repo state, verify with concrete evidence (files, commits, test output)
+whether they are met. Output exactly \`VERDICT: PASS — <evidence>\` or \`VERDICT: FAIL —
+<reason>\` as the last line."
+
+  set +e
+  if [ -n "$TIMEOUT_BIN" ]; then
+    "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$vprompt" --dangerously-skip-permissions --add-dir "$dir" > "$vlog" 2>&1
+  else
+    "$CLAUDE" -p "$vprompt" --dangerously-skip-permissions --add-dir "$dir" > "$vlog" 2>&1
+  fi
+  vrc=$?
+  set -e
+  { echo; echo "=== factory: thor-verify exit=$vrc at $(date) ==="; } >> "$vlog"
+
+  verdict="$(grep -oE 'VERDICT: (PASS|FAIL) — .*' "$vlog" 2>/dev/null | tail -1 || true)"
+  if [ "$vrc" -ne 0 ] || [ -z "$verdict" ]; then
+    printf 'FAIL\tunparseable thor-verify output (exit=%s) — see %s\n' "$vrc" "$vlog"
+    return 0
+  fi
+  case "$verdict" in
+    "VERDICT: PASS"*) printf 'PASS\t%s\n' "${verdict#VERDICT: PASS — }" ;;
+    "VERDICT: FAIL"*) printf 'FAIL\t%s\n' "${verdict#VERDICT: FAIL — }" ;;
+    *) printf 'FAIL\tunparseable verdict line: %s\n' "$verdict" ;;
+  esac
 }
 
 run_task() {
@@ -84,29 +128,58 @@ run_task() {
   { echo; echo "=== factory: exit=$rc at $(date) ==="; } >> "$log"
 
   local card; card="$(field "$f" card)"
+  local verify_status="" verify_detail=""
+
+  # Task exited 0 AND declares a card: run @thor verification before trusting it.
+  # A verification FAIL routes through the SAME retry/failed path as a task exit≠0
+  # (below) — an exit 0 that didn't meet the DoD is not a success.
+  if [ "$rc" -eq 0 ] && [ -n "$card" ]; then
+    local vresult; vresult="$(verify_card "$card" "$dir" "$tmo" "$LOG/${ts}-${name}-thor-verify.log")"
+    verify_status="${vresult%%$'\t'*}"
+    verify_detail="${vresult#*$'\t'}"
+    if [ "$verify_status" = "FAIL" ]; then
+      echo "[factory] THOR-VERIFY FAILED $name: $verify_detail"
+      rc=1
+    fi
+  fi
 
   if [ "$rc" -eq 0 ]; then
     rm -f "$attempts_file"
     mv "$f" "$DONE/${ts}-${name}.md"
     printf -- '\n---\nfactory_exit: %s\nfactory_log: %s\nfactory_completed: %s\n' "$rc" "$log" "$(date)" >> "$DONE/${ts}-${name}.md"
     echo "[factory] DONE  $name (exit $rc)"
-    [ -n "$card" ] && note_card "$card" "exit=$rc log=$log at=$(date +%Y-%m-%d\ %H:%M) — succeeded, still needs @thor to reach kanban done/"
+    if [ -n "$card" ]; then
+      note_card "$card" "exit=$rc log=$log at=$(date +%Y-%m-%d\ %H:%M) — succeeded, still needs @thor to reach kanban done/"
+      [ "$verify_status" = "PASS" ] && note_card "$card" "headless thor pass PASSED ($verify_detail) — still needs human kb finish"
+    fi
     return 0
   fi
 
   attempts=$((attempts+1))
   if [ "$attempts" -lt "$MAX_ATTEMPTS" ]; then
     echo "$attempts" > "$attempts_file"
-    mv "$f" "$Q/${name}.md"
+    # $f is always already inside $Q (run_task is only ever called on queue/*.md) — a retry
+    # requeues by simply leaving it there. `mv` a file onto itself fails under `set -e` (GNU
+    # coreutils: "are the same file", exit 1), which used to silently kill the whole factory
+    # run on a task's very first failure. Only mv if the paths actually differ.
+    [ "$f" -ef "$Q/${name}.md" ] || mv "$f" "$Q/${name}.md"
     echo "[factory] RETRY $name (attempt $attempts/$MAX_ATTEMPTS, exit $rc) -> requeued, see $log"
-    [ -n "$card" ] && note_card "$card" "exit=$rc log=$log at=$(date +%Y-%m-%d\ %H:%M) — retrying (attempt $attempts/$MAX_ATTEMPTS)"
+    if [ "$verify_status" = "FAIL" ]; then
+      note_card "$card" "exit=0 log=$log at=$(date +%Y-%m-%d\ %H:%M) — thor-verify FAILED: $verify_detail — retrying (attempt $attempts/$MAX_ATTEMPTS)"
+    else
+      [ -n "$card" ] && note_card "$card" "exit=$rc log=$log at=$(date +%Y-%m-%d\ %H:%M) — retrying (attempt $attempts/$MAX_ATTEMPTS)"
+    fi
   else
     rm -f "$attempts_file"
     mv "$f" "$FAILED/${ts}-${name}.md"
     printf -- '\n---\nfactory_exit: %s\nfactory_log: %s\nfactory_failed_at: %s\nattempts: %s\nescalate: true\n' \
       "$rc" "$log" "$(date)" "$attempts" >> "$FAILED/${ts}-${name}.md"
     echo "[factory] FAILED $name (exit $rc, attempts=$attempts) -> $FAILED/${ts}-${name}.md — escalate"
-    [ -n "$card" ] && note_card "$card" "exit=$rc log=$log at=$(date +%Y-%m-%d\ %H:%M) — FAILED after $attempts attempts, escalate:true, see $FAILED/${ts}-${name}.md"
+    if [ "$verify_status" = "FAIL" ]; then
+      note_card "$card" "exit=0 log=$log at=$(date +%Y-%m-%d\ %H:%M) — thor-verify FAILED after $attempts attempts: $verify_detail — escalate:true, see $FAILED/${ts}-${name}.md"
+    else
+      [ -n "$card" ] && note_card "$card" "exit=$rc log=$log at=$(date +%Y-%m-%d\ %H:%M) — FAILED after $attempts attempts, escalate:true, see $FAILED/${ts}-${name}.md"
+    fi
   fi
   FAILURES=$((FAILURES+1))
 }
