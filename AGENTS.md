@@ -99,6 +99,13 @@ Logic in plain markdown, tool-agnostic (wrappers are generated):
 [`focus-group`](skills/focus-group/skill.md) — pool of user-personas + moderator + consolidator, multi-mode, anti-sycophancy ·
 [`problem-validation`](skills/problem-validation/skill.md) — orchestrator: focus-group → prioritization → premortem, leverages gstack.
 
+## Eval — does the canon actually change output?
+
+[`eval/README.md`](eval/README.md) — with/without-canon A/B on 10 representative tasks + blind
+pairwise judging, the behavioral-canon counterpart to the retrieval ablation in
+`docs/roberdan-os-paper-en.md` §9.1. Honest limit stated up front there: it measures stated
+compliance against a checklist, not that Roberto himself prefers the with-canon output.
+
 ---
 
 ## Human gates

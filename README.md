@@ -25,6 +25,7 @@ Day-to-day operator guide (kb, factory, recall, gates): [`docs/USAGE.md`](docs/U
 | Loop | `loop/loop-protocol.md` |
 | Per-platform wrappers | `platforms/` — generated locally by `bin/sync.sh --emit-only`, gitignored, not committed |
 | Web bundle | `bin/make-bundle.sh` → pasteable doc (excludes `private/`) |
+| Eval (does the canon work?) | [`eval/README.md`](eval/README.md) — with/without-canon A/B + blind judge, mirrors the retrieval ablation in `docs/roberdan-os-paper-en.md` §9.1 |
 
 **Wrappers are not in the repo.** `platforms/` is fully generated from the canon and gitignored
 (see `.gitignore`, `bin/sync.sh`). Run `bin/sync.sh --emit-only` locally to materialize them on

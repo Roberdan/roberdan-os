@@ -78,12 +78,12 @@ fi
 rm -rf "$d1" "$d2"
 
 # --- 4) Shellcheck -----------------------------------------------------------
-section "shellcheck (hooks + bin + test)"
+section "shellcheck (hooks + bin + test + eval)"
 if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck -S warning hooks/*.sh bin/*.sh test/*.sh; then ok "shellcheck clean"; else err "shellcheck warning/error"; fi
+  if shellcheck -S warning hooks/*.sh bin/*.sh test/*.sh eval/*.sh; then ok "shellcheck clean"; else err "shellcheck warning/error"; fi
 else
   printf "  skip: shellcheck not installed\n"
-  for f in hooks/*.sh bin/*.sh test/*.sh; do bash -n "$f" || err "syntax: $f"; done
+  for f in hooks/*.sh bin/*.sh test/*.sh eval/*.sh; do bash -n "$f" || err "syntax: $f"; done
 fi
 
 # --- 5) Leak check (privacy gate) --------------------------------------------
@@ -97,6 +97,14 @@ if bash test/test-factory-kb.sh >/dev/null 2>&1; then ok "kb gates + factory gua
 # --- 7) Leak-check self-test (salted-hash tier b) -----------------------------
 section "leak-check self-test — tier (b) salted-hash catches a planted leak"
 if bash test/test-leak-check.sh >/dev/null 2>&1; then ok "leak-check tiers verified (see bash test/test-leak-check.sh)"; else err "test-leak-check — see bash test/test-leak-check.sh"; fi
+
+# --- 8) eval/ harness (stub-mode pipeline test) -------------------------------
+# eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The
+# actual with/without-canon comparison needs a real `claude` binary and Roberto's own machine —
+# what CI can verify is that the harness itself (run-eval.sh -> judge.sh -> report.sh) is
+# mechanically correct, resumable, and blind — see eval/test-eval-pipeline.sh.
+section "eval/ harness — stub-mode pipeline (run-eval -> judge -> report)"
+if bash eval/test-eval-pipeline.sh >/dev/null 2>&1; then ok "eval harness verified (see bash eval/test-eval-pipeline.sh)"; else err "test-eval-pipeline — see bash eval/test-eval-pipeline.sh"; fi
 
 # --- Result --------------------------------------------------------------
 printf "\n"
