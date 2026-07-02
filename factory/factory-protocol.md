@@ -46,6 +46,32 @@ apart — without it, a card can say "doing" while the factory says "failed" and
 one to the other. **A factory exit 0 is not a kanban done: it only proves the process didn't crash,**
 not that the DoD/acceptance was met — `@thor` still has to validate before `kb finish`.
 
+### Headless @thor verification pass (closing the "exit 0 ≠ DoD" gap)
+
+When a task exits 0 **and** declares `card: <id>`, `run.sh` runs a **second** headless pass before
+trusting the result — same invocation conventions as the task itself (timeout wrapper, billing-safe
+env, `logs/<ts>-<name>-thor-verify.log`). The prompt embodies `@thor` (see `agents/thor.md`: fresh
+context, evidence-only, zero tolerance for incomplete work) and reads the referenced card's `dod:`
+and `acceptance:` fields:
+
+> Given these acceptance criteria [`dod:`/`acceptance:` from the card] and this repo state, verify
+> with concrete evidence (files, commits, test output) whether they are met. Output exactly
+> `VERDICT: PASS — <evidence>` or `VERDICT: FAIL — <reason>` as the last line.
+
+`run.sh` parses the last `VERDICT:` line in the verification log:
+
+- **PASS** → the task proceeds to `done/` as before, and the card gets an extra annotation:
+  `headless thor pass PASSED (<evidence excerpt>) — still needs human kb finish`. This is a
+  factory-level signal, not a kanban gate: `kb finish` still requires a human-supplied `--thor`
+  evidence string (see `kanban/README.md`) — the headless pass narrows what a human has to check,
+  it doesn't replace `kb finish`.
+- **FAIL or unparseable** (verification process errors, times out, or never prints a `VERDICT:`
+  line) → routed through the **exact same** retry/failed path as a task that exits non-zero: retried
+  once, then filed under `failed/` with `escalate: true` if it fails again. The card annotation notes
+  the verdict text (or the parse failure) so the reason is visible without opening the log.
+- **No `card:`** → today's behavior is unchanged: no verification pass runs, exit 0 goes straight to
+  `done/`.
+
 Always set `dir:` explicitly for tasks outside roberdan-os — the default is scoped to roberdan-os
 itself, not the whole `~/GitHub` tree, since `--dangerously-skip-permissions` grants write access
 to whatever `--add-dir` points at.
