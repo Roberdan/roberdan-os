@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# hooks/pre-commit — native git pre-commit hook, installed via bin/install-git-hooks.sh.
+# BLOCKS the commit itself if test/leak-check.sh fails.
+#
+# Why this exists: on 2026-07-01 a subagent wrote real confidential client names into a
+# committed doc while verifying the privacy split — leak-check.sh existed but only ran
+# when someone remembered `test/validate.sh`, so the leak was committed AND pushed before
+# anyone caught it. "Run it by hand before committing" is not a control, it's a hope.
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+if ! bash test/leak-check.sh; then
+  echo "" >&2
+  echo "pre-commit: BLOCKED — confidential term(s) detected (see above)." >&2
+  echo "Fix the content, or if this is a false positive, adjust private/.denylist." >&2
+  exit 1
+fi
