@@ -22,8 +22,10 @@ launchd `com.roberdan.rda-evolve`, **weekly**. Fires regardless of which tool is
 
 - **Never** auto-commit to `behavior/ rules/ agents/ AGENTS.md` — draft only in
   `proposals/`.
-- Mechanical enforcement: `hooks/post-task-sync.sh` auto-commits **only**
-  `platforms/` (scoped git add, opt-in). `test/validate.sh` does the drift-check.
+- Mechanical enforcement: `hooks/post-task-sync.sh` (opt-in `RDA_AUTOSYNC=1`) only
+  regenerates the gitignored `platforms/` wrappers on disk — it commits nothing
+  (`platforms/` is not tracked; see `.gitignore`). `test/validate.sh` checks that
+  generation is deterministic, not a wrapper-vs-canon diff.
 - No-hallucination: every claim has a verifiable source.
 
 ## Done

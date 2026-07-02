@@ -1,7 +1,7 @@
 ---
 name: best-practices
-version: "3.0.0"
-last_updated: "2026-05-01"
+version: "3.2.0"
+last_updated: "2026-07-02"
 ---
 
 # Best Practices
@@ -49,6 +49,38 @@ Every changed line in a diff should trace directly to the user's request. Don't 
 ## Documentation
 
 JSDoc / docstrings for public APIs (WHY, not WHAT). CHANGELOG: `## [vX.Y.Z] - date` → `### Added | Changed | Fixed`. Keep TROUBLESHOOTING.md current.
+
+## Documentation Budget
+
+A system that documents itself more than it does the work is a smell. Keep meta-documentation to:
+
+- **One living plan**: `docs/plan.md`. Not a plan per session — the plan, updated in place.
+- **One living handoff**: `handoff/latest.md`. Not a handoff per session — overwritten each time, git history is the log.
+- **Dated session artifacts** (plans, judgments, test reports tied to a specific date) move to `docs/archive/` once their actions are closed. They stay for reference; nothing there is maintained going forward.
+- **No build artifacts** (PDF, generated bundles, compiled output) committed to git. Regenerate from source; git history keeps old copies if ever needed.
+
+The behavioral canon (`AGENTS.md`, `behavior/`, `rules/`, `agents/`) must always outweigh the system's self-documentation. If a repo has more words describing its own process than governing actual behavior, that's a sign the process writing has run away — prune it back to the living plan + living handoff, archive the rest.
+
+## Meta-Card Budget
+
+The same self-referential-runaway risk applies to the kanban board, not just to docs. In
+`roberdan-os`, every card closed so far (`kanban/done/`) has been the system building, auditing,
+or improving *itself* — none has produced value in Roberto's actual external work. Left
+unbounded, self-improvement work crowds out external use, because it's always easier to find
+one more thing to polish about the system than to go do the harder, less legible work outside it.
+
+**Rule:** whenever at least one external-facing card (a card whose DoD produces a verifiable
+artifact outside roberdan-os — e.g. in Convergio, Fight the Stroke, or Microsoft work) sits in
+`kanban/todo/`, keep **at most 1** active meta/self-improvement card (a card about roberdan-os
+itself — its infra, docs, tests, or agents) across `kanban/todo/` + `kanban/doing/` combined.
+
+This is a **discipline norm for whoever proposes new cards** (Roberto or an agent) — not a
+mechanically enforced gate. `kb.sh` does not check or block on this; nothing stops a second
+meta-card from being added. Treat it the same way as the `--by`/`approved_by` honor-system
+gates in `kanban/README.md`: reviewable, not cryptographically bound. If you're about to add a
+second active meta-card while an external-facing card is sitting in `todo/`, that's the signal
+to either finish/park one of the meta-cards first, or make the case out loud for why this
+meta-card is the exception.
 
 ## API Conventions
 

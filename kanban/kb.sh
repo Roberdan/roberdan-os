@@ -9,6 +9,15 @@ mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
 cmd="${1:-view}"; [ $# -gt 0 ] && shift || true
 
 _field() { grep -m1 "^$2:" "$1" 2>/dev/null | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"\$//"; }
+# Portable in-place status edit: `sed -i ''` is BSD-only syntax (macOS) and breaks under
+# GNU sed (Linux) — it treats the empty string as the script and the real script as a
+# filename, dying with "No such file or directory". Redirect-to-temp-then-move works
+# identically on both.
+_set_status() {
+  local f="$1" v="$2" tmp
+  tmp="$(mktemp "${TMPDIR:-/tmp}/rda-kb.XXXXXX")"
+  sed "s/^status:.*/status: $v/" "$f" > "$tmp" && mv "$tmp" "$f"
+}
 _list() {
   local c="$1" any=0 f
   for f in "$KB/$c"/*.md; do
@@ -24,7 +33,7 @@ _list() {
 # visual kanban: three columns side by side
 _board() {
   local W=26 f i
-  local -a T D N
+  local -a T=() D=() N=()
   for f in "$KB/todo"/*.md;  do [ -e "$f" ] && T+=("$(basename "$f" .md)"); done
   for f in "$KB/doing"/*.md; do [ -e "$f" ] && D+=("$(basename "$f" .md)"); done
   # done: show last 10 (newest first), skip the _archive narrative file
@@ -83,11 +92,20 @@ case "$cmd" in
   start)
     id="${1:?id required}"; by=""; [ "${2:-}" = "--by" ] && by="${3:-}"
     f="$KB/todo/$id.md"; [ -e "$f" ] || { echo "no todo card $id" >&2; exit 1; }
+    # DISCIPLINE gate, not a security boundary: --by is honor-system — any caller can pass
+    # `--by roberto`. There is deliberately no blocking check here (that would break the
+    # documented "do all the todos" autonomous flow). Instead, every kb start ATTEMPT — even
+    # a refused one — gets an audit line appended to the card: who claimed it, when, and
+    # whether it came from an interactive terminal. Bypasses are honor-system but not
+    # invisible; see kanban/README.md.
+    interactive=no; [ -t 0 ] && interactive=yes
+    printf 'kb_start_audit: "at=%s by=%s interactive=%s"\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${by:-(unset)}" "$interactive" >> "$f"
     if [ -z "$by" ]; then echo "REFUSED: todo->doing is a human gate. Approve with: kb start $id --by roberto" >&2; exit 1; fi
     if _field "$f" dod | grep -q 'FILL:' || _field "$f" acceptance | grep -q 'FILL:'; then
       echo "REFUSED: fill Definition of Done + Acceptance first (kb edit $id)" >&2; exit 1
     fi
-    sed -i '' 's/^status:.*/status: doing/' "$f"
+    _set_status "$f" doing
     { echo "approved_by: $by"; echo "approved_at: $(date +%Y-%m-%d)"; } >> "$f"
     mv "$f" "$KB/doing/"; echo "doing/$id started (approved by $by)"
     ;;
@@ -98,7 +116,7 @@ case "$cmd" in
     [ -e "$KB/todo/$id.md" ] && f="$KB/todo/$id.md"
     [ -e "$KB/doing/$id.md" ] && f="$KB/doing/$id.md"
     [ -n "$f" ] || { echo "no todo/doing card $id" >&2; exit 1; }
-    sed -i '' 's/^status:.*/status: blocked/' "$f"
+    _set_status "$f" blocked
     { echo "blocked_reason: \"$reason\""; echo "blocked_at: $(date +%Y-%m-%d)"; } >> "$f"
     [ "$(dirname "$f")" = "$KB/todo" ] || mv "$f" "$KB/todo/"
     echo "todo/$id blocked: $reason"
@@ -115,7 +133,7 @@ case "$cmd" in
       echo "  Run @thor vs the acceptance criteria, then: kb finish $id --thor '<commit/test/output>'" >&2
       exit 1
     fi
-    sed -i '' 's/^status:.*/status: done/' "$f"
+    _set_status "$f" done
     { echo 'verified_by: thor'; echo "verified_evidence: $ev"; echo "verified_at: $(date +%Y-%m-%d)"; } >> "$f"
     mv "$f" "$KB/done/"; echo "done/$id verified by @thor ($ev)"
     ;;

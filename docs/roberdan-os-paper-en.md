@@ -3,6 +3,10 @@
 **Author:** Roberto D'Angelo (Fight the Stroke Foundation) · developed in a human–agent pair with Claude (Anthropic)
 **Date:** 1 July 2026 · **Version:** 1.0 (English) · **Status:** operating system, single-user, single-machine
 
+> **PDF:** not committed (build artifact — git history keeps old copies if ever needed). Regenerate
+> locally with pandoc + a LaTeX engine, e.g.
+> `pandoc docs/roberdan-os-paper-en.md -o roberdan-os-paper-en.pdf --pdf-engine=tectonic`.
+
 ---
 
 ## Executive summary

@@ -235,6 +235,109 @@ else
   err "card: field did not sync a factory_result: line onto the kanban card"
 fi
 
+# ---------------------------------------------------------------------------
+# Phase 6: a factory exit 0 only proves the process didn't crash, not that the card's
+# DoD/acceptance was met — factory/run.sh now runs a second headless pass embodying @thor
+# whenever a task exits 0 AND declares `card:`. These three cases exercise: PASS verdict,
+# FAIL verdict (routed through the existing retry/failed path), and no `card:` at all (no
+# verification triggered). The stub `claude` distinguishes the thor-verify call from the
+# main task call by inspecting the prompt text ($2) for the thor-verify marker.
+section "factory: card + thor-verify PASS -> done/ with a PASSED annotation on the card"
+FAC7="$TMP/factory-verify-pass"; KB7="$TMP/kanban-verify-pass"
+mkdir -p "$FAC7/queue" "$FAC7/bin" "$KB7/doing"
+cat > "$FAC7/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+# invoked as: claude -p "<prompt>" --dangerously-skip-permissions --add-dir <dir>
+case "$2" in
+  *"You are acting as @thor"*) echo "VERDICT: PASS — files exist, tests pass" ;;
+esac
+exit 0
+EOF
+chmod +x "$FAC7/bin/claude"
+cat > "$KB7/doing/verify-pass.md" <<'EOF'
+---
+title: verify pass card
+dod: "real dod"
+acceptance: "real acceptance"
+status: doing
+approved_by: roberto
+created: 2026-07-01
+---
+body
+EOF
+printf -- '---\ndir: %s\ntimeout: 5\ncard: verify-pass\n---\nprobe task\n' "$TMP" > "$FAC7/queue/verifypass.md"
+env -i PATH="$FAC7/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FAC7" RDA_KANBAN="$KB7" RDA_HANDOFF=/dev/null \
+  bash factory/run.sh >/dev/null 2>&1
+if ls "$FAC7/done"/*.md >/dev/null 2>&1 \
+  && grep -q 'headless thor pass PASSED' "$KB7/doing/verify-pass.md" 2>/dev/null \
+  && ls "$FAC7/logs"/*-thor-verify.log >/dev/null 2>&1; then
+  ok "task with card + thor-verify PASS lands in done/ and the card is annotated PASSED"
+else
+  err "task with card + thor-verify PASS did not land in done/ with a PASSED annotation"
+fi
+
+section "factory: card + thor-verify FAIL -> routed through the existing failure path"
+FAC8="$TMP/factory-verify-fail"; KB8="$TMP/kanban-verify-fail"
+mkdir -p "$FAC8/queue" "$FAC8/bin" "$KB8/doing"
+cat > "$FAC8/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+case "$2" in
+  *"You are acting as @thor"*) echo "VERDICT: FAIL — acceptance criteria not met, no test output found" ;;
+esac
+exit 0
+EOF
+chmod +x "$FAC8/bin/claude"
+cat > "$KB8/doing/verify-fail.md" <<'EOF'
+---
+title: verify fail card
+dod: "real dod"
+acceptance: "real acceptance"
+status: doing
+approved_by: roberto
+created: 2026-07-01
+---
+body
+EOF
+printf -- '---\ndir: %s\ntimeout: 5\ncard: verify-fail\n---\nprobe task\n' "$TMP" > "$FAC8/queue/verifyfail.md"
+# Two runs, same as the "failing task" regression test above: attempt 1 retries,
+# attempt 2 exhausts MAX_ATTEMPTS=2 into failed/.
+env -i PATH="$FAC8/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FAC8" RDA_KANBAN="$KB8" RDA_HANDOFF=/dev/null \
+  bash factory/run.sh >/dev/null 2>&1
+env -i PATH="$FAC8/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FAC8" RDA_KANBAN="$KB8" RDA_HANDOFF=/dev/null \
+  bash factory/run.sh >/dev/null 2>&1
+if [ -z "$(ls -A "$FAC8/done" 2>/dev/null)" ] \
+  && ls "$FAC8/failed"/*.md >/dev/null 2>&1 && grep -q 'escalate: true' "$FAC8/failed"/*.md \
+  && grep -q 'thor-verify FAILED' "$KB8/doing/verify-fail.md" 2>/dev/null; then
+  ok "card + thor-verify FAIL never lands in done/, exhausts retries into failed/ with escalate:true, card annotated"
+else
+  err "card + thor-verify FAIL was not routed through the existing failure path correctly"
+fi
+
+section "factory: task WITHOUT card: skips verification entirely"
+FAC9="$TMP/factory-no-card"
+mkdir -p "$FAC9/queue" "$FAC9/bin"
+cat > "$FAC9/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+case "$2" in
+  *"You are acting as @thor"*) echo "VERDICT: FAIL — should never be invoked for a cardless task" ;;
+esac
+exit 0
+EOF
+chmod +x "$FAC9/bin/claude"
+printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe task, no card\n' "$TMP" > "$FAC9/queue/nocard.md"
+env -i PATH="$FAC9/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FAC9" RDA_HANDOFF=/dev/null \
+  bash factory/run.sh >/dev/null 2>&1
+if ls "$FAC9/done"/*.md >/dev/null 2>&1 \
+  && [ -z "$(ls "$FAC9/logs"/*-thor-verify.log 2>/dev/null)" ]; then
+  ok "task without card: lands in done/ with no thor-verify pass triggered (no verify log written)"
+else
+  err "task without card: either failed to complete or triggered an unwanted verification pass"
+fi
+
 section "factory: claude binary resolved even without the interactive alias in PATH"
 FAC3="$TMP/factory-resolve"
 mkdir -p "$FAC3/queue" "$FAC3/home/.local/bin"
@@ -256,4 +359,4 @@ fi
 
 # ---------------------------------------------------------------------------
 printf "\n"
-if [ "$FAIL" -eq 0 ]; then echo "test-factory-kb: ✅ TUTTO VERDE"; exit 0; else echo "test-factory-kb: ❌ FAIL (vedi sopra)"; exit 1; fi
+if [ "$FAIL" -eq 0 ]; then echo "test-factory-kb: ✅ ALL GREEN"; exit 0; else echo "test-factory-kb: ❌ FAIL (see above)"; exit 1; fi

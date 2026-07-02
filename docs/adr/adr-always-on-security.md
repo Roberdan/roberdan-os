@@ -1,171 +1,174 @@
-# ADR — Always-on roberdan-os: sicurezza dell'esposizione della memoria (G5)
+# ADR — roberdan-os Always-on: security of exposing memory (G5)
 
-**Status:** Proposed (2026-07-01) · advisory · **Decide:** Roberto (gate umano — spesa/architettura/esposizione memoria)
-**Security lens:** luca-mode (zero-trust, OWASP-style) applicato a un setup personale/indie
+**Status:** Proposed (2026-07-01) · advisory · **Decide:** Roberto (human gate — spend/architecture/memory exposure)
+**Security lens:** luca-mode (zero-trust, OWASP-style) applied to a personal/indie setup
 **Relates to:** `docs/always-on-design.md` (Path A/B/C), `kanban/todo/G5-always-on.md`, `kanban/todo/FtS-ingest.md`
 
-> Questo documento è **materiale per decidere**, non una decisione. G5 resta un gate umano.
-> Nessuna card kanban viene mossa.
+> This document is **material for deciding**, not a decision. G5 remains a human gate.
+> No kanban card is moved.
 
-## Contesto del rischio
+## Risk context
 
-G5 vuole rendere la memoria di roberdan-os interrogabile dall'app Claude su iPhone quando il
-Mac è spento, esponendo il **MCP server di gbrain** su un host always-on con auth (bearer token).
+G5 wants to make roberdan-os's memory queryable from the Claude app on iPhone when the
+Mac is off, exposing the **gbrain MCP server** on an always-on host with auth (bearer token).
 
-Il rischio non è teorico. La memoria non è "il vault e basta": il brain gbrain è **multi-source**
-(verificato con `gbrain sources list`). Un endpoint MCP mal-scopato non espone il vault — espone
-**tutto il brain**:
+The risk is not theoretical. Memory is not "just the vault": the gbrain brain is **multi-source**
+(verified with `gbrain sources list`). A mis-scoped MCP endpoint doesn't expose the vault — it
+exposes **the whole brain**:
 
-| Source | Pagine | Sensibilità |
+| Source | Pages | Sensitivity |
 |---|---|---|
-| `vault` | 291 | Note personali + (post FtS-ingest) **finanziari/contratti Fight the Stroke** |
-| `edufy27` | 42 | `OneDrive-Microsoft/FY27/MicrosoftScout` → **verosimilmente Microsoft-confidential** |
-| `mirrorbuddy` / `convergio` / `hve-core` / … | 4363 / 918 / 644 / … | Codice + design di prodotti propri |
-| `default` | 43 | **Transcript grezzi di sessione** (contengono di tutto) |
+| `vault` | 291 | Personal notes + (post FtS-ingest) **Fight the Stroke financials/contracts** |
+| `edufy27` | 42 | `OneDrive-Microsoft/FY27/MicrosoftScout` → **likely Microsoft-confidential** |
+| `mirrorbuddy` / `convergio` / `hve-core` / … | 4363 / 918 / 644 / … | Code + design of own products |
+| `default` | 43 | **Raw session transcripts** (contain everything) |
 
-Blast radius di un token/tunnel compromesso = **l'intera seconda memoria**, non un sotto-insieme.
+Blast radius of a compromised token/tunnel = **the entire second memory**, not a subset.
 
-### Il finding che governa tutto: `fightthestroke` è un *workspace*, non una *source*
+### The finding that governs everything: `fightthestroke` is a *workspace*, not a *source*
 
-La card `FtS-ingest.md` ingesta ~214 documenti confidenziali FtS **dentro la source `vault`**
+The `FtS-ingest.md` card ingests ~214 confidential FtS documents **into the `vault` source**
 (DoD: *"searchable in the vault"*, acceptance: *"a gbrain **vault** query returns the correct FtS doc"*),
-taggati `workspace=fightthestroke`.
+tagged `workspace=fightthestroke`.
 
-`workspace` è **frontmatter/metadata**, non un confine di source gbrain. Conseguenze di sicurezza:
+`workspace` is **frontmatter/metadata**, not a gbrain source boundary. Security consequences:
 
-1. **Il tag NON è un confine di sicurezza.** La ricerca semantica lavora sui chunk embedded e non
-   rispetta in modo affidabile il frontmatter. "Esponi `vault` ma escludi `workspace=fightthestroke`"
-   **non è enforceable** con lo strumento a disposizione.
-2. **Il confine che gbrain ha davvero è la _source_.** Lo scoping avviene per `source_id`
-   (verificato: parametro dello schema MCP `query`).
-3. Quindi, se FtS finisce dentro `vault`, esporre `vault` = esporre i finanziari FtS. Punto.
+1. **The tag is NOT a security boundary.** Semantic search operates on embedded chunks and does
+   not reliably respect frontmatter. "Expose `vault` but exclude `workspace=fightthestroke`"
+   **is not enforceable** with the tool available.
+2. **The boundary gbrain actually has is the _source_.** Scoping happens by `source_id`
+   (verified: parameter of the MCP `query` schema).
+3. Therefore, if FtS ends up inside `vault`, exposing `vault` = exposing the FtS financials. Full stop.
 
-### Il secondo finding: lo scope è *controllabile dal caller*
+### The second finding: scope is *controllable by the caller*
 
-Dallo schema MCP `mcp__gbrain__query`, `source_id`:
+From the MCP schema `mcp__gbrain__query`, `source_id`:
 > *"Pass `__all__` to span every source for trusted local callers; for remote callers `__all__` spans only your **granted sources**."*
 
-Due implicazioni dirette:
+Two direct implications:
 
-- **Un "default pin a `vault`" NON è un confine.** Il client iPhone può passare
-  `source_id=mirrorbuddy` o `__all__`. Chi ha il token sceglie la source. Pinnare un default
-  è ergonomia, non sicurezza.
-- **Il confine reale è la _granted-sources allowlist per-remote_** che gbrain applica ai caller
-  remoti (`__all__` per un remote = solo le sue source concesse). È quello il controllo da usare,
-  ed è quello che va configurato correttamente **prima** di aprire l'endpoint.
+- **A "default pin to `vault`" is NOT a boundary.** The iPhone client can pass
+  `source_id=mirrorbuddy` or `__all__`. Whoever holds the token chooses the source. Pinning a
+  default is ergonomics, not security.
+- **The real boundary is the _per-remote granted-sources allowlist_** that gbrain applies to
+  remote callers (`__all__` for a remote = only its granted sources). That's the control to use,
+  and it's the one that must be configured correctly **before** opening the endpoint.
 
-## Opzioni valutate (dai Path del design)
+## Options evaluated (from the design's Paths)
 
-Assunzioni comuni: auth = bearer token nell'app Claude; nessun secondo fattore lato app;
-il token vive in un device mobile (perdibile/rubabile).
+Common assumptions: auth = bearer token in the Claude app; no second factor on the app side;
+the token lives on a mobile device (losable/stealable).
 
-### Path A — Tunnel al Mac (Tailscale *oppure* Cloudflare Tunnel)
+### Path A — Tunnel to the Mac (Tailscale *or* Cloudflare Tunnel)
 
-Il design tratta A come un'opzione, ma **Tailscale e Cloudflare Tunnel hanno modelli di minaccia
-opposti** e vanno separati:
+The design treats A as one option, but **Tailscale and Cloudflare Tunnel have opposite
+threat models** and must be kept separate:
 
-| Sotto-variante | Superficie d'attacco | Token/credenziale compromessa | Chi altro può raggiungere l'host |
+| Sub-variant | Attack surface | Compromised token/credential | Who else can reach the host |
 |---|---|---|---|
-| **A1 — Tailscale (WireGuard mesh)** | **Nessuna superficie pubblica.** L'MCP è bound al tailnet; non c'è hostname pubblico da scansionare/brute-forzare. | Bearer token da solo = **inutile**: serve anche un device *dentro il tailnet* (ACL Tailscale). Difesa in profondità reale. | Solo i device del tailnet (i tuoi). ACL Tailscale restringono ulteriormente. |
-| **A2 — Cloudflare Tunnel (hostname pubblico)** | **Superficie pubblica.** Hostname raggiungibile da chiunque su Internet; solo l'auth separa. Diventa un target esposto 24/7. | Leak del token *o* mis-config della Cloudflare Access policy = **accesso da qualsiasi punto del pianeta**, nessun vincolo di rete. | Chiunque su Internet che superi l'auth. |
+| **A1 — Tailscale (WireGuard mesh)** | **No public surface.** The MCP is bound to the tailnet; no public hostname to scan/brute-force. | Bearer token alone = **useless**: also requires a device *inside the tailnet* (Tailscale ACL). Real defense in depth. | Only tailnet devices (yours). Tailscale ACLs restrict further. |
+| **A2 — Cloudflare Tunnel (public hostname)** | **Public surface.** Hostname reachable by anyone on the Internet; only auth separates it. Becomes a target exposed 24/7. | Token leak *or* Cloudflare Access policy misconfiguration = **access from anywhere on the planet**, no network constraint. | Anyone on the Internet who clears auth. |
 
-- **A1 (Tailscale):** ✅ miglior rapporto rischio/sforzo. Nessuna esposizione pubblica, difesa in
-  profondità (rete + token), ~0€, ~1h. ⚠️ il Mac deve restare acceso (non risolve "Mac spento").
-- **A2 (Cloudflare):** ⚠️ esposizione pubblica per un endpoint che parla alla tua intera memoria.
-  Per questa classe di dato è un downgrade di sicurezza rispetto ad A1 senza un guadagno funzionale
-  che lo giustifichi. **Sconsigliato** salvo necessità specifica (es. accesso da device che non
-  possono stare sul tailnet).
+- **A1 (Tailscale):** ✅ best risk/effort ratio. No public exposure, defense in
+  depth (network + token), ~€0, ~1h. ⚠️ the Mac must stay on (doesn't solve "Mac off").
+- **A2 (Cloudflare):** ⚠️ public exposure for an endpoint that talks to your entire memory.
+  For this class of data it's a security downgrade versus A1 with no functional gain that
+  justifies it. **Not recommended** unless there's a specific need (e.g. access from a device
+  that can't be on the tailnet).
 
-### Path B — Small cloud VM (~5–10€/mo)
+### Path B — Small cloud VM (~€5–10/mo)
 
-- ✅ Risolve "Mac spento" senza hardware.
-- ❌ **Downgrade di confidenzialità, borderline squalificante per FtS.** I documenti confidenziali
-  FtS (finanziari/contratti) **e i loro embedding** lascerebbero fisicamente casa e vivrebbero su
-  una box di terze parti. Gli embedding non sono "anonimi": sono ricostruibili/interrogabili e
-  rappresentano il contenuto. Per dati FtS (e potenzialmente Microsoft-confidential in `edufy27`)
-  questo confligge con il principio *local-first / review-before-backup* scritto nella stessa
-  card FtS-ingest.
-- ❌ Aumenta la superficie: OS della VM, patching, accesso del provider, snapshot/backup del disco.
-- ⚠️ Fronte-tunnel comunque necessario (Tailscale davanti alla VM, non Postgres/MCP su IP pubblico).
+- ✅ Solves "Mac off" without hardware.
+- ❌ **Confidentiality downgrade, borderline disqualifying for FtS.** The confidential FtS
+  documents (financials/contracts) **and their embeddings** would physically leave home and live
+  on a third-party box. Embeddings are not "anonymous": they are reconstructible/queryable and
+  represent the content. For FtS data (and potentially Microsoft-confidential data in `edufy27`)
+  this conflicts with the *local-first / review-before-backup* principle written into the same
+  FtS-ingest card.
+- ❌ Increases the surface: VM OS, patching, provider access, disk snapshots/backups.
+- ⚠️ Still needs a front-tunnel (Tailscale in front of the VM, not Postgres/MCP on a public IP).
 
 ### Path C — Mac mini home server
 
-- ✅ **Local-first mantenuto** (gbrain + bge-m3 su GPU + vault restano in casa): miglior privacy,
-  i dati confidenziali non lasciano l'edificio. Risolve "Mac spento" (il mini è sempre acceso).
-- ⚠️ Aggiunge **superficie LAN domestica**: altri device/IoT sulla rete di casa. Va comunque
-  fronteggiato con Tailscale, **mai** esposto in chiaro sulla LAN o in port-forward sul router.
-- ❌ Costo hardware one-time (~500€) + un altro host da patchare e custodire fisicamente.
+- ✅ **Keeps local-first** (gbrain + bge-m3 on GPU + vault stay at home): best privacy,
+  confidential data never leaves the building. Solves "Mac off" (the mini is always on).
+- ⚠️ Adds a **home LAN surface**: other devices/IoT on the home network. Still needs to be
+  fronted by Tailscale, **never** exposed in the clear on the LAN or port-forwarded on the router.
+- ❌ One-time hardware cost (~€500) + another host to patch and physically secure.
 
-## Raccomandazione
+## Recommendation
 
-**Combinazione, in fasi, con lo scoping come pre-condizione non negoziabile.**
+**Combination, phased, with scoping as a non-negotiable pre-condition.**
 
-### Mitigazioni OBBLIGATORIE prima di esporre qualsiasi endpoint (valgono per tutti i Path)
+### MANDATORY mitigations before exposing any endpoint (apply to all Paths)
 
-1. **Isolare FtS in una source gbrain dedicata, NON dentro `vault`.**
-   Ingestare i documenti FtS in una source separata (es. `vault-fts`), così l'esclusione diventa
-   *enforceable alla granularità che gbrain possiede davvero* (la source). Questo è il fix che rende
-   funzionante la mitigazione "esponi solo `vault`, escludi FtS". Va fatto **cambiando la destinazione
-   della card FtS-ingest** (source dedicata invece di `workspace` dentro `vault`).
-2. **Sicurezza = granted-sources allowlist per-remote, non default pin.**
-   Configurare il remote gbrain in *deny-by-default*: il device iPhone riceve accesso **solo** alle
-   source esplicitamente concesse (es. `vault`), e **mai** a `vault-fts`, `edufy27`, `default`
-   (transcript grezzi), né ai repo di codice. Verificare esplicitamente che `source_id=__all__` e
-   `source_id=<qualsiasi source non concessa>` da remoto **falliscano** (test negativo, non fiducia
-   nel default).
-3. **Preferire Tailscale a Cloudflare Tunnel.** Nessuna esposizione pubblica; il token diventa un
-   secondo fattore *de facto* dietro il confine di rete, non l'unico controllo.
-4. **Bearer token trattato come segreto revocabile.** Token dedicato per device, scadenza/rotazione,
-   procedura di revoca nota (device perso = revoca token + rimuovi device dal tailnet). Mai in git.
-5. **Read-only + audit.** L'endpoint remoto espone solo tool di lettura/ricerca gbrain (niente
-   `put_page`/`delete_page`/`schema_apply_*` da remoto). Loggare le query remote per poter rilevare
-   un abuso.
+1. **Isolate FtS in a dedicated gbrain source, NOT inside `vault`.**
+   Ingest the FtS documents into a separate source (e.g. `vault-fts`), so the exclusion becomes
+   *enforceable at the granularity gbrain actually has* (the source). This is the fix that makes
+   the "expose only `vault`, exclude FtS" mitigation actually work. Requires **changing the
+   destination of the FtS-ingest card** (dedicated source instead of `workspace` inside `vault`).
+2. **Security = per-remote granted-sources allowlist, not a default pin.**
+   Configure the remote gbrain in *deny-by-default*: the iPhone device gets access **only** to
+   explicitly granted sources (e.g. `vault`), and **never** to `vault-fts`, `edufy27`, `default`
+   (raw transcripts), nor the code repos. Explicitly verify that `source_id=__all__` and
+   `source_id=<any non-granted source>` from remote **fail** (negative test, not trust in the
+   default).
+3. **Prefer Tailscale over Cloudflare Tunnel.** No public exposure; the token becomes a
+   *de facto* second factor behind the network boundary, not the only control.
+4. **Treat the bearer token as a revocable secret.** Per-device dedicated token,
+   expiration/rotation, known revocation procedure (lost device = revoke token + remove device
+   from the tailnet). Never in git.
+5. **Read-only + audit.** The remote endpoint exposes only gbrain read/search tools (no
+   `put_page`/`delete_page`/`schema_apply_*` from remote). Log remote queries to be able to
+   detect abuse.
 
-### Sequenza consigliata
+### Recommended sequence
 
-- **Fase 1 (adesso, se serve accesso mobile):** **Path A1 (Tailscale)** con le mitigazioni 2–5 già
-  applicate. Zero costo, zero esposizione pubblica, ~1h. Copre "Mac acceso, accesso da iPhone".
-  Accetta il limite: non è ancora "Mac spento".
-- **Fase 2 (per il vero "Mac spento"):** **Path C (Mac mini) + Tailscale**, che mantiene local-first
-  e coerenza col principio privacy della card FtS. Path B **solo** se Roberto accetta esplicitamente
-  che dati FtS/edufy27 **non** siano tra le source concesse al box cloud (allora la VM ospita solo
-  source non-confidenziali e il downgrade non si applica).
-- **Evitare Path A2 (Cloudflare public tunnel)** salvo requisito specifico non coperto da Tailscale.
+- **Phase 1 (now, if mobile access is needed):** **Path A1 (Tailscale)** with mitigations 2–5
+  already applied. Zero cost, zero public exposure, ~1h. Covers "Mac on, access from iPhone."
+  Accepts the limitation: not yet "Mac off".
+- **Phase 2 (for true "Mac off"):** **Path C (Mac mini) + Tailscale**, which keeps local-first
+  and stays coherent with the FtS card's privacy principle. Path B **only** if Roberto explicitly
+  accepts that FtS/edufy27 data **not** be among the sources granted to the cloud box (then the
+  VM hosts only non-confidential sources and the downgrade doesn't apply).
+- **Avoid Path A2 (Cloudflare public tunnel)** unless there's a specific requirement not covered
+  by Tailscale.
 
-## Dipendenza esplicita con FtS-ingest — ordine
+## Explicit dependency with FtS-ingest — ordering
 
-**Mettere in sicurezza l'esposizione PRIMA di ingestare i dati confidenziali FtS.** Motivazione:
+**Secure the exposure BEFORE ingesting the confidential FtS data.** Rationale:
 
-- Le due card sono entrambe in `todo` e indipendenti. Se **FtS-ingest** viene eseguita prima che G5
-  sia scopato in sicurezza, i finanziari/contratti FtS diventano interrogabili dall'endpoint remoto
-  **nell'istante stesso** in cui l'endpoint viene aperto — senza che nessuno abbia deciso di esporli.
-- È un rischio *silenzioso*: nessun errore, nessun segnale; il dato confidenziale è semplicemente
-  lì, ricercabile dal telefono.
+- The two cards are both in `todo` and independent. If **FtS-ingest** runs before G5 is
+  securely scoped, the FtS financials/contracts become queryable from the remote endpoint
+  **the instant** the endpoint is opened — without anyone having decided to expose them.
+- It's a *silent* risk: no error, no signal; the confidential data is simply
+  sitting there, searchable from the phone.
 
-**Ordine raccomandato:**
+**Recommended order:**
 
-1. Decidere G5 (questo ADR) e implementare le mitigazioni 1–2 (source `vault-fts` dedicata +
-   granted-sources allowlist deny-by-default).
-2. **Solo dopo**, eseguire FtS-ingest — verso la source `vault-fts` isolata, esclusa dalla grant remota.
-3. Verificare con test negativo: dal telefono, una query FtS **non** deve restituire nulla.
+1. Decide G5 (this ADR) and implement mitigations 1–2 (dedicated `vault-fts` source +
+   deny-by-default granted-sources allowlist).
+2. **Only then**, run FtS-ingest — into the isolated `vault-fts` source, excluded from the
+   remote grant.
+3. Verify with a negative test: from the phone, an FtS query **must** return nothing.
 
-Se Roberto preferisce fare FtS-ingest prima (es. gli serve la ricerca FtS localmente, subito):
-**ammissibile**, a condizione che l'endpoint remoto G5 **resti chiuso** finché la source `vault-fts`
-isolata e la allowlist non sono in atto. La regola invariante è: *nessun endpoint remoto aperto
-mentre esiste una source confidenziale non isolata/non esclusa.*
+If Roberto prefers to do FtS-ingest first (e.g. he needs FtS search locally, right away):
+**acceptable**, on condition that the remote G5 endpoint **stays closed** until the isolated
+`vault-fts` source and the allowlist are in place. The invariant rule is: *no remote endpoint
+open while an unisolated/unexcluded confidential source exists.*
 
-## Cosa NON fare (anti-pattern)
+## What NOT to do (anti-patterns)
 
-- ❌ Affidarsi al tag `workspace=fightthestroke` come confine di accesso (non lo è).
-- ❌ Affidarsi al "default source pin" come sicurezza (il caller può cambiarlo).
-- ❌ Postgres o l'MCP gbrain su IP pubblico / port-forward sul router.
-- ❌ Un unico token condiviso, non revocabile, committato in git o nel canone.
-- ❌ Aprire l'endpoint prima di aver isolato le source confidenziali.
+- ❌ Relying on the `workspace=fightthestroke` tag as an access boundary (it isn't one).
+- ❌ Relying on the "default source pin" as security (the caller can change it).
+- ❌ Postgres or the gbrain MCP on a public IP / router port-forward.
+- ❌ A single shared, non-revocable token, committed to git or the canon.
+- ❌ Opening the endpoint before isolating the confidential sources.
 
-## Conseguenza
+## Consequence
 
-Il confine di accesso della memoria remota diventa **esplicito e enforceable alla granularità di
-source**, deny-by-default, dietro rete privata. La memoria personale resta interrogabile dal telefono;
-i dati confidenziali (FtS, edufy27, transcript grezzi) restano **fuori dal perimetro remoto** per
-costruzione, non per fiducia. G5 può procedere quando Roberto decide spesa e Path; questo ADR fissa
-le condizioni di sicurezza che quella decisione deve rispettare.
+The access boundary of remote memory becomes **explicit and enforceable at source
+granularity**, deny-by-default, behind a private network. Personal memory stays queryable
+from the phone; confidential data (FtS, edufy27, raw transcripts) stays **outside the remote
+perimeter** by construction, not by trust. G5 can proceed once Roberto decides spend and Path;
+this ADR sets the security conditions that decision must satisfy.
