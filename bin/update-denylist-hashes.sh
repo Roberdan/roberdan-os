@@ -63,9 +63,16 @@ gen_salt() {
 }
 
 normalize() {
-  # lowercase, collapse all whitespace to single spaces, trim ends. Must match the
+  # Strips regex-only syntax (\b anchors, backslash-escapes like \.) BEFORE lowercasing —
+  # several real denylist entries use \bName\b or an escaped dot (e.g. an email domain).
+  # Without this, an entry hashes to its literal regex source (backslashes and all), which
+  # never appears in real scanned prose — a silent false-negative for every such entry.
+  # Verified empirically against a planted \bName\b-style entry: pre-fix, a real occurrence
+  # of the plain name in prose was NOT caught by the hash scan; post-fix, it is.
+  # Then: lowercase, collapse all whitespace to single spaces, trim ends. Must match the
   # normalization used by test/leak-check.sh's tier (b) scanner exactly, or hashes never match.
   printf '%s' "$1" \
+    | sed -E 's/\\b//g; s/\\(.)/\1/g' \
     | tr '[:upper:]' '[:lower:]' \
     | tr '\t\n\r' '   ' \
     | sed -E 's/  +/ /g; s/^ +//; s/ +$//'
