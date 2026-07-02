@@ -30,6 +30,16 @@ _list() {
   return 0
 }
 
+# DONE (0) doesn't mean "nothing was ever done" — closed cards get periodically rolled up
+# into _archive-*.md (audit trail, not loaded every session) and removed as individual files.
+# Print a one-line pointer so a 0 count isn't mistaken for an empty history.
+_archive_hint() {
+  local f archives=()
+  for f in "$KB/done"/_*.md; do [ -e "$f" ] && archives+=("$(basename "$f")"); done
+  [ "${#archives[@]}" -eq 0 ] && return 0
+  echo "  (past work archived in kanban/done/${archives[*]} — read on demand, not counted above)"
+}
+
 # visual kanban: three columns side by side
 _board() {
   local W=26 f i
@@ -39,7 +49,7 @@ _board() {
   # done: show last 10 (newest first), skip the _archive narrative file
   while IFS= read -r f; do [ -n "$f" ] && N+=("$(basename "$f" .md)"); done \
     < <(ls -t "$KB/done"/*.md 2>/dev/null | grep -v '/_' | head -10)
-  local ntot; ntot=$(ls "$KB/done"/*.md 2>/dev/null | grep -vc '/_' || echo 0)
+  local ntot; ntot=$(ls "$KB/done"/*.md 2>/dev/null | grep -vc '/_' || true)
   local nt=${#T[@]} nd=${#D[@]} nn=${#N[@]} rows
   rows=$nt; [ $nd -gt $rows ] && rows=$nd; [ $nn -gt $rows ] && rows=$nn
   [ $rows -eq 0 ] && rows=1
@@ -53,6 +63,7 @@ _board() {
       $w $w "${T[$i]:-}" $w $w "${D[$i]:-}" $w $w "${N[$i]:-}"
   done
   printf '└%s┴%s┴%s┘\n' "$ln" "$ln" "$ln"
+  _archive_hint
 }
 
 usage() {
@@ -72,8 +83,8 @@ case "$cmd" in
   list|ls)                         # plain vertical list
     echo "TO DO:";  _list todo
     echo "DOING:";  _list doing
-    n=$(ls "$KB/done"/*.md 2>/dev/null | wc -l | tr -d ' ')
-    echo "DONE ($n):"; _list done
+    n=$(ls "$KB/done"/*.md 2>/dev/null | grep -vc '/_' || true)
+    echo "DONE ($n):"; _list done; _archive_hint
     ;;
 
   show)
@@ -123,7 +134,7 @@ case "$cmd" in
     ;;
 
   todo|doing) echo "$(echo "$cmd" | tr a-z A-Z):"; _list "$cmd" ;;
-  done) n=$(ls "$KB/done"/*.md 2>/dev/null | wc -l | tr -d ' '); echo "DONE ($n):"; _list done ;;
+  done) n=$(ls "$KB/done"/*.md 2>/dev/null | grep -vc '/_' || true); echo "DONE ($n):"; _list done; _archive_hint ;;
 
   finish)
     id="${1:?id required}"; ev=""; [ "${2:-}" = "--thor" ] && ev="${3:-}"
