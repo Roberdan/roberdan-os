@@ -81,12 +81,21 @@ whether they are met. Output exactly \`VERDICT: PASS — <evidence>\` or \`VERDI
 <reason>\` as the last line."
 
   set +e
-  if [ -n "$TIMEOUT_BIN" ]; then
-    "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$vprompt" --dangerously-skip-permissions --add-dir "$dir" > "$vlog" 2>&1
+  # cd into $dir first: --add-dir only grants filesystem ACCESS, it does not change the
+  # process's cwd. Without this, "current directory" in a prompt silently resolves to
+  # wherever run.sh itself was launched from (the roberdan-os repo root) instead of the
+  # task's declared dir — found live: a probe task wrote its output file into this repo
+  # instead of its intended workdir. Subshell so the cd doesn't leak into the rest of run.sh.
+  if [ ! -d "$dir" ]; then
+    { echo "[factory] FATAL: dir '$dir' does not exist"; } >> "$vlog"
+    vrc=2
+  elif [ -n "$TIMEOUT_BIN" ]; then
+    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$vprompt" --dangerously-skip-permissions --add-dir "$dir" ) > "$vlog" 2>&1
+    vrc=$?
   else
-    "$CLAUDE" -p "$vprompt" --dangerously-skip-permissions --add-dir "$dir" > "$vlog" 2>&1
+    ( cd "$dir" && "$CLAUDE" -p "$vprompt" --dangerously-skip-permissions --add-dir "$dir" ) > "$vlog" 2>&1
+    vrc=$?
   fi
-  vrc=$?
   set -e
   { echo; echo "=== factory: thor-verify exit=$vrc at $(date) ==="; } >> "$vlog"
 
@@ -118,12 +127,19 @@ run_task() {
 
   echo "[factory] START $name (dir=$dir timeout=${tmo}s attempt=$((attempts+1))) -> $log"
   set +e
-  if [ -n "$TIMEOUT_BIN" ]; then
-    "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$full" --dangerously-skip-permissions --add-dir "$dir" > "$log" 2>&1
+  # cd into $dir first — see the comment in verify_card() for why: --add-dir alone leaves
+  # the process's actual cwd at wherever run.sh was launched from, not the task's dir.
+  local rc
+  if [ ! -d "$dir" ]; then
+    { echo "[factory] FATAL: dir '$dir' does not exist"; } >> "$log"
+    rc=2
+  elif [ -n "$TIMEOUT_BIN" ]; then
+    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$full" --dangerously-skip-permissions --add-dir "$dir" ) > "$log" 2>&1
+    rc=$?
   else
-    "$CLAUDE" -p "$full" --dangerously-skip-permissions --add-dir "$dir" > "$log" 2>&1
+    ( cd "$dir" && "$CLAUDE" -p "$full" --dangerously-skip-permissions --add-dir "$dir" ) > "$log" 2>&1
+    rc=$?
   fi
-  local rc=$?
   set -e
   { echo; echo "=== factory: exit=$rc at $(date) ==="; } >> "$log"
 
