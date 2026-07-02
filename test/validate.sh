@@ -56,17 +56,26 @@ done
 if [ -f "/tmp/rda-linkcheck.$$" ]; then broken=$(wc -l < "/tmp/rda-linkcheck.$$"); rm -f "/tmp/rda-linkcheck.$$"; fi
 [ "$broken" -gt 0 ] && FAIL=1 || ok "all relative links resolve"
 
-# --- 3) Drift check (emit deterministico == committato) ----------------------
-section "drift check — wrapper rigenerati == committati"
-bash bin/sync.sh --emit-only >/dev/null 2>&1
-# git status --porcelain cattura sia i tracked modificati sia i nuovi untracked (bundle.md è gitignored, escluso).
-drift_out="$(git status --porcelain -- platforms/ 2>/dev/null)"
-if [ -z "$drift_out" ]; then
-  ok "nessun drift (platforms/ in sync col canone, inclusi file nuovi)"
+# --- 3) Drift check (generation is deterministic) -----------------------------
+# platforms/ is no longer committed (fully generated — see .gitignore). Instead of
+# diffing regenerated output against a committed copy, verify bin/sync.sh --emit-only
+# is deterministic and succeeds: two independent runs into two temp dirs must be
+# byte-identical.
+section "drift check — bin/sync.sh --emit-only is deterministic"
+d1="$(mktemp -d "${TMPDIR:-/tmp}/rda-sync-check.XXXXXX")"
+d2="$(mktemp -d "${TMPDIR:-/tmp}/rda-sync-check.XXXXXX")"
+rc1=0; rc2=0
+RDA_SYNC_OUT="$d1" bash bin/sync.sh --emit-only >/dev/null 2>&1 || rc1=$?
+RDA_SYNC_OUT="$d2" bash bin/sync.sh --emit-only >/dev/null 2>&1 || rc2=$?
+if [ "$rc1" -ne 0 ] || [ "$rc2" -ne 0 ]; then
+  err "drift: bin/sync.sh --emit-only exited non-zero (run1=$rc1 run2=$rc2)"
+elif diff_out="$(diff -r "$d1" "$d2" 2>&1)" && [ -z "$diff_out" ]; then
+  ok "generation is deterministic (two independent runs are byte-identical)"
 else
-  err "drift: platforms/ diverge dal canone. Esegui bin/sync.sh --emit-only e committa."
-  printf '%s\n' "$drift_out" | sed 's/^/    /'
+  err "drift: bin/sync.sh --emit-only is non-deterministic across runs"
+  printf '%s\n' "$diff_out" | sed 's/^/    /'
 fi
+rm -rf "$d1" "$d2"
 
 # --- 4) Shellcheck -----------------------------------------------------------
 section "shellcheck (hooks + bin + test)"
