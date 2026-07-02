@@ -358,5 +358,34 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Regression test for a real bug found via a live (non-stub) run: --add-dir only grants
+# filesystem ACCESS, it does not change the claude process's actual cwd. Without an explicit
+# `cd "$dir"`, a task's "current directory" silently resolved to wherever run.sh itself was
+# launched from — in production, the roberdan-os repo root — not the task's declared dir.
+# Caught it live: a probe task asked to write a file "in the current directory" wrote it into
+# this repo instead of its intended workdir.
+section "factory: the dispatched process's cwd is the task's dir, not run.sh's launch dir"
+FAC7="$TMP/factory-cwd"; mkdir -p "$FAC7/queue" "$FAC7/bin" "$FAC7/otherdir"
+cat > "$FAC7/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+pwd > "${CAPTURE_CWD:?}"
+exit 0
+EOF
+chmod +x "$FAC7/bin/claude"
+printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe\n' "$FAC7/otherdir" > "$FAC7/queue/cwdcheck.md"
+CAPCWD="$TMP/observed-cwd.txt"
+# Launch run.sh from $TMP (NOT from $FAC7/otherdir) — the launch dir must NOT leak through.
+( cd "$TMP" && env -i PATH="$FAC7/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FAC7" RDA_HANDOFF=/dev/null CAPTURE_CWD="$CAPCWD" \
+  bash "$ROOT/factory/run.sh" >/dev/null 2>&1 )
+observed="$(cat "$CAPCWD" 2>/dev/null || true)"
+expected="$(cd "$FAC7/otherdir" && pwd)"
+if [ "$observed" = "$expected" ]; then
+  ok "dispatched process cwd == task's declared dir (not run.sh's launch dir)"
+else
+  err "dispatched process cwd was '$observed', expected '$expected' — --add-dir alone is not enough"
+fi
+
+# ---------------------------------------------------------------------------
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "test-factory-kb: ✅ ALL GREEN"; exit 0; else echo "test-factory-kb: ❌ FAIL (see above)"; exit 1; fi
