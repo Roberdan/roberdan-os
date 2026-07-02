@@ -61,7 +61,30 @@ Draft the follow-up email.
 - cites evidence
 - no unverified done claim
 EOF
-ok "wrote 2 task fixtures under $TASKS"
+
+# Third fixture: canon points at a skills/<name>/skill.md file — must be run and judged like any
+# other, but eval/report.sh must segregate it into the qualitative-only "Skill-type canon tasks"
+# section and exclude it from the aggregate summary + per-canon-file ranking (the actual fix
+# under test here; see the eval/run-eval.sh and eval/report.sh comments for why).
+cat > "$TASKS/t3-skill.md" <<'EOF'
+---
+id: t3-skill
+category: triage
+canon: skills/premortem/skill.md
+---
+
+# t3-skill
+
+## Prompt
+
+Talk me through it.
+
+## Canon-compliant checklist
+
+- cites evidence
+- no unverified done claim
+EOF
+ok "wrote 3 task fixtures under $TASKS (2 core canon + 1 skill-type canon)"
 
 # ---------------------------------------------------------------------------
 section "stub claude: differentiated output per condition + content-based judge"
@@ -121,17 +144,18 @@ run_env() {
 }
 
 # ---------------------------------------------------------------------------
-section "run-eval.sh --stub: first run generates all 4 outputs (2 tasks x 2 conditions)"
+section "run-eval.sh --stub: first run generates all 6 outputs (3 tasks x 2 conditions)"
 run_env bash eval/run-eval.sh --stub >"$TMP/run1.log" 2>&1
 if [ -f "$RESULTS/t1-evidence/a.md" ] && [ -f "$RESULTS/t1-evidence/b.md" ] \
-  && [ -f "$RESULTS/t2-voice/a.md" ] && [ -f "$RESULTS/t2-voice/b.md" ]; then
-  ok "all 4 output files present after first run"
+  && [ -f "$RESULTS/t2-voice/a.md" ] && [ -f "$RESULTS/t2-voice/b.md" ] \
+  && [ -f "$RESULTS/t3-skill/a.md" ] && [ -f "$RESULTS/t3-skill/b.md" ]; then
+  ok "all 6 output files present after first run"
 else
   err "missing output file(s) after first run — see $TMP/run1.log"
 fi
 n1="$(wc -l < "$COUNTER" | tr -d ' ')"
-[ "$n1" -eq 4 ] && ok "claude invoked exactly 4 times on a fresh run" \
-  || err "expected 4 claude invocations, got $n1"
+[ "$n1" -eq 6 ] && ok "claude invoked exactly 6 times on a fresh run" \
+  || err "expected 6 claude invocations, got $n1"
 
 section "differentiated stub content actually landed in the right files"
 if grep -q "FAKE-SHA" "$RESULTS/t1-evidence/b.md" && ! grep -q "FAKE-SHA" "$RESULTS/t1-evidence/a.md"; then
@@ -161,14 +185,15 @@ fi
 section "run-eval.sh --stub --force: regenerates everything regardless of existing output"
 run_env bash eval/run-eval.sh --stub --force >"$TMP/run4.log" 2>&1
 n4="$(wc -l < "$COUNTER" | tr -d ' ')"
-[ "$n4" -eq $((n3 + 4)) ] && ok "--force regenerated all 4 pairs (4 new invocations)" \
+[ "$n4" -eq $((n3 + 6)) ] && ok "--force regenerated all 6 pairs (6 new invocations)" \
   || err "--force did not regenerate all pairs as expected (n3=$n3 n4=$n4)"
 
 # ---------------------------------------------------------------------------
 section "judge.sh --stub: produces a verdict for each task, blind to condition labels"
 run_env bash eval/judge.sh --stub >"$TMP/judge1.log" 2>&1
-if [ -f "$RESULTS/t1-evidence/verdict.md" ] && [ -f "$RESULTS/t2-voice/verdict.md" ]; then
-  ok "verdict.md written for both tasks"
+if [ -f "$RESULTS/t1-evidence/verdict.md" ] && [ -f "$RESULTS/t2-voice/verdict.md" ] \
+  && [ -f "$RESULTS/t3-skill/verdict.md" ]; then
+  ok "verdict.md written for all three tasks"
 else
   err "verdict.md missing for at least one task — see $TMP/judge1.log"
 fi
@@ -213,7 +238,7 @@ fi
 section "judge.sh --stub --force: re-judges on demand"
 run_env bash eval/judge.sh --stub --force >"$TMP/judge3.log" 2>&1
 n_judge_force="$(wc -l < "$COUNTER" | tr -d ' ')"
-[ "$n_judge_force" -eq $((n_judge_after + 2)) ] && ok "--force re-judged both tasks (2 new invocations)" \
+[ "$n_judge_force" -eq $((n_judge_after + 3)) ] && ok "--force re-judged all three tasks (3 new invocations)" \
   || err "--force did not re-judge as expected"
 
 # ---------------------------------------------------------------------------
@@ -221,10 +246,11 @@ section "report.sh: aggregates verdicts into a well-formed report.md"
 run_env bash eval/report.sh --stub >"$TMP/report1.log" 2>&1
 REPORT="$RESULTS/report.md"
 if [ -f "$REPORT" ]; then ok "report.md written"; else err "report.md was not written"; fi
-if grep -q "t1-evidence" "$REPORT" 2>/dev/null && grep -q "t2-voice" "$REPORT" 2>/dev/null; then
-  ok "report.md contains rows for both tasks"
+if grep -q "t1-evidence" "$REPORT" 2>/dev/null && grep -q "t2-voice" "$REPORT" 2>/dev/null \
+  && grep -q "t3-skill" "$REPORT" 2>/dev/null; then
+  ok "report.md contains rows for all three tasks (core + skill-type)"
 else
-  err "report.md is missing one or both task rows"
+  err "report.md is missing one or more task rows"
 fi
 if grep -q "## Summary" "$REPORT" 2>/dev/null && grep -q "## What this does and doesn't prove" "$REPORT" 2>/dev/null; then
   ok "report.md contains the summary and honest-limitations sections"
@@ -232,14 +258,45 @@ else
   err "report.md is missing the summary and/or honest-limitations section"
 fi
 if grep -qE 'B \(with canon\) preferred: \*\*2\*\*' "$REPORT" 2>/dev/null; then
-  ok "report.md correctly counts both tasks as B-preferred (matches the stub's designed differentiation)"
+  ok "report.md core summary counts exactly the 2 core (non-skill) tasks as B-preferred"
 else
-  err "report.md did not count the expected 2/2 B-preferred verdicts"
+  err "report.md did not count the expected 2/2 core B-preferred verdicts"
 fi
 if grep -q "which canon file mattered most" "$REPORT" 2>/dev/null || grep -qi "canon file" "$REPORT"; then
   ok "report.md includes the per-canon-file breakdown"
 else
   err "report.md is missing the per-canon-file breakdown"
+fi
+
+section "report.sh: skill-type canon task is segregated, not folded into the core aggregate"
+if grep -q "Skill-type canon tasks" "$REPORT" 2>/dev/null; then
+  ok "report.md has a dedicated 'Skill-type canon tasks' section"
+else
+  err "report.md is missing the 'Skill-type canon tasks' section"
+fi
+# t3-skill's row must appear ONLY in the skill-type table, never in the core per-task table above
+# it, and the per-canon-file ranking must not mention skills/premortem/skill.md at all.
+core_table="$(awk '/^## Per-task results \(core/{f=1} /^## Skill-type canon tasks/{f=0} f' "$REPORT")"
+skill_table="$(awk '/^## Skill-type canon tasks/{f=1} /^## Methodology note|^### Methodology note/{f=0} f' "$REPORT")"
+if ! printf '%s' "$core_table" | grep -q "t3-skill"; then
+  ok "t3-skill does not appear in the core per-task table"
+else
+  err "t3-skill leaked into the core per-task table"
+fi
+if printf '%s' "$skill_table" | grep -q "t3-skill"; then
+  ok "t3-skill appears in the skill-type-only table"
+else
+  err "t3-skill is missing from the skill-type-only table"
+fi
+if grep -q "Core tasks with a parsed verdict: \*\*2\*\* / 2" "$REPORT" 2>/dev/null; then
+  ok "core summary denominator is 2/2 (t3-skill correctly excluded from the core count)"
+else
+  err "core summary denominator does not reflect the 2 core tasks only (t3-skill may have leaked in)"
+fi
+if grep -qE '^\| skills/premortem/skill\.md \|' "$REPORT" 2>/dev/null; then
+  err "skills/premortem/skill.md leaked into the per-canon-file ranking (should be core-only)"
+else
+  ok "skills/premortem/skill.md is absent from the per-canon-file ranking, as expected"
 fi
 
 # ---------------------------------------------------------------------------
