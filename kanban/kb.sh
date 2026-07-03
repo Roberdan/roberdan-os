@@ -22,13 +22,28 @@ _set_status() {
   tmp="$(mktemp "${TMPDIR:-/tmp}/rda-kb.XXXXXX")"
   sed "s/^status:.*/status: $v/" "$f" > "$tmp" && mv "$tmp" "$f"
 }
+_repo_tag() {
+  local repo; repo="$(_field "$1" repo)"
+  printf '%s' "${repo:-—}"
+}
+# board cells are id-first (the id is the key you pass to show/start/finish — it must
+# never be truncated). Append " (repo)" only when it fits within the column's content
+# width; otherwise degrade to the bare id rather than corrupt it. Full repo+title is
+# always available via `kb list`/`kb show`.
+_board_cell() {
+  local f="$1" w="$2" id repo cell
+  id="$(basename "$f" .md)"
+  repo="$(_repo_tag "$f")"
+  cell="$id ($repo)"
+  if [ "${#cell}" -le "$w" ]; then printf '%s' "$cell"; else printf '%s' "$id"; fi
+}
 _list() {
   local c="$1" any=0 f
   for f in "$KB/$c"/*.md; do
     [ -e "$f" ] || continue
     case "$(basename "$f")" in _*) continue;; esac
     any=1
-    printf '  [%s] %s\n' "$(basename "$f" .md)" "$(_field "$f" title)"
+    printf '  [%s] (%s) %s\n' "$(basename "$f" .md)" "$(_repo_tag "$f")" "$(_field "$f" title)"
   done
   if [ "$any" -eq 0 ]; then echo "  (empty)"; fi
   return 0
@@ -46,16 +61,27 @@ _archive_hint() {
 
 # visual kanban: three columns side by side
 _board() {
-  local W=26 f i
+  local W=34 f i
+  local w=$((W-2))
   local -a T=() D=() N=()
-  for f in "$KB/todo"/*.md;  do [ -e "$f" ] && T+=("$(basename "$f" .md)"); done
-  for f in "$KB/doing"/*.md; do [ -e "$f" ] && D+=("$(basename "$f" .md)"); done
+  for f in "$KB/todo"/*.md;  do [ -e "$f" ] && T+=("$(_board_cell "$f" "$w")"); done
+  for f in "$KB/doing"/*.md; do [ -e "$f" ] && D+=("$(_board_cell "$f" "$w")"); done
   # done: show last 10 (newest first), skip the _archive narrative file
-  while IFS= read -r f; do [ -n "$f" ] && N+=("$(basename "$f" .md)"); done \
+  while IFS= read -r f; do [ -n "$f" ] && N+=("$(_board_cell "$f" "$w")"); done \
     < <(ls -t "$KB/done"/*.md 2>/dev/null | grep -v '/_' | head -10)
   local ntot; ntot=$(ls "$KB/done"/*.md 2>/dev/null | grep -vc '/_' || true)
-  # archived goals: one numbered table row each in _archive-*.md (rolled-up history)
-  local narch; narch=$(grep -hE '^\| [0-9]+ \|' "$KB/done"/_archive-*.md 2>/dev/null | wc -l | tr -d ' ')
+  # archived goals: one numbered table row each in _archive-*.md (rolled-up history).
+  # Pre-existing bug found while testing this function on a fixture with zero archive
+  # files: the bare glob passed straight to grep/pipefail died under `set -e` when it
+  # didn't match anything (grep tried to open the literal string "_archive-*.md",
+  # failed, and pipefail propagated that failure into killing the whole script) — never
+  # triggered on the real board because it always has at least one archive file. Loop
+  # with an existence check instead, same convention as _archive_hint/_archive_cmd below.
+  local narch=0 _af
+  for _af in "$KB/done"/_archive-*.md; do
+    [ -e "$_af" ] || continue
+    narch=$((narch + $(grep -cE '^\| [0-9]+ \|' "$_af" 2>/dev/null || true)))
+  done
   local done_label=" ✅ DONE ($ntot"
   [ "$narch" -gt 0 ] && done_label="$done_label +$narch arch"
   done_label="$done_label)"
@@ -66,7 +92,6 @@ _board() {
   printf '┌%s┬%s┬%s┐\n' "$ln" "$ln" "$ln"
   printf '│%-*s│%-*s│%-*s│\n' $W " 📋 TO DO ($nt)" $W " 🔵 DOING ($nd)" $W "$done_label"
   printf '├%s┼%s┼%s┤\n' "$ln" "$ln" "$ln"
-  local w=$((W-2))
   for ((i=0; i<rows; i++)); do
     printf '│ %-*.*s │ %-*.*s │ %-*.*s │\n' \
       $w $w "${T[$i]:-}" $w $w "${D[$i]:-}" $w $w "${N[$i]:-}"
@@ -83,7 +108,7 @@ usage() {
   echo '  kb todo | kb doing | kb done  view one column'
   echo '  kb show <id>                  show a card'
   echo ' gates:'
-  echo '  kb add "<title>" [dod] [acc]  new card in todo'
+  echo '  kb add "<title>" --repo <r> [dod] [acc]  new card in todo (repo = ~/GitHub dir-name, or "personal")'
   echo '  kb edit <id>                  edit a card (fill dod/acceptance)'
   echo '  kb start <id> --by roberto    GATE: todo->doing (needs your approval)'
   echo '  kb finish <id> --thor "<ev>"  GATE: doing->done (@thor validates + evidence)'
@@ -103,20 +128,21 @@ usage() {
 # (never loaded at session start — that budget is owned by todo/doing only).
 _history() {
   echo "=== HISTORY — individual done/ cards (most recent verified first) ==="
-  local f rows=() vat title id
+  local f rows=() vat title id repo
   for f in "$KB/done"/*.md; do
     [ -e "$f" ] || continue
     case "$(basename "$f")" in _*) continue;; esac
     vat="$(_field "$f" verified_at)"; [ -n "$vat" ] || vat="$(_field "$f" created)"
     title="$(_field "$f" title)"
+    repo="$(_repo_tag "$f")"
     id="$(basename "$f" .md)"
-    rows+=("${vat:-0000-00-00}|$id|$title")
+    rows+=("${vat:-0000-00-00}|$id|$repo|$title")
   done
   if [ "${#rows[@]}" -eq 0 ]; then
     echo "  (no individual done cards right now — see archives below)"
   else
-    printf '%s\n' "${rows[@]}" | sort -t'|' -k1,1 -r | while IFS='|' read -r vat id title; do
-      printf '  [%s] %s (verified %s)\n' "$id" "$title" "$vat"
+    printf '%s\n' "${rows[@]}" | sort -t'|' -k1,1 -r | while IFS='|' read -r vat id repo title; do
+      printf '  [%s] (%s) %s (verified %s)\n' "$id" "$repo" "$title" "$vat"
     done || true
   fi
   echo
@@ -273,10 +299,25 @@ case "$cmd" in
     ;;
 
   add)
-    title="${1:?title required}"; dod="${2:-FILL: definition of done}"; acc="${3:-FILL: acceptance criteria (how @thor verifies)}"
+    # --repo can appear anywhere among the args; everything else stays positional
+    # (title, then optional dod, then optional acceptance), same as before.
+    repo=""; args=()
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --repo) repo="${2:-}"; shift 2 ;;
+        *) args+=("$1"); shift ;;
+      esac
+    done
+    title="${args[0]:?title required}"; dod="${args[1]:-FILL: definition of done}"; acc="${args[2]:-FILL: acceptance criteria (how @thor verifies)}"
+    if [ -z "$repo" ]; then
+      echo "REFUSED: --repo required — which repo/scope is this card about? e.g.:" >&2
+      echo "  kb add \"$title\" --repo roberdan-os [dod] [acc]" >&2
+      echo "  (use the ~/GitHub dir-name for a code repo, or 'personal' for non-repo work)" >&2
+      exit 1
+    fi
     id="$(date +%y%m%d-%H%M%S)"
-    { echo '---'; echo "title: $title"; echo "dod: \"$dod\""; echo "acceptance: \"$acc\""; echo 'status: todo'; echo "created: $(date +%Y-%m-%d)"; echo '---'; } > "$KB/todo/$id.md"
-    echo "added todo/$id"
+    { echo '---'; echo "title: $title"; echo "repo: $repo"; echo "dod: \"$dod\""; echo "acceptance: \"$acc\""; echo 'status: todo'; echo "created: $(date +%Y-%m-%d)"; echo '---'; } > "$KB/todo/$id.md"
+    echo "added todo/$id (repo: $repo)"
     ;;
 
   start)
@@ -294,6 +335,10 @@ case "$cmd" in
     if [ -z "$by" ]; then echo "REFUSED: todo->doing is a human gate. Approve with: kb start $id --by roberto" >&2; exit 1; fi
     if _field "$f" dod | grep -q 'FILL:' || _field "$f" acceptance | grep -q 'FILL:'; then
       echo "REFUSED: fill Definition of Done + Acceptance first (kb edit $id)" >&2; exit 1
+    fi
+    repo_val="$(_field "$f" repo)"
+    if [ -z "$repo_val" ] || printf '%s' "$repo_val" | grep -q 'FILL:'; then
+      echo "REFUSED: fill repo first (kb edit $id) — e.g. repo: roberdan-os, repo: convergio, repo: personal" >&2; exit 1
     fi
     _set_status "$f" doing
     { echo "approved_by: $by"; echo "approved_at: $(date +%Y-%m-%d)"; } >> "$f"
