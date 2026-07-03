@@ -17,6 +17,10 @@ err()     { printf "  FAIL: %s\n" "$1"; FAIL=1; }
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 SKILLS_DIR="$TMP/claude-skills"
+# Isolation for the copilot skills target: a path whose parent (.copilot) is never
+# created unless a test explicitly does so — keeps every invocation below from
+# falling back to the real $HOME/.copilot/skills default and touching the machine.
+NOCOPILOT_SKILLS_DIR="$TMP/no-copilot/.copilot/skills"
 
 section "bin/sync.sh --emit-only (default mode): must NOT touch the skills install dir"
 RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR" bash bin/sync.sh --emit-only >/dev/null 2>&1
@@ -33,7 +37,7 @@ mkdir -p "$SKILLS_DIR/sync"
 printf 'PRE-EXISTING (do not touch)\n' > "$SKILLS_DIR/sync/SKILL.md"
 
 section "bin/sync.sh --install: fresh run installs symlinks, skips the collision"
-out="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR" bash bin/sync.sh --install 2>&1)"
+out="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR" RDA_COPILOT_SKILLS_DIR="$NOCOPILOT_SKILLS_DIR" bash bin/sync.sh --install 2>&1)"
 rc=$?
 [ "$rc" -eq 0 ] || err "sync.sh --install exited non-zero ($rc)"
 
@@ -66,7 +70,7 @@ else
 fi
 
 section "bin/sync.sh --install: idempotent (second run only SKIPs, installs nothing new)"
-out2="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR" bash bin/sync.sh --install 2>&1)"
+out2="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR" RDA_COPILOT_SKILLS_DIR="$NOCOPILOT_SKILLS_DIR" bash bin/sync.sh --install 2>&1)"
 installed2="$(printf '%s\n' "$out2" | grep -c '^INSTALL ' || true)"
 skipped2="$(printf '%s\n' "$out2" | grep -c '^SKIP ' || true)"
 [ "$installed2" -eq 0 ] && ok "second run installs 0 new skills" \
@@ -81,6 +85,7 @@ mkdir -p "$PTR_HOME/GitHub"
 printf 'PRE-EXISTING (do not touch)\n' > "$PTR_HOME/GitHub/AGENTS.md"  # pre-existing → must SKIP
 
 pout="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR/ptr-skills" RDA_POINTER_HOME="$PTR_HOME" \
+        RDA_COPILOT_SKILLS_DIR="$NOCOPILOT_SKILLS_DIR" \
         RDA_FORCE_OPENCODE=0 bash bin/sync.sh --install 2>&1)"
 prc=$?
 [ "$prc" -eq 0 ] || err "sync.sh --install (pointer section) exited non-zero ($prc)"
@@ -113,6 +118,7 @@ section "global AGENTS.md pointer — clean skip when a tool is fully absent (no
 PTR_HOME2="$TMP/ptr-home-absent"
 mkdir -p "$PTR_HOME2"    # no .codex dir at all → codex must be skipped
 pout2="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR/ptr-skills2" RDA_POINTER_HOME="$PTR_HOME2" \
+         RDA_COPILOT_SKILLS_DIR="$NOCOPILOT_SKILLS_DIR" \
          RDA_FORCE_OPENCODE=1 bash bin/sync.sh --install 2>&1)"
 [ -e "$PTR_HOME2/.codex/AGENTS.md" ] && err "codex AGENTS.md installed despite no ~/.codex dir" \
   || ok "codex AGENTS.md correctly skipped (no ~/.codex dir)"
@@ -122,6 +128,76 @@ printf '%s\n' "$pout2" | grep -q "^SKIP codex:" && ok "SKIP message printed for 
   || err "expected $PTR_HOME2/.config/opencode/AGENTS.md to be installed (RDA_FORCE_OPENCODE=1)"
 [ -f "$PTR_HOME2/GitHub/AGENTS.md" ] && ok "GitHub/AGENTS.md installed fresh (no pre-existing file)" \
   || err "expected $PTR_HOME2/GitHub/AGENTS.md to be installed"
+
+section "copilot skills install — clean skip when ~/.copilot is absent"
+COPILOT_ABSENT_HOME="$TMP/copilot-absent"
+mkdir -p "$COPILOT_ABSENT_HOME"   # no .copilot dir at all
+cout_absent="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR/cop-skills-absent" \
+    RDA_COPILOT_SKILLS_DIR="$COPILOT_ABSENT_HOME/.copilot/skills" \
+    RDA_POINTER_HOME="$TMP/ptr-home-cop-absent" RDA_FORCE_OPENCODE=0 \
+    bash bin/sync.sh --install 2>&1)"
+[ -e "$COPILOT_ABSENT_HOME/.copilot/skills" ] && err "copilot skills dir created despite ~/.copilot absent" \
+  || ok "copilot skills dir correctly not created (~/.copilot absent)"
+printf '%s\n' "$cout_absent" | grep -q "^SKIP copilot: " && ok "SKIP message printed for copilot (absent)" \
+  || err "expected a SKIP line for copilot — got:\n$cout_absent"
+
+section "copilot skills install — fresh install + collision-skip when ~/.copilot is present"
+COPILOT_HOME="$TMP/copilot-present"
+mkdir -p "$COPILOT_HOME/.copilot"           # simulate Copilot installed
+COPILOT_SKILLS_DIR="$COPILOT_HOME/.copilot/skills"
+mkdir -p "$COPILOT_SKILLS_DIR/sync"         # pre-existing collision, e.g. gstack's own "sync"
+printf 'PRE-EXISTING (gstack, do not touch)\n' > "$COPILOT_SKILLS_DIR/sync/SKILL.md"
+cout_present="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR/cop-skills-present" \
+    RDA_COPILOT_SKILLS_DIR="$COPILOT_SKILLS_DIR" \
+    RDA_POINTER_HOME="$TMP/ptr-home-cop-present" RDA_FORCE_OPENCODE=0 \
+    bash bin/sync.sh --install 2>&1)"
+
+if [ -L "$COPILOT_SKILLS_DIR/verify-done/SKILL.md" ]; then
+  ok "copilot verify-done/SKILL.md installed as a symlink"
+  cop_linked_target="$(readlink "$COPILOT_SKILLS_DIR/verify-done/SKILL.md")"
+  [ -f "$cop_linked_target" ] && ok "copilot symlink resolves to an existing generated wrapper" \
+    || err "copilot symlink target does not exist: $cop_linked_target"
+else
+  err "expected $COPILOT_SKILLS_DIR/verify-done/SKILL.md to be a symlink after install"
+fi
+
+if [ "$(cat "$COPILOT_SKILLS_DIR/sync/SKILL.md")" = "PRE-EXISTING (gstack, do not touch)" ]; then
+  ok "pre-existing copilot sync/SKILL.md content untouched (no silent overwrite)"
+else
+  err "pre-existing copilot sync/SKILL.md content was modified — should never happen"
+fi
+printf '%s\n' "$cout_present" | grep -q "^SKIP sync: " && ok "SKIP printed for the colliding copilot skill (sync)" \
+  || err "expected a SKIP line for copilot 'sync' (pre-existing collision) — got:\n$cout_present"
+
+section "copilot mcp-config.json — read-only WARN when gbrain missing"
+COPILOT_HOME_WARN="$TMP/copilot-warn"
+mkdir -p "$COPILOT_HOME_WARN/.copilot"
+printf '{"mcpServers":{"convergio":{}}}\n' > "$COPILOT_HOME_WARN/.copilot/mcp-config.json"
+warn_out="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR/cop-skills-warn" \
+    RDA_COPILOT_SKILLS_DIR="$COPILOT_HOME_WARN/.copilot/skills" \
+    RDA_COPILOT_MCP_CONFIG="$COPILOT_HOME_WARN/.copilot/mcp-config.json" \
+    RDA_POINTER_HOME="$TMP/ptr-home-cop-warn" RDA_FORCE_OPENCODE=0 \
+    bash bin/sync.sh --install 2>&1)"
+printf '%s\n' "$warn_out" | grep -q "^WARN copilot mcp-config.json: gbrain NON trovato" \
+  && ok "WARN printed when mcp-config.json lacks gbrain" \
+  || err "expected a WARN line for missing gbrain in mcp-config.json — got:\n$warn_out"
+if [ "$(cat "$COPILOT_HOME_WARN/.copilot/mcp-config.json")" = '{"mcpServers":{"convergio":{}}}' ]; then
+  ok "copilot mcp-config.json left untouched (read-only check, never written)"
+else
+  err "copilot mcp-config.json content was modified — should never happen (Copilot-owned file)"
+fi
+
+section "copilot mcp-config.json — no WARN when gbrain already present"
+COPILOT_HOME_OK="$TMP/copilot-ok"
+mkdir -p "$COPILOT_HOME_OK/.copilot"
+printf '{"mcpServers":{"gbrain":{},"convergio":{}}}\n' > "$COPILOT_HOME_OK/.copilot/mcp-config.json"
+ok_out="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR/cop-skills-ok" \
+    RDA_COPILOT_SKILLS_DIR="$COPILOT_HOME_OK/.copilot/skills" \
+    RDA_COPILOT_MCP_CONFIG="$COPILOT_HOME_OK/.copilot/mcp-config.json" \
+    RDA_POINTER_HOME="$TMP/ptr-home-cop-ok" RDA_FORCE_OPENCODE=0 \
+    bash bin/sync.sh --install 2>&1)"
+printf '%s\n' "$ok_out" | grep -q "^WARN copilot mcp-config.json" && err "unexpected WARN when gbrain is present — got:\n$ok_out" \
+  || ok "no WARN printed when gbrain already present in mcp-config.json"
 
 # --- Result --------------------------------------------------------------
 printf "\n"
