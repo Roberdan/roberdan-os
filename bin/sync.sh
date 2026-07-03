@@ -42,6 +42,9 @@
 # installed, never overwriting an existing file. RDA_POINTER_HOME overrides
 # $HOME (default $HOME) for isolated testing; RDA_FORCE_CODEX / RDA_FORCE_OPENCODE
 # (0|1) force tool-presence detection for tests.
+# NB: installed skill symlinks point INTO platforms/ (gitignored) — after a
+# `git clean -fdx` they dangle until the next `--emit-only`/`--install` run
+# re-materializes the targets; validate.sh's tool-coverage section flags that.
 #
 # Deterministic output: no timestamps, no unstable ordering.
 set -euo pipefail
@@ -388,21 +391,28 @@ if [ "$MODE" = "install" ]; then
     echo "SKIP codex: $PTR_HOME/.codex non trovato (tool non installato)"
   fi
 
-  # opencode: ~/.config/opencode/AGENTS.md, only if `opencode` resolves.
+  # opencode: ~/.config/opencode/AGENTS.md — detected by binary OR config dir
+  # (rex LOW-3: a GUI/launchd-installed opencode may not be on this shell's
+  # PATH; the config dir is the same detection style codex uses).
   opencode_present=0
   if [ "${RDA_FORCE_OPENCODE:-}" = "1" ]; then opencode_present=1
   elif [ "${RDA_FORCE_OPENCODE:-}" = "0" ]; then opencode_present=0
-  elif command -v opencode >/dev/null 2>&1; then opencode_present=1
+  elif command -v opencode >/dev/null 2>&1 || [ -d "$PTR_HOME/.config/opencode" ]; then opencode_present=1
   fi
   if [ "$opencode_present" -eq 1 ]; then
     install_agents_pointer "$PTR_HOME/.config/opencode/AGENTS.md" "opencode"
   else
-    echo "SKIP opencode: comando 'opencode' non risolto (tool non installato)"
+    echo "SKIP opencode: né comando 'opencode' né $PTR_HOME/.config/opencode trovati (tool non installato)"
   fi
 
-  # ~/GitHub/AGENTS.md: always eligible (this machine's ~/GitHub layout), no
-  # tool-presence gate — only the existing-file guard applies.
-  install_agents_pointer "$PTR_HOME/GitHub/AGENTS.md" "\$HOME/GitHub/AGENTS.md"
+  # ~/GitHub/AGENTS.md: only if ~/GitHub already exists (rex LOW-2: --install
+  # must not create directory trees outside the repo on machines with a
+  # different layout) — plus the usual existing-file guard.
+  if [ -d "$PTR_HOME/GitHub" ]; then
+    install_agents_pointer "$PTR_HOME/GitHub/AGENTS.md" "\$HOME/GitHub/AGENTS.md"
+  else
+    echo "SKIP \$HOME/GitHub/AGENTS.md: $PTR_HOME/GitHub non esiste (layout diverso, nessuna dir creata)"
+  fi
 
   echo ""
   echo "Real install of agents/hooks into ~/.claude: NOT performed by this script"

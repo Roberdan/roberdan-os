@@ -118,7 +118,7 @@ printf '%s\n' "$pout" | grep -qF 'SKIP $HOME/GitHub/AGENTS.md:' && ok "SKIP mess
 
 section "global AGENTS.md pointer — clean skip when a tool is fully absent (no .codex dir, forced opencode present)"
 PTR_HOME2="$TMP/ptr-home-absent"
-mkdir -p "$PTR_HOME2"    # no .codex dir at all → codex must be skipped
+mkdir -p "$PTR_HOME2/GitHub"    # no .codex dir at all → codex skipped; GitHub/ present → pointer installed
 pout2="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR/ptr-skills2" RDA_POINTER_HOME="$PTR_HOME2" \
          RDA_COPILOT_SKILLS_DIR="$NOCOPILOT_SKILLS_DIR" \
          RDA_FORCE_OPENCODE=1 bash bin/sync.sh --install 2>&1)"
@@ -128,8 +128,19 @@ printf '%s\n' "$pout2" | grep -q "^SKIP codex:" && ok "SKIP message printed for 
   || err "expected a SKIP line for codex — got:\n$pout2"
 [ -f "$PTR_HOME2/.config/opencode/AGENTS.md" ] && ok "opencode AGENTS.md installed (forced present)" \
   || err "expected $PTR_HOME2/.config/opencode/AGENTS.md to be installed (RDA_FORCE_OPENCODE=1)"
-[ -f "$PTR_HOME2/GitHub/AGENTS.md" ] && ok "GitHub/AGENTS.md installed fresh (no pre-existing file)" \
+[ -f "$PTR_HOME2/GitHub/AGENTS.md" ] && ok "GitHub/AGENTS.md installed fresh (dir existed, no pre-existing file)" \
   || err "expected $PTR_HOME2/GitHub/AGENTS.md to be installed"
+
+section "global AGENTS.md pointer — ~/GitHub NOT created as a side effect when absent (rex LOW-2)"
+PTR_HOME3="$TMP/ptr-home-nogithub"
+mkdir -p "$PTR_HOME3"    # deliberately NO GitHub/ dir
+pout3="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR/ptr-skills3" RDA_POINTER_HOME="$PTR_HOME3" \
+         RDA_COPILOT_SKILLS_DIR="$NOCOPILOT_SKILLS_DIR" \
+         RDA_FORCE_CODEX=0 RDA_FORCE_OPENCODE=0 bash bin/sync.sh --install 2>&1)"
+[ -d "$PTR_HOME3/GitHub" ] && err "\$HOME/GitHub was created as a side effect — must never happen" \
+  || ok "\$HOME/GitHub not created when absent (no out-of-repo side effects)"
+printf '%s\n' "$pout3" | grep -qF 'SKIP $HOME/GitHub/AGENTS.md:' && ok "SKIP message printed for absent ~/GitHub" \
+  || err "expected a SKIP line for absent ~/GitHub — got:\n$pout3"
 
 section "copilot skills install — clean skip when ~/.copilot is absent"
 COPILOT_ABSENT_HOME="$TMP/copilot-absent"
