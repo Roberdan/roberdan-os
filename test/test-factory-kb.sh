@@ -387,5 +387,105 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Model policy (explicit Roberto directive, 2026-07): the factory must always run on sonnet,
+# scaling to opus only on a task's explicit request, and never fall through to the account's
+# interactive default model (which can be anything, e.g. the pricier Fable). run.sh must always
+# pass an explicit --model to claude -p. The fake claude here dumps its full argv (not just
+# $2 like the earlier stubs) so we can assert on the --model flag's value directly.
+section "factory: model policy — no model: in frontmatter defaults to --model sonnet"
+FACM1="$TMP/factory-model-default"; mkdir -p "$FACM1/queue" "$FACM1/bin"
+cat > "$FACM1/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "${CAPTURE_ARGV:?}"
+exit 0
+EOF
+chmod +x "$FACM1/bin/claude"
+printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe task\n' "$TMP" > "$FACM1/queue/nomodel.md"
+CAPARGV1="$TMP/argv-default.txt"
+env -i PATH="$FACM1/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FACM1" RDA_HANDOFF=/dev/null CAPTURE_ARGV="$CAPARGV1" \
+  bash factory/run.sh >/dev/null 2>&1
+if [ -f "$CAPARGV1" ] && grep -A1 -x -- '--model' "$CAPARGV1" | grep -qx 'sonnet'; then
+  ok "task without model: gets --model sonnet"
+else
+  err "task without model: did not get --model sonnet (argv: $(cat "$CAPARGV1" 2>/dev/null | tr '\n' ' '))"
+fi
+
+section "factory: model policy — model: opus in frontmatter passes --model opus"
+FACM2="$TMP/factory-model-opus"; mkdir -p "$FACM2/queue" "$FACM2/bin"
+cat > "$FACM2/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "${CAPTURE_ARGV:?}"
+exit 0
+EOF
+chmod +x "$FACM2/bin/claude"
+printf -- '---\ndir: %s\ntimeout: 5\nmodel: opus\n---\nprobe task\n' "$TMP" > "$FACM2/queue/opustask.md"
+CAPARGV2="$TMP/argv-opus.txt"
+env -i PATH="$FACM2/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FACM2" RDA_HANDOFF=/dev/null CAPTURE_ARGV="$CAPARGV2" \
+  bash factory/run.sh >/dev/null 2>&1
+if [ -f "$CAPARGV2" ] && grep -A1 -x -- '--model' "$CAPARGV2" | grep -qx 'opus'; then
+  ok "task with model: opus gets --model opus"
+else
+  err "task with model: opus did not get --model opus (argv: $(cat "$CAPARGV2" 2>/dev/null | tr '\n' ' '))"
+fi
+
+section "factory: model policy — disallowed model value is clamped to sonnet with a WARN"
+FACM3="$TMP/factory-model-fable"; mkdir -p "$FACM3/queue" "$FACM3/bin"
+cat > "$FACM3/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "${CAPTURE_ARGV:?}"
+exit 0
+EOF
+chmod +x "$FACM3/bin/claude"
+printf -- '---\ndir: %s\ntimeout: 5\nmodel: fable\n---\nprobe task\n' "$TMP" > "$FACM3/queue/fabletask.md"
+CAPARGV3="$TMP/argv-fable.txt"
+RUNLOG3="$TMP/run-fable.log"
+env -i PATH="$FACM3/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FACM3" RDA_HANDOFF=/dev/null CAPTURE_ARGV="$CAPARGV3" \
+  bash factory/run.sh >/dev/null 2>"$RUNLOG3"
+if [ -f "$CAPARGV3" ] && grep -A1 -x -- '--model' "$CAPARGV3" | grep -qx 'sonnet' \
+  && grep -q "WARN model 'fable' not allowed (sonnet|opus only) — clamped to sonnet" "$RUNLOG3"; then
+  ok "model: fable is clamped to --model sonnet and logs an explicit WARN"
+else
+  err "model: fable was not clamped+warned correctly (argv: $(cat "$CAPARGV3" 2>/dev/null | tr '\n' ' '), run log: $(cat "$RUNLOG3" 2>/dev/null))"
+fi
+
+section "factory: model policy — the thor-verify pass always uses --model sonnet"
+FACM4="$TMP/factory-model-verify"; KBM4="$TMP/kanban-model-verify"; mkdir -p "$FACM4/queue" "$FACM4/bin" "$KBM4/doing"
+cat > "$FACM4/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  *"You are acting as @thor"*)
+    printf '%s\n' "$@" > "${CAPTURE_VERIFY_ARGV:?}"
+    echo "VERDICT: PASS — files exist, tests pass"
+    ;;
+esac
+exit 0
+EOF
+chmod +x "$FACM4/bin/claude"
+cat > "$KBM4/doing/model-verify.md" <<'EOF'
+---
+title: model verify card
+dod: "real dod"
+acceptance: "real acceptance"
+status: doing
+approved_by: roberto
+created: 2026-07-01
+---
+body
+EOF
+printf -- '---\ndir: %s\ntimeout: 5\ncard: model-verify\nmodel: opus\n---\nprobe task\n' "$TMP" > "$FACM4/queue/modelverify.md"
+CAPVERIFYARGV="$TMP/argv-verify.txt"
+env -i PATH="$FACM4/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_FACTORY="$FACM4" RDA_KANBAN="$KBM4" RDA_HANDOFF=/dev/null CAPTURE_VERIFY_ARGV="$CAPVERIFYARGV" \
+  bash factory/run.sh >/dev/null 2>&1
+if [ -f "$CAPVERIFYARGV" ] && grep -A1 -x -- '--model' "$CAPVERIFYARGV" | grep -qx 'sonnet'; then
+  ok "thor-verify pass always uses --model sonnet, even when the task itself used model: opus"
+else
+  err "thor-verify pass did not use --model sonnet (argv: $(cat "$CAPVERIFYARGV" 2>/dev/null | tr '\n' ' '))"
+fi
+
+# ---------------------------------------------------------------------------
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "test-factory-kb: ✅ ALL GREEN"; exit 0; else echo "test-factory-kb: ❌ FAIL (see above)"; exit 1; fi
