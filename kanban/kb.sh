@@ -6,6 +6,10 @@ set -euo pipefail
 
 KB="${RDA_KANBAN:-$HOME/GitHub/roberdan-os/kanban}"
 mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
+# repo ROOT (independent of $KB, which under tests points at a temp fixture
+# dir) — needed so `kb plans`/`kb plan`/`kb sched` resolve docs/ and
+# proposals/ from the real repo no matter what directory `kb` is invoked from.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cmd="${1:-view}"; [ $# -gt 0 ] && shift || true
 
 _field() { grep -m1 "^$2:" "$1" 2>/dev/null | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"\$//"; }
@@ -73,14 +77,184 @@ _board() {
 
 usage() {
   echo 'kb — gated kanban. Commands:'
+  echo ' view:'
   echo '  kb                            view whole board (todo+doing+done)'
+  echo '  kb list | kb ls                plain vertical list, all columns'
   echo '  kb todo | kb doing | kb done  view one column'
   echo '  kb show <id>                  show a card'
+  echo ' gates:'
   echo '  kb add "<title>" [dod] [acc]  new card in todo'
   echo '  kb edit <id>                  edit a card (fill dod/acceptance)'
   echo '  kb start <id> --by roberto    GATE: todo->doing (needs your approval)'
   echo '  kb finish <id> --thor "<ev>"  GATE: doing->done (@thor validates + evidence)'
   echo '  kb block <id> "<reason>"      mark a card blocked, move back to todo/'
+  echo ' detail (everything ever done, on demand):'
+  echo '  kb history                    ALL work: done/ cards + every archived goal, newest first'
+  echo '  kb archive [YYYY-MM-DD]       list archive files (counts) | cat one archive'
+  echo '  kb plans                      list docs/plan-*.md (+ docs/archive/) with H1 + line count'
+  echo '  kb plan <match>               print the plan whose filename contains <match>'
+  echo ' ops:'
+  echo '  kb sched                      launchd jobs + schedules + factory queue/failed + evolve proposals'
+}
+
+# ---------------------------------------------------------------------------
+# kb history — everything ever done: individual done/ cards + every row rolled
+# up into done/_archive-*.md. Most recent first. Read-only, on-demand detail
+# (never loaded at session start — that budget is owned by todo/doing only).
+_history() {
+  echo "=== HISTORY — individual done/ cards (most recent verified first) ==="
+  local f rows=() vat title id
+  for f in "$KB/done"/*.md; do
+    [ -e "$f" ] || continue
+    case "$(basename "$f")" in _*) continue;; esac
+    vat="$(_field "$f" verified_at)"; [ -n "$vat" ] || vat="$(_field "$f" created)"
+    title="$(_field "$f" title)"
+    id="$(basename "$f" .md)"
+    rows+=("${vat:-0000-00-00}|$id|$title")
+  done
+  if [ "${#rows[@]}" -eq 0 ]; then
+    echo "  (no individual done cards right now — see archives below)"
+  else
+    printf '%s\n' "${rows[@]}" | sort -t'|' -k1,1 -r | while IFS='|' read -r vat id title; do
+      printf '  [%s] %s (verified %s)\n' "$id" "$title" "$vat"
+    done || true
+  fi
+  echo
+  echo "=== HISTORY — archived goals (newest archive first) ==="
+  local afiles=()
+  for f in "$KB/done"/_archive-*.md; do [ -e "$f" ] && afiles+=("$f"); done
+  if [ "${#afiles[@]}" -eq 0 ]; then
+    echo "  (no archives yet)"
+    return 0
+  fi
+  local num goal status evidence
+  for f in $(printf '%s\n' "${afiles[@]}" | sort -r); do
+    echo
+    echo "-- $(basename "$f") --"
+    grep -E '^\| [0-9]+ \|' "$f" 2>/dev/null | while IFS='|' read -r _ num goal status evidence _; do
+      num="$(echo "$num" | tr -d ' ')"
+      goal="$(echo "$goal" | sed 's/^ *//; s/ *$//')"
+      status="$(echo "$status" | sed 's/^ *//; s/ *$//')"
+      evidence="$(echo "$evidence" | sed 's/^ *//; s/ *$//')"
+      printf '  %s. %s [%s] — %s\n' "$num" "$goal" "$status" "$evidence"
+    done || true
+  done
+  return 0
+}
+
+# kb archive [DATE] — list archive files with goal counts, or cat one by date.
+_archive_cmd() {
+  local date="${1:-}"
+  if [ -z "$date" ]; then
+    echo "ARCHIVES:"
+    local f found=0 n
+    for f in "$KB/done"/_archive-*.md; do
+      [ -e "$f" ] || continue
+      found=1
+      n="$(grep -cE '^\| [0-9]+ \|' "$f" 2>/dev/null || true)"
+      printf '  %-32s %s goal(s)\n' "$(basename "$f")" "${n:-0}"
+    done
+    [ "$found" -eq 0 ] && echo "  (no archives yet)"
+    return 0
+  fi
+  local f="$KB/done/_archive-$date.md"
+  if [ -e "$f" ]; then cat "$f"; else echo "no archive for '$date' (looked for $f)" >&2; return 1; fi
+}
+
+# kb plans — list docs/plan-*.md + docs/archive/plan-*.md (name, H1, line count).
+_plans_list() {
+  echo "PLANS:"
+  local f h1 lines found=0
+  for f in "$ROOT"/docs/plan-*.md "$ROOT"/docs/archive/plan-*.md; do
+    [ -e "$f" ] || continue
+    found=1
+    h1="$(grep -m1 '^# ' "$f" 2>/dev/null || true)"; h1="${h1#\# }"
+    lines="$(wc -l < "$f" | tr -d ' ')"
+    printf '  %-60s %-4s lines  %s\n' "${f#"$ROOT"/}" "$lines" "$h1"
+  done
+  [ "$found" -eq 0 ] && echo "  (no plans found under docs/plan-*.md or docs/archive/plan-*.md)"
+}
+
+# kb plan <match> — print the plan whose filename contains <match>.
+_plan_show() {
+  local match="${1:?match required (e.g. kb plan tool-ind)}" f
+  local -a matches=()
+  for f in "$ROOT"/docs/plan-*.md "$ROOT"/docs/archive/plan-*.md; do
+    [ -e "$f" ] || continue
+    case "$f" in *"$match"*) matches+=("$f") ;; esac
+  done
+  case "${#matches[@]}" in
+    0) echo "no plan matches '$match'" >&2; return 1 ;;
+    1) cat "${matches[0]}" ;;
+    *) echo "multiple plans match '$match':"; for f in "${matches[@]}"; do printf '  %s\n' "${f#"$ROOT"/}"; done ;;
+  esac
+}
+
+# kb sched — one operative view of everything scheduled: launchd jobs +
+# their human-readable schedule (from the plist) + factory queue/failed +
+# latest evolve proposals. Every piece degrades to "n/a", never crashes.
+_sched() {
+  echo "=== SCHEDULED JOBS (launchctl) ==="
+  local found=0
+  if command -v launchctl >/dev/null 2>&1; then
+    while IFS=$'\t' read -r pid exitcode label; do
+      [ -n "${label:-}" ] || continue
+      found=1
+      printf '  %-8s exit=%-5s %s\n' "${pid:-?}" "${exitcode:-?}" "$label"
+    done < <(launchctl list 2>/dev/null | awk -F'\t' '$3 ~ /^com\.roberdan\./' || true)
+  fi
+  [ "$found" -eq 0 ] && echo "  n/a (no com.roberdan.* jobs visible via launchctl list)"
+
+  echo
+  echo "=== SCHEDULES (from ~/Library/LaunchAgents plists) ==="
+  local plist_dir="$HOME/Library/LaunchAgents" p label sched hour minute weekday interval hh mm
+  if [ -d "$plist_dir" ] && command -v plutil >/dev/null 2>&1; then
+    found=0
+    for p in "$plist_dir"/com.roberdan.*.plist; do
+      [ -e "$p" ] || continue
+      found=1
+      label="$(basename "$p" .plist)"
+      hour="$(plutil -extract StartCalendarInterval.Hour raw "$p" 2>/dev/null || true)"
+      minute="$(plutil -extract StartCalendarInterval.Minute raw "$p" 2>/dev/null || true)"
+      weekday="$(plutil -extract StartCalendarInterval.Weekday raw "$p" 2>/dev/null || true)"
+      interval="$(plutil -extract StartInterval raw "$p" 2>/dev/null || true)"
+      if [ -n "$hour" ] || [ -n "$minute" ]; then
+        hh="$(printf '%02d' "${hour:-0}")"; mm="$(printf '%02d' "${minute:-0}")"
+        if [ -n "$weekday" ]; then sched="weekly (dow=$weekday) $hh:$mm"; else sched="daily $hh:$mm"; fi
+      elif [ -n "$interval" ]; then
+        sched="every ${interval}s"
+      else
+        sched="n/a (no StartCalendarInterval/StartInterval)"
+      fi
+      printf '  %-38s %s\n' "$label" "$sched"
+    done
+    [ "$found" -eq 0 ] && echo "  n/a (no com.roberdan.*.plist in $plist_dir)"
+  else
+    echo "  n/a (no $plist_dir or plutil unavailable)"
+  fi
+
+  echo
+  echo "=== FACTORY STATE ==="
+  local fdir="${RDA_FACTORY:-$HOME/.roberdan-os/factory}" qn fn
+  if [ -d "$fdir" ]; then
+    qn="$(ls "$fdir/queue" 2>/dev/null | wc -l | tr -d ' ' || true)"
+    fn="$(ls "$fdir/failed" 2>/dev/null | wc -l | tr -d ' ' || true)"
+    printf '  queue:  %s file(s) — %s\n' "${qn:-0}" "$fdir/queue"
+    printf '  failed: %s file(s) — %s\n' "${fn:-0}" "$fdir/failed"
+  else
+    echo "  n/a (no factory dir at $fdir)"
+  fi
+
+  echo
+  echo "=== EVOLVE PROPOSALS (latest 3) ==="
+  if [ -d "$ROOT/proposals" ]; then
+    local any=0 x
+    for x in $(ls -t "$ROOT/proposals/" 2>/dev/null | head -3 || true); do any=1; echo "  $x"; done
+    [ "$any" -eq 0 ] && echo "  n/a (proposals/ empty)"
+  else
+    echo "  n/a (no proposals/ dir at $ROOT/proposals)"
+  fi
+  return 0
 }
 
 case "$cmd" in
@@ -160,6 +334,12 @@ case "$cmd" in
     [ -n "$f" ] || { echo "no card $id" >&2; exit 1; }
     "${EDITOR:-open}" "$f"
     ;;
+
+  history) _history ;;
+  archive) _archive_cmd "${1:-}" ;;
+  plans)   _plans_list ;;
+  plan)    _plan_show "${1:-}" ;;
+  sched)   _sched ;;
 
   *) usage ;;
 esac
