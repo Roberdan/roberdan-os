@@ -12,11 +12,13 @@ mkdir -p "$state_dir" "$proposals"
 touch "$seen"
 
 # Sources: name → changelog URL (versioned). Expandable.
-sources_names=(claude-code copilot codex)
+sources_names=(claude-code copilot codex hermes-agent warp)
 sources_urls=(
   "https://docs.anthropic.com/en/release-notes/claude-code"
   "https://github.blog/changelog/label/copilot/"
   "https://github.com/openai/codex/releases"
+  "https://github.com/NousResearch/hermes-agent/releases"
+  "https://docs.warp.dev/getting-started/changelog"
 )
 
 now="$(date +%Y-%m-%d)"

@@ -74,7 +74,7 @@ Card kanban unica per l'iniziativa: `T-tool-independence` (dod = P1..P8 verifica
 | P2 | — | — |
 | P3 | — | — |
 | P4 | — | — |
-| P5 | — | — |
+| P5 | done | `evolve/watch.sh` +hermes-agent (github.com/NousResearch/hermes-agent/releases) +warp (docs.warp.dev/getting-started/changelog); URL verificate 200 con curl; run isolato (`RDA_EVOLVE_STATE` custom) su 5 fonti pulito, `shellcheck evolve/watch.sh` pulito; test/validate.sh: FAIL preesistente in bin/sync.sh (SC2088, altro agente P1 in corso) confermato non causato da questo item via stash/pop |
 | P6 | — | — |
 | P7 | — | — |
 | P8 | — | — |
