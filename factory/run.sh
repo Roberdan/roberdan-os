@@ -48,6 +48,25 @@ frontmatter() { sed -n '/^---$/,/^---$/p' "$1"; }
 field() { frontmatter "$1" | grep -m1 "^$2:" | sed "s/^$2:[[:space:]]*//" | tr -d '"' || true; }
 prompt_of() { awk 'BEGIN{f=0} /^---$/{f++; next} f>=2{print}' "$1"; }  # body after 2nd ---
 
+# Model policy (explicit Roberto directive, 2026-07): the factory must always run on sonnet,
+# scaling to opus only when a task needs it — NEVER on the account's interactive default model
+# (which can be anything, e.g. the pricier Fable), since `claude -p` without --model silently
+# inherits it. Allowlist is deliberately hardcoded (not read from env/frontmatter as-is) so a
+# typo or an unexpected value (fable, haiku, empty) can never slip through as a raw string —
+# every requested value is clamped through this function before it reaches the claude command
+# line. Applies to BOTH the per-task frontmatter `model:` field and the RDA_FACTORY_MODEL env
+# override; neither is trusted directly.
+resolve_model() {
+  local requested="$1"
+  case "$requested" in
+    sonnet|opus) printf '%s' "$requested" ;;
+    *)
+      echo "[factory] WARN model '$requested' not allowed (sonnet|opus only) — clamped to sonnet" >&2
+      printf 'sonnet'
+      ;;
+  esac
+}
+
 # If a task names its originating kanban card (`card: <id>` in frontmatter), append the
 # factory result to that card so kanban/doing/ and factory queue/->done/|failed/ don't
 # drift apart — this closes the gap that let two "doing" cards go silently stale.
@@ -90,10 +109,12 @@ whether they are met. Output exactly \`VERDICT: PASS — <evidence>\` or \`VERDI
     { echo "[factory] FATAL: dir '$dir' does not exist"; } >> "$vlog"
     vrc=2
   elif [ -n "$TIMEOUT_BIN" ]; then
-    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$vprompt" --dangerously-skip-permissions --add-dir "$dir" ) > "$vlog" 2>&1
+    # Verify pass is QA, not authorship — always sonnet, never scaled to opus and never
+    # influenced by RDA_FACTORY_MODEL/per-task model: (those govern the authoring pass only).
+    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$vprompt" --model sonnet --dangerously-skip-permissions --add-dir "$dir" ) > "$vlog" 2>&1
     vrc=$?
   else
-    ( cd "$dir" && "$CLAUDE" -p "$vprompt" --dangerously-skip-permissions --add-dir "$dir" ) > "$vlog" 2>&1
+    ( cd "$dir" && "$CLAUDE" -p "$vprompt" --model sonnet --dangerously-skip-permissions --add-dir "$dir" ) > "$vlog" 2>&1
     vrc=$?
   fi
   set -e
@@ -112,12 +133,16 @@ whether they are met. Output exactly \`VERDICT: PASS — <evidence>\` or \`VERDI
 }
 
 run_task() {
-  local f="$1" name ts dir tmo log body attempts_file attempts
+  local f="$1" name ts dir tmo log body attempts_file attempts model_req model
   name="$(basename "$f" .md)"
   ts="$(date +%Y%m%d-%H%M%S)"
   dir="$(field "$f" dir)"; dir="${dir/#\~/$HOME}"; dir="${dir:-$DEFAULT_DIR}"
   tmo="$(field "$f" timeout)"; tmo="${tmo:-$DEFAULT_TIMEOUT}"
   log="$LOG/${ts}-${name}.log"
+  # Per-task frontmatter `model:` wins; else the global RDA_FACTORY_MODEL override; else
+  # sonnet. Either source is clamped through resolve_model()'s allowlist (sonnet|opus only).
+  model_req="$(field "$f" model)"; model_req="${model_req:-${RDA_FACTORY_MODEL:-sonnet}}"
+  model="$(resolve_model "$model_req")"
   body="$(prompt_of "$f")"; [ -n "$body" ] || body="$(cat "$f")"
   attempts_file="$STATE/${name}.attempts"
   attempts="$(cat "$attempts_file" 2>/dev/null || echo 0)"
@@ -125,7 +150,7 @@ run_task() {
   local primer=""; [ -f "$PRIMER" ] && primer="$(cat "$PRIMER")"$'\n\n=== YOUR TASK ===\n'
   local full="${primer}${body}"
 
-  echo "[factory] START $name (dir=$dir timeout=${tmo}s attempt=$((attempts+1))) -> $log"
+  echo "[factory] START $name (dir=$dir timeout=${tmo}s attempt=$((attempts+1)) model=$model) -> $log"
   set +e
   # cd into $dir first — see the comment in verify_card() for why: --add-dir alone leaves
   # the process's actual cwd at wherever run.sh was launched from, not the task's dir.
@@ -134,10 +159,10 @@ run_task() {
     { echo "[factory] FATAL: dir '$dir' does not exist"; } >> "$log"
     rc=2
   elif [ -n "$TIMEOUT_BIN" ]; then
-    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$full" --dangerously-skip-permissions --add-dir "$dir" ) > "$log" 2>&1
+    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$full" --model "$model" --dangerously-skip-permissions --add-dir "$dir" ) > "$log" 2>&1
     rc=$?
   else
-    ( cd "$dir" && "$CLAUDE" -p "$full" --dangerously-skip-permissions --add-dir "$dir" ) > "$log" 2>&1
+    ( cd "$dir" && "$CLAUDE" -p "$full" --model "$model" --dangerously-skip-permissions --add-dir "$dir" ) > "$log" 2>&1
     rc=$?
   fi
   set -e

@@ -18,7 +18,8 @@ Convergio, daemon-optional.
 
 - `factory/enqueue.sh "<task text or file>" [name]` — add a task to the queue.
 - `factory/run.sh` — process the queue: for each task, dispatch a headless agent
-  (`claude -p "<task>" --dangerously-skip-permissions --add-dir <dir>`), capture the log.
+  (`claude -p "<task>" --model <sonnet|opus> --dangerously-skip-permissions --add-dir <dir>`),
+  capture the log. See "Model policy" below for how `<sonnet|opus>` is chosen.
   **A task only reaches `done/` on exit 0.** On failure it is requeued once (attempt 2/2); if
   it fails again it moves to `failed/` with `escalate: true` — never silently marked done.
   **Resumable:** state lives in the filesystem (queue/ → done/ or failed/), so a killed run just
@@ -35,9 +36,34 @@ Convergio, daemon-optional.
 dir: ~/GitHub/roberdan-os      # working dir the agent gets (--add-dir); default ~/GitHub/roberdan-os
 timeout: 1800                  # seconds (optional)
 card: T-example-id             # optional: kanban card id this task fulfills
+model: sonnet                  # optional: sonnet (default) | opus — see "Model policy" below
 ---
 <the task / goal, in natural language — the agent reads AGENTS.md and works in roberto-mode>
 ```
+
+### Model policy — always sonnet, scale to opus on need, never the account default
+
+`run.sh` always passes an explicit `--model` to `claude -p` — it never lets the process fall
+through to the account's interactive default model. That default is whatever Roberto's account
+happens to be set to at the time (it has been the pricier Fable), and `claude -p` silently
+inherits it when `--model` is omitted; an unattended factory must not ride that default.
+
+- **Default: `sonnet`** for every task unless overridden.
+- **Per-task override**: set `model: opus` in a task's frontmatter for tasks that genuinely need
+  the extra reasoning depth (complex architectural work, hard bugs, high-stakes artefacts — see
+  the model-selection decision table in the global instructions). Read via the existing `field()`
+  helper, same as `dir:`/`timeout:`/`card:`.
+- **Global override**: `RDA_FACTORY_MODEL` env var changes the default for tasks that don't set
+  `model:` explicitly.
+- **Allowlist is hardcoded to `sonnet` and `opus` only** — never any other value, and in
+  particular never `fable`. Both the per-task `model:` field and the `RDA_FACTORY_MODEL` env
+  override are clamped through this allowlist before reaching the `claude` command line. An
+  unrecognized value (typo, empty string, `fable`, `haiku`, anything else) is clamped to
+  `sonnet` and logged as `[factory] WARN model '<x>' not allowed (sonnet|opus only) — clamped to
+  sonnet` — it is never passed through raw and never causes the task itself to fail.
+- **The headless @thor verification pass always uses `sonnet`**, unconditionally — it is QA
+  (compare evidence against `dod:`/`acceptance:`), not authorship, so it never scales to opus and
+  is unaffected by `model:` or `RDA_FACTORY_MODEL`.
 
 If `card:` is set, `run.sh` appends a `factory_result:` line to that kanban card (wherever it
 currently lives — todo/doing/done) after every attempt: success, retry, or final failure. This is
@@ -89,4 +115,6 @@ to whatever `--add-dir` points at.
 ## Config (env)
 
 `RDA_FACTORY` (default `~/.roberdan-os/factory`) · `RDA_FACTORY_WORKDIR` (default `~/GitHub`) ·
-`RDA_FACTORY_MAX` (tasks/run, default 8) · `RDA_FACTORY_TIMEOUT` (default 1800s).
+`RDA_FACTORY_MAX` (tasks/run, default 8) · `RDA_FACTORY_TIMEOUT` (default 1800s) ·
+`RDA_FACTORY_MODEL` (default model for tasks without a per-task `model:`, clamped to
+`sonnet`|`opus` — see "Model policy" above).
