@@ -3,6 +3,27 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v1.1.0] - 2026-07-03
+
+Kanban cards now say what they're about, not just what they're called.
+
+### Added
+- **`repo:` mandatory field on every kanban card** — names the `~/GitHub` repo/scope the card
+  is about (or `personal` for non-code work). `kb add` requires `--repo`; `kb start` refuses a
+  card whose `repo:` is missing or still `FILL:`, same discipline as `dod:`/`acceptance:`.
+- Board/`kb list`/`kb history` render `(repo)` next to every card so scope is visible at a
+  glance — the board never truncates the id itself (the key you pass to `show`/`start`/`finish`),
+  it only appends the repo tag when it fits the column width; legacy cards with no `repo:`
+  degrade to `(—)` instead of crashing.
+- `test/validate.sh` gained a frontmatter lint for `kanban/todo`+`kanban/doing` cards (mirrors
+  the existing agents/skills sections), scoped to active cards only.
+
+### Fixed
+- `_board` crashed (`set -e` + `pipefail`) on a kanban with zero archive files — the bare
+  `_archive-*.md` glob passed straight to `grep` failed to open the literal non-matching
+  pattern and killed the whole script. Never seen on the real board (always has ≥1 archive);
+  found while testing the `repo:` display against a clean fixture.
+
 ## [v1.0.0] - 2026-07-03
 
 First tagged release: the system graduates from "under construction" to versioned operation.
