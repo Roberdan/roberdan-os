@@ -23,6 +23,7 @@ mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
 cat > "$KB/todo/probe.md" <<'EOF'
 ---
 title: probe card
+repo: roberdan-os
 dod: "real dod"
 acceptance: "real acceptance"
 status: todo
@@ -44,6 +45,7 @@ section "kb gate: start refuses cards with unfilled DoD/acceptance"
 cat > "$KB/todo/unfilled.md" <<'EOF'
 ---
 title: unfilled card
+repo: roberdan-os
 dod: "FILL: definition of done"
 acceptance: "real acceptance"
 status: todo
@@ -55,6 +57,57 @@ if RDA_KANBAN="$KB" bash kanban/kb.sh start unfilled --by roberto >/dev/null 2>&
   err "kb start accepted a card with FILL: placeholder in dod"
 else
   ok "kb start refuses unfilled DoD"
+fi
+
+section "kb gate: start refuses cards with missing repo:"
+cat > "$KB/todo/norepo.md" <<'EOF'
+---
+title: no-repo card
+dod: "real dod"
+acceptance: "real acceptance"
+status: todo
+created: 2026-07-01
+---
+body
+EOF
+if RDA_KANBAN="$KB" bash kanban/kb.sh start norepo --by roberto >/dev/null 2>&1; then
+  err "kb start accepted a card with no repo: field"
+else
+  ok "kb start refuses a card with no repo: field"
+fi
+
+section "kb gate: start refuses cards with unfilled repo: (FILL: placeholder)"
+cat > "$KB/todo/repofill.md" <<'EOF'
+---
+title: repo fill placeholder card
+repo: "FILL: which repo"
+dod: "real dod"
+acceptance: "real acceptance"
+status: todo
+created: 2026-07-01
+---
+body
+EOF
+if RDA_KANBAN="$KB" bash kanban/kb.sh start repofill --by roberto >/dev/null 2>&1; then
+  err "kb start accepted a card with FILL: placeholder in repo"
+else
+  ok "kb start refuses unfilled repo (FILL: placeholder)"
+fi
+
+section "kb add: refuses without --repo"
+if RDA_KANBAN="$KB" bash kanban/kb.sh add "no repo title" >/dev/null 2>&1; then
+  err "kb add accepted a title with no --repo flag"
+else
+  ok "kb add refuses without --repo"
+fi
+
+section "kb add: --repo persists the repo: field into the new card"
+addout="$(RDA_KANBAN="$KB" bash kanban/kb.sh add "has repo title" --repo roberdan-os 2>&1)"
+newid="$(printf '%s' "$addout" | grep -oE 'todo/[^ ]+' | head -1 | cut -d/ -f2)"
+if [ -n "$newid" ] && [ -e "$KB/todo/$newid.md" ] && grep -q '^repo: roberdan-os' "$KB/todo/$newid.md"; then
+  ok "kb add --repo roberdan-os writes repo: field into the new card"
+else
+  err "kb add --repo did not persist the repo field as expected (out: $addout)"
 fi
 
 section "kb gate: doing->done needs @thor + evidence"
@@ -91,6 +144,7 @@ section "kb block: marks a card blocked and returns it to todo/"
 cat > "$KB/doing/inflight.md" <<'EOF'
 ---
 title: inflight card
+repo: roberdan-os
 dod: "real dod"
 acceptance: "real acceptance"
 status: doing
@@ -217,6 +271,7 @@ chmod +x "$FAC4/bin/claude"
 cat > "$KB4/doing/probe-sync.md" <<'EOF'
 ---
 title: probe sync card
+repo: roberdan-os
 dod: "real dod"
 acceptance: "real acceptance"
 status: doing
@@ -257,6 +312,7 @@ chmod +x "$FAC7/bin/claude"
 cat > "$KB7/doing/verify-pass.md" <<'EOF'
 ---
 title: verify pass card
+repo: roberdan-os
 dod: "real dod"
 acceptance: "real acceptance"
 status: doing
@@ -291,6 +347,7 @@ chmod +x "$FAC8/bin/claude"
 cat > "$KB8/doing/verify-fail.md" <<'EOF'
 ---
 title: verify fail card
+repo: roberdan-os
 dod: "real dod"
 acceptance: "real acceptance"
 status: doing
@@ -467,6 +524,7 @@ chmod +x "$FACM4/bin/claude"
 cat > "$KBM4/doing/model-verify.md" <<'EOF'
 ---
 title: model verify card
+repo: roberdan-os
 dod: "real dod"
 acceptance: "real acceptance"
 status: doing

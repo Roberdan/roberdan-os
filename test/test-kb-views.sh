@@ -28,6 +28,7 @@ mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
 cat > "$KB/done/probe-a.md" <<'EOF'
 ---
 title: Probe A card
+repo: roberdan-os
 dod: "real dod"
 acceptance: "real acceptance"
 status: done
@@ -38,9 +39,29 @@ verified_at: 2026-07-02
 body
 EOF
 out="$(RDA_KANBAN="$KB" bash kanban/kb.sh history 2>&1)"
-echo "$out" | grep -q '\[probe-a\] Probe A card (verified 2026-07-02)' \
-  && ok "history lists the individual done card with id/title/verified date" \
+echo "$out" | grep -q '\[probe-a\] (roberdan-os) Probe A card (verified 2026-07-02)' \
+  && ok "history lists the individual done card with id/repo/title/verified date" \
   || err "history did not list probe-a as expected — got: $out"
+
+section "kb history: a done card with no repo: (legacy) degrades gracefully instead of crashing"
+cat > "$KB/done/probe-legacy.md" <<'EOF'
+---
+title: Legacy probe card (no repo field)
+dod: "real dod"
+acceptance: "real acceptance"
+status: done
+verified_by: thor
+verified_evidence: "test evidence legacy"
+verified_at: 2026-07-01
+---
+body
+EOF
+out="$(RDA_KANBAN="$KB" bash kanban/kb.sh history 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && echo "$out" | grep -q '\[probe-legacy\] (—) Legacy probe card (no repo field) (verified 2026-07-01)'; then
+  ok "history degrades a missing repo: to (—) instead of crashing"
+else
+  err "history did not degrade gracefully on a card with no repo: — got: $out"
+fi
 
 section "kb history: archived goal rows are extracted and grouped by archive file"
 cat > "$KB/done/_archive-2026-06-01.md" <<'EOF'
@@ -69,6 +90,44 @@ if RDA_KANBAN="$EMPTY" bash kanban/kb.sh history >/dev/null 2>&1; then
   ok "kb history on an empty board exits 0"
 else
   err "kb history on an empty board crashed (exit != 0)"
+fi
+
+# ---------------------------------------------------------------------------
+section "kb list/todo: shows [id] (repo) title so scope + objective are visible at a glance"
+LKB="$TMP/list-kanban"
+mkdir -p "$LKB/todo" "$LKB/doing" "$LKB/done"
+cat > "$LKB/todo/list-probe.md" <<'EOF'
+---
+title: List probe objective
+repo: convergio
+dod: "real dod"
+acceptance: "real acceptance"
+status: todo
+created: 2026-07-01
+---
+body
+EOF
+out="$(RDA_KANBAN="$LKB" bash kanban/kb.sh list 2>&1)"
+echo "$out" | grep -q '\[list-probe\] (convergio) List probe objective' \
+  && ok "kb list shows [id] (repo) title" \
+  || err "kb list did not show repo+title as expected — got: $out"
+
+section "kb todo: a card with no repo: (legacy) degrades to (—) instead of crashing"
+cat > "$LKB/todo/list-legacy.md" <<'EOF'
+---
+title: Legacy list card
+dod: "real dod"
+acceptance: "real acceptance"
+status: todo
+created: 2026-07-01
+---
+body
+EOF
+out="$(RDA_KANBAN="$LKB" bash kanban/kb.sh todo 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && echo "$out" | grep -q '\[list-legacy\] (—) Legacy list card'; then
+  ok "kb todo degrades a missing repo: to (—) instead of crashing"
+else
+  err "kb todo did not degrade gracefully on a card with no repo: — got: $out"
 fi
 
 # ---------------------------------------------------------------------------
