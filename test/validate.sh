@@ -2,7 +2,9 @@
 # validate.sh — roberdan-os CI gate. Runs on every PR.
 # 1) frontmatter lint (agents vs skills: distinct schemas)  2) link check (exempts [[wikilink]])
 # 3) drift check (generation is deterministic)  4) shellcheck  5) leak check  8) sync.sh --install
-# skills symlink step (isolated, incl. emit-only must NOT touch it)
+# skills symlink step (isolated, incl. emit-only must NOT touch it)  10) tool coverage — for
+# tools DETECTED as installed on THIS machine, asserts the real wiring artifact still exists
+# (skip, never FAIL, for tools not installed — must be a total no-op on a clean CI box)
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
@@ -110,6 +112,87 @@ if bash test/test-sync-install.sh >/dev/null 2>&1; then ok "install symlink/skip
 # mechanically correct, resumable, and blind — see eval/test-eval-pipeline.sh.
 section "eval/ harness — stub-mode pipeline (run-eval -> judge -> report)"
 if bash eval/test-eval-pipeline.sh >/dev/null 2>&1; then ok "eval harness verified (see bash eval/test-eval-pipeline.sh)"; else err "test-eval-pipeline — see bash eval/test-eval-pipeline.sh"; fi
+
+# --- 10) tool coverage (installed tools only) --------------------------------
+# Wiring can silently rot: Roberto reinstalls Copilot, deletes a pointer, upgrades
+# codex — nothing notices ("looks wired but never ran", see eval/tasks/12). For
+# each tool DETECTED as present on this machine, assert its wiring artifact still
+# exists. A tool that isn't installed is a clean "skip", never a FAIL — so this
+# section is a total no-op on a fresh clone / CI box with no tools installed.
+section "tool coverage (installed tools only)"
+REMEDIATE="run: bash bin/sync.sh --install"
+
+# claude: only the 3 roberdan-os skills known NOT to collide with another skill
+# system (gstack vendors 'review' and 'ship' under the same name — documented,
+# intentionally not asserted here).
+if [ -d "$HOME/.claude" ]; then
+  for s in auto-checkpoint sync verify-done; do
+    if [ -e "$HOME/.claude/skills/$s/SKILL.md" ]; then
+      ok "claude skill '$s' wired (~/.claude/skills/$s/SKILL.md resolves)"
+    else
+      err "claude skill '$s' missing at ~/.claude/skills/$s/SKILL.md — $REMEDIATE"
+    fi
+  done
+else
+  printf "  skip: claude not installed (no ~/.claude)\n"
+fi
+
+# copilot: all 8 roberdan-os skills + gbrain wired into its own mcp-config.json.
+if [ -d "$HOME/.copilot" ]; then
+  for s in auto-checkpoint focus-group premortem problem-validation review ship sync verify-done; do
+    if [ -e "$HOME/.copilot/skills/$s/SKILL.md" ]; then
+      ok "copilot skill '$s' wired (~/.copilot/skills/$s/SKILL.md resolves)"
+    else
+      err "copilot skill '$s' missing at ~/.copilot/skills/$s/SKILL.md — $REMEDIATE"
+    fi
+  done
+  if [ -f "$HOME/.copilot/mcp-config.json" ]; then
+    if grep -q "gbrain" "$HOME/.copilot/mcp-config.json" 2>/dev/null; then
+      ok "copilot mcp-config.json has gbrain"
+    else
+      err "copilot mcp-config.json missing gbrain — add it manually (Copilot-owned file, sync.sh never writes it)"
+    fi
+  else
+    printf "  skip: ~/.copilot/mcp-config.json not present yet (Copilot never run)\n"
+  fi
+else
+  printf "  skip: copilot not installed (no ~/.copilot)\n"
+fi
+
+# codex: reads AGENTS.md natively — just the global pointer needs to exist.
+if [ -d "$HOME/.codex" ]; then
+  if [ -s "$HOME/.codex/AGENTS.md" ]; then
+    ok "codex pointer wired (~/.codex/AGENTS.md non-empty)"
+  else
+    err "codex pointer missing/empty at ~/.codex/AGENTS.md — $REMEDIATE"
+  fi
+else
+  printf "  skip: codex not installed (no ~/.codex)\n"
+fi
+
+# opencode: reads AGENTS.md natively — global pointer only, gated on the binary.
+if command -v opencode >/dev/null 2>&1; then
+  if [ -e "$HOME/.config/opencode/AGENTS.md" ]; then
+    ok "opencode pointer wired (~/.config/opencode/AGENTS.md exists)"
+  else
+    err "opencode pointer missing at ~/.config/opencode/AGENTS.md — $REMEDIATE"
+  fi
+else
+  printf "  skip: opencode not installed (command not found)\n"
+fi
+
+# ~/GitHub pointer fabric: always checked when the directory exists, regardless
+# of which tools are installed (any AGENTS.md-native tool opened elsewhere under
+# ~/GitHub should still find the canon).
+if [ -d "$HOME/GitHub" ]; then
+  if [ -f "$HOME/GitHub/AGENTS.md" ] && grep -q "roberdan-os" "$HOME/GitHub/AGENTS.md" 2>/dev/null; then
+    ok "\$HOME/GitHub/AGENTS.md wired (mentions roberdan-os)"
+  else
+    err "\$HOME/GitHub/AGENTS.md missing or doesn't mention roberdan-os — $REMEDIATE"
+  fi
+else
+  printf "  skip: ~/GitHub not present\n"
+fi
 
 # --- Result --------------------------------------------------------------
 printf "\n"
