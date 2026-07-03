@@ -127,10 +127,13 @@ REMEDIATE="run: bash bin/sync.sh --install"
 # intentionally not asserted here).
 if [ -d "$HOME/.claude" ]; then
   for s in auto-checkpoint sync verify-done; do
-    if [ -e "$HOME/.claude/skills/$s/SKILL.md" ]; then
-      ok "claude skill '$s' wired (~/.claude/skills/$s/SKILL.md resolves)"
+    _lnk="$HOME/.claude/skills/$s/SKILL.md"
+    if [ -e "$_lnk" ] && readlink "$_lnk" 2>/dev/null | grep -q "roberdan-os/platforms/"; then
+      ok "claude skill '$s' wired (symlink resolves into roberdan-os platforms/)"
+    elif [ -e "$_lnk" ]; then
+      err "claude skill '$s' exists but is NOT the roberdan-os symlink (foreign same-name skill?) — $REMEDIATE"
     else
-      err "claude skill '$s' missing at ~/.claude/skills/$s/SKILL.md — $REMEDIATE"
+      err "claude skill '$s' missing at $_lnk — $REMEDIATE"
     fi
   done
 else
@@ -140,10 +143,13 @@ fi
 # copilot: all 8 roberdan-os skills + gbrain wired into its own mcp-config.json.
 if [ -d "$HOME/.copilot" ]; then
   for s in auto-checkpoint focus-group premortem problem-validation review ship sync verify-done; do
-    if [ -e "$HOME/.copilot/skills/$s/SKILL.md" ]; then
-      ok "copilot skill '$s' wired (~/.copilot/skills/$s/SKILL.md resolves)"
+    _lnk="$HOME/.copilot/skills/$s/SKILL.md"
+    if [ -e "$_lnk" ] && readlink "$_lnk" 2>/dev/null | grep -q "roberdan-os/platforms/"; then
+      ok "copilot skill '$s' wired (symlink resolves into roberdan-os platforms/)"
+    elif [ -e "$_lnk" ]; then
+      err "copilot skill '$s' exists but is NOT the roberdan-os symlink (foreign same-name skill?) — $REMEDIATE"
     else
-      err "copilot skill '$s' missing at ~/.copilot/skills/$s/SKILL.md — $REMEDIATE"
+      err "copilot skill '$s' missing at $_lnk — $REMEDIATE"
     fi
   done
   if [ -f "$HOME/.copilot/mcp-config.json" ]; then
@@ -170,8 +176,9 @@ else
   printf "  skip: codex not installed (no ~/.codex)\n"
 fi
 
-# opencode: reads AGENTS.md natively — global pointer only, gated on the binary.
-if command -v opencode >/dev/null 2>&1; then
+# opencode: reads AGENTS.md natively — detected by binary OR config dir (same
+# detection sync.sh --install uses, so gate and installer never disagree).
+if command -v opencode >/dev/null 2>&1 || [ -d "$HOME/.config/opencode" ]; then
   if [ -e "$HOME/.config/opencode/AGENTS.md" ]; then
     ok "opencode pointer wired (~/.config/opencode/AGENTS.md exists)"
   else
