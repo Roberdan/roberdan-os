@@ -10,8 +10,10 @@ behavior. `AGENTS.md` is the universal entry point; the runtime wrappers are gen
 
 ## Status
 
-Canon built (Phases 0-5). `test/validate.sh` green: frontmatter, links, drift,
-shellcheck, leak-check. Full plan in [`docs/plan.md`](docs/plan.md).
+Canon built (Phases 0-5) plus a tool-independence pass (2026-07-03, `@rex` APPROVE, `@thor`
+PASS). `test/validate.sh` green: frontmatter, links, drift, shellcheck, leak-check, factory+kb
+regression, tool-coverage. Full plan in [`docs/plan.md`](docs/plan.md); latest pass in
+[`docs/plan-2026-07-03-tool-independence.md`](docs/plan-2026-07-03-tool-independence.md).
 Day-to-day operator guide (kb, factory, recall, gates): [`docs/USAGE.md`](docs/USAGE.md).
 
 | Component | Where |
@@ -23,17 +25,27 @@ Day-to-day operator guide (kb, factory, recall, gates): [`docs/USAGE.md`](docs/U
 | Skills | `skills/` — verify-done, ship, review, sync, auto-checkpoint |
 | Hooks | `hooks/` — main-guard, bash-guard, verify-done, autofmt, post-task-sync |
 | Loop | `loop/loop-protocol.md` |
+| Kanban | `kanban/` — durable, gated goal ledger (`kb`); see [`docs/USAGE.md`](docs/USAGE.md) |
+| Agent factory | `factory/` — unattended headless `claude -p` runs, sonnet default / opus opt-in |
+| Meta-loop | `learn/` (capture+distill) + `evolve/` (weekly upstream watch) |
+| Eval (does the canon work?) | [`eval/README.md`](eval/README.md) — with/without-canon A/B + blind judge, agent-agnostic (`RDA_EVAL_AGENT_CMD`), mirrors §9.1 of `docs/roberdan-os-paper-en.md` |
+| Test suite | `test/validate.sh` (full CI gate) + `test/test-*.sh` (factory/kb/sync-install/kb-views) |
 | Per-platform wrappers | `platforms/` — generated locally by `bin/sync.sh --emit-only`, gitignored, not committed |
 | Web bundle | `bin/make-bundle.sh` → pasteable doc (excludes `private/`) |
-| Eval (does the canon work?) | [`eval/README.md`](eval/README.md) — with/without-canon A/B + blind judge, mirrors the retrieval ablation in `docs/roberdan-os-paper-en.md` §9.1 |
 
 **Wrappers are not in the repo.** `platforms/` is fully generated from the canon and gitignored
 (see `.gitignore`, `bin/sync.sh`). Run `bin/sync.sh --emit-only` locally to materialize them on
 disk; `test/validate.sh`'s drift check verifies generation is deterministic (two runs diff clean)
 rather than diffing against a committed copy.
 
+**Cross-tool support.** `AGENTS.md` is the de-facto standard read natively by Codex, Copilot,
+Cursor, opencode, Warp and hermes — `bin/sync.sh --install` installs global pointers
+(`~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/GitHub/AGENTS.md`) and distributes
+skills to `~/.copilot/skills/`, gated per-tool on what's actually installed on the machine.
+
 **Install (gated):** `bin/sync.sh --install` does not overwrite an existing
-`~/.claude/CLAUDE.md` — it prints the pointer block to add by hand. Push to GitHub: deferred.
+`~/.claude/CLAUDE.md` — it prints the pointer block to add by hand. Pushed to a private GitHub
+remote (`github.com/Roberdan/roberdan-os`).
 
 ## Privacy
 

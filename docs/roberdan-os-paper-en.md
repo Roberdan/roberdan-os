@@ -1,7 +1,7 @@
 # roberdan-os: a personal, cross-platform agentic operating system with local-first memory and a self-improving meta-loop
 
 **Author:** Roberto D'Angelo (Fight the Stroke Foundation) · developed in a human–agent pair with Claude (Anthropic)
-**Date:** 2 July 2026 · **Version:** 1.1 (English) · **Status:** operating system, single-user, single-machine
+**Date:** 3 July 2026 · **Version:** 1.2 (English) · **Status:** operating system, single-user, single-machine
 
 > **PDF:** not committed (build artifact — `docs/*.pdf` is gitignored). Regenerate locally with the
 > `make-pdf` skill: `~/.claude/skills/gstack/make-pdf/dist/pdf generate --cover --toc
@@ -479,6 +479,52 @@ mechanism (`--add-dir` "should" scope the process) that only breaks under a live
 code read cannot surface — reinforcing §11's principle that verification must be empirical, not
 inferred from reading code that looks correct.
 
+### 9.4 Tool-independence pass (July 2026)
+
+§10 originally flagged cross-tool portability as "designed but verified primarily on Claude
+Code." A dedicated audit (2026-07-03) asked, deliberately harder than a design review: is the
+architectural bet — `AGENTS.md` as the single canon — actually validated by the ecosystem, or
+only by our own claims about it?
+
+**The bet is validated; the gap was distribution, not architecture.** Primary-source verification
+(vendor docs, installed `--help` output, package contents — not secondhand claims) confirmed
+`AGENTS.md` is read *natively* by OpenAI Codex CLI, GitHub Copilot (coding agent + CLI), Cursor,
+opencode, Warp, Google Jules, and hermes-agent (Nous Research) — the last verified by inspecting
+the installed `hermes-agent` v0.18.0 package directly, not by trusting its marketing. A local
+spot-check on this machine, however, found the architecture undeployed in practice: Copilot CLI
+had gbrain wired into its MCP config but zero roberdan-os skills installed; hermes and Warp had
+no pointer at all; no repo outside `roberdan-os` itself had a global `AGENTS.md` to fall back on.
+The lesson generalises the one already logged in §10 ("built ≠ active-by-default"): a correct
+design does not distribute itself.
+
+**The fix, and what it caught.** `bin/sync.sh --install` now emits global `AGENTS.md` pointers
+(`~/.codex/`, `~/.config/opencode/`, `~/GitHub/`) and distributes skills to `~/.copilot/skills/`,
+each gated on the target tool actually being present — no wrappers for uninstalled tools. A new
+`test/validate.sh` gate asserts, *only for tools detected as installed*, that the expected wiring
+artefact exists; it is a no-op on a clean machine or CI, never a false failure. On its first real
+run this gate immediately surfaced a genuine gap: opencode was detected as installed but its
+pointer had not yet been created — the gate caught the exact class of silent half-wiring it was
+built to catch, on its first day, rather than in theory.
+
+**A second, unrelated correction landed the same day: cost governance in the agent factory.**
+The account's interactive default model had just moved to a pricier tier; `factory/run.sh` had
+never passed an explicit `--model`, so unattended overnight runs would have silently inherited
+whatever that default was. Fixed with a hardcoded allowlist (`sonnet|opus` only, clamping any
+other value including the new default with a `WARN`) — sonnet by default, opus opt-in per task,
+the QA verification pass always sonnet regardless. Reviewed by `@rex` (opus, APPROVE) and
+verified by `@thor` (PASS, live evidence); see `docs/plan-2026-07-03-tool-independence.md` for
+the full item-by-item record.
+
+**Honest scope of the claim.** What changed is *distribution wiring*, verified on this one
+machine — pointers exist, skills are symlinked, the gate is green. Day-to-day *use* of
+roberdan-os through Copilot, Codex, opencode, Warp or hermes remains unexercised: no fixture in
+§9.2's eval harness has yet run against a non-Claude backend in production use, only in the
+harness's own agent-agnostic stub test. The gap this section closes is "can the tool read the
+canon"; the gap it does not close is "does using it that way actually work as well" — that
+remains future work (§12).
+
+---
+
 ## Case studies: without vs with the system
 
 To validate *value* (not just retrieval), we ran two discovery skills on a realistic business decision — a nonprofit about to launch a paid EUR 297, 8-week online coaching programme ("Fight Camp") for Italian parents of children with cerebral palsy, 50 seats. Both are real agent outputs, condensed and illustrative.
@@ -539,8 +585,11 @@ Run independently, premortem and focus-group **converged** on the same core insi
   should not be.
 - **Residual sycophancy.** The focus-group mitigates but does not eliminate simulated-persona
   agreeableness; it is a tool for discovering questions and friction, not a substitute for real users.
-- **Single-user, single-machine.** Calibrated to one individual and one machine; cross-platform
-  portability is designed but verified primarily on Claude Code.
+- **Single-user, single-machine.** Calibrated to one individual and one machine. Cross-platform
+  *wiring* is now verified beyond Claude Code — §9.4 confirms `AGENTS.md` is read natively by
+  Codex, Copilot, opencode, Warp and hermes, and distribution artefacts are installed and
+  gate-checked on this machine for each — but day-to-day *use* through those other tools remains
+  unexercised; only Claude Code has been driven through real, sustained work.
 - **Self-modification risk.** A system that proposes changes to itself needs mechanical invariants
   (draft-only, scoped git-add, human gates, deny-list, now a pre-commit privacy gate); their
   robustness is an assumption to be monitored continuously, not an acquired fact — this evaluation
@@ -587,7 +636,8 @@ of time and quality — not another internal audit.
 Remaining technical work:
 - **Close the canon-preference gap (§9.2/§10):** a sample of real, with-canon transcripts read by
   Roberto himself — the step no headless judge can substitute for.
-- Verify real portability on Copilot and Codex (not merely designed).
+- Exercise real day-to-day *use* on Copilot, Codex, opencode, Warp or hermes (§9.4 verified the
+  wiring; the sustained-use gap remains).
 - Automatic capture from session transcripts (today agent-driven).
 - Focus-group panels calibrated on real audiences with consent.
 - Longitudinal meta-loop metrics (how many promoted learnings survive review).
@@ -608,7 +658,7 @@ judgement.
 ### Reproducibility and artefacts
 
 Code and canon: git repository `roberdan-os` (private remote `github.com/Roberdan/roberdan-os`,
-~72 commits as of 2 July 2026), entirely in English. Memory: Obsidian vault (local-first) + gbrain
+~88 commits as of 3 July 2026), entirely in English. Memory: Obsidian vault (local-first) + gbrain
 (local Postgres/pgvector); embedding **local** `ollama:bge-m3`@1024 (via a patch to gbrain's Ollama
 recipe, commit `f7376b11`; durability verified by `bin/check-embedder.sh`). Scheduling: `launchd`.
 Governance: gated goal-ledger kanban (`kb`, §6.1) + an autonomous headless task factory with a
