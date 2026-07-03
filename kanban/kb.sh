@@ -50,12 +50,17 @@ _board() {
   while IFS= read -r f; do [ -n "$f" ] && N+=("$(basename "$f" .md)"); done \
     < <(ls -t "$KB/done"/*.md 2>/dev/null | grep -v '/_' | head -10)
   local ntot; ntot=$(ls "$KB/done"/*.md 2>/dev/null | grep -vc '/_' || true)
+  # archived goals: one numbered table row each in _archive-*.md (rolled-up history)
+  local narch; narch=$(grep -hE '^\| [0-9]+ \|' "$KB/done"/_archive-*.md 2>/dev/null | wc -l | tr -d ' ')
+  local done_label=" ✅ DONE ($ntot"
+  [ "$narch" -gt 0 ] && done_label="$done_label +$narch arch"
+  done_label="$done_label)"
   local nt=${#T[@]} nd=${#D[@]} nn=${#N[@]} rows
   rows=$nt; [ $nd -gt $rows ] && rows=$nd; [ $nn -gt $rows ] && rows=$nn
   [ $rows -eq 0 ] && rows=1
   local ln; ln="$(printf '─%.0s' $(seq 1 $W))"
   printf '┌%s┬%s┬%s┐\n' "$ln" "$ln" "$ln"
-  printf '│%-*s│%-*s│%-*s│\n' $W " 📋 TO DO ($nt)" $W " 🔵 DOING ($nd)" $W " ✅ DONE ($ntot, last 10)"
+  printf '│%-*s│%-*s│%-*s│\n' $W " 📋 TO DO ($nt)" $W " 🔵 DOING ($nd)" $W "$done_label"
   printf '├%s┼%s┼%s┤\n' "$ln" "$ln" "$ln"
   local w=$((W-2))
   for ((i=0; i<rows; i++)); do
