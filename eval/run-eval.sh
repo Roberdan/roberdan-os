@@ -4,7 +4,10 @@
 # eval/tasks/. Saves both raw outputs to eval/results/<task-id>/{a,b}.md.
 #
 # Resumable: skips a task+condition pair whose output file already exists, unless --force.
-# Binary resolution + billing safety mirror factory/run.sh exactly (see eval/lib.sh).
+# Binary resolution + billing safety mirror factory/run.sh exactly (see eval/lib.sh). By default
+# the agent is headless Claude Code; set RDA_EVAL_AGENT_CMD to drive a different headless agent
+# CLI instead (e.g. `copilot -p`, `hermes chat -z`) — see eval_invoke_agent in eval/lib.sh for
+# the full convention (prompt delivered via stdin, no claude-specific flags passed through).
 #
 # KNOWN LIMITATION — canon: skills/*/skill.md: this script prepends ANY declared canon file
 # verbatim as passive text, including skill files, purely for mechanical uniformity (one
@@ -53,32 +56,34 @@ mkdir -p "$RESULTS"
 
 eval_unset_billing_env
 
-CLAUDE="$(eval_resolve_claude)"
-if [ -z "$CLAUDE" ] || [ ! -x "$CLAUDE" ]; then
-  if [ "$STUB" -eq 1 ]; then
-    echo "[eval] FATAL (--stub): no claude resolvable on PATH. --stub expects the caller to have" >&2
-    echo "       already prepended a fake claude script to PATH (see eval/test-eval-pipeline.sh)." >&2
-  else
-    echo "[eval] FATAL: no claude binary found. Run with --stub only after putting a fake claude" >&2
-    echo "       on PATH for pipeline testing; for a REAL run, install Claude Code first." >&2
+# CLAUDE stays unresolved when RDA_EVAL_AGENT_CMD overrides the agent — see eval_invoke_agent
+# in eval/lib.sh for the override convention (prompt via stdin, no claude-specific flags).
+CLAUDE=""
+if eval_agent_configured; then
+  echo "[eval] RDA_EVAL_AGENT_CMD override active: $RDA_EVAL_AGENT_CMD" >&2
+else
+  CLAUDE="$(eval_resolve_claude)"
+  if [ -z "$CLAUDE" ] || [ ! -x "$CLAUDE" ]; then
+    if [ "$STUB" -eq 1 ]; then
+      echo "[eval] FATAL (--stub): no claude resolvable on PATH. --stub expects the caller to have" >&2
+      echo "       already prepended a fake claude script to PATH (see eval/test-eval-pipeline.sh)." >&2
+      echo "       (or set RDA_EVAL_AGENT_CMD to stub a different agent CLI instead.)" >&2
+    else
+      echo "[eval] FATAL: no claude binary found. Run with --stub only after putting a fake claude" >&2
+      echo "       on PATH for pipeline testing; for a REAL run, install Claude Code, or set" >&2
+      echo "       RDA_EVAL_AGENT_CMD to drive a different headless agent CLI instead." >&2
+    fi
+    exit 127
   fi
-  exit 127
 fi
 
 TIMEOUT_BIN="$(eval_resolve_timeout)"
 
 invoke_claude() {
-  # invoke_claude PROMPT OUTFILE
-  local prompt="$1" outfile="$2" rc=0
-  set +e
-  if [ -n "$TIMEOUT_BIN" ]; then
-    "$TIMEOUT_BIN" "$TIMEOUT_S" "$CLAUDE" -p "$prompt" --dangerously-skip-permissions --add-dir "$ROOT" > "$outfile" 2>&1
-  else
-    "$CLAUDE" -p "$prompt" --dangerously-skip-permissions --add-dir "$ROOT" > "$outfile" 2>&1
-  fi
-  rc=$?
-  set -e
-  return $rc
+  # invoke_claude PROMPT OUTFILE — thin wrapper over eval_invoke_agent (eval/lib.sh), which
+  # branches on RDA_EVAL_AGENT_CMD.
+  local prompt="$1" outfile="$2"
+  eval_invoke_agent "$prompt" "$outfile" "$ROOT" "$TIMEOUT_S" "$TIMEOUT_BIN" "$CLAUDE"
 }
 
 n=0

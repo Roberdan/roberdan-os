@@ -18,9 +18,9 @@ sample worth showing him, it doesn't replace the showing.
 
 ## Method
 
-**N=10 representative tasks × 2 conditions × blind pairwise judging.**
+**N=12 representative tasks × 2 conditions × blind pairwise judging.**
 
-1. **Tasks** (`eval/tasks/*.md`) — 10 small, self-contained fixtures across the 6 surface
+1. **Tasks** (`eval/tasks/*.md`) — 12 small, self-contained fixtures across the 6 surface
    categories the canon most visibly shapes: `code-fix`, `code-review`, `email-draft`,
    `status-update`, `triage`, `done-claim`. Each is written so a canon-naive agent's *default*
    behavior plausibly violates something specific — claiming done without test output, writing a
@@ -68,6 +68,42 @@ sample worth showing him, it doesn't replace the showing.
    per-canon-file ranking — see the "Skill-type canon tasks" section `report.sh` generates, and
    the caveat under condition B above.
 
+## Tool independence — `RDA_EVAL_AGENT_CMD`
+
+By default this harness drives headless Claude Code (`claude -p "$prompt"
+--dangerously-skip-permissions --add-dir "$ROOT"`, resolved the same way `factory/run.sh` resolves
+it) for all three headless calls it makes: condition A generation, condition B generation, and
+the blind judge (`eval/judge.sh`). That hardcodes the eval to one tool, which contradicts the
+tool-independence goal the rest of this system aims for (`AGENTS.md` is meant to work with any
+coding agent, not just Claude Code).
+
+Set `RDA_EVAL_AGENT_CMD` to point every headless call in the harness at a different agent CLI
+instead:
+
+```bash
+RDA_EVAL_AGENT_CMD="copilot -p"     eval/run-eval.sh
+RDA_EVAL_AGENT_CMD="hermes chat -z" eval/run-eval.sh
+```
+
+**Convention** (implemented in `eval_invoke_agent`, `eval/lib.sh`):
+- `RDA_EVAL_AGENT_CMD` is the **full command** — binary plus any fixed flags, whitespace-split (no
+  quoting/escaping support; keep each flag a single token).
+- The prompt is delivered over **stdin**, never appended as a trailing CLI argument. Stdin beats
+  "prompt as last arg" for two reasons: it works across CLIs with unrelated flag dialects without
+  this harness needing to learn each tool's prompt-flag name (as long as the tool reads a prompt
+  from stdin when invoked non-interactively, true of `copilot -p` and `hermes chat -z` per their
+  own docs), and condition B prompts embed a full canon file (tens of KB) — stdin has no argv
+  length ceiling that a single CLI argument can hit.
+- The claude-specific flags (`--dangerously-skip-permissions`, `--add-dir`) are **never** passed
+  when the override is set — they are meaningless, or actively wrong, for a different tool. The
+  override is a fully separate invocation path, not the claude path with flags swapped in.
+- Leaving `RDA_EVAL_AGENT_CMD` unset leaves behavior byte-for-byte unchanged: the default resolved
+  `claude` binary, `-p "$prompt"` as a CLI arg, same flags as before.
+
+`eval/test-eval-pipeline.sh` proves the override mechanically in stub mode: a fake command reads
+the prompt from stdin, confirms no claude-specific flags reached it, and confirms the real
+`claude` stub was never invoked while the override was active.
+
 ## What's real vs. what's stub
 
 **This container has no usable headless `claude` binary** — `eval_resolve_claude` in
@@ -90,7 +126,7 @@ verified in this container:
 **To get the real numbers, on a machine with Claude Code installed:**
 
 ```bash
-eval/run-eval.sh          # condition A + B for all 10 tasks -> eval/results/<id>/{a,b}.md
+eval/run-eval.sh          # condition A + B for all 12 tasks -> eval/results/<id>/{a,b}.md
 eval/judge.sh              # blind pairwise judging -> eval/results/<id>/verdict.md
 eval/report.sh              # aggregate -> eval/results/report.md
 ```
@@ -105,7 +141,7 @@ want to keep a dated snapshot; otherwise regenerate on demand.
 
 | Path | What |
 |---|---|
-| `eval/tasks/*.md` | 10 task fixtures (prompt + checklist + `canon:` pointer) |
+| `eval/tasks/*.md` | 12 task fixtures (prompt + checklist + `canon:` pointer) |
 | `eval/lib.sh` | shared bash helpers: frontmatter/section parsing, `claude` resolution, JSON extraction, banner stripping |
 | `eval/run-eval.sh` | generates condition A/B outputs |
 | `eval/judge.sh` | blind pairwise judging |
@@ -115,12 +151,25 @@ want to keep a dated snapshot; otherwise regenerate on demand.
 
 ## Caveats (see also `eval/report.sh`'s closing section, generated fresh each run)
 
-- **Small N.** 10 hand-written fixtures, not a representative sample of everything the canon
+- **Small N.** 12 hand-written fixtures, not a representative sample of everything the canon
   touches.
-- **Single judge model, same family as the subject.** Judge and subject share whatever blind
-  spots the underlying model has — the same caveat `docs/roberdan-os-paper-en.md` makes about
-  focus-group persona sycophancy: a simulated evaluator can be systematically wrong in ways it
-  can't see about itself.
+- **Single judge model, same family as the subject — declared self-preference risk.** Judge and
+  subject share whatever blind spots the underlying model has — the same caveat
+  `docs/roberdan-os-paper-en.md` makes about focus-group persona sycophancy: a simulated evaluator
+  can be systematically wrong in ways it can't see about itself, and same-family judges are known
+  to score same-family outputs more favorably than an independent judge would (self-preference
+  bias). This risk is not mitigated here — `RDA_EVAL_AGENT_CMD` (see above) can point the
+  *subject* calls at a different vendor's CLI, but `eval/judge.sh` still uses whatever
+  `RDA_EVAL_AGENT_CMD`/`claude` resolves for the judge call too, so a same-family judge is still
+  the default even in a cross-tool run unless the judge itself is deliberately run with a
+  different override.
+- **Order randomization mitigates position bias, not self-preference bias.** `eval/judge.sh`
+  already randomizes which slot ("Output 1" / "Output 2") holds condition A vs B on every task
+  (`$RANDOM`, see the "Blind pairwise judging" step above) specifically so the judge can't learn a
+  positional pattern across the run — that guards against **position bias**, a different, well
+  documented failure mode from self-preference bias above. The two are independent: randomizing
+  order does nothing to stop a same-family judge from favoring same-family phrasing/style once it
+  reads the content.
 - **One run per task per condition.** No repeated trials to measure variance; a single sample
   could land on either side of the model's actual output distribution.
 - **Compliance ≠ Roberto's actual preference.** Restated from the top of this file because it's
