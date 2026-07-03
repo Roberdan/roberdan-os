@@ -11,15 +11,18 @@ durable, the conversation is not.
 ```
 kb                            # view the board (todo / doing / done, last 10)
 kb todo | kb doing | kb done  # view one column
-kb show <id>                  # print a card
-kb add "<title>" [dod] [acc]  # new card in todo/ (fill dod/acceptance, or `kb edit <id>` after)
-kb start <id> --by roberto    # GATE: todo -> doing, needs Roberto's approval
-kb finish <id> --thor "<ev>"  # GATE: doing -> done, needs @thor + evidence (never a rubber-stamp)
-kb block <id> "<reason>"      # mark a card blocked, move it back to todo/
+kb show <id>                        # print a card
+kb add "<title>" --repo <r> [dod] [acc]  # new card in todo/ (repo required; fill dod/acceptance, or `kb edit <id>` after)
+kb start <id> --by roberto          # GATE: todo -> doing, needs Roberto's approval
+kb finish <id> --thor "<ev>"        # GATE: doing -> done, needs @thor + evidence (never a rubber-stamp)
+kb block <id> "<reason>"            # mark a card blocked, move it back to todo/
 ```
 
-Every card needs a `dod:` (Definition of Done) and `acceptance:` (how @thor verifies) before it
-can leave `todo/` — `kb start` refuses cards with a `FILL:` placeholder still in either field.
+Every card needs a `repo:` (which repo/scope it's about — a `~/GitHub` dir-name, or `personal`
+for non-code work), a `dod:` (Definition of Done) and `acceptance:` (how @thor verifies) before
+it can leave `todo/` — `kb start` refuses cards with `repo:` missing or a `FILL:` placeholder
+still in any of the three fields. The board and `kb list`/`kb history` show `(repo)` next to
+every card so scope is visible at a glance, not just buried in the card body.
 
 **Detail on demand** (never loaded at session start, only when asked):
 

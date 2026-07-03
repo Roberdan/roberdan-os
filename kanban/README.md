@@ -5,12 +5,12 @@ Card-files (one file per card) in three columns, driven by the fast **`kb`** CLI
 
 ## Fast commands (`kb`)
 ```
-kb                             # view the board (fast)
-kb show <id>                   # show a card
-kb add "<title>" [dod] [acc]   # new card in todo/
-kb edit <id>                   # fill Definition of Done + Acceptance
-kb start <id> --by roberto     # GATE: todo->doing (needs Roberto's approval)
-kb finish <id> --thor "<ev>"   # GATE: doing->done (@thor validates with evidence)
+kb                                    # view the board (fast)
+kb show <id>                         # show a card
+kb add "<title>" --repo <r> [dod] [acc]   # new card in todo/ (repo required)
+kb edit <id>                         # fill Definition of Done + Acceptance + repo
+kb start <id> --by roberto           # GATE: todo->doing (needs Roberto's approval)
+kb finish <id> --thor "<ev>"         # GATE: doing->done (@thor validates with evidence)
 ```
 
 ## The two gates (no rubber-stamping)
@@ -19,8 +19,30 @@ kb finish <id> --thor "<ev>"   # GATE: doing->done (@thor validates with evidenc
   **acceptance criteria**, with **evidence** (commit/test/output). No rubber-stamps.
 
 ## Every card has (mandatory)
-`dod:` — a clear **Definition of Done** · `acceptance:` — **acceptance criteria** (how @thor verifies).
-A card cannot `start` until both are filled.
+`title:` — states the **objective** (what outcome this card produces, not just a label) ·
+`repo:` — which repo/scope this card is about · `dod:` — a clear **Definition of Done** ·
+`acceptance:` — **acceptance criteria** (how @thor verifies). A card cannot `start` until
+`repo:`, `dod:` and `acceptance:` are all filled.
+
+## `repo:` — which repo this card is about
+
+Every card must name its scope so a glance at the board (or `kb list`) tells you *what* it's
+for, not just its id. Value is one of:
+- The **directory name under `~/GitHub`** the card is about, e.g. `repo: roberdan-os`,
+  `repo: convergio`, `repo: MirrorBuddy` — this is what most cards should use.
+- `repo: personal` — reserved for work that isn't a code repo at all (e.g. inbox/Teams triage,
+  a non-code Fight the Stroke initiative).
+
+`kb add "<title>" --repo <r> [dod] [acc]` refuses without `--repo`; `kb start` refuses a card
+whose `repo:` is empty or still says `FILL: …` — same discipline as `dod:`/`acceptance:`. The
+value isn't validated against the filesystem (the repo may not be cloned on this machine, or may
+not exist yet), only checked for "present and not a placeholder."
+
+Where it shows up: `kb list`/`kb todo`/`kb doing`/`kb done` print `[id] (repo) title`; `kb history`
+prints `[id] (repo) title (verified <date>)`; the board (`kb`/`kb view`) appends `(repo)` next to
+the id whenever it fits the column width, otherwise it degrades to the bare id (never truncates
+the id itself — that's the key you pass to `show`/`start`/`finish`). Legacy cards with no `repo:`
+render as `(—)` instead of crashing.
 
 ## Honest limit: `--by` is a DISCIPLINE gate, not a security boundary
 
@@ -44,4 +66,6 @@ is the audit archive → the board never bloats the context.
 
 Self-improvement cards (about roberdan-os itself) can crowd out external-facing ones if left
 unbounded — see the **Meta-Card Budget** rule in [`rules/best-practices.md`](../rules/best-practices.md)
-for the discipline norm (not a `kb.sh`-enforced gate).
+for the discipline norm (not a `kb.sh`-enforced gate). `repo:` makes "how many active cards are
+`roberdan-os` vs. something external" a one-glance `kb list` read instead of a re-read of every
+card's body — still a discipline norm, not a mechanized gate.
