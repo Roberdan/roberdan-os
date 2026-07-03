@@ -8,12 +8,15 @@
 #                             - CLAUDE.md: REFUSES to overwrite an existing ~/.claude/CLAUDE.md;
 #                               only prints the pointer block to add by hand.
 #                             - skills: for each generated platforms/claude/skills/<name>/SKILL.md,
-#                               if ~/.claude/skills/<name>/ does NOT exist yet, creates it and
+#                               if <target>/<name>/ does NOT exist yet, creates it and
 #                               symlinks SKILL.md to the repo's generated wrapper (stays in sync
 #                               automatically as the canon changes — no static copy to drift).
-#                               If ~/.claude/skills/<name>/ already exists (e.g. same-named skill
+#                               If <target>/<name>/ already exists (e.g. same-named skill
 #                               from another skill system such as gstack), SKIPs it explicitly —
-#                               never a silent overwrite.
+#                               never a silent overwrite. Installed into ~/.claude/skills/ always,
+#                               and into ~/.copilot/skills/ too when ~/.copilot is detected present.
+#                             - copilot mcp-config.json: read-only check, WARN if gbrain missing
+#                               (never modified — that file is owned by Copilot).
 #                             - agents/hooks: still NOT installed by this script (manual/approve).
 #
 # platforms/ is NOT committed to git (it's fully generated — see .gitignore). Run
@@ -23,6 +26,17 @@
 # Output dir override (for the determinism check in test/validate.sh): RDA_SYNC_OUT.
 # Skills install dir override (for the isolated install test): RDA_CLAUDE_SKILLS_DIR
 # (default $HOME/.claude/skills).
+# Copilot skills install (--install only, GATED on ~/.copilot existing — i.e. Copilot
+# CLI/coding-agent detected as installed): same collision-safe symlink pattern as the
+# Claude skills install, into ~/.copilot/skills/. SKILL.md is a portable format (Codex,
+# Gemini CLI, Cursor support it; opencode reads .claude/skills directly), so this reuses
+# the ALREADY-GENERATED platforms/claude/skills/<name>/SKILL.md wrappers as the source —
+# no separate copilot skill wrapper is generated. Override RDA_COPILOT_SKILLS_DIR (default
+# $HOME/.copilot/skills) for isolated testing; presence is gated on the PARENT dir of that
+# path existing (so tests can simulate "Copilot absent" by simply not creating it).
+# Read-only check (never writes): if ~/.copilot/mcp-config.json exists but does not
+# contain "gbrain", prints a WARN — that file is owned by Copilot, never modified here.
+# Override RDA_COPILOT_MCP_CONFIG for isolated testing.
 # Global AGENTS.md pointer install (--install only): writes ~/.codex/AGENTS.md,
 # ~/.config/opencode/AGENTS.md and ~/GitHub/AGENTS.md for tools DETECTED as
 # installed, never overwriting an existing file. RDA_POINTER_HOME overrides
@@ -236,26 +250,60 @@ if [ "$MODE" = "install" ]; then
   fi
 
   # Skills → symlink install (defensive: never overwrite, never delete). For each
-  # generated wrapper platforms/claude/skills/<name>/SKILL.md, if ~/.claude/skills/<name>/
+  # generated wrapper platforms/claude/skills/<name>/SKILL.md, if <target>/<name>/
   # does not exist yet, create it and symlink SKILL.md to the repo's generated wrapper — so
   # it stays in sync automatically whenever the canon changes (no static copy to drift).
-  # If ~/.claude/skills/<name>/ already exists (e.g. a same-named skill from another skill
+  # If <target>/<name>/ already exists (e.g. a same-named skill from another skill
   # system such as gstack), SKIP it explicitly rather than silently overriding it.
+  # Generalized over a list of (label, target dir) pairs — the same
+  # source wrapper set (SKILL.md is a portable format) is symlinked into
+  # every detected tool's skills dir, instead of duplicating the loop per tool.
+  install_skills_set() {
+    local label="$1" target_dir="$2"
+    echo ""
+    echo "--- skills install ($label, symlink, into $target_dir) ---"
+    mkdir -p "$target_dir"
+    local w sname target
+    for w in $(list "$P/claude/skills" "SKILL.md" 2); do
+      sname="$(basename "$(dirname "$w")")"
+      target="$target_dir/$sname"
+      if [ -e "$target" ]; then
+        echo "SKIP $sname: già presente in $target/ (verifica manualmente se è una collisione con un altro sistema di skill, es. gstack)"
+        continue
+      fi
+      mkdir -p "$target"
+      ln -s "$w" "$target/SKILL.md"
+      echo "INSTALL $sname: symlink $target/SKILL.md -> $w"
+    done
+  }
+
   SKILLS_DIR="${RDA_CLAUDE_SKILLS_DIR:-$CL/skills}"
+  install_skills_set "claude" "$SKILLS_DIR"
+
+  # Copilot: same pattern, GATED on ~/.copilot existing (Copilot detected as
+  # installed). RDA_COPILOT_SKILLS_DIR overrides the target dir for isolated
+  # testing; presence is gated on that path's PARENT dir existing, so a test
+  # can simulate "Copilot absent" by simply never creating it.
+  COPILOT_SKILLS_DIR="${RDA_COPILOT_SKILLS_DIR:-$HOME/.copilot/skills}"
+  COPILOT_ROOT="$(dirname "$COPILOT_SKILLS_DIR")"
   echo ""
-  echo "--- skills install (symlink, into $SKILLS_DIR) ---"
-  mkdir -p "$SKILLS_DIR"
-  for w in $(list "$P/claude/skills" "SKILL.md" 2); do
-    sname="$(basename "$(dirname "$w")")"
-    target="$SKILLS_DIR/$sname"
-    if [ -e "$target" ]; then
-      echo "SKIP $sname: già presente in $target/ (verifica manualmente se è una collisione con un altro sistema di skill, es. gstack)"
-      continue
+  if [ -d "$COPILOT_ROOT" ]; then
+    install_skills_set "copilot" "$COPILOT_SKILLS_DIR"
+  else
+    echo "--- skills install (copilot) ---"
+    echo "SKIP copilot: $COPILOT_ROOT non trovato (Copilot non installato)"
+  fi
+
+  # Read-only check: Copilot's own mcp-config.json is never modified by this
+  # script (it's Copilot's file), but we WARN if gbrain isn't wired into it yet.
+  COPILOT_MCP_CONFIG="${RDA_COPILOT_MCP_CONFIG:-$COPILOT_ROOT/mcp-config.json}"
+  if [ -f "$COPILOT_MCP_CONFIG" ]; then
+    if grep -q "gbrain" "$COPILOT_MCP_CONFIG" 2>/dev/null; then
+      echo "OK copilot mcp-config.json: gbrain già presente ($COPILOT_MCP_CONFIG)"
+    else
+      echo "WARN copilot mcp-config.json: gbrain NON trovato in $COPILOT_MCP_CONFIG — aggiungilo manualmente (file di proprietà di Copilot, mai modificato da questo script)"
     fi
-    mkdir -p "$target"
-    ln -s "$w" "$target/SKILL.md"
-    echo "INSTALL $sname: symlink $target/SKILL.md -> $w"
-  done
+  fi
 
   # Global AGENTS.md pointer install — ONLY for tools detected as installed,
   # ONLY if the target doesn't already exist (never overwrite curated config).
