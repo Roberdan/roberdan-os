@@ -6,7 +6,9 @@
 # why" verdict. Writes eval/results/<task-id>/verdict.md.
 #
 # Resumable: skips a task whose verdict.md already exists, unless --force.
-# Same --stub convention as run-eval.sh (see eval/lib.sh + eval/test-eval-pipeline.sh).
+# Same --stub convention as run-eval.sh (see eval/lib.sh + eval/test-eval-pipeline.sh). Same
+# RDA_EVAL_AGENT_CMD override too (eval_invoke_agent in eval/lib.sh) — the judge call is a
+# headless agent invocation like any other in this harness, so it honors the same override.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -34,14 +36,23 @@ TIMEOUT_S="${RDA_EVAL_TIMEOUT:-600}"
 
 eval_unset_billing_env
 
-CLAUDE="$(eval_resolve_claude)"
-if [ -z "$CLAUDE" ] || [ ! -x "$CLAUDE" ]; then
-  if [ "$STUB" -eq 1 ]; then
-    echo "[judge] FATAL (--stub): no claude resolvable on PATH — put a fake claude on PATH first" >&2
-  else
-    echo "[judge] FATAL: no claude binary found. Use --stub only for pipeline testing." >&2
+# CLAUDE stays unresolved when RDA_EVAL_AGENT_CMD overrides the agent — see eval_invoke_agent
+# in eval/lib.sh for the override convention (prompt via stdin, no claude-specific flags).
+CLAUDE=""
+if eval_agent_configured; then
+  echo "[judge] RDA_EVAL_AGENT_CMD override active: $RDA_EVAL_AGENT_CMD" >&2
+else
+  CLAUDE="$(eval_resolve_claude)"
+  if [ -z "$CLAUDE" ] || [ ! -x "$CLAUDE" ]; then
+    if [ "$STUB" -eq 1 ]; then
+      echo "[judge] FATAL (--stub): no claude resolvable on PATH — put a fake claude on PATH first" >&2
+      echo "        (or set RDA_EVAL_AGENT_CMD to stub a different agent CLI instead.)" >&2
+    else
+      echo "[judge] FATAL: no claude binary found. Use --stub only for pipeline testing, or set" >&2
+      echo "        RDA_EVAL_AGENT_CMD to drive a different headless agent CLI instead." >&2
+    fi
+    exit 127
   fi
-  exit 127
 fi
 TIMEOUT_BIN="$(eval_resolve_timeout)"
 
@@ -120,12 +131,11 @@ $out1
 $out2"
 
   raw_out="$outdir/.judge-raw.md"
+  # eval_invoke_agent (eval/lib.sh) branches on RDA_EVAL_AGENT_CMD; unset means the default
+  # claude -p path, unchanged. Wrapped in set +e/-e (script runs under set -e) so a non-zero
+  # exit is inspected below instead of killing the script.
   set +e
-  if [ -n "$TIMEOUT_BIN" ]; then
-    "$TIMEOUT_BIN" "$TIMEOUT_S" "$CLAUDE" -p "$judge_prompt" --dangerously-skip-permissions --add-dir "$ROOT" > "$raw_out" 2>&1
-  else
-    "$CLAUDE" -p "$judge_prompt" --dangerously-skip-permissions --add-dir "$ROOT" > "$raw_out" 2>&1
-  fi
+  eval_invoke_agent "$judge_prompt" "$raw_out" "$ROOT" "$TIMEOUT_S" "$TIMEOUT_BIN" "$CLAUDE"
   rc=$?
   set -e
 

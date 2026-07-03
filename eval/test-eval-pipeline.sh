@@ -300,5 +300,92 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+section "RDA_EVAL_AGENT_CMD override: fake non-claude agent CLI, prompt via stdin, no claude flags"
+# Separate tasks/results dirs so this doesn't interact with the resumability counters above.
+TASKS_ALT="$TMP/tasks-alt"
+RESULTS_ALT="$TMP/results-alt"
+mkdir -p "$TASKS_ALT" "$RESULTS_ALT"
+cat > "$TASKS_ALT/t-alt.md" <<'EOF'
+---
+id: t-alt
+category: code-fix
+canon: behavior/roberto-mode.md
+---
+
+# t-alt
+
+## Prompt
+
+Fix the bug and tell me it's done.
+
+## Canon-compliant checklist
+
+- cites evidence
+EOF
+
+# Fake alt-agent CLI: a completely different binary from the claude stub above, so a passing test
+# proves the override actually swaps the invoked tool, not just adds a flag to claude. Captures
+# its own argv (must contain ONLY the fixed flag from RDA_EVAL_AGENT_CMD, never
+# --dangerously-skip-permissions/--add-dir) and reads the prompt from stdin (the documented
+# convention — see eval_invoke_agent in eval/lib.sh and eval/README.md).
+cat > "$BIN/alt-agent" <<'ALTEOF'
+#!/usr/bin/env bash
+echo "invoked" >> "${ALT_AGENT_COUNTER:?}"
+printf 'ARGV: %s\n' "$*" > "${ALT_AGENT_ARGV_CAPTURE:?}"
+stdin_prompt="$(cat)"
+printf '%s' "$stdin_prompt" > "${ALT_AGENT_STDIN_CAPTURE:?}"
+echo "ALT-AGENT-RESPONSE: prompt received via stdin, $(printf '%s' "$stdin_prompt" | wc -l) lines"
+ALTEOF
+chmod +x "$BIN/alt-agent"
+ok "wrote fake alt-agent CLI to $BIN/alt-agent (distinct from the claude stub)"
+
+ALT_COUNTER="$TMP/alt-invocations.log"
+ALT_ARGV="$TMP/alt-argv.log"
+ALT_STDIN="$TMP/alt-stdin.log"
+: > "$ALT_COUNTER"
+CLAUDE_COUNTER_BEFORE="$(wc -l < "$COUNTER" | tr -d ' ')"
+
+env -i PATH="$BIN:/usr/local/bin:/usr/bin:/bin" HOME="$HOME" \
+  RDA_EVAL_TASKS="$TASKS_ALT" RDA_EVAL_RESULTS="$RESULTS_ALT" RDA_EVAL_TIMEOUT=15 \
+  RDA_EVAL_AGENT_CMD="$BIN/alt-agent --fake-flag" \
+  EVAL_STUB_COUNTER="$COUNTER" \
+  ALT_AGENT_COUNTER="$ALT_COUNTER" ALT_AGENT_ARGV_CAPTURE="$ALT_ARGV" ALT_AGENT_STDIN_CAPTURE="$ALT_STDIN" \
+  bash eval/run-eval.sh --stub >"$TMP/run-alt.log" 2>&1
+
+CLAUDE_COUNTER_AFTER="$(wc -l < "$COUNTER" | tr -d ' ')"
+[ "$CLAUDE_COUNTER_AFTER" -eq "$CLAUDE_COUNTER_BEFORE" ] \
+  && ok "the claude stub was never invoked while RDA_EVAL_AGENT_CMD was set" \
+  || err "claude stub was invoked ($CLAUDE_COUNTER_BEFORE -> $CLAUDE_COUNTER_AFTER) despite RDA_EVAL_AGENT_CMD override"
+
+n_alt="$(wc -l < "$ALT_COUNTER" | tr -d ' ')"
+[ "$n_alt" -eq 2 ] && ok "alt-agent invoked exactly 2 times (condition A + B for the 1 task)" \
+  || err "expected 2 alt-agent invocations, got $n_alt"
+
+if [ -f "$RESULTS_ALT/t-alt/a.md" ] && [ -f "$RESULTS_ALT/t-alt/b.md" ] \
+  && grep -q "ALT-AGENT-RESPONSE" "$RESULTS_ALT/t-alt/a.md" \
+  && grep -q "ALT-AGENT-RESPONSE" "$RESULTS_ALT/t-alt/b.md"; then
+  ok "both a.md and b.md carry the alt-agent's response, not the claude stub's"
+else
+  err "output files missing or do not contain the alt-agent's response — see $TMP/run-alt.log"
+fi
+
+if grep -q '^ARGV: --fake-flag$' "$ALT_ARGV"; then
+  ok "alt-agent argv is exactly the fixed flag from RDA_EVAL_AGENT_CMD (no prompt appended as an arg)"
+else
+  err "alt-agent argv did not match the expected '--fake-flag' only — got: $(cat "$ALT_ARGV" 2>/dev/null)"
+fi
+if grep -q -- '--dangerously-skip-permissions' "$ALT_ARGV" || grep -q -- '--add-dir' "$ALT_ARGV"; then
+  err "claude-specific flags (--dangerously-skip-permissions / --add-dir) leaked into the alt-agent invocation"
+else
+  ok "no claude-specific flags reached the alt-agent invocation"
+fi
+
+if grep -q "Fix the bug and tell me it's done" "$ALT_STDIN"; then
+  ok "alt-agent received the task prompt via stdin, per the documented convention"
+else
+  err "alt-agent did not receive the expected prompt content on stdin"
+fi
+
+# ---------------------------------------------------------------------------
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "test-eval-pipeline: ✅ ALL GREEN"; exit 0; else echo "test-eval-pipeline: ❌ FAIL (see above)"; exit 1; fi

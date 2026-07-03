@@ -50,6 +50,61 @@ eval_unset_billing_env() {
   unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN 2>/dev/null || true
 }
 
+# --- agent command override (tool-independence) ---------------------------------------------
+# By default the harness drives headless Claude Code exactly like factory/run.sh:
+# `claude -p "$prompt" --dangerously-skip-permissions --add-dir "$ROOT"`. That hardcodes the
+# eval to one tool, which contradicts the tool-independence goal of the rest of this system
+# (AGENTS.md is meant to work with any coding agent). Set RDA_EVAL_AGENT_CMD to point the
+# harness at a different headless agent CLI instead, e.g.:
+#   RDA_EVAL_AGENT_CMD="copilot -p"        eval/run-eval.sh
+#   RDA_EVAL_AGENT_CMD="hermes chat -z"    eval/run-eval.sh
+#
+# CONVENTION (read before setting it):
+#   - RDA_EVAL_AGENT_CMD is the FULL command: binary + any fixed flags, whitespace-split (no
+#     quoting/escaping support — keep flags simple, one token each).
+#   - The prompt is delivered over STDIN, never appended as a trailing CLI argument. Stdin was
+#     chosen over "prompt as last arg" for two reasons: (1) it works across CLIs with unrelated
+#     flag dialects without this harness having to learn each tool's prompt-flag name, as long as
+#     the tool reads a prompt from stdin when invoked non-interactively (true of `copilot -p` and
+#     `hermes chat -z` per their own docs); (2) condition B prompts embed a full canon file
+#     (tens of KB) — stdin has no argv-length ceiling, a single CLI argument can.
+#   - claude-specific flags (--dangerously-skip-permissions, --add-dir) are NEVER passed when
+#     RDA_EVAL_AGENT_CMD is set — they are meaningless (or actively wrong) for a different tool.
+#     The override is a fully separate invocation path, not the claude path with flags swapped.
+#   - When RDA_EVAL_AGENT_CMD is unset, behavior is byte-for-byte unchanged: the default
+#     `eval_resolve_claude` binary, `-p "$prompt"` as a CLI arg, same flags as before.
+eval_agent_configured() {
+  [ -n "${RDA_EVAL_AGENT_CMD:-}" ]
+}
+
+# eval_invoke_agent PROMPT OUTFILE ROOT TIMEOUT_S TIMEOUT_BIN CLAUDE_BIN
+# Runs exactly one headless agent call, writing raw stdout+stderr to OUTFILE, returning the
+# invoked process's exit code. Centralizes the RDA_EVAL_AGENT_CMD branch so run-eval.sh and
+# judge.sh share one invocation path instead of each reimplementing it.
+eval_invoke_agent() {
+  local prompt="$1" outfile="$2" root="$3" timeout_s="$4" timeout_bin="$5" claude_bin="$6"
+  local rc=0
+  set +e
+  if eval_agent_configured; then
+    # shellcheck disable=SC2086  # RDA_EVAL_AGENT_CMD is intentionally whitespace-split — see the
+    # documented convention above; it's a trusted local override, not untrusted input.
+    if [ -n "$timeout_bin" ]; then
+      printf '%s' "$prompt" | "$timeout_bin" "$timeout_s" $RDA_EVAL_AGENT_CMD > "$outfile" 2>&1
+    else
+      printf '%s' "$prompt" | $RDA_EVAL_AGENT_CMD > "$outfile" 2>&1
+    fi
+  else
+    if [ -n "$timeout_bin" ]; then
+      "$timeout_bin" "$timeout_s" "$claude_bin" -p "$prompt" --dangerously-skip-permissions --add-dir "$root" > "$outfile" 2>&1
+    else
+      "$claude_bin" -p "$prompt" --dangerously-skip-permissions --add-dir "$root" > "$outfile" 2>&1
+    fi
+  fi
+  rc=$?
+  set -e
+  return $rc
+}
+
 eval_resolve_timeout() {
   local t
   t="$(command -v timeout 2>/dev/null || true)"
