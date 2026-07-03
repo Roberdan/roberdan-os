@@ -21,6 +21,16 @@ kb block <id> "<reason>"      # mark a card blocked, move it back to todo/
 Every card needs a `dod:` (Definition of Done) and `acceptance:` (how @thor verifies) before it
 can leave `todo/` — `kb start` refuses cards with a `FILL:` placeholder still in either field.
 
+**Detail on demand** (never loaded at session start, only when asked):
+
+```
+kb history          # ALL work: every done/ card + every archived goal, newest first
+kb archive [date]   # list archive files (goal counts) | cat one archive
+kb plans            # list docs/plan-*.md (+ docs/archive/) with H1 + line count
+kb plan <match>     # print the plan whose filename contains <match>
+kb sched            # launchd jobs + schedules + factory queue/failed + evolve proposals
+```
+
 ## Agent factory (unattended overnight work)
 
 `factory/` runs queued tasks through headless `claude -p` agents, one after another, tracked on
@@ -35,6 +45,12 @@ factory/run.sh                                     # process the queue now (also
 Runs on the Max subscription (`run.sh` unsets `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN`) — no
 per-token API billing. Task files can set `card: <kanban-id>` so the result gets written back onto
 that card automatically.
+
+- **Model policy**: `sonnet` by default, always explicit (never inherits the account's
+  interactive default). Set `model: opus` in a task's frontmatter to scale up when needed;
+  `RDA_FACTORY_MODEL` overrides the default globally. Hardcoded allowlist `sonnet|opus` only —
+  any other value (fable, typo) clamps to sonnet with a `WARN`. The headless `@thor` verify pass
+  is always `sonnet`, regardless of the task's model.
 
 - **A task only reaches `~/.roberdan-os/factory/done/` on exit 0.** On failure it's retried once;
   a second failure moves it to `failed/` with `escalate: true` — never silently marked done.
