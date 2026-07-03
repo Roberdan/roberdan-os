@@ -84,6 +84,20 @@ In practice, the two you'll hit constantly are `kb start <id> --by roberto` (tod
 `kb finish <id> --thor "<evidence>"` (doing→done) — everything else in the loop runs autonomously
 inside those two gates.
 
+## Other agentic tools
+
+- **Copilot CLI** — skills installed via `bin/sync.sh --install` (symlinked into
+  `~/.copilot/skills/`); gbrain is already registered in its MCP config; `AGENTS.md`
+  is read natively per-repo.
+- **codex / opencode** — global pointers installed by `bin/sync.sh --install` when
+  the tool is present on the machine (skipped cleanly otherwise).
+- **Warp** — reads `AGENTS.md` natively (precedence: subdirectory > repo root >
+  Global Rules; `WARP.md` is legacy). Just open a repo that has `AGENTS.md`; add
+  Global Rules by hand via the Warp UI only if you want extra machine-wide context.
+- **Hermes (Nous Research hermes-agent)** — reads `AGENTS.md` natively as workspace
+  instructions; no wrapper, only documented setup commands. See the generated
+  `platforms/hermes/README.md` (run `bin/sync.sh --emit-only` first — `platforms/` is not in git).
+
 ## Verify the system itself
 
 ```

@@ -206,14 +206,65 @@ EOF
 }
 
 emit_hermes() {
-  # Deferred — "verify capabilities" gate before projecting a wrapper (see the Phase 4 plan).
+  # Verified 2026-07-03 against hermes-agent v0.18.0 (~/.hermes): reads AGENTS.md
+  # natively as "workspace instructions" — no dedicated wrapper needed, only docs.
   mkdir -p "$P/hermes"
   cat > "$P/hermes/README.md" <<'EOF'
-# Hermes — deferred
+# Hermes (Nous Research hermes-agent) → roberdan-os
 
-Not built yet: format unverified, did not surface in the system scan. Gate on
-"verify capabilities" before projecting a wrapper. `AGENTS.md` stays compatible
-if Hermes reads it natively in the future.
+Verified against hermes-agent v0.18.0 (`~/.hermes/`, wrapper `~/.local/bin/hermes`):
+Hermes reads `AGENTS.md` **natively** as workspace instructions (confirmed by
+`hermes chat --help`: `--ignore-rules` "Skip auto-injection of AGENTS.md, SOUL.md,
+.cursorrules, memory, and preloaded skills"). The canon is already compatible —
+**no wrapper needed**, only a working directory / workdir that contains (or
+inherits) an `AGENTS.md`.
+
+This file documents the recommended setup as **exact commands** — it does not run
+them. `~/.hermes/config.yaml` is never touched by `bin/sync.sh`; apply by hand if
+you want it.
+
+## 1. Point a workspace at the canon
+
+`~/GitHub/AGENTS.md` is already installed (by `bin/sync.sh --install`) as a thin
+pointer to this repo's `AGENTS.md`. Two ways to use it with Hermes:
+
+- Interactive chat: run `hermes` (or `hermes chat`) with `~/GitHub` (or any repo
+  under it that has its own `AGENTS.md`) as the current directory — AGENTS.md
+  auto-injects unless `--ignore-rules`/`--safe-mode` is passed.
+- Cron jobs: `hermes cron create <schedule> "<prompt>" --workdir ~/GitHub` — the
+  `--workdir` flag is documented (`hermes cron create --help`) to "Inject AGENTS.md
+  / CLAUDE.md / .cursorrules from that directory and use it as the cwd for
+  terminal/file/code_exec tools."
+
+## 2. Add gbrain as an MCP server
+
+Verified exact syntax via `hermes mcp add --help` (positional `name`, then
+`--command` + `--args`, **not** a `--` passthrough):
+
+```
+hermes mcp add gbrain --command ~/.gbrain/gbrain-mcp-serve.sh
+```
+
+Confirm afterwards with `hermes mcp list`.
+
+## 3. Skills (SKILL.md)
+
+Hermes' `hermes skills` subsystem is registry/hub-driven (`browse`, `search`,
+`tap add <github-repo>`, `install <identifier-or-URL>`), not a local-directory
+loader: `hermes skills install --help` shows it accepts a skill identifier
+(`org/skills/name`) or a direct HTTPS URL to a `SKILL.md`, and
+`hermes skills tap add` can register a GitHub repo as a skill source. No flag for
+"install every SKILL.md under a local dir" was found in v0.18.0. To bring in a
+roberdan-os skill:
+
+```
+hermes skills tap add roberdan/roberdan-os        # if/when this repo is public on GitHub
+hermes skills install <skill-identifier-from-tap>
+```
+
+Until then, Hermes sessions running inside a repo with `AGENTS.md` still see the
+`skills/*/skill.md` index referenced from there — just not pre-registered as
+Hermes hub skills.
 EOF
 }
 
