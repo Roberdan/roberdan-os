@@ -37,6 +37,24 @@ for s in $(find skills -maxdepth 2 -name 'skill.md' | LC_ALL=C sort); do
   [ -n "$miss" ] && err "$s missing:$miss" || ok "$s"
 done
 
+section "frontmatter — kanban cards, todo/doing only (title, repo, dod, acceptance, status, created)"
+# done/ is the append-only audit archive — not linted here (see kanban/README.md): backfilling
+# repo: onto historical done cards isn't required, only active todo/doing cards are gated on it.
+found=0
+for k in kanban/todo kanban/doing; do
+  for c in "$k"/*.md; do
+    [ -e "$c" ] || continue
+    case "$(basename "$c")" in _*) continue ;; esac
+    found=1
+    miss=""
+    for field in title repo dod acceptance status created; do
+      grep -qE "^$field:" "$c" || miss="$miss $field"
+    done
+    [ -n "$miss" ] && err "$c missing:$miss" || ok "$c"
+  done
+done
+[ "$found" -eq 0 ] && printf "  skip: no active todo/doing cards to lint\n"
+
 # --- 2) Link check (relative markdown; exempts [[wikilink]] and http) --------
 section "link check (relative markdown; [[wikilink]] exempted)"
 broken=0
