@@ -37,7 +37,8 @@ mkdir -p "$SKILLS_DIR/sync"
 printf 'PRE-EXISTING (do not touch)\n' > "$SKILLS_DIR/sync/SKILL.md"
 
 section "bin/sync.sh --install: fresh run installs symlinks, skips the collision"
-out="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR" RDA_COPILOT_SKILLS_DIR="$NOCOPILOT_SKILLS_DIR" bash bin/sync.sh --install 2>&1)"
+out="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR" RDA_COPILOT_SKILLS_DIR="$NOCOPILOT_SKILLS_DIR" \
+    RDA_POINTER_HOME="$TMP/ptr-home-legacy1" RDA_FORCE_OPENCODE=0 bash bin/sync.sh --install 2>&1)"
 rc=$?
 [ "$rc" -eq 0 ] || err "sync.sh --install exited non-zero ($rc)"
 
@@ -70,7 +71,8 @@ else
 fi
 
 section "bin/sync.sh --install: idempotent (second run only SKIPs, installs nothing new)"
-out2="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR" RDA_COPILOT_SKILLS_DIR="$NOCOPILOT_SKILLS_DIR" bash bin/sync.sh --install 2>&1)"
+out2="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR" RDA_COPILOT_SKILLS_DIR="$NOCOPILOT_SKILLS_DIR" \
+    RDA_POINTER_HOME="$TMP/ptr-home-legacy1" RDA_FORCE_OPENCODE=0 bash bin/sync.sh --install 2>&1)"
 installed2="$(printf '%s\n' "$out2" | grep -c '^INSTALL ' || true)"
 skipped2="$(printf '%s\n' "$out2" | grep -c '^SKIP ' || true)"
 [ "$installed2" -eq 0 ] && ok "second run installs 0 new skills" \
