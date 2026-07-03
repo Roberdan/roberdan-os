@@ -192,17 +192,19 @@ else
   printf "  skip: opencode not installed (command not found)\n"
 fi
 
-# ~/GitHub pointer fabric: always checked when the directory exists, regardless
-# of which tools are installed (any AGENTS.md-native tool opened elsewhere under
-# ~/GitHub should still find the canon).
-if [ -d "$HOME/GitHub" ]; then
+# ~/GitHub pointer fabric: only meaningful on machines using the canonical
+# ~/GitHub layout — i.e. when THIS repo itself lives under $HOME/GitHub. On CI
+# runners / other layouts (repo checked out elsewhere) the pointer convention
+# doesn't apply, so skip instead of failing (this exact check broke CI on
+# 2026-07-03: the runner tripped the $HOME/GitHub condition).
+if [ "$(cd "$ROOT/.." 2>/dev/null && pwd)" = "$HOME/GitHub" ]; then
   if [ -f "$HOME/GitHub/AGENTS.md" ] && grep -q "roberdan-os" "$HOME/GitHub/AGENTS.md" 2>/dev/null; then
     ok "\$HOME/GitHub/AGENTS.md wired (mentions roberdan-os)"
   else
     err "\$HOME/GitHub/AGENTS.md missing or doesn't mention roberdan-os — $REMEDIATE"
   fi
 else
-  printf "  skip: ~/GitHub not present\n"
+  printf "  skip: repo not under \$HOME/GitHub (different layout, pointer convention n/a)\n"
 fi
 
 # --- Result --------------------------------------------------------------
