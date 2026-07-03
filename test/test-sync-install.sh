@@ -74,6 +74,55 @@ skipped2="$(printf '%s\n' "$out2" | grep -c '^SKIP ' || true)"
 [ "$skipped2" -gt 0 ] && ok "second run skipped $skipped2 already-installed skills" \
   || err "second run skipped 0 — expected all previously-installed skills to be skipped"
 
+section "global AGENTS.md pointer — fresh install for detected tools, skip for absent/existing"
+PTR_HOME="$TMP/ptr-home"
+mkdir -p "$PTR_HOME/.codex"                                    # simulate codex installed
+mkdir -p "$PTR_HOME/GitHub"
+printf 'PRE-EXISTING (do not touch)\n' > "$PTR_HOME/GitHub/AGENTS.md"  # pre-existing → must SKIP
+
+pout="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR/ptr-skills" RDA_POINTER_HOME="$PTR_HOME" \
+        RDA_FORCE_OPENCODE=0 bash bin/sync.sh --install 2>&1)"
+prc=$?
+[ "$prc" -eq 0 ] || err "sync.sh --install (pointer section) exited non-zero ($prc)"
+
+if [ -f "$PTR_HOME/.codex/AGENTS.md" ]; then
+  ok "codex AGENTS.md installed (~/.codex detected present)"
+  grep -q "roberdan-os" "$PTR_HOME/.codex/AGENTS.md" && ok "codex AGENTS.md points at roberdan-os" \
+    || err "codex AGENTS.md content missing roberdan-os pointer"
+else
+  err "expected $PTR_HOME/.codex/AGENTS.md to be installed (codex dir present)"
+fi
+
+if [ -e "$PTR_HOME/.config/opencode/AGENTS.md" ]; then
+  err "opencode AGENTS.md installed despite RDA_FORCE_OPENCODE=0 (tool 'absent')"
+else
+  ok "opencode AGENTS.md correctly skipped (tool detected absent)"
+fi
+printf '%s\n' "$pout" | grep -q "^SKIP opencode:" && ok "SKIP message printed for opencode" \
+  || err "expected a SKIP line for opencode — got:\n$pout"
+
+if [ "$(cat "$PTR_HOME/GitHub/AGENTS.md")" = "PRE-EXISTING (do not touch)" ]; then
+  ok "pre-existing ~/GitHub/AGENTS.md left untouched (no silent overwrite)"
+else
+  err "pre-existing ~/GitHub/AGENTS.md content was modified — should never happen"
+fi
+printf '%s\n' "$pout" | grep -qF 'SKIP $HOME/GitHub/AGENTS.md:' && ok "SKIP message printed for \$HOME/GitHub/AGENTS.md" \
+  || err "expected a SKIP line for \$HOME/GitHub/AGENTS.md — got:\n$pout"
+
+section "global AGENTS.md pointer — clean skip when a tool is fully absent (no .codex dir, forced opencode present)"
+PTR_HOME2="$TMP/ptr-home-absent"
+mkdir -p "$PTR_HOME2"    # no .codex dir at all → codex must be skipped
+pout2="$(RDA_CLAUDE_SKILLS_DIR="$SKILLS_DIR/ptr-skills2" RDA_POINTER_HOME="$PTR_HOME2" \
+         RDA_FORCE_OPENCODE=1 bash bin/sync.sh --install 2>&1)"
+[ -e "$PTR_HOME2/.codex/AGENTS.md" ] && err "codex AGENTS.md installed despite no ~/.codex dir" \
+  || ok "codex AGENTS.md correctly skipped (no ~/.codex dir)"
+printf '%s\n' "$pout2" | grep -q "^SKIP codex:" && ok "SKIP message printed for codex" \
+  || err "expected a SKIP line for codex — got:\n$pout2"
+[ -f "$PTR_HOME2/.config/opencode/AGENTS.md" ] && ok "opencode AGENTS.md installed (forced present)" \
+  || err "expected $PTR_HOME2/.config/opencode/AGENTS.md to be installed (RDA_FORCE_OPENCODE=1)"
+[ -f "$PTR_HOME2/GitHub/AGENTS.md" ] && ok "GitHub/AGENTS.md installed fresh (no pre-existing file)" \
+  || err "expected $PTR_HOME2/GitHub/AGENTS.md to be installed"
+
 # --- Result --------------------------------------------------------------
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "test-sync-install: PASS"; exit 0; else echo "test-sync-install: FAIL"; exit 1; fi

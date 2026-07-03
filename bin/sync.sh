@@ -23,6 +23,11 @@
 # Output dir override (for the determinism check in test/validate.sh): RDA_SYNC_OUT.
 # Skills install dir override (for the isolated install test): RDA_CLAUDE_SKILLS_DIR
 # (default $HOME/.claude/skills).
+# Global AGENTS.md pointer install (--install only): writes ~/.codex/AGENTS.md,
+# ~/.config/opencode/AGENTS.md and ~/GitHub/AGENTS.md for tools DETECTED as
+# installed, never overwriting an existing file. RDA_POINTER_HOME overrides
+# $HOME (default $HOME) for isolated testing; RDA_FORCE_CODEX / RDA_FORCE_OPENCODE
+# (0|1) force tool-presence detection for tests.
 #
 # Deterministic output: no timestamps, no unstable ordering.
 set -euo pipefail
@@ -45,6 +50,25 @@ fm() { grep -m1 -E "^$2:" "$1" 2>/dev/null | sed -E "s/^$2:[[:space:]]*//; s/^[\
 
 # Stable file ordering (sort) for deterministic output.
 list() { find "$1" -maxdepth "${3:-1}" -name "$2" 2>/dev/null | LC_ALL=C sort; }
+
+emit_global_agents_pointer() {
+  # Content of the thin AGENTS.md pointer installed OUTSIDE this repo (parent
+  # ~/GitHub, plus any AGENTS.md-native tool's global instructions dir: codex,
+  # opencode). Single source so every installed copy is byte-identical —
+  # never hand-copy this text elsewhere.
+  cat <<'EOF'
+# AGENTS.md → roberdan-os
+
+Thin pointer. Canonical behavior lives in `AGENTS.md` inside `roberdan-os`
+(`~/GitHub/roberdan-os/AGENTS.md`) — read that, do not duplicate it here.
+
+Working in any repo under `~/GitHub`, by default:
+- **Loop engineering** (autonomy, evidence-first, commit per phase, verified done) — code and business alike.
+- **Digital twin** kicks in automatically when the output is communication/decision "as Roberto" (draft-not-send for anything external).
+- Agents at the right moment: `@thor` (done-gate), `@rex` (review), `@luca` (security), `@baccio` (architecture), `@socrates` (first-principles), `@wanda` (loop).
+- Human gates are never automated (see `roberdan-os/AGENTS.md#gate-umani`).
+EOF
+}
 
 emit_claude() {
   local d="$P/claude"
@@ -232,6 +256,54 @@ if [ "$MODE" = "install" ]; then
     ln -s "$w" "$target/SKILL.md"
     echo "INSTALL $sname: symlink $target/SKILL.md -> $w"
   done
+
+  # Global AGENTS.md pointer install — ONLY for tools detected as installed,
+  # ONLY if the target doesn't already exist (never overwrite curated config).
+  # RDA_POINTER_HOME overrides $HOME for isolated testing (default $HOME).
+  # RDA_FORCE_CODEX / RDA_FORCE_OPENCODE (0|1) force detection for tests
+  # without depending on the real machine's installed tools.
+  PTR_HOME="${RDA_POINTER_HOME:-$HOME}"
+  echo ""
+  echo "--- global AGENTS.md pointer install (detected tools only, into $PTR_HOME) ---"
+
+  install_agents_pointer() {
+    local target="$1" label="$2"
+    if [ -e "$target" ]; then
+      echo "SKIP $label: già presente in $target (mai overwrite)"
+      return
+    fi
+    mkdir -p "$(dirname "$target")"
+    emit_global_agents_pointer > "$target"
+    echo "INSTALL $label: pointer scritto in $target"
+  }
+
+  # codex: ~/.codex/AGENTS.md, only if ~/.codex exists (codex installed).
+  codex_present=0
+  if [ "${RDA_FORCE_CODEX:-}" = "1" ]; then codex_present=1
+  elif [ "${RDA_FORCE_CODEX:-}" = "0" ]; then codex_present=0
+  elif [ -d "$PTR_HOME/.codex" ]; then codex_present=1
+  fi
+  if [ "$codex_present" -eq 1 ]; then
+    install_agents_pointer "$PTR_HOME/.codex/AGENTS.md" "codex"
+  else
+    echo "SKIP codex: $PTR_HOME/.codex non trovato (tool non installato)"
+  fi
+
+  # opencode: ~/.config/opencode/AGENTS.md, only if `opencode` resolves.
+  opencode_present=0
+  if [ "${RDA_FORCE_OPENCODE:-}" = "1" ]; then opencode_present=1
+  elif [ "${RDA_FORCE_OPENCODE:-}" = "0" ]; then opencode_present=0
+  elif command -v opencode >/dev/null 2>&1; then opencode_present=1
+  fi
+  if [ "$opencode_present" -eq 1 ]; then
+    install_agents_pointer "$PTR_HOME/.config/opencode/AGENTS.md" "opencode"
+  else
+    echo "SKIP opencode: comando 'opencode' non risolto (tool non installato)"
+  fi
+
+  # ~/GitHub/AGENTS.md: always eligible (this machine's ~/GitHub layout), no
+  # tool-presence gate — only the existing-file guard applies.
+  install_agents_pointer "$PTR_HOME/GitHub/AGENTS.md" "\$HOME/GitHub/AGENTS.md"
 
   echo ""
   echo "Real install of agents/hooks into ~/.claude: NOT performed by this script"
