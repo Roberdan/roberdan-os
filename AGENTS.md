@@ -56,11 +56,12 @@ state on file, empirical terminal-condition, per-phase checkpoints, escalation, 
 The loop is reliable without a daemon; Convergio is an **optional** observer, never a single point of failure.
 
 **Goal tracking = [`kanban/`](kanban/) (durable, auditable, token-bounded, GATED — default).**
-Card-files in `todo/ doing/ done/`. Fast CLI: **`kb`** (`kb` view · `kb add "<title>" [dod] [acc]` ·
+Card-files in `todo/ doing/ done/`. Fast CLI: **`kb`** (`kb` view · `kb add "<title>" --repo <r> [dod] [acc]` ·
 `kb start <id> --by roberto` · `kb finish <id> --thor "<evidence>"`).
 
-- **Every card carries a Definition of Done (`dod:`) + Acceptance criteria (`acceptance:`)** — a card
-  can't start without them.
+- **Every card carries a `repo:` (which repo/scope it's about — a `~/GitHub` dir-name, or
+  `personal` for non-code work), a Definition of Done (`dod:`) + Acceptance criteria
+  (`acceptance:`)** — a card can't start without all three filled. See `kanban/README.md`.
 - **Gate `todo → doing`:** human — needs **Roberto's approval** (`kb start … --by roberto`).
   **Honest limit:** `--by` is a **discipline gate, not a security boundary** — any caller can pass
   `--by roberto`; there's no blocking check (it would break the "do all the todos" autonomous
