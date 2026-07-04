@@ -3,6 +3,11 @@
 Card-files (one file per card) in three columns, driven by the fast **`kb`** CLI:
 - `todo/` — queued · `doing/` — in progress · `done/` — completed/verified (append-only, read on demand)
 
+**Card content is local-only, never in git.** `todo/`, `doing/` and `done/` are gitignored — they
+hold Roberto's live operational/business state (task detail, client/product specifics), the same
+split as `private/`. Only the tool (`kb.sh`, this `README.md`) is versioned. On a fresh clone the
+three directories start empty; `kb.sh` creates them on demand.
+
 ## Fast commands (`kb`)
 ```
 kb                                    # view the board (fast)

@@ -25,7 +25,7 @@ Day-to-day operator guide (kb, factory, recall, gates): [`docs/USAGE.md`](docs/U
 | Skills | `skills/` — verify-done, ship, review, sync, auto-checkpoint |
 | Hooks | `hooks/` — main-guard, bash-guard, verify-done, autofmt, post-task-sync |
 | Loop | `loop/loop-protocol.md` |
-| Kanban | `kanban/` — durable, gated goal ledger (`kb`); see [`docs/USAGE.md`](docs/USAGE.md) |
+| Kanban | `kanban/` — durable, gated goal ledger (`kb`); see [`docs/USAGE.md`](docs/USAGE.md). Card content (`todo/ doing/ done/`) is gitignored, local-only |
 | Agent factory | `factory/` — unattended headless `claude -p` runs, sonnet default / opus opt-in |
 | Meta-loop | `learn/` (capture+distill) + `evolve/` (weekly upstream watch) |
 | Eval (does the canon work?) | [`eval/README.md`](eval/README.md) — with/without-canon A/B + blind judge, agent-agnostic (`RDA_EVAL_AGENT_CMD`), mirrors §9.1 of `docs/roberdan-os-paper-en.md` |
@@ -44,11 +44,63 @@ Cursor, opencode, Warp and hermes — `bin/sync.sh --install` installs global po
 skills to `~/.copilot/skills/`, gated per-tool on what's actually installed on the machine.
 
 **Install (gated):** `bin/sync.sh --install` does not overwrite an existing
-`~/.claude/CLAUDE.md` — it prints the pointer block to add by hand. Pushed to a private GitHub
-remote (`github.com/Roberdan/roberdan-os`).
+`~/.claude/CLAUDE.md` — it prints the pointer block to add by hand.
+
+## Prerequisites
+
+Required:
+- `git`, `jq`, `bash` (macOS ships all three).
+- An agentic CLI/IDE that reads `AGENTS.md` — this canon targets
+  [Claude Code](https://claude.com/claude-code) primarily; Codex, GitHub Copilot CLI/VS Code,
+  Cursor, opencode, Warp and hermes-agent read the same file natively (see Cross-tool support
+  above).
+
+Optional, feature-gated (everything degrades cleanly without them — `bin/bootstrap.sh` checks
+what's present and skips the rest):
+- `shellcheck` — lint gate in `test/validate.sh` (falls back to `bash -n` if absent).
+- [gstack](https://github.com/garrytan/gstack) — the skill pack several `skills/*` entries build
+  on (`focus-group`, `premortem`, `ship`, `review`, …). Install per its own README, then
+  `bin/sync.sh --install` wires the roberdan-os-specific skills alongside it.
+- [gbrain](https://github.com/garrytan/gbrain) — local-first semantic memory over the Obsidian
+  vault and this repo's code, backing `memory/` and `gbrain search`/`query` recall. Roberto runs a
+  patched fork ([`github.com/Roberdan/gbrain`](https://github.com/Roberdan/gbrain)) that keeps
+  embeddings on `ollama:bge-m3` instead of a cloud model — see `bin/check-embedder.sh`. Needs
+  [Ollama](https://ollama.com) locally for that embedding model if you want the same privacy
+  posture; gbrain itself works with cloud embeddings too if you'd rather skip Ollama.
+
+None of these are required to read the canon itself (`AGENTS.md`, `behavior/`, `rules/`,
+`agents/`, `skills/`) — they're only needed to run the automation around it (factory, meta-loop,
+recall).
+
+## Getting started
+
+```
+git clone https://github.com/Roberdan/roberdan-os.git
+cd roberdan-os
+bin/bootstrap.sh                    # generates wrappers, symlinks agents into ~/.claude/agents,
+                                     # runs test/validate.sh
+```
+
+`bootstrap.sh` is idempotent and non-destructive: it never overwrites `~/.claude/CLAUDE.md` or
+`settings.json`, it prints the pointer blocks to add by hand (see its output). Pass
+`--dossier /path/to/profile.md` only if you have Roberto's own confidential profile — everyone
+else skips that flag and the twin degrades gracefully to `[placeholder]`.
+
+## License
+
+[MIT](LICENSE). The canon (behavior, rules, agents, skills, hooks, loop, kanban tooling) is
+generic and reusable; adapt `behavior/roberto-voice.md` and drop in your own dossier for
+`roberdan-twin` to speak in your voice instead.
 
 ## Privacy
 
-`private/` is gitignored: it contains the Microsoft-confidential dossier (clients,
-deals, people) and never enters git nor any public bundle. Only the
-non-sensitive voice/style is committed.
+Two things are gitignored and never enter git or any bundle:
+- `private/` — the Microsoft-confidential dossier (clients, deals, people). Only the
+  non-sensitive voice/style (`behavior/roberto-voice.md`) is committed.
+- `kanban/todo/`, `kanban/doing/`, `kanban/done/` — live task/business content. Only the `kb`
+  tool and protocol (`kanban/kb.sh`, `kanban/README.md`) are committed.
+
+Everything else in this repo is intentionally public and attributed to Roberto D'Angelo by name —
+that's not an oversight, it's a personal system published under his own identity. If you fork
+this for yourself, run `bin/update-denylist-hashes.sh` against your own `private/.denylist`
+before your first commit (see [`test/leak-check.sh`](test/leak-check.sh)).
