@@ -3,6 +3,27 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v1.2.0] - 2026-07-04
+
+Prepared the repo for public release.
+
+### Changed
+- **Kanban card content is gitignored** (`kanban/todo/`, `kanban/doing/`, `kanban/done/`) — same
+  split as `private/`. The `kb` tool and protocol stay versioned; the live task/business content
+  in individual cards never enters git. `kanban/README.md`/`AGENTS.md`/`README.md` updated to
+  document the split.
+- **History purged** of all previously-committed kanban card content (`git filter-repo`), including
+  three cards with unredacted product-compliance detail that should never have been committed —
+  found and removed before the repo went public. A stale, already-merged remote branch carrying
+  the same pre-purge history was deleted rather than rewritten.
+- Added `LICENSE` (MIT) and a public-facing README (prerequisites, install, gstack/gbrain setup).
+
+### Fixed
+- Same class of privacy incident as the one noted in v1.0.0 — cards from a different session
+  slipped past denylist-based leak-check (which only catches known terms, not business-sensitive
+  prose it was never told about) and reached `main`. Structural fix this time: the content class
+  is gitignored, not just its exact known strings.
+
 ## [v1.1.0] - 2026-07-03
 
 Kanban cards now say what they're about, not just what they're called.

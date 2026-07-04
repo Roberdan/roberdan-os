@@ -57,7 +57,9 @@ The loop is reliable without a daemon; Convergio is an **optional** observer, ne
 
 **Goal tracking = [`kanban/`](kanban/) (durable, auditable, token-bounded, GATED — default).**
 Card-files in `todo/ doing/ done/`. Fast CLI: **`kb`** (`kb` view · `kb add "<title>" --repo <r> [dod] [acc]` ·
-`kb start <id> --by roberto` · `kb finish <id> --thor "<evidence>"`).
+`kb start <id> --by roberto` · `kb finish <id> --thor "<evidence>"`). **Card content is gitignored**
+(same split as `private/`) — it holds Roberto's live operational/business state; only the `kb.sh`
+tool and this protocol are versioned.
 
 - **Every card carries a `repo:` (which repo/scope it's about — a `~/GitHub` dir-name, or
   `personal` for non-code work), a Definition of Done (`dod:`) + Acceptance criteria

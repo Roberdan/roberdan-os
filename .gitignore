@@ -1,6 +1,13 @@
 # Microsoft-confidential dossier — never in git (NDA-split, installed into ~/.roberdan-os/private/)
 private/
 
+# Kanban card CONTENT is Roberto's live operational/business state (task detail, client/product
+# specifics) — local-only, never committed. The tool itself (kb.sh, README.md) stays versioned;
+# only the data directories are ignored. Purged from history 2026-07-04 (see CHANGELOG).
+kanban/todo/
+kanban/doing/
+kanban/done/
+
 # OS / editor
 .DS_Store
 *.swp
