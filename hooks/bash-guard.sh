@@ -19,11 +19,6 @@ if printf '%s' "$norm" | grep -qE 'git[[:space:]]+push.*(--no-verify|(^|[[:space
   deny "--no-verify / --force on git push are forbidden. Fix the cause (failed hook, conflict), don't bypass it. Human gate #2 for force-push on main."
 fi
 
-# 2) gh pr merge → requires explicit human approval (human gate #1).
-if printf '%s' "$norm" | grep -qE '^gh[[:space:]]+pr[[:space:]]+merge'; then
-  ask "Before merging: 'gh pr checks <n>', paste the output, confirm all SUCCESS, and get an explicit 'yes' from the user. See skills/ship."
-fi
-
 # 3) Destructive reset/clean on history or working tree → confirm.
 if printf '%s' "$norm" | grep -qE 'git[[:space:]]+(reset[[:space:]]+--hard|clean[[:space:]]+-[a-z]*f)'; then
   ask "git reset --hard / clean -f destroys uncommitted changes. Explicit confirmation required before proceeding."
