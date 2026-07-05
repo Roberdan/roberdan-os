@@ -328,6 +328,70 @@ else
   err "kb lint did not route to lint-cards.sh correctly"
 fi
 
+# =====================================================================
+# PHASE 5 — Node 1 atomic claim + repo locks (factory/lib.sh)
+# =====================================================================
+LIB="$ROOT/factory/lib.sh"
+
+# run claim_card in a SEPARATE process (a real filesystem race), writing WON/LOST.
+# bash -c: $0=lib path, $1=repo, $2=id.
+race_claim() {  # $1=locksdir $2=repo $3=id $4=outfile
+  RDA_LOCKS="$1" bash -c 'source "$0"; if claim_card "$1" "$2"; then echo WON; else echo LOST; fi' \
+    "$LIB" "$2" "$3" > "$4" 2>/dev/null
+}
+
+section "phase5: two parallel claimers on the same <repo>+<id> → exactly one WON, one LOST"
+RL="$TMP/locks-race"
+race_claim "$RL" repoRace 260705-777 "$TMP/c1" &
+race_claim "$RL" repoRace 260705-777 "$TMP/c2" &
+wait
+won=$(grep -l WON "$TMP/c1" "$TMP/c2" 2>/dev/null | wc -l | tr -d ' ')
+lost=$(grep -l LOST "$TMP/c1" "$TMP/c2" 2>/dev/null | wc -l | tr -d ' ')
+if [ "$won" = "1" ] && [ "$lost" = "1" ]; then
+  ok "atomic claim: exactly one winner, one clean skip (no double-claim)"
+else
+  err "claim race not exclusive (won=$won lost=$lost) — got: $(cat "$TMP/c1" "$TMP/c2" 2>/dev/null)"
+fi
+
+section "phase5: the SAME bare id in two DIFFERENT repos is independently claimable (@rex #2)"
+RL2="$TMP/locks-sameid"
+race_claim "$RL2" repoOne 260705-SAME "$TMP/s1" &
+race_claim "$RL2" repoTwo 260705-SAME "$TMP/s2" &
+wait
+if grep -q WON "$TMP/s1" && grep -q WON "$TMP/s2"; then
+  ok "same id, different repo → BOTH win (locks are keyed on <repo>+<id>, not bare id)"
+else
+  err "same-id-different-repo were not independently claimable — s1=$(cat "$TMP/s1") s2=$(cat "$TMP/s2")"
+fi
+
+section "phase5: repo lock is one-runner-per-repo; a second acquire is refused"
+RL3="$TMP/locks-repo"
+out=$(RDA_LOCKS="$RL3" bash -c 'source "$0"; acquire_repo_lock repoLock && echo A1; acquire_repo_lock repoLock && echo A2 || echo A2-REFUSED' "$LIB" 2>/dev/null)
+if echo "$out" | grep -q 'A1' && echo "$out" | grep -q 'A2-REFUSED'; then
+  ok "repo lock: first acquire wins, second is refused (structural one-runner-per-repo)"
+else
+  err "repo lock did not enforce single holder — got: $out"
+fi
+
+section "phase5: stale sweep reclaims a dead-pid + old-heartbeat lock, keeps a live one"
+RL4="$TMP/locks-stale"; mkdir -p "$RL4"
+# stale: pid that cannot be alive, heartbeat far in the past
+mkdir -p "$RL4/card-deadrepo-stale.lock"
+echo 999999999 > "$RL4/card-deadrepo-stale.lock/pid"
+: > "$RL4/card-deadrepo-stale.lock/heartbeat"; touch -t 202001010000 "$RL4/card-deadrepo-stale.lock/heartbeat"
+# fresh: current process pid, new heartbeat
+mkdir -p "$RL4/card-liverepo-fresh.lock"
+echo "$$" > "$RL4/card-liverepo-fresh.lock/pid"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$RL4/card-liverepo-fresh.lock/heartbeat"
+RDA_LOCKS="$RL4" RDA_LOCK_TIMEOUT=1 bash -c 'source "$0"; sweep_stale_locks' "$LIB" 2>/dev/null
+gone=1; [ -d "$RL4/card-deadrepo-stale.lock" ] && gone=0
+kept=0; [ -d "$RL4/card-liverepo-fresh.lock" ] && kept=1
+if [ "$gone" -eq 1 ] && [ "$kept" -eq 1 ]; then
+  ok "stale sweep reclaims dead-pid+old-heartbeat, preserves the live lock"
+else
+  err "stale sweep misbehaved (stale-gone=$gone live-kept=$kept)"
+fi
+
 # ---------------------------------------------------------------------------
 if [ "$FAIL" -eq 0 ]; then
   echo; echo "test-federated-kb: ✅ ALL GREEN"; exit 0

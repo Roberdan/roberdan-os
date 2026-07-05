@@ -45,93 +45,14 @@ if [ -z "$TIMEOUT_BIN" ] || [ ! -x "$TIMEOUT_BIN" ]; then
   TIMEOUT_BIN=""
 fi
 
-frontmatter() { sed -n '/^---$/,/^---$/p' "$1"; }
-field() { frontmatter "$1" | grep -m1 "^$2:" | sed "s/^$2:[[:space:]]*//" | tr -d '"' || true; }
+# frontmatter(), field(), resolve_model(), note_card(), verify_card() and the Node 1
+# lock primitives are provided by factory/lib.sh — sourced here and by
+# dispatch-runner.sh (design §2d, @rex #3). BASH_SOURCE-relative so it resolves
+# under launchd's foreign cwd. $CLAUDE/$TIMEOUT_BIN/$KB are already set above; the
+# helpers late-bind them at call time regardless.
+# shellcheck source=factory/lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 prompt_of() { awk 'BEGIN{f=0} /^---$/{f++; next} f>=2{print}' "$1"; }  # body after 2nd ---
-
-# Model policy (explicit Roberto directive, 2026-07): the factory must always run on sonnet,
-# scaling to opus only when a task needs it — NEVER on the account's interactive default model
-# (which can be anything, e.g. the pricier Fable), since `claude -p` without --model silently
-# inherits it. Allowlist is deliberately hardcoded (not read from env/frontmatter as-is) so a
-# typo or an unexpected value (fable, haiku, empty) can never slip through as a raw string —
-# every requested value is clamped through this function before it reaches the claude command
-# line. Applies to BOTH the per-task frontmatter `model:` field and the RDA_FACTORY_MODEL env
-# override; neither is trusted directly.
-resolve_model() {
-  local requested="$1"
-  case "$requested" in
-    sonnet|opus) printf '%s' "$requested" ;;
-    *)
-      echo "[factory] WARN model '$requested' not allowed (sonnet|opus only) — clamped to sonnet" >&2
-      printf 'sonnet'
-      ;;
-  esac
-}
-
-# If a task names its originating kanban card (`card: <id>` in frontmatter), append the
-# factory result to that card so kanban/doing/ and factory queue/->done/|failed/ don't
-# drift apart — this closes the gap that let two "doing" cards go silently stale.
-note_card() {
-  local cid="$1" line="$2" cf=""
-  for c in todo doing "done"; do [ -e "$KB/$c/$cid.md" ] && cf="$KB/$c/$cid.md"; done
-  [ -n "$cf" ] || return 0
-  printf -- '\nfactory_result: "%s"\n' "$line" >> "$cf"
-}
-
-# Second headless pass, run only when a task exits 0 AND names a `card:` — an exit 0 only
-# proves the process didn't crash, not that the card's DoD/acceptance was met (see
-# factory-protocol.md). Embodies @thor (see agents/thor.md): fresh context, evidence-only,
-# no rubber-stamping. Same invocation conventions as run_task (timeout wrapper, billing-safe
-# env, logging). Echoes "PASS<TAB>evidence" or "FAIL<TAB>reason" on stdout — never anything
-# else, so callers can split on the first tab.
-verify_card() {
-  local cid="$1" dir="$2" tmo="$3" vlog="$4" cf="" dod="" acc="" vprompt="" vrc=0 verdict=""
-  for c in todo doing "done"; do [ -e "$KB/$c/$cid.md" ] && cf="$KB/$c/$cid.md"; done
-  if [ -z "$cf" ]; then
-    printf 'FAIL\tcard %s not found in kanban/ for verification\n' "$cid"
-    return 0
-  fi
-  dod="$(field "$cf" dod)"
-  acc="$(field "$cf" acceptance)"
-  vprompt="You are acting as @thor (see agents/thor.md): the QA / verify-done guardian, brutal
-quality validator, zero tolerance for incomplete work, fresh context, evidence-only — no
-rubber-stamping. Given these acceptance criteria — Definition of Done: \"$dod\" / Acceptance:
-\"$acc\" — and this repo state, verify with concrete evidence (files, commits, test output)
-whether they are met. Output exactly \`VERDICT: PASS — <evidence>\` or \`VERDICT: FAIL —
-<reason>\` as the last line."
-
-  set +e
-  # cd into $dir first: --add-dir only grants filesystem ACCESS, it does not change the
-  # process's cwd. Without this, "current directory" in a prompt silently resolves to
-  # wherever run.sh itself was launched from (the roberdan-os repo root) instead of the
-  # task's declared dir — found live: a probe task wrote its output file into this repo
-  # instead of its intended workdir. Subshell so the cd doesn't leak into the rest of run.sh.
-  if [ ! -d "$dir" ]; then
-    { echo "[factory] FATAL: dir '$dir' does not exist"; } >> "$vlog"
-    vrc=2
-  elif [ -n "$TIMEOUT_BIN" ]; then
-    # Verify pass is QA, not authorship — always sonnet, never scaled to opus and never
-    # influenced by RDA_FACTORY_MODEL/per-task model: (those govern the authoring pass only).
-    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$vprompt" --model sonnet --dangerously-skip-permissions --add-dir "$dir" ) > "$vlog" 2>&1
-    vrc=$?
-  else
-    ( cd "$dir" && "$CLAUDE" -p "$vprompt" --model sonnet --dangerously-skip-permissions --add-dir "$dir" ) > "$vlog" 2>&1
-    vrc=$?
-  fi
-  set -e
-  { echo; echo "=== factory: thor-verify exit=$vrc at $(date) ==="; } >> "$vlog"
-
-  verdict="$(grep -oE 'VERDICT: (PASS|FAIL) — .*' "$vlog" 2>/dev/null | tail -1 || true)"
-  if [ "$vrc" -ne 0 ] || [ -z "$verdict" ]; then
-    printf 'FAIL\tunparseable thor-verify output (exit=%s) — see %s\n' "$vrc" "$vlog"
-    return 0
-  fi
-  case "$verdict" in
-    "VERDICT: PASS"*) printf 'PASS\t%s\n' "${verdict#VERDICT: PASS — }" ;;
-    "VERDICT: FAIL"*) printf 'FAIL\t%s\n' "${verdict#VERDICT: FAIL — }" ;;
-    *) printf 'FAIL\tunparseable verdict line: %s\n' "$verdict" ;;
-  esac
-}
 
 run_task() {
   local f="$1" name ts dir tmo log body attempts_file attempts model_req model
