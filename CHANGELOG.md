@@ -3,7 +3,7 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
-## [Unreleased]
+## [v1.3.0] - 2026-07-05
 
 Feedback from an external review of the public repo (via Grok) converged with the earlier
 focus-group finding: forking this for yourself was underspecified as "adapt one file."
