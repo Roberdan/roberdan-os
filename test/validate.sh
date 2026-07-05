@@ -127,6 +127,17 @@ if bash test/test-kb-views.sh >/dev/null 2>&1; then ok "kb views green"; else er
 section "federated kanban (cwd-scoping, kb all/handoff, init, locks, dormant dispatcher)"
 if bash test/test-federated-kb.sh >/dev/null 2>&1; then ok "federated kb + dispatcher gates green"; else err "test-federated-kb — see bash test/test-federated-kb.sh"; fi
 
+# --- 6d) dispatcher WIRED even while dormant (@rex #5) ------------------------
+# A module that exists but has no live entry-path is not "wired" — dormancy must
+# come from REFUSAL (preflight #5/#8), not from being unreachable. This check FAILS
+# if `kb dispatch` no longer routes to an executable dispatch-runner.sh.
+section "dispatcher wired (kb dispatch -> factory/dispatch-runner.sh) even while dormant"
+if grep -qE '^[[:space:]]*dispatch\)[^#]*factory/dispatch-runner\.sh' kanban/kb.sh && [ -x factory/dispatch-runner.sh ]; then
+  ok "kb dispatch routes to an executable dispatch-runner.sh (dormant by refusal, not unreachable)"
+else
+  err "kb dispatch is NOT wired to factory/dispatch-runner.sh — dormant-by-unreachable is forbidden (@rex #5)"
+fi
+
 # --- 7) Leak-check self-test (salted-hash tier b) -----------------------------
 section "leak-check self-test — tier (b) salted-hash catches a planted leak"
 if bash test/test-leak-check.sh >/dev/null 2>&1; then ok "leak-check tiers verified (see bash test/test-leak-check.sh)"; else err "test-leak-check — see bash test/test-leak-check.sh"; fi

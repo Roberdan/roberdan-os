@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# factory/runner-shims/rm — AUDIT ONLY (design §Node 3b/§5). Filesystem escape
+# (rm -rf outside the worktree) is NOT bash-enforceable — a PATH shim is bypassable
+# (/bin/rm, python -c os.unlink). The real defense is the phase-7 OS floor (dedicated
+# uid, worktree as the sole writable path). This shim only LOGS the attempt; it does
+# not pretend to block, so it never gives a false sense of a gate it cannot enforce.
+set -u
+[ -n "${RUNNER_SHIM_LOG:-}" ] && printf 'rm %s\n' "$*" >> "$RUNNER_SHIM_LOG" 2>/dev/null
+selfdir="$(cd "$(dirname "$0")" && pwd)"
+real=""
+IFS=:; for d in $PATH; do
+  [ "$d" = "$selfdir" ] && continue
+  if [ -x "$d/rm" ]; then real="$d/rm"; break; fi
+done
+unset IFS
+[ -n "$real" ] || { echo "[runner-shim] no real rm on PATH" >&2; exit 98; }
+exec "$real" "$@"

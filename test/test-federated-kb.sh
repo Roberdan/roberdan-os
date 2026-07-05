@@ -392,6 +392,123 @@ else
   err "stale sweep misbehaved (stale-gone=$gone live-kept=$kept)"
 fi
 
+# =====================================================================
+# PHASE 6 — dispatcher skeleton, WIRED but DORMANT (hostile-stub gate tests)
+# =====================================================================
+DISP="$ROOT/factory/dispatch-runner.sh"
+SANDBOX="$ROOT/factory/runner-sandbox.sh"
+
+# make a card file on disk for the dispatcher to chew on (it always refuses)
+mk_dispatch_card() {  # $1=root $2=id  [runner line...] via extra args appended
+  local root="$1" id="$2"; shift 2
+  mkdir -p "$root/kanban/todo"
+  { cat <<EOF
+---
+title: Dispatch probe
+repo: orca
+dod: "d"
+acceptance: "a"
+status: todo
+created: 2026-07-05
+EOF
+  for extra in "$@"; do printf '%s\n' "$extra"; done
+  echo '---'; } > "$root/kanban/todo/$id.md"
+  printf '%s' "$root/kanban/todo/$id.md"
+}
+
+section "phase6: credential vacuum — hostile repo-local .git/config helper fires OUTSIDE, is neutralized INSIDE (@luca #8)"
+VR="$TMP/vacuumRepo"; mk_gitrepo "$VR"
+MARK="$TMP/cred-marker"
+git -C "$VR" config credential.helper "!touch $MARK"   # canary standing in for a hostile osxkeychain
+# (i) OUTSIDE the vacuum (global/system config excluded so ONLY the canary is reachable — and no
+#     real credential helper is ever consulted, so a real token can never be produced): canary fires.
+/bin/rm -f "$MARK" 2>/dev/null || rm -f "$MARK"
+printf 'protocol=https\nhost=github.com\n\n' | GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git -C "$VR" credential fill >/dev/null 2>&1 || true
+outside=0; [ -f "$MARK" ] && outside=1
+# (ii) INSIDE sandbox_git (adds forced -c credential.helper= — the ONLY difference from leg i):
+#      the helper list is reset, the canary never runs.
+/bin/rm -f "$MARK" 2>/dev/null || rm -f "$MARK"
+printf 'protocol=https\nhost=github.com\n\n' | bash -c 'source "$0"; sandbox_git "$1" credential fill' "$SANDBOX" "$VR" >/dev/null 2>&1 || true
+inside=0; [ -f "$MARK" ] && inside=1
+# (iii) env -i allowlist drops a planted GH_TOKEN
+envout="$(GH_TOKEN=planted-fake-not-real bash -c 'source "$0"; sandbox_env_run "'"$ROOT"'/factory/runner-shims" "'"$TMP"'/sbhome" "'"$TMP"'/sbtmp" -- env' "$SANDBOX" 2>/dev/null)"
+tok_absent=1; printf '%s\n' "$envout" | grep -q '^GH_TOKEN=' && tok_absent=0
+if [ "$outside" -eq 1 ] && [ "$inside" -eq 0 ] && [ "$tok_absent" -eq 1 ]; then
+  ok "vacuum proven: canary fires without the reset (leg i real), neutralized with it (leg ii); env -i drops GH_TOKEN"
+else
+  err "credential vacuum NOT proven (outside=$outside inside=$inside token_absent=$tok_absent) — vacuous-pass guard tripped"
+fi
+
+section "phase6: EVERY dispatch refuses (dormant) — non-zero, card untouched, #5 in the reasons"
+DCARD="$(mk_dispatch_card "$TMP/dRepo" 260705-500000)"
+out="$(bash "$DISP" "$DCARD" copilot-cli 2>&1)"; rc=$?
+still_todo=0; [ -f "$DCARD" ] && still_todo=1
+if [ "$rc" -ne 0 ] && echo "$out" | grep -q 'REFUSE #5' && echo "$out" | grep -q 'DORMANT' && [ "$still_todo" -eq 1 ]; then
+  ok "dispatch refuses (exit $rc), reports #5 hard-wired refuse, leaves the card in todo/"
+else
+  err "dispatch did not refuse as required (rc=$rc still_todo=$still_todo) — got: $out"
+fi
+
+section "phase6: #5 is HARD-WIRED — a config/env claiming the floor is present CANNOT flip it (@luca #9)"
+# try every plausible override: an env var AND a local config file asserting the floor exists.
+echo "OS_FLOOR_PRESENT=1" > "$TMP/fake-floor.conf"
+out="$(OS_FLOOR_PRESENT=1 RDA_OS_FLOOR_PRESENT=1 RDA_OS_FLOOR=1 bash "$DISP" "$DCARD" copilot-cli 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] && echo "$out" | grep -q 'REFUSE #5'; then
+  ok "#5 still refuses even with OS_FLOOR_PRESENT=1 in the env — it is a code constant, not config"
+else
+  err "#5 was flipped by an env/config override (rc=$rc) — HARD-WIRING BROKEN — got: $out"
+fi
+
+section "phase6: leak-check tier fail-open is CLOSED — no active tier ⇒ refuse at #8 (@rex #1)"
+out="$(RDA_DENYLIST_SRC="$TMP/no-denylist" RDA_DENYLIST_HASHFILE="$TMP/no-hashfile" bash "$DISP" "$DCARD" copilot-cli 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] && echo "$out" | grep -q 'REFUSE #8'; then
+  ok "with no denylist and no denylist.sha256, dispatch refuses at #8 (never a tier-c fail-open)"
+else
+  err "leak-check fail-open was NOT closed (rc=$rc) — got: $out"
+fi
+
+section "phase6: a runner: human-only card is filtered out (#6) — never dispatched"
+HCARD="$(mk_dispatch_card "$TMP/hRepo" 260705-500001 'runner: human-only' 'human_gates: push')"
+out="$(bash "$DISP" "$HCARD" copilot-cli 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] && echo "$out" | grep -q 'REFUSE #6'; then
+  ok "runner: human-only card is refused at #6 (gated surface never runner-eligible)"
+else
+  err "human-only card was not filtered at #6 (rc=$rc) — got: $out"
+fi
+
+section "phase6: a card passing ALL other checks STILL refuses — solely at #5 (impossible without a code edit)"
+ER="$TMP/eligibleRepo"; mk_gitrepo "$ER"
+RDA_KANBAN_REGISTRY="$TMP/reg-elig" bash "$KB" init "$ER" >/dev/null 2>&1
+mkdir -p "$ER/kanban/todo"
+cat > "$ER/kanban/todo/260705-elig.md" <<'EOF'
+---
+title: Fully eligible except the OS floor
+repo: eligiblerepo
+dod: "d"
+acceptance: "a"
+status: todo
+created: 2026-07-05
+runner: copilot-cli/opus
+---
+EOF
+echo "eligiblerepo" > "$TMP/allowlist-elig"
+out="$(RDA_KANBAN_REGISTRY="$TMP/reg-elig" RDA_RUNNER_ALLOWLIST="$TMP/allowlist-elig" \
+       bash "$DISP" "$ER/kanban/todo/260705-elig.md" copilot-cli 2>&1)"; rc=$?
+reasons="$(echo "$out" | grep -c '^  REFUSE #')"      # count reason lines only (not the header)
+if [ "$rc" -ne 0 ] && [ "$reasons" = "1" ] && echo "$out" | grep -q '^  REFUSE #5'; then
+  ok "with #1-#4/#6/#8 all satisfied, ONLY #5 refuses — #5 is the sole dormancy gate, code-only to lift"
+else
+  err "eligible-except-#5 did not refuse solely at #5 (rc=$rc reasons=$reasons) — got: $out"
+fi
+
+section "phase6: WIRED — kb dispatch routes to dispatch-runner.sh (dormant by refusal, not unreachable)"
+out="$(bash "$KB" dispatch "$DCARD" 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] && echo "$out" | grep -q 'external-runner dispatch requested'; then
+  ok "kb dispatch reaches dispatch-runner.sh (live entry-path) and it refuses"
+else
+  err "kb dispatch did not route to the dispatcher (rc=$rc) — got: $out"
+fi
+
 # ---------------------------------------------------------------------------
 if [ "$FAIL" -eq 0 ]; then
   echo; echo "test-federated-kb: ✅ ALL GREEN"; exit 0
