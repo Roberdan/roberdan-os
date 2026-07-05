@@ -3,6 +3,34 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.1.0] - 2026-07-05
+
+Non-breaking follow-up to v2.0.0: a new quality rule, a rewired weekly watcher, and
+Fable-5 reasoning guidance — all additive.
+
+### Added
+- **"Wired End-to-End" rule** (`rules/best-practices.md` v3.3.0 + `verify-done` skill): a feature
+  that exists but is never reached from a live path is not done — it's dead code that looks done.
+  Trace entry→caller→feature; prefer a mechanical proof (coverage gate) over human vigilance.
+  Grounded in real failure modes from this repo's work.
+- **Fable-5-scoped reasoning guidance** (`behavior/thinking-toolkit.md § Running on Fable 5`):
+  effort doctrine (`high` default / `xhigh` for the hardest `board`/`socrates` calls / `low`
+  routine), act-sooner-survey-less, clean final output, and a `reasoning_extraction` landmine
+  note. Deliberately scoped — NOT written into the `model:opus` agent bodies where it would
+  misfire. Effort knob also documented in the global model policy. From Anthropic's
+  Prompting-Claude-Fable-5 doc, which validates the repo on 5 axes; addyosmani/agent-skills
+  linked as a reference (not imported — redundant + over-prescription degrades Fable).
+- Research + design docs for the multi-CLI thread (`docs/plan-2026-07-05-*`): CAO tested and
+  rejected, kanban-as-handoff validated, the federated-kanban + sandboxed-dispatcher design
+  (reviewed by @rex + @luca; dispatcher stays dormant until OS isolation).
+
+### Changed
+- **evolve watcher** (`evolve/watch.sh`): moved to **Saturday 02:00** (launchd catch-up runs a
+  missed job at next boot/wake if the Mac was off) and now **drops a kanban card** per changelog
+  novelty instead of a skeleton draft — any CLI (Claude, Copilot) executes it on its next run.
+  No headless `claude -p`; the card is the cross-tool handoff. `RDA_KANBAN_TODO` override added
+  for testability. Tested end-to-end (5 sources → 5 lint-clean cards).
+
 ## [v2.0.0] - 2026-07-05
 
 ### Changed (BREAKING)
