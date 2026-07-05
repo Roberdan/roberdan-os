@@ -123,6 +123,10 @@ if bash test/test-kb-views.sh >/dev/null 2>&1; then ok "kb views green"; else er
 section "leak-check self-test — tier (b) salted-hash catches a planted leak"
 if bash test/test-leak-check.sh >/dev/null 2>&1; then ok "leak-check tiers verified (see bash test/test-leak-check.sh)"; else err "test-leak-check — see bash test/test-leak-check.sh"; fi
 
+# --- 7b) fork merge-clean proof (the v2.0.0 engine/identity split guarantee) ----------
+section "fork merge-clean — identity-only fork merges upstream engine edits, zero conflicts"
+if bash test/test-fork-merge.sh >/dev/null 2>&1; then ok "merge-clean proof green (see bash test/test-fork-merge.sh)"; else err "test-fork-merge — see bash test/test-fork-merge.sh"; fi
+
 # --- 8) sync.sh --install: skills symlink step (isolated, no real ~/.claude touched) ---
 section "sync.sh --install — skills symlink step (isolated via RDA_CLAUDE_SKILLS_DIR)"
 if bash test/test-sync-install.sh >/dev/null 2>&1; then ok "install symlink/skip logic verified (see bash test/test-sync-install.sh)"; else err "test-sync-install — see bash test/test-sync-install.sh"; fi
