@@ -24,7 +24,7 @@ for f in "$inbox"/*.md; do
   while IFS= read -r line; do
     sig="${line#*] }"                       # strip the timestamp "- [ts] "
     [ -n "${sig// /}" ] || continue
-    case "$sig" in *"/.roberdan-os/private/"*) continue ;; esac   # privacy hard-gate
+    case "$sig" in *"/${RDA_HOME##*/}/private/"*) continue ;; esac   # privacy hard-gate (follows RDA_HOME, see capture.sh)
 
     terms="$(printf '%s' "$sig" | tr -cs '[:alnum:]' ' ' | awk '{for(i=1;i<=NF&&i<=6;i++)printf "%s ",$i}')"
     dupes="$(gbrain_search "$terms")"

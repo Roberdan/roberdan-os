@@ -12,7 +12,8 @@ writes, decides and delegates — read identically by every AI tool he uses. One
 never cross on its own (merges, force-pushes, spend, deletions, publication), and an **eval
 harness** that measures whether the canon actually changes agent output — instead of just
 asserting that it does. Layer map: [`ARCHITECTURE.md`](ARCHITECTURE.md). Not a technical
-read? Start with [`docs/roberdan-os-paper-en.md`](docs/roberdan-os-paper-en.md) instead.
+read? Start with [`docs/roberdan-os-paper-en.md`](docs/roberdan-os-paper-en.md) instead
+(the paper is versioned separately; file paths it cites predate the v2.0.0 `identity/` split).
 
 ## What it is — and what it is not
 

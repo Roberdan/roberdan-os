@@ -14,14 +14,16 @@ signal="${1:-$(cat)}"
 [ -n "${signal// /}" ] || { echo "capture: empty signal, skip" >&2; exit 0; }
 
 # Privacy hard-gate (as CODE, not discretion):
-# 1) never capture references to the dossier path
+# 1) never capture references to the dossier path. Match on the RDA_HOME basename
+#    (".roberdan-os" by default, ".jane-os" for a forker who exported RDA_HOME) so both
+#    tilde-written and absolute mentions are caught, and the gate follows the fork.
 case "$signal" in
-  *"/.roberdan-os/private/"*) echo "capture: privacy block (dossier path), skip" >&2; exit 0 ;;
+  *"/${RDA_HOME##*/}/private/"*) echo "capture: privacy block (dossier path), skip" >&2; exit 0 ;;
 esac
 # 2) never capture content matching the real deny-list (confidential names/entities).
-#    Runtime deny-list: ~/.roberdan-os/private/.denylist, fallback to the repo.
+#    Runtime deny-list: $RDA_HOME/private/.denylist, fallback to the repo.
 denylist=""
-for d in "$HOME/.roberdan-os/private/.denylist" "$(dirname "$0")/../private/.denylist"; do
+for d in "$RDA_HOME/private/.denylist" "$(dirname "$0")/../private/.denylist"; do
   [ -f "$d" ] && { denylist="$d"; break; }
 done
 # NB: filter blank/comment lines from the deny-list (an empty pattern in grep -f matches everything).

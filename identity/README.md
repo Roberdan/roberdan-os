@@ -8,7 +8,7 @@
 
 | File | What it holds | Consumed by |
 |---|---|---|
-| [`identity.conf`](identity.conf) | machine-readable `KEY=value` (slug, full_name, primary_language, twin_handle, rda_home) | scripts (`source`) and `bin/sync.sh` at generation time |
+| [`identity.conf`](identity.conf) | machine-readable `KEY=value` (slug, full_name, primary_language, twin_handle, rda_home) | today: `bin/sync.sh` reads `full_name` at generation time; `rda_home` documents the value you `export RDA_HOME=` in your shell (scripts read the env var); the other keys are scaffolded for future generator use |
 | [`voice.md`](voice.md) | the voice canon — how the operator writes and decides | the twin agent, at runtime |
 | [`operator.md`](operator.md) | who the operator is: profile, named-agent ecosystem, tool stack, phrase table | `behavior/roberto-mode.md` (pointer), agents at runtime |
 | [`twin-persona.md`](twin-persona.md) | the persona half of the twin agent (name, languages, relationship style) | `agents/twin.md`, at runtime |
