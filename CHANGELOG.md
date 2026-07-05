@@ -3,7 +3,12 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
-## [Unreleased]
+## [v2.2.0] - 2026-07-06
+
+Non-breaking: the kanban goes federated and a multi-CLI dispatcher lands **wired but provably
+dormant** (external-runner risk stays zero — it is hard-wired to refuse until a reviewed
+OS-isolation floor exists). Reviewed by @rex (APPROVE) + @thor (PASS), every design fix proven
+empirically.
 
 ### Added
 - **Federated kanban + dormant multi-CLI dispatcher** (phases 1–6 of
