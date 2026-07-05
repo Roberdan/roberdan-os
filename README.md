@@ -1,5 +1,14 @@
 # roberdan-os
 
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![validate](https://github.com/Roberdan/roberdan-os/actions/workflows/validate.yml/badge.svg)](https://github.com/Roberdan/roberdan-os/actions/workflows/validate.yml)
+
+A personal behavioral canon for AI coding agents: one file (`AGENTS.md`) every tool reads the
+same way, hard-coded **human-approval gates** an agent can never cross on its own (merges,
+force-pushes, spend, deletions, publication), and an **eval harness** that measures whether the
+canon actually changes agent output — instead of just asserting that it does. Not a plain-English
+read? Start with [`docs/roberdan-os-paper-en.md`](docs/roberdan-os-paper-en.md) instead.
+
 Single canonical source of Roberto D'Angelo's agentic system. One versioned
 source from which every tool (Claude Code, GitHub Copilot CLI+VS Code, Codex,
 ChatGPT/Claude web) consumes the same behavior.
@@ -89,8 +98,18 @@ else skips that flag and the twin degrades gracefully to `[placeholder]`.
 ## License
 
 [MIT](LICENSE). The canon (behavior, rules, agents, skills, hooks, loop, kanban tooling) is
-generic and reusable; adapt `behavior/roberto-voice.md` and drop in your own dossier for
-`roberdan-twin` to speak in your voice instead.
+generic and reusable — but Roberto's identity runs deeper through it than one file. Forking it
+for yourself means at minimum:
+- Renaming the `roberdan-twin` agent ([`agents/roberdan-twin.md`](agents/roberdan-twin.md)) and
+  rewriting [`behavior/roberto-voice.md`](behavior/roberto-voice.md) in your own voice.
+- Swapping every `~/.roberdan-os/` path and `RDA_`-prefixed env var (`factory/`, `bin/`,
+  `hooks/`) for your own namespace.
+- Grepping `AGENTS.md` and `behavior/roberto-mode.md` for "Roberto"/"roberdan" — dozens of
+  mentions, not one.
+- Writing your own `private/.denylist` and `~/.roberdan-os/private/profile.md` before your first
+  commit (see Privacy below) — his is meaningless to you and yours doesn't exist yet.
+
+None of this is hard, but it's a real pass across the repo, not a single-sentence edit.
 
 ## Privacy
 
