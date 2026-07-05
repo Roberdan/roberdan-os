@@ -502,3 +502,23 @@ lands the dispatcher *inert*. Phase 7 is the human-gated activation.
 
 The one node with **no clean bash solution is 3b** — and it is precisely why module (3) ships dormant
 (preflight #5) rather than pretending bash can sandbox a hostile process.
+
+---
+
+## Review verdicts (2026-07-05) — @rex + @luca
+
+**@rex — APPROVE-WITH-CONCERNS** (design solido, riusa il canone correttamente; concern tutte design-fixabili, nessun blocco che richiede ri-architettura):
+1. **Leak-check fail-OPEN (più grave):** `leak-check.sh` con `private/.denylist` assente/vuoto fa `exit 0` (tier c) → il gate "obbligatorio" diventa no-op silente e l'output del runner viene committato senza protezione. Nessuno dei 7 preflight lo copre. **Fix: preflight #8 = asserire un tier leak-check attivo e non-vuoto prima di ogni dispatch, else refuse.**
+2. **Card id non globalmente unico nel federato:** `date +%y%m%d-%H%M%S` è per-repo → due repo possono collidere su `locks/card-<id>.lock` e su `verify_card`. **Fix: lock/claim per `repo+id`, non `id` nudo.**
+3. **"run.sh UNCHANGED" vs "riusa verify_card": tensione** — quelle funzioni vivono DENTRO run.sh; riusarle richiede estrarre `factory/lib.sh` (tocca run.sh). Dichiararlo.
+4. **Node 3a step "remote non-pushable dentro il worktree" è ERRATO** — i worktree condividono `.git`/remote del parent → no-op o muta il remote reale. Rimuoverlo; la garanzia è il credential-vacuum.
+5. **Wired end-to-end (viola la regola v3.3.0 citata dal design stesso):** `dispatch-runner.sh` non ha entry-path vivo. **Fix: entry `kb dispatch` + check in validate.sh che fallisce se non wired**, anche se il modulo refusa sempre in fase 6.
+- Blind spot privacy: `git rm --cached` de-traccia in avanti ma il blob resta in history locale — leak se quel branch viene mai pushato; kb init deve segnalare anche i commit locali non-pushati con card content.
+
+**@luca — mergeabile in forma DORMIENTE a una condizione** (il modello è solido nella sua onestà; assume l'injection e vincola le conseguenze):
+- **Il crux del design è sbagliato:** il rischio dominante non è `rm -rf`/lettura-dossier (filesystem) ma **l'esfiltrazione via rete** (`curl`/DNS) — né credential-vacuum né utente-dedicato la chiudono; serve egress-control per-uid (`pf`) o network-namespace.
+- **Buco concreto:** `.git/config` locale del repo untrusted bypassa la vacuum (`GIT_CONFIG_NOSYSTEM`+`GIT_CONFIG_GLOBAL=/dev/null` NON disabilitano il config locale). `credential.helper=osxkeychain` + keychain sbloccato + remote iniettato = push riuscito. **Fix: forzare `-c credential.helper=` su ogni git + neutralizzare TUTTI i remote + `env -i` allowlist invece di unset-denylist.**
+- **Non negoziabili per attivare fase 7:** (a) egress denied/allowlist per-uid; (b) `private/`+antenati verificati non-leggibili dalla uid runner a runtime (EACCES, fail-closed) e nessuna copia world-readable; (c) worktree unico path scrivibile + TMPDIR per-runner disposable; (d) git forzato `credential.helper=`, keychain runner vuoto, remote neutralizzati; (e) suite fase-7 che PROVA il floor.
+- **Condizione per il merge dormiente:** preflight #5 dev'essere un rifiuto inerte **hard-wired** (attivare = code-edit rivista da @rex+@luca), NON un toggle che un file di config locale possa ribaltare.
+
+**Sintesi:** le fasi 1-5 (federazione kanban + `runner:` label) portano tutto il valore a **rischio-esterno zero**. Il dispatcher esterno (fase 6-7) resta sulla carta/dormiente e richiede: i fix di @rex (preflight #8, lock repo+id, wired-end-to-end, rimuovere step 3a errato, factory/lib.sh) + le non-negoziabili di @luca (egress-control, credential.helper vuoto, EACCES sul dossier, hard-wired refusal). Prossimo: @baccio aggiorna il design incorporandoli, PRIMA di qualunque implementazione.
