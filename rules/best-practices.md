@@ -1,7 +1,7 @@
 ---
 name: best-practices
-version: "3.2.0"
-last_updated: "2026-07-02"
+version: "3.3.0"
+last_updated: "2026-07-05"
 ---
 
 # Best Practices
@@ -34,6 +34,31 @@ Every changed line in a diff should trace directly to the user's request. Don't 
 **Schema change**: migration in the same PR. Field addition → update ALL fixtures.
 
 **Coverage**: 80% business logic / 100% critical paths. Parameterized SQL.
+
+## Wired End-to-End (features must be reachable, not just present)
+
+A feature that exists but is never invoked from a live path is **not done — it's dead code that
+looks done**. Every feature, field, flag, option, hook, agent, or skill you add must be **wired
+end-to-end**: defined **and** consumed **and** reachable from the real entry point (CLI arg, hook
+trigger, entry file, config the runtime actually reads). "The file/function/field exists" is not
+the bar; "a live caller reaches it" is.
+
+**Verify by tracing the path**, not by confirming the definition. Start at the entry point and
+follow the call/read chain to the feature. No caller on a live path → not wired → not done.
+
+Concrete failure modes this rule exists to catch (all seen in this repo or its work):
+- A config field written in one file but read from a *different* file the runtime uses (e.g. a
+  `provider:` key set in a tool's native profile but not in the profile the dispatcher actually
+  reads → silently ignored).
+- A generated wrapper on disk that no tool is pointed at (the `tool-coverage` gate in
+  `test/validate.sh` exists precisely to prove skills resolve into the canon, not just exist).
+- Code that "looks wired but never ran" (an entire eval fixture class is named after this).
+- A new env var / flag added to a script but never branched on; a new agent file never referenced
+  from `AGENTS.md`; a new skill never symlinked into the tool's skills dir.
+
+**Prefer a mechanical proof.** Where feasible, add a check that fails when a feature is unwired
+(a coverage gate, a grep-for-caller test, a link check) rather than relying on a human to notice.
+An unwired feature that ships green is worse than one that fails loudly.
 
 ## Persuasion Guardrails
 
