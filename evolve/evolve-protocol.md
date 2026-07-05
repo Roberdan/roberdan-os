@@ -7,16 +7,26 @@ Keeps roberdan-os current on what's new in Claude Code / GitHub Copilot / Codex,
 
 launchd `com.roberdan.rda-evolve`, **weekly**. Fires regardless of which tool is open.
 
+## Cadence detail
+
+launchd `com.roberdan.rda-evolve`, **Saturday 02:00**. `StartCalendarInterval` means a missed
+run (Mac off/asleep) fires at the next boot/wake — not skipped like cron.
+
 ## Flow
 
-`evolve/watch.sh`:
-1. **Fetch** changelogs/release notes from sources (versioned URLs) → compare against
-   the last seen version (durable state `~/.roberdan-os/evolve/seen.json`).
-2. **Diff capability:** for each novelty, assess whether it touches something
-   roberdan-os uses (hook, skill, agent, scheduling, MCP, memory).
-3. **Propose** in `roberdan-os/proposals/<YYYY-MM-DD>-<slug>.md`: what changes, why,
-   the suggested patch, **source citation (URL + version + date)**. No citation →
-   no proposal.
+`evolve/watch.sh` **detects; it does not analyze.** It never launches a headless agent
+(no `claude -p`) — the analysis is handed off as a kanban card any CLI can execute:
+
+1. **Fetch** changelogs/release notes from sources (versioned URLs) → compare a content
+   fingerprint against the last seen state (`~/.roberdan-os/evolve/seen`).
+2. **Drop a card** per novel source into `kanban/todo/` (gitignored, local-only): id
+   `<ts>-<name>`, standard frontmatter (title/repo/dod/acceptance/status/created), body
+   carrying the source URL + the 4-step task. The card IS the handoff.
+3. **Any agent picks it up** on its next run (Claude, Copilot — Roberto launches one, it reads
+   the board, does the work): extract the concrete novelties, assess impact on what roberdan-os
+   uses (hook/skill/agent/scheduling/MCP/memory/factory/loop), and **propose** in
+   `roberdan-os/proposals/<YYYY-MM-DD>-<slug>.md` with **source citation (URL + version + date)**.
+   No citation → no proposal. Then `@thor` + `kb finish` per the normal gate.
 
 ## Invariants (hard)
 
