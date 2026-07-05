@@ -20,6 +20,7 @@ skill before declaring any task complete.
 - [ ] 0 technical debt left open
 - [ ] Coverage ≥ 80% on business logic, 100% on critical paths
 - [ ] Tests run — **output shown**, not described
+- [ ] **Feature wired end-to-end** — reached from a live path (entry point → caller → feature), not just present on disk. Trace the path; a definition with no live caller is not done. See `rules/best-practices.md § Wired End-to-End`.
 - [ ] Docs updated if you changed an API/interface
 - [ ] Commit for every completed phase
 - [ ] CI green (or explicit documented wontfix)
