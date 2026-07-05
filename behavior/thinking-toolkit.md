@@ -87,5 +87,40 @@ is a form of honesty. *"If you can't explain it simply, you don't understand it.
 
 ---
 
+## Running on Fable 5 (model-scoped — only when the agent actually runs on Fable)
+
+`socrates`, `board` and `twin` default to `model: opus`; Fable is invoked *on top* ad hoc.
+So this guidance is **scoped, not global** — it must live here, never in those agents' bodies,
+or it would fire on their Opus runs where it's useless or harmful. It applies **only** on a
+Fable run. Source: [Anthropic — Prompting Claude Fable 5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5).
+
+- **Effort is the primary control on Fable** (intelligence ↔ latency/cost). Doctrine: **`high`
+  by default; `xhigh` for the hardest capability-sensitive calls** (a `board` red-team, a
+  `socrates` deconstruction of an ambiguous high-stakes problem); `low`/`medium` for routine.
+  This is a run-time knob (API/SDK), not an agent frontmatter field — set it when you invoke
+  Fable, don't write it into an agent file.
+- **Act sooner, survey less.** Fable rewards *"you have enough to act, so act — a recommendation,
+  not an exhaustive survey"*. This is already the mother rule; on Fable at high effort it matters
+  more, because the failure mode is over-deliberation, not under-thinking.
+- **Clean final output.** In the deliverable, drop working shorthand (no `A→B→fail` arrow
+  chains) — full sentences, outcome first. `best-practices § Writing` already says this; it's a
+  reinforcement, not new doctrine.
+- **Landmine (audit, not alarm):** prompts that tell a model to *echo / transcribe / explain its
+  internal reasoning as response text* can trip Fable's `reasoning_extraction` refusal → silent
+  fallback to Opus. Producing an analytical deliverable (an Assumption Map, an adversarial case,
+  a recommendation-with-why) is normal output and is fine — the repo is already clean. Just don't
+  ask a Fable agent to surface its hidden chain-of-thought.
+
+## Related external reference
+
+For source-grounded engineering habits, [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)
+is worth a look on demand — mainly its `source-driven-development` (ground library/framework choices
+in official docs *with citations*) and `incremental-implementation` (vertical slice + feature flag)
+patterns, useful as habits for `baccio`. Most of its 24 skills are already covered by this repo's
+`best-practices` + `verify-done` + the agent set — link, don't import (a large prescriptive skill
+set also degrades Fable output, per the doc above).
+
+---
+
 *The repertoire keeps growing: add a model only once it's earned its place with a
 real case. The root always remains: first-principles + falsification. See [[roberto-mode]].*
