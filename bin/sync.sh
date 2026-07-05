@@ -62,6 +62,15 @@ esac
 
 P="${RDA_SYNC_OUT:-$ROOT/platforms}"
 
+# Generation-time identity injection (deterministic: reads the committed
+# identity/identity.conf, no timestamps). Engine text stays neutral; the
+# operator's name reaches the generated wrappers only through this read.
+conf_get() {
+  sed -n "s/^$1=//p" "$ROOT/identity/identity.conf" | head -1 | sed -e 's/^"//' -e 's/"$//'
+}
+FULL_NAME="$(conf_get full_name)"
+FULL_NAME="${FULL_NAME:-the operator}"
+
 # Extracts a simple YAML frontmatter field (name:/description:) from a file.
 fm() { grep -m1 -E "^$2:" "$1" 2>/dev/null | sed -E "s/^$2:[[:space:]]*//; s/^[\"']//; s/[\"']$//"; }
 
@@ -98,7 +107,7 @@ emit_claude() {
 This is a thin pointer. The canonical source of behavior is
 [\`AGENTS.md\`](../../AGENTS.md) in roberdan-os. Read that.
 
-- Behavior: \`behavior/roberto-mode.md\` (engineering) + \`behavior/roberto-voice.md\` (voice) + \`behavior/thinking-toolkit.md\` (reasoning)
+- Behavior: \`behavior/roberto-mode.md\` (engineering) + \`identity/voice.md\` (voice) + \`behavior/thinking-toolkit.md\` (reasoning)
 - Rules: \`rules/constitution.md\` + \`rules/best-practices.md\`
 - Agents: \`agents/*.md\` · Loop: \`loop/loop-protocol.md\`
 EOF
@@ -163,20 +172,20 @@ emit_copilot() {
   mkdir -p "$d/prompts"
 
   # .github/copilot-instructions.md thin → AGENTS.md.
-  cat > "$d/copilot-instructions.md" <<'EOF'
+  cat > "$d/copilot-instructions.md" <<EOF
 # Copilot instructions → roberdan-os
 
-The canonical source of behavior is `AGENTS.md` in roberdan-os. Copilot reads this
-thin file: for the full behavior follow `AGENTS.md` (Behavior, Rules, Agents,
+The canonical source of behavior is \`AGENTS.md\` in roberdan-os. Copilot reads this
+thin file: for the full behavior follow \`AGENTS.md\` (Behavior, Rules, Agents,
 Loop Protocol, Human gates).
 
 ## Behavior
-- Engineering: `behavior/roberto-mode.md` — autonomy, evidence-first, done-criteria, quality gate.
-- Voice: `behavior/roberto-voice.md` — drafting/triage in Roberto's voice.
-- Thinking: `behavior/thinking-toolkit.md` — first-principles, Feynman, selective frameworks.
+- Engineering: \`behavior/roberto-mode.md\` — autonomy, evidence-first, done-criteria, quality gate.
+- Voice: \`identity/voice.md\` — drafting/triage in ${FULL_NAME}'s voice.
+- Thinking: \`behavior/thinking-toolkit.md\` — first-principles, Feynman, selective frameworks.
 
 ## Rules
-- `rules/constitution.md` · `rules/best-practices.md`
+- \`rules/constitution.md\` · \`rules/best-practices.md\`
 EOF
 
   # Skills as thin .prompt.md files.
@@ -278,7 +287,7 @@ emit_chatgpt() {
 # ChatGPT / Claude web → bundle
 
 No filesystem: use `bin/make-bundle.sh` to generate a pasteable doc (roberto-mode
-+ roberto-voice + best-practices + constitution + agents index) to paste into Custom
++ identity/voice + best-practices + constitution + agents index) to paste into Custom
 Instructions / Project. The bundle always EXCLUDES `private/`.
 EOF
 }

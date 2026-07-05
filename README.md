@@ -28,7 +28,7 @@ Day-to-day operator guide (kb, factory, recall, gates): [`docs/USAGE.md`](docs/U
 | Component | Where |
 |---|---|
 | Universal entry | [`AGENTS.md`](AGENTS.md) |
-| Behavior | `behavior/roberto-mode.md` (engineering) + `behavior/roberto-voice.md` (voice) + `behavior/thinking-toolkit.md` (reasoning) |
+| Behavior | `behavior/roberto-mode.md` (engineering) + `identity/voice.md` (voice) + `behavior/thinking-toolkit.md` (reasoning) |
 | Rules | `rules/constitution.md` (values + ethics) + `rules/best-practices.md` |
 | Agents | `agents/` — baccio, rex, luca, thor, socrates, board, wanda, roberdan-twin |
 | Skills | `skills/` — verify-done, ship, review, sync, auto-checkpoint |
@@ -110,7 +110,7 @@ repo, not a single-sentence edit — the script does the mechanical part, you do
 
 Two things are gitignored and never enter git or any bundle:
 - `private/` — the Microsoft-confidential dossier (clients, deals, people). Only the
-  non-sensitive voice/style (`behavior/roberto-voice.md`) is committed.
+  non-sensitive voice/style (`identity/voice.md`) is committed.
 - `kanban/todo/`, `kanban/doing/`, `kanban/done/` — live task/business content. Only the `kb`
   tool and protocol (`kanban/kb.sh`, `kanban/README.md`) are committed.
 

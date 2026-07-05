@@ -19,7 +19,7 @@ The two complementary hemispheres of the behavioral canon:
 
 - **Engineering / operating** → [`behavior/roberto-mode.md`](behavior/roberto-mode.md)
   How agents *operate* on code: total autonomy, evidence-first, done-criteria, quality gates.
-- **Voice / relationship** → [`behavior/roberto-voice.md`](behavior/roberto-voice.md)
+- **Voice / relationship** → [`identity/voice.md`](identity/voice.md)
   How agents *communicate in his voice* and *decide like him*: drafting, follow-up, triage, decision-lens.
 - **Thinking / reasoning** → [`behavior/thinking-toolkit.md`](behavior/thinking-toolkit.md)
   Shared cognitive engine: first-principles, Feynman style, selective framework repertoire (no cargo-cult).

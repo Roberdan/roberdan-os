@@ -2,7 +2,7 @@
 
 `docs/roberdan-os-paper-en.md` §9.1 has real quantitative ablation for the retrieval/embedding
 side of this system (R@k, MRR, mean rank, a model ablation). The behavioral canon —
-`behavior/roberto-mode.md`, `behavior/roberto-voice.md`, `behavior/thinking-toolkit.md`,
+`behavior/roberto-mode.md`, `identity/voice.md`, `behavior/thinking-toolkit.md`,
 `rules/constitution.md`, `rules/best-practices.md`, `agents/*.md` — has never had the equivalent.
 It's asserted, never measured. This directory is that measurement.
 
@@ -61,7 +61,7 @@ sample worth showing him, it doesn't replace the showing.
    to condition A/B via the footer mapping, and writes `eval/results/report.md`: a
    task × property-scores-A × property-scores-B × holistic-verdict table, a win/loss/tie summary,
    a "which canon file mattered most" breakdown (average score gap B−A per canon file, so you can
-   see whether e.g. `roberto-voice.md` moves the needle more than `thinking-toolkit.md`), and the
+   see whether e.g. `identity/voice.md` moves the needle more than `thinking-toolkit.md`), and the
    same "what this does and doesn't prove" section as this README. Tasks whose `canon:` matches
    `skills/*/skill.md` (case-insensitive) are run and judged like any other, but reported in a
    **separate, qualitative-only table** and excluded from the aggregate summary and the

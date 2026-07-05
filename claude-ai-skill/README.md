@@ -1,7 +1,7 @@
 # claude-ai-skill — the roberto-mode canon, packaged for claude.ai
 
 This directory is a hand-curated export of roberdan-os's **behavioral canon** —
-`behavior/roberto-mode.md`, `behavior/roberto-voice.md`, `behavior/thinking-toolkit.md`,
+`behavior/roberto-mode.md`, `identity/voice.md`, `behavior/thinking-toolkit.md`,
 `rules/constitution.md`, and the human-gates list in `AGENTS.md` — repackaged as a
 Custom Skill uploadable to [claude.ai](https://claude.ai).
 

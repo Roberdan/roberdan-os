@@ -1,7 +1,7 @@
 ---
 id: 06-inbox-triage
 category: triage
-canon: behavior/roberto-voice.md
+canon: identity/voice.md
 ---
 
 # inbox-triage

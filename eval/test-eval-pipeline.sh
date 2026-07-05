@@ -47,7 +47,7 @@ cat > "$TASKS/t2-voice.md" <<'EOF'
 ---
 id: t2-voice
 category: email-draft
-canon: behavior/roberto-voice.md
+canon: identity/voice.md
 ---
 
 # t2-voice

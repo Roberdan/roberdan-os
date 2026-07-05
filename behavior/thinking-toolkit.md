@@ -75,7 +75,7 @@ is a form of honesty. *"If you can't explain it simply, you don't understand it.
 | Tool | Use when |
 |---|---|
 | **Challenger Sale** | don't just agree — teach the customer a reframe that unlocks value |
-| **Relationship-before-transaction** | the deal rests on the relationship (it's Roberto's decision-lens, see [[roberto-voice]]) |
+| **Relationship-before-transaction** | the deal rests on the relationship (it's Roberto's decision-lens, see [[voice]]) |
 | **Value-before-price** | frame the value before the cost |
 
 ### Systems & scale
