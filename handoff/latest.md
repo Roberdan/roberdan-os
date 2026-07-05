@@ -1,61 +1,58 @@
-# Handoff — session 2026-07-03 (tool-independence pass)
+# Handoff — session 2026-07-04/05 (public release + v2.0.0 engine/identity split)
 
-**For a fresh agent:** read this + `kanban/todo/` + `MEMORY.md`, then `gbrain search` what you
-need. Full plan + analysis of this pass: `docs/plan-2026-07-03-tool-independence.md`.
+**For a fresh agent:** read this + `kb` + `MEMORY.md`, then `gbrain search` what you need.
+Design of the split: `docs/plan-2026-07-05-engine-identity-split.md`. Previous handoff
+(tool-independence pass, 07-03) is superseded; its open threads that survive are folded in below.
 
-## What this session did
+## What this session did (two days, one thread)
 
-Roberto's /goal: the system must work **independently of model or tool** (Claude, Copilot, local
-ollama, opencode, hermes, codex, Warp, anything agentic). Fable analyzed the repo + the machine's
-real tool inventory against 2026 best practices (web research with primary sources), produced an
-8-item plan, sonnet agents executed it (sequential on shared files — the 07-02 git-index race
-lesson), rex (opus) reviewed, thor validated, card `T-tool-independence` closed.
+1. **Public release prep + go-public.** Security audit found committed kanban cards with
+   MirrorBuddy AI-Act compliance detail → history purged (`git filter-repo`) → GitHub kept the
+   old history reachable via the merged-PR ref (`refs/pull/1/head`, untouchable server-side) →
+   **repo deleted and recreated clean**, then made PUBLIC. MIT license, README with
+   prerequisites/install (gstack, gbrain, Ollama). Kanban card content is now **gitignored**
+   (`kanban/{todo,doing,done}/` — same split as `private/`); done/ cards restored from the
+   pre-purge mirror backup; MirrorBuddy cards revalidated against the real repo (P1 card
+   closed via @thor — PR #478 merged, compliance checks 5/5+7/7).
+2. **v1.3.0**: fork-identity.sh (rename-based fork) + QUICKSTART — superseded same-day by:
+3. **v2.0.0 — engine/identity split** (Roberto explicitly chose the big option over deferral).
+   @baccio design → opus implementation in 6 phase-commits → @rex REQUEST-CHANGES (real
+   blocker: the learn/ privacy hard-gate didn't follow RDA_HOME for forkers; fixed in
+   ee81252, behaviorally verified) → @rex APPROVE → @thor PASS 8/8 → pushed, tagged, released.
+   **Core design:** forkers edit ONLY `identity/` (voice, operator, twin-persona,
+   identity.conf); engine files never embed identity → `git merge upstream/main` conflict-free
+   by construction, proven by `test/test-fork-merge.sh` (wired into validate.sh).
+   `RDA_` = fixed engine namespace; `RDA_HOME` (default `~/.roberdan-os`) is the one
+   relocatable value. `@roberdan-twin` → **`@twin`** (persona in identity/).
+4. **Positioning** (from focus-group + two external reviews, Grok/GPT): "Agentic Digital
+   Twin" framing, What-it-is/is-not, `ARCHITECTURE.md` (layer map), "Relationship to
+   Convergio" section. GitHub Discussions enabled.
+   Release: https://github.com/Roberdan/roberdan-os/releases/tag/v2.0.0
 
-**Key finding:** the AGENTS.md bet is industry-validated — Codex, Copilot, Cursor, opencode,
-Warp, Jules and hermes all read it natively now; SKILL.md is the portable skill format. The gap
-was never architecture, it was **distribution**: wrappers generated but only Claude consumed them.
+## Open threads
 
-## What changed (all committed, main)
-
-- **Pointer fabric**: `~/GitHub/AGENTS.md` (new), `~/.codex/AGENTS.md` (0-byte file filled),
-  `~/.config/opencode/AGENTS.md` — all installed live by `bin/sync.sh --install`, which now
-  detects installed tools (never overwrites, explicit SKIP otherwise).
-- **Copilot CLI fully wired**: all 8 roberdan-os skills symlinked into `~/.copilot/skills/`
-  (68 total there, zero collisions — gstack uses its prefix in Copilot, so Copilot gets
-  `review`/`ship` too, unlike Claude where those names collide). gbrain was already in its MCP.
-- **hermes**: `platforms/hermes` stub replaced with verified reality (v0.18.0 auto-injects
-  AGENTS.md; exact `hermes cron create --workdir` / `hermes mcp add gbrain --command` syntax
-  checked against its own --help). Config untouched — commands documented, self-proposing.
-- **Eval harness agent-agnostic**: `RDA_EVAL_AGENT_CMD` (prompt via stdin) + 2 new fixtures
-  derived from this system's REAL failures (exit-0-is-not-done; looks-wired-but-never-ran).
-- **evolve/** now watches hermes-agent releases + Warp changelog too.
-- **validate.sh tool-coverage gate** (ownership-aware: symlinks must resolve into
-  roberdan-os/platforms/): on its first run it caught a real half-wired tool (opencode config
-  dir present, pointer missing) — fixed by its own printed remediation.
-- **rex review**: APPROVE, 0 CRITICAL/HIGH; LOW-1/2/3+INFO-4 remediated (no out-of-repo dir
-  creation, installer/gate detection symmetry, dangling-symlink doc, ownership-aware gate);
-  INFO-5/6 deliberately annotated only. **thor: PASS** (live evidence, 39 green checks).
-
-## Open threads / gates on Roberto (unchanged from before, still the honest next step)
-
-1. **The 5 todo cards all wait on Roberto's decisions**: FtS-ingest (corpus A/B/C),
-   G5-always-on (ADR ready — note hermes' cron/Slack/serve makes it a concrete always-on
-   candidate worth weighing in that decision), X-convergio-decision / X-fts-initiative /
-   X-msft-triage (scoping). The system's internal backlog remains structurally exhausted —
-   by design, not stall.
-2. **review/ship skill-name collision in Claude** (gstack owns those names there) — Roberto's
-   call, documented in `docs/report-2026-07-02-realistic-testing.md` §5.
-3. **Eval real run against a second agent CLI** (e.g. `RDA_EVAL_AGENT_CMD` + Copilot headless):
-   harness is ready; running it is cheap but burns real tokens — worth doing when the canon
-   changes next, not as ritual.
-4. **Canon-preference human sample**: still the missing, non-delegable eval step (Roberto's
-   eyes on real transcripts).
+- **PR Convergio #511** (docs/vision.md cross-ref, "one citizen's house" bullet) — OPEN,
+  **merge is Roberto's gate**: https://github.com/Roberdan/convergio/pull/511
+- Deferred until real demand signal (watch Discussions/forks/traffic): canon levels, metrics
+  dashboard, community section, further fork tooling (`twin_handle` generation is scaffolded
+  in identity.conf but unconsumed — documented honestly there).
+- MirrorBuddy cards: 260703-224310 (P0 code fixes — prosody module + imageBase64 persistence,
+  both still open, revalidated 07-05), 260703-224312 (P2 gaps incl. age-gating module that
+  appeared since — needs human/legal re-read), 260703-224313 (legal sign-off, Roberto/legale).
+- Surviving from 07-03 handoff: eval run against a second agent CLI (harness ready, run it
+  when the canon next changes); canon-preference human sample (Roberto's eyes, non-delegable).
+- Roberto's machine migrated: bootstrap re-run, `twin.md` symlinked, stale roberdan-twin
+  pruned, global `~/.claude/CLAUDE.md` pointer updated, launchd rda-* verified loaded.
+  **New sessions invoke `@twin`, not `@roberdan-twin`.**
 
 ## Scars this session (don't repeat)
 
-- An isolation fix broke idempotency (two runs got two different fake HOMEs — idempotency needs
-  the SAME environment twice). Caught by the test suite immediately.
-- The legacy test sections were writing to the real `$HOME` during test runs (pre-existing;
-  found by P6's CI simulation, fixed with md5-verified hermeticity). Same class as 07-02's
-  copilot-skills leak: **every out-of-repo path in a test needs an override, and the cheap
-  proof is snapshotting real targets across the run.**
+- **GitHub merged-PR refs survive force-push AND branch deletion** — for a real history scrub,
+  delete/recreate the repo (or a GitHub support ticket). Structural fix shipped: card content
+  is never committed at all now.
+- **git filter-repo checks out the rewritten HEAD** → it silently deleted the done/ card
+  files from disk too (they were removed from history, so the checkout dropped them);
+  restored from the mirror backup. Always `git clone --mirror` before any history rewrite.
+- The "rename fork" model (v1.3.0) was wrong within 24h of shipping — the CHANGELOG says so
+  honestly. Boundary-by-directory beats rename-by-sed: isolate what forkers edit, don't
+  rewrite what they inherit.
