@@ -5,8 +5,9 @@
 # See learn/learn-protocol.md. Launched by launchd. Non-blocking.
 set -euo pipefail
 
-inbox="${RDA_INBOX:-$HOME/.roberdan-os/learnings/inbox}"
-quar="${RDA_QUARANTINE:-$HOME/.roberdan-os/learnings/quarantine}"
+RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
+inbox="${RDA_INBOX:-$RDA_HOME/learnings/inbox}"
+quar="${RDA_QUARANTINE:-$RDA_HOME/learnings/quarantine}"
 done_dir="$inbox/_processed"
 mkdir -p "$quar" "$done_dir"
 shopt -s nullglob

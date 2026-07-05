@@ -5,7 +5,8 @@
 # in distill.sh + curate.sh. See learn/learn-protocol.md.
 set -euo pipefail
 
-inbox="${RDA_INBOX:-$HOME/.roberdan-os/learnings/inbox}"
+RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
+inbox="${RDA_INBOX:-$RDA_HOME/learnings/inbox}"
 mkdir -p "$inbox"
 
 # Signal from $1 (text) or stdin.
