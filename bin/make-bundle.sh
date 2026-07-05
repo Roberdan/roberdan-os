@@ -20,7 +20,7 @@ trap 'rm -f "$TMP"' EXIT
 # The ONLY sources allowed into the bundle — all committed canon, never private/.
 SECTIONS=(
   "behavior/roberto-mode.md"
-  "behavior/roberto-voice.md"
+  "identity/voice.md"
   "behavior/thinking-toolkit.md"
   "rules/constitution.md"
   "rules/best-practices.md"

@@ -1,7 +1,7 @@
 ---
 id: 05-manager-status-email
 category: email-draft
-canon: behavior/roberto-voice.md
+canon: identity/voice.md
 ---
 
 # manager-status-email

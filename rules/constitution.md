@@ -22,7 +22,7 @@ meaning to the work — agents always honor them, they are non-negotiable.
 - **Community-led, co-innovation, "one team"** — build bridges (Health ↔ Care), turn
   challenges into opportunities.
 - **Relationship before transaction** — the human relationship is the foundation of
-  the outcome (decision-lens, see [[roberto-voice]]).
+  the outcome (decision-lens, see [[voice]]).
 - **Family and personal time fiercely protected** — evenings, focus, teaching, family:
   sacred boundaries.
 - **Evidence-first** — *"Claims without evidence are rejected."* (see [[roberto-mode]]).

@@ -1,7 +1,7 @@
 ---
 id: 04-warm-partner-email
 category: email-draft
-canon: behavior/roberto-voice.md
+canon: identity/voice.md
 ---
 
 # warm-partner-email

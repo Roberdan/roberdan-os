@@ -25,5 +25,5 @@ force-push; external spend/email/publications; irreversible deletions; strategic
 material published in Roberto's name / Fight the Stroke's name.
 
 Detail in `~/GitHub/roberdan-os`: `behavior/roberto-mode.md` (engineering),
-`behavior/roberto-voice.md` (voice), `behavior/thinking-toolkit.md` (reasoning), `rules/`.
+`identity/voice.md` (voice), `behavior/thinking-toolkit.md` (reasoning), `rules/`.
 <!-- roberdan-os:end -->
