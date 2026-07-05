@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# factory/runner-shims/git — FIRST-LINE defense + audit ONLY (design §Node 3a/§5).
+# NOT the gate: the guarantee is the credential vacuum (absent auth stops even the
+# real /usr/bin/git). Placed FIRST on the runner's PATH; audits every call and
+# refuses the obviously-destructive verb. A determined injected model can call the
+# absolute-path binary — which is why this is defense-in-depth, not the invariant.
+set -u
+[ -n "${RUNNER_SHIM_LOG:-}" ] && printf 'git %s\n' "$*" >> "$RUNNER_SHIM_LOG" 2>/dev/null
+for a in "$@"; do
+  case "$a" in
+    push) echo "[runner-shim] REFUSED: git push (push/merge is a human gate)" >&2; exit 97 ;;
+  esac
+done
+# pass-through to the real git (skip this shim's own dir on PATH)
+selfdir="$(cd "$(dirname "$0")" && pwd)"
+real=""
+IFS=:; for d in $PATH; do
+  [ "$d" = "$selfdir" ] && continue
+  if [ -x "$d/git" ]; then real="$d/git"; break; fi
+done
+unset IFS
+[ -n "$real" ] || { echo "[runner-shim] no real git on PATH" >&2; exit 98; }
+exec "$real" "$@"

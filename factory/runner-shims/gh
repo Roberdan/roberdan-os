@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# factory/runner-shims/gh — FIRST-LINE defense + audit ONLY (design §Node 3a/§5).
+# NOT the gate (see runner-shims/git). Refuses `gh auth` (blocks the gh credential
+# helper handing a real token to the runner) and any `merge` verb; audits the rest.
+set -u
+[ -n "${RUNNER_SHIM_LOG:-}" ] && printf 'gh %s\n' "$*" >> "$RUNNER_SHIM_LOG" 2>/dev/null
+case "${1:-}" in
+  auth) echo "[runner-shim] REFUSED: gh auth (no credential access from the runner)" >&2; exit 97 ;;
+esac
+for a in "$@"; do
+  case "$a" in
+    merge) echo "[runner-shim] REFUSED: gh ... merge (merge is a human gate)" >&2; exit 97 ;;
+  esac
+done
+selfdir="$(cd "$(dirname "$0")" && pwd)"
+real=""
+IFS=:; for d in $PATH; do
+  [ "$d" = "$selfdir" ] && continue
+  if [ -x "$d/gh" ]; then real="$d/gh"; break; fi
+done
+unset IFS
+[ -n "$real" ] || { echo "[runner-shim] no real gh on PATH" >&2; exit 98; }
+exec "$real" "$@"

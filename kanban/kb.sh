@@ -162,6 +162,7 @@ usage() {
   echo ' federation:'
   echo '  kb init [repo]                make a repo safe to hold cards (gitignore+de-track+hook+register; idempotent)'
   echo '  kb lint                       schema lint: runner: grammar + human_gates:↔human-only'
+  echo '  kb dispatch <id> [cli]        restricted external-CLI dispatcher — DORMANT (hard-wired to refuse)'
   echo ' gates:'
   echo '  kb add "<title>" --repo <r> [dod] [acc]  new card in todo (repo = ~/GitHub dir-name, or "personal")'
   echo '  kb edit <id>                  edit a card (fill dod/acceptance)'
@@ -525,6 +526,7 @@ case "$cmd" in
     ;;
   init) _kb_init "${1:-$ROOT}" ;;  # scaffold + privatize a repo's board (idempotent)
   lint) RDA_KANBAN="$KB" bash "$ROOT/kanban/lint-cards.sh" ;;  # runner/human_gates schema lint
+  dispatch) bash "$ROOT/factory/dispatch-runner.sh" "$@" ;;   # restricted external-CLI dispatcher (DORMANT — always refuses)
   all|g) _all ;;                   # aggregated view across the registry
   handoff) _handoff ;;             # per-repo (in a repo) or aggregated live state
   list|ls)                         # plain vertical list
