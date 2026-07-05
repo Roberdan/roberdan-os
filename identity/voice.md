@@ -8,7 +8,7 @@
 > **Privacy:** this file is committed canon and contains **only style/voice**. The
 > real data — clients, deals, people — lives in the local-only dossier
 > `~/.roberdan-os/private/roberto-profile.md`, never here. The few-shots use generic
-> placeholders (`[Partner]`, `[Collega]`, `[Cliente]`). See `roberdan-twin` in `agents/`.
+> placeholders (`[Partner]`, `[Collega]`, `[Cliente]`). See `twin` in `agents/`.
 
 ---
 

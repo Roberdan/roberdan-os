@@ -44,7 +44,7 @@ ethical block is **referenced** from `rules/constitution.md`, not copy-pasted.
 | [`socrates`](agents/socrates.md) | First-principles: digs out one truth | opus |
 | [`board`](agents/board.md) | Sounding board + adversarial red-team on decisions | opus |
 | [`wanda`](agents/wanda.md) | Loop orchestrator | sonnet |
-| [`roberdan-twin`](agents/roberdan-twin.md) | Digital twin: voice + cognitive engine (knows when to convene board/framework) | opus |
+| [`twin`](agents/twin.md) | Digital twin: voice + cognitive engine (knows when to convene board/framework); persona in [`identity/`](identity/README.md) | opus |
 
 ## Loop Protocol
 
@@ -130,7 +130,7 @@ Autonomy ≠ black box. These **always** go through Roberto (direct message):
 
 The confidential dossier (clients, deals, people) lives **only** in
 `~/.roberdan-os/private/roberto-profile.md` (gitignored, local-only), read at runtime
-by `roberdan-twin`. It never enters git nor any bundle. The gate is
+by `twin`. It never enters git nor any bundle. The gate is
 [`test/leak-check.sh`](test/leak-check.sh) (denylist in `private/.denylist`), with a
 three-tier fallback:
 

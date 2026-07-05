@@ -26,6 +26,12 @@ bash bin/sync.sh --emit-only
 mkdir -p "$HOME/.claude/agents"
 for a in agents/*.md; do n="$(basename "$a")"; ln -sf "$ROOT/$a" "$HOME/.claude/agents/$n"; done
 echo "  agents symlinked into ~/.claude/agents/ ($(ls agents/*.md | wc -l | tr -d ' '))"
+# Migration (v2.0.0 engine/identity split): agents/roberdan-twin.md was renamed to
+# agents/twin.md — prune the stale symlink so @roberdan-twin stops resolving.
+if [ -L "$HOME/.claude/agents/roberdan-twin.md" ]; then
+  rm -f "$HOME/.claude/agents/roberdan-twin.md"
+  echo "  pruned stale symlink ~/.claude/agents/roberdan-twin.md (renamed to twin.md in v2.0.0)"
+fi
 
 # 4) Confidential dossier → $RDA_HOME/private (local-only, never in git)
 if [ -n "$DOSSIER" ] && [ -f "$DOSSIER" ]; then

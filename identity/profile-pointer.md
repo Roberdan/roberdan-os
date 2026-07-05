@@ -7,7 +7,7 @@ this repo**. It lives local-only, gitignored, outside git history and outside ev
 $RDA_HOME/private/roberto-profile.md      # default: ~/.roberdan-os/private/roberto-profile.md
 ```
 
-- The twin agent ([`agents/roberdan-twin.md`](../agents/roberdan-twin.md)) reads it at runtime **if present**.
+- The twin agent ([`agents/twin.md`](../agents/twin.md)) reads it at runtime **if present**.
 - **If absent**, the twin degrades cleanly: style-only operation, marked `[placeholder]`
   for every name/detail it would need from the dossier. It never invents.
 - Install it on a new machine with `bin/bootstrap.sh --dossier /path/to/profile.md`

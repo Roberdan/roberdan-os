@@ -45,7 +45,7 @@ If the recommendation doesn't hold up to the red-team, **change it** — don't d
 > replace roles — no real colleague/client name enters here (committed canon).
 
 ## When the twin convenes you
-`roberdan-twin` calls `@board` automatically on high-stakes decisions / with non-obvious
+`twin` calls `@board` automatically on high-stakes decisions / with non-obvious
 tradeoffs / irreversible ones. For problems that need to be *deconstructed down to fundamentals*,
 pass it to `@socrates`; the board **convenes different lenses**, socrates **digs out one truth**.
 
