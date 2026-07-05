@@ -98,13 +98,14 @@ else skips that flag and the twin degrades gracefully to `[placeholder]`.
 ## License
 
 [MIT](LICENSE). The canon (behavior, rules, agents, skills, hooks, loop, kanban tooling) is
-generic and reusable — but Roberto's identity runs deeper through it than one file (the
-`roberdan-twin` agent, `RDA_`-prefixed env vars, the `~/.roberdan-os` home directory,
-`behavior/roberto-voice.md`). **[`docs/QUICKSTART-for-forkers.md`](docs/QUICKSTART-for-forkers.md)**
-is the fast path — it walks through `bin/fork-identity.sh` (renames all of the above across the
-repo in one pass, dry-run by default) plus the parts that still need your judgment (rewriting the
-voice file, your own privacy/denylist setup). None of it is hard, but it's a real pass across the
-repo, not a single-sentence edit — the script does the mechanical part, you do the rest.
+generic and reusable, and since v2.0.0 the fork story is one directory: **everything
+forker-editable lives in [`identity/`](identity/README.md)** (voice, operator profile, twin
+persona, `identity.conf`) — engine files never embed identity, so `git merge upstream/main`
+stays conflict-free on them forever. **[`docs/QUICKSTART-for-forkers.md`](docs/QUICKSTART-for-forkers.md)**
+is the fast path — `bin/identity-init.sh` scaffolds your `identity/` (dry-run by default,
+renames no engine file), then you rewrite the prose in your own words and set
+`RDA_HOME=~/.<you>-os` (a value, not a file edit; the `RDA_` prefix itself is fixed engine
+namespace). The merge-clean guarantee is tested, not asserted: `test/test-fork-merge.sh`.
 
 ## Privacy
 
