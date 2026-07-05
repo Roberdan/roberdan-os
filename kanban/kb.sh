@@ -159,6 +159,8 @@ usage() {
   echo '  kb list | kb ls                plain vertical list, all columns'
   echo '  kb todo | kb doing | kb done  view one column'
   echo '  kb show <id>                  show a card'
+  echo ' federation:'
+  echo '  kb init [repo]                make a repo safe to hold cards (gitignore+de-track+hook+register; idempotent)'
   echo ' gates:'
   echo '  kb add "<title>" --repo <r> [dod] [acc]  new card in todo (repo = ~/GitHub dir-name, or "personal")'
   echo '  kb edit <id>                  edit a card (fill dod/acceptance)'
@@ -386,10 +388,141 @@ _handoff() {
   return 0
 }
 
+# kb init [repo] — the single act that makes a repo safe to hold federated cards
+# (design §2e). Idempotent. GATE: never point this at a shared external repo
+# (MirrorBuddy / FightTheStroke) — federating those is a human decision. It only
+# scaffolds the repo path you pass (default: roberdan-os itself).
+_kb_init() {
+  local target="${1:-$ROOT}" root gi line f tracked_handoff=0
+  root="$(git -C "$target" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -z "$root" ]; then echo "kb init: '$target' is not inside a git repo" >&2; return 1; fi
+  echo "kb init: initializing federated board in $root"
+
+  # 1) scaffold
+  mkdir -p "$root/kanban/todo" "$root/kanban/doing" "$root/kanban/done" "$root/handoff"
+
+  # CARD content lives ONLY in the three column subdirs — NEVER bare kanban/,
+  # which in roberdan-os also holds tracked tooling (kb.sh, README.md). De-track
+  # and the history scan therefore target the columns, not kanban/.
+  local -a card_paths=(kanban/todo/ kanban/doing/ kanban/done/)
+
+  # is handoff/latest.md already TRACKED? roberdan-os tracks it as canon-ish live
+  # state — design §5 note: do NOT silently change that tracking. When tracked we
+  # FLAG it and leave gitignore/de-track/history-scan of it alone.
+  if git -C "$root" ls-files --error-unmatch handoff/latest.md >/dev/null 2>&1; then
+    tracked_handoff=1
+  fi
+
+  # 2) gitignore-append (idempotent; never rewrite the target's gitignore wholesale)
+  gi="$root/.gitignore"; touch "$gi"
+  local -a need=(kanban/todo/ kanban/doing/ kanban/done/)
+  [ "$tracked_handoff" -eq 0 ] && need+=(handoff/latest.md)
+  for line in "${need[@]}"; do
+    if ! grep -qxF "$line" "$gi" 2>/dev/null; then
+      printf '%s\n' "$line" >> "$gi"; echo "  gitignore += $line"
+    fi
+  done
+  if [ "$tracked_handoff" -eq 1 ]; then
+    echo "  FLAG: handoff/latest.md is TRACKED in $(basename "$root") — federating it as"
+    echo "        gitignored state is a SEPARATE human decision (design §5 note); NOT changed."
+  fi
+
+  # 3) de-track already-committed CARD content (git rm --cached, keep working copy)
+  local tracked
+  tracked="$(git -C "$root" ls-files "${card_paths[@]}" 2>/dev/null || true)"
+  if [ -n "$tracked" ]; then
+    printf '%s\n' "$tracked" | while IFS= read -r f; do
+      [ -n "$f" ] && git -C "$root" rm --cached --quiet "$f" 2>/dev/null || true
+    done
+    echo "  de-tracked already-committed card content (working copies kept)"
+  fi
+  if [ "$tracked_handoff" -eq 0 ] && git -C "$root" ls-files --error-unmatch handoff/latest.md >/dev/null 2>&1; then
+    git -C "$root" rm --cached --quiet handoff/latest.md 2>/dev/null || true
+    echo "  de-tracked handoff/latest.md"
+  fi
+
+  # 4) scan LOCAL history for card content already committed (the blob survives
+  #    git rm --cached). pushed -> HUMAN GATE #4 (refuse); local-only -> loud warn.
+  local -a scan_paths=("${card_paths[@]}")
+  [ "$tracked_handoff" -eq 0 ] && scan_paths+=(handoff/latest.md)
+  local hits pushed_hits="" local_hits="" sha
+  hits="$(git -C "$root" log --all --pretty=%H -- "${scan_paths[@]}" 2>/dev/null || true)"
+  if [ -n "$hits" ]; then
+    while IFS= read -r sha; do
+      [ -n "$sha" ] || continue
+      if [ -n "$(git -C "$root" branch -r --contains "$sha" 2>/dev/null)" ]; then
+        pushed_hits="$pushed_hits $sha"
+      else
+        local_hits="$local_hits $sha"
+      fi
+    done <<EOF_SCAN
+$hits
+EOF_SCAN
+  fi
+  if [ -n "$pushed_hits" ]; then
+    {
+      echo ""
+      echo "kb init: REFUSED — card/handoff content is in PUSHED history (human gate #4):"
+      for sha in $pushed_hits; do git -C "$root" --no-pager log -1 --oneline "$sha"; done
+      echo "  This is deletion of already-published data — escalate to Roberto (git filter-repo"
+      echo "  or repo recreate). kb init does NOT scrub published history automatically."
+    } >&2
+    return 1
+  fi
+  if [ -n "$local_hits" ]; then
+    {
+      echo ""
+      echo "kb init: WARNING — card/handoff content in LOCAL-ONLY (un-pushed) commits:"
+      for sha in $local_hits; do git -C "$root" --no-pager log -1 --oneline "$sha"; done
+      echo "  git rm --cached de-tracks forward, but the blob REMAINS in local history."
+      echo "  Do NOT push these branches; scrub (git filter-repo / rebase) before any push."
+    } >&2
+  fi
+
+  # 5) pre-commit hook: roberdan-os leak-check on the staged tree (interactive
+  #    safety; --no-verify-bypassable, so NOT the runner's gate — design §2e#5).
+  #    Idempotent — never clobber an existing leak-check hook.
+  local hookdir hook
+  hookdir="$(git -C "$root" rev-parse --absolute-git-dir 2>/dev/null)/hooks"; hook="$hookdir/pre-commit"
+  mkdir -p "$hookdir"
+  if [ -f "$hook" ] && grep -q 'leak-check' "$hook" 2>/dev/null; then
+    echo "  pre-commit hook already runs leak-check (left as-is)"
+  else
+    cat > "$hook" <<HOOK
+#!/usr/bin/env bash
+# installed by roberdan-os \`kb init\` — runs roberdan-os leak-check on the staged
+# tree before every commit (interactive safety; bypassable with --no-verify, so
+# it is NOT the runner's gate — that lives in the dispatcher, design §2e#5).
+set -euo pipefail
+RDA_LEAKCHECK="$ROOT/test/leak-check.sh"
+if [ -x "\$RDA_LEAKCHECK" ]; then
+  if ! bash "\$RDA_LEAKCHECK"; then
+    echo "pre-commit: BLOCKED — confidential term(s) detected (see above)." >&2
+    exit 1
+  fi
+fi
+HOOK
+    chmod +x "$hook"
+    echo "  installed pre-commit leak-check hook -> $hook"
+  fi
+
+  # 6) register (idempotent)
+  mkdir -p "$(dirname "$REGISTRY")"; touch "$REGISTRY"
+  if ! grep -qxF "$root" "$REGISTRY" 2>/dev/null; then
+    printf '%s\n' "$root" >> "$REGISTRY"; echo "  registered $root in $REGISTRY"
+  else
+    echo "  already registered in $REGISTRY"
+  fi
+  echo "kb init: done (idempotent). This does NOT make the repo runner-eligible"
+  echo "         (that is the separate, narrower runner-allowlist)."
+  return 0
+}
+
 case "$cmd" in
   view|board|"")                   # visual kanban (default); aggregate if cwd
     if [ "$KB_MATCHED" -eq 0 ]; then _all; else _board; fi
     ;;
+  init) _kb_init "${1:-$ROOT}" ;;  # scaffold + privatize a repo's board (idempotent)
   all|g) _all ;;                   # aggregated view across the registry
   handoff) _handoff ;;             # per-repo (in a repo) or aggregated live state
   list|ls)                         # plain vertical list
