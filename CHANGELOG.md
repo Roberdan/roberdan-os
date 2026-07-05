@@ -3,6 +3,55 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.0.0] - 2026-07-05
+
+### Changed (BREAKING)
+- **Engine / identity split.** All forker-editable identity now lives in one place:
+  `identity/` (voice, operator profile, twin persona, `identity.conf`). Engine files no
+  longer embed identity, so `git merge upstream/main` stays conflict-free on engine files
+  forever. See docs/plan-2026-07-05-engine-identity-split.md.
+- **`behavior/roberto-voice.md` → `identity/voice.md`** (moved, content byte-identical).
+  Update any local reference.
+- **`agents/roberdan-twin.md` → `agents/twin.md`**, invoked as **`@twin`** (was
+  `@roberdan-twin`). The role prose is now operator-neutral engine; the persona moved to
+  `identity/twin-persona.md`.
+- **`behavior/roberto-mode.md`** keeps its name but is now pure engine discipline; the
+  operator profile (who he is, how he communicates, the Italian phrase table, named-agent
+  ecosystem, tool stack) moved to `identity/operator.md`.
+- **`RDA_HOME`** env var introduced (default `~/.roberdan-os`) — set it once to relocate the
+  runtime home. The `RDA_` prefix is now documented as a **fixed engine namespace**, not
+  identity, and is intentionally not parametrized.
+- `bin/sync.sh` reads `identity/identity.conf` at generation time (deterministic) to inject
+  the operator's name into the generated wrappers; behavior references in the wrappers point
+  at the new `identity/` paths. Eval `canon:` wiring repointed to `identity/voice.md`
+  (fixture prose itself unchanged — it stays instance test data).
+
+### Removed
+- **`bin/fork-identity.sh`** (shipped v1.3.0) — its `git mv`+`sed` rename model is exactly
+  what caused perpetual merge conflicts; deprecated after one minor version because the
+  model was wrong, not because it was buggy. Replaced by `bin/identity-init.sh`, which
+  scaffolds `identity/` and renames no engine file.
+
+### Added
+- `identity/` — the ONLY forker-editable surface (`README.md` ownership contract,
+  `identity.conf`, `voice.md`, `operator.md`, `twin-persona.md`, `profile-pointer.md`).
+- `bin/identity-init.sh` — dry-run-by-default fork scaffolder (`--slug`/`--name`/`--apply`,
+  same origin-refusal rail as its predecessor).
+- `test/test-fork-merge.sh` — the merge-clean proof, wired into `test/validate.sh`:
+  an identity-only fork merges simulated upstream engine edits with **zero conflicts**;
+  the soft guarantee (an `identity/` file both sides edit can still conflict, small and
+  localized) is documented in the test, not asserted.
+- `docs/QUICKSTART-for-forkers.md` rewritten for the `identity/` workflow.
+
+### Migration
+- Run `bin/bootstrap.sh` (re-symlinks agents incl. `twin.md`, prunes the stale
+  `roberdan-twin` symlink). `RDA_HOME` defaults to today's path, so existing factory/dossier
+  state is untouched. Full steps: docs/plan-2026-07-05-engine-identity-split.md § Migration.
+
+### Note
+- `claude-ai-skill/roberto-mode/` (packaged skill) is unchanged — a published named artifact,
+  out of split scope.
+
 ## [v1.3.0] - 2026-07-05
 
 Feedback from an external review of the public repo (via Grok) converged with the earlier
