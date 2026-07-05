@@ -3,6 +3,31 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [Unreleased]
+
+### Added
+- **Federated kanban + dormant multi-CLI dispatcher** (phases 1–6 of
+  `docs/plan-2026-07-05-federated-kanban-multi-cli.md`). All additive; external-runner risk stays
+  **zero** (the dispatcher is wired but hard-wired to refuse).
+  - **Read-path** (`kanban/kb.sh`): cwd board resolution, `kb all`/`kb g` aggregated view across a
+    local-only registry (`~/.roberdan-os/kanban-registry`), `kb handoff` (per-repo or aggregated).
+  - **`kb init`**: idempotent per-repo privacy scaffolding — gitignore card columns, de-track
+    already-committed card content, scan local history (pushed → refuse/human-gate #4, local-only →
+    warn), install a leak-check pre-commit hook, register the board.
+  - **`runner:`/`human_gates:` fields + `kb lint`** (`kanban/lint-cards.sh`): declarative CLI/model
+    intent label (no execution change) + a lint enforcing `human_gates: ⇒ runner: human-only`.
+  - **Atomic claim + repo locks** (`factory/lib.sh`): `mkdir`-based, keyed `<repo>+<id>`, with a
+    stale sweep. `verify_card`/`note_card`/`resolve_model` extracted from `run.sh` into `lib.sh`
+    (behavior-preserving), sourced by both `run.sh` and the dispatcher.
+  - **Restricted dispatcher, dormant** (`factory/dispatch-runner.sh`, `factory/runner-sandbox.sh`,
+    `factory/runner-shims/`): reachable via `kb dispatch`, with a fail-closed preflight. Preflight
+    #5 (OS-isolation floor) and #8 (leak-check tier active) are **hard-wired to refuse** — #5 is a
+    code constant no config can flip — so **every** external dispatch refuses until a reviewed code
+    edit (phase 7) lands the OS floor.
+- **Migration record** (`docs/federated-kanban-migration-2026-07-05.md`): roberdan-os migrated in
+  place; MirrorBuddy cards kept in place with `kb init` on MirrorBuddy left as an un-crossed human
+  gate.
+
 ## [v2.1.0] - 2026-07-05
 
 Non-breaking follow-up to v2.0.0: a new quality rule, a rewired weekly watcher, and
