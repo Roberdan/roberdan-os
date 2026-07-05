@@ -41,7 +41,7 @@ factory/run.sh                         # run now  (launchd runs it nightly at 01
 ```
 The factory dispatches headless Claude agents **on your Max plan** (no API charges — it unsets any
 API key) and injects the context-primer so each agent works with the right context. Logs in
-`~/.roberdan-os/factory/logs/`. Human gates still hold.
+`$RDA_HOME/factory/logs/` (default `~/.roberdan-os`). Human gates still hold.
 
 ## Daily commands
 `kb` (board) · `kb add/start/finish` (gated flow) · `factory/enqueue.sh` (queue autonomous work) ·
