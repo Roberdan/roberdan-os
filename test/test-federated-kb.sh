@@ -130,6 +130,99 @@ else
   err "aggregated handoff did not include both repos — got: $out"
 fi
 
+# =====================================================================
+# PHASE 2 — kb init + per-repo privacy
+# =====================================================================
+
+mk_gitrepo() {  # $1=root
+  local root="$1"
+  mkdir -p "$root"
+  git -C "$root" init -q
+  git -C "$root" config user.email "t@example.com"
+  git -C "$root" config user.name "Test"
+  git -C "$root" config commit.gpgsign false
+}
+
+section "phase2: kb init scaffolds gitignore + pre-commit hook + registry entry"
+GR="$TMP/initRepo"; mk_gitrepo "$GR"
+GR="$(cd "$GR" && pwd -P)"   # canonicalize (git --show-toplevel resolves symlinks; registry stores the physical path)
+REGI="$TMP/reg-init"
+out="$(RDA_KANBAN_REGISTRY="$REGI" bash "$KB" init "$GR" 2>&1)"; rc=$?
+gi_ok=0; git -C "$GR" check-ignore kanban/todo/x.md >/dev/null 2>&1 && gi_ok=1
+hook_ok=0; [ -f "$GR/.git/hooks/pre-commit" ] && grep -q 'leak-check' "$GR/.git/hooks/pre-commit" && hook_ok=1
+reg_ok=0; grep -qxF "$GR" "$REGI" 2>/dev/null && reg_ok=1
+if [ "$rc" -eq 0 ] && [ "$gi_ok" -eq 1 ] && [ "$hook_ok" -eq 1 ] && [ "$reg_ok" -eq 1 ]; then
+  ok "kb init: card paths gitignored + leak-check hook installed + repo registered"
+else
+  err "kb init incomplete (rc=$rc gitignore=$gi_ok hook=$hook_ok registry=$reg_ok) — got: $out"
+fi
+
+section "phase2: kb init is idempotent (re-run adds no duplicate gitignore/registry lines)"
+RDA_KANBAN_REGISTRY="$REGI" bash "$KB" init "$GR" >/dev/null 2>&1; rc=$?
+reg_count="$(grep -cxF "$GR" "$REGI" 2>/dev/null || echo 0)"
+gi_count="$(grep -cxF 'kanban/todo/' "$GR/.gitignore" 2>/dev/null || echo 0)"
+if [ "$rc" -eq 0 ] && [ "$reg_count" -eq 1 ] && [ "$gi_count" -eq 1 ]; then
+  ok "kb init re-run is idempotent (registry x$reg_count, gitignore line x$gi_count)"
+else
+  err "kb init not idempotent (rc=$rc registry=$reg_count gitignore=$gi_count)"
+fi
+
+section "phase2: kb init de-tracks already-committed card content AND flags local history"
+DR="$TMP/detrackRepo"; mk_gitrepo "$DR"
+mkdir -p "$DR/kanban/todo"
+cat > "$DR/kanban/todo/260705-999999.md" <<'EOF'
+---
+title: Committed card that must be de-tracked
+repo: detrack
+dod: "d"
+acceptance: "a"
+status: todo
+created: 2026-07-05
+---
+EOF
+git -C "$DR" add -f kanban/todo/260705-999999.md >/dev/null 2>&1
+git -C "$DR" commit -q -m "accidentally committed a card" --no-verify
+out="$(RDA_KANBAN_REGISTRY="$TMP/reg-dt" bash "$KB" init "$DR" 2>&1)"; rc=$?
+still_tracked="$(git -C "$DR" ls-files kanban/todo/ 2>/dev/null)"
+wc_kept=0; [ -f "$DR/kanban/todo/260705-999999.md" ] && wc_kept=1
+warned=0; echo "$out" | grep -q 'LOCAL-ONLY' && warned=1
+if [ "$rc" -eq 0 ] && [ -z "$still_tracked" ] && [ "$wc_kept" -eq 1 ] && [ "$warned" -eq 1 ]; then
+  ok "de-tracked from index (ls-files empty), working copy kept, local-history warned (not silent)"
+else
+  err "de-track/history-flag failed (rc=$rc tracked='$still_tracked' wc=$wc_kept warned=$warned) — got: $out"
+fi
+
+section "phase2: kb init REFUSES when card content is in PUSHED history (human gate #4)"
+PR="$TMP/pushedRepo"; mk_gitrepo "$PR"
+BARE="$TMP/pushedRepo.git"; git init -q --bare "$BARE"
+mkdir -p "$PR/kanban/todo"; printf 'card body\n' > "$PR/kanban/todo/260705-888888.md"
+git -C "$PR" add -f kanban/todo/260705-888888.md >/dev/null 2>&1
+git -C "$PR" commit -q -m "card in pushed history" --no-verify
+br="$(git -C "$PR" rev-parse --abbrev-ref HEAD)"
+git -C "$PR" remote add origin "$BARE"
+git -C "$PR" push -q origin "$br" >/dev/null 2>&1
+out="$(RDA_KANBAN_REGISTRY="$TMP/reg-pushed" bash "$KB" init "$PR" 2>&1)"; rc=$?
+if [ "$rc" -ne 0 ] && echo "$out" | grep -q 'PUSHED history'; then
+  ok "kb init refuses (non-zero) on card content in pushed history, escalating to a human"
+else
+  err "kb init did NOT refuse on pushed card history (rc=$rc) — got: $out"
+fi
+
+section "phase2: kb init FLAGS a tracked handoff/latest.md instead of silently de-tracking it (§5 note)"
+HRR="$TMP/handoffTrackedRepo"; mk_gitrepo "$HRR"
+mkdir -p "$HRR/handoff"; echo "live state" > "$HRR/handoff/latest.md"
+git -C "$HRR" add handoff/latest.md >/dev/null 2>&1
+git -C "$HRR" commit -q -m "track handoff/latest.md (canon-ish live state)" --no-verify
+out="$(RDA_KANBAN_REGISTRY="$TMP/reg-htrack" bash "$KB" init "$HRR" 2>&1)"; rc=$?
+flagged=0; echo "$out" | grep -q 'handoff/latest.md is TRACKED' && flagged=1
+still_tracked=0; git -C "$HRR" ls-files --error-unmatch handoff/latest.md >/dev/null 2>&1 && still_tracked=1
+not_ignored=1; grep -qxF 'handoff/latest.md' "$HRR/.gitignore" 2>/dev/null && not_ignored=0
+if [ "$rc" -eq 0 ] && [ "$flagged" -eq 1 ] && [ "$still_tracked" -eq 1 ] && [ "$not_ignored" -eq 1 ]; then
+  ok "tracked handoff/latest.md is flagged, left tracked + un-gitignored, no false pushed-refuse"
+else
+  err "handoff tracked-flag wrong (rc=$rc flagged=$flagged tracked=$still_tracked not_ignored=$not_ignored) — got: $out"
+fi
+
 # ---------------------------------------------------------------------------
 if [ "$FAIL" -eq 0 ]; then
   echo; echo "test-federated-kb: ✅ ALL GREEN"; exit 0
