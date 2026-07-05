@@ -119,6 +119,10 @@ if bash test/test-factory-kb.sh >/dev/null 2>&1; then ok "kb gates + factory gua
 section "kb views (history/archive/plans/plan/sched)"
 if bash test/test-kb-views.sh >/dev/null 2>&1; then ok "kb views green"; else err "test-kb-views — see bash test/test-kb-views.sh"; fi
 
+# --- 6c) federated kanban + dormant dispatcher --------------------------------
+section "federated kanban (cwd-scoping, kb all/handoff, init, locks, dormant dispatcher)"
+if bash test/test-federated-kb.sh >/dev/null 2>&1; then ok "federated kb + dispatcher gates green"; else err "test-federated-kb — see bash test/test-federated-kb.sh"; fi
+
 # --- 7) Leak-check self-test (salted-hash tier b) -----------------------------
 section "leak-check self-test — tier (b) salted-hash catches a planted leak"
 if bash test/test-leak-check.sh >/dev/null 2>&1; then ok "leak-check tiers verified (see bash test/test-leak-check.sh)"; else err "test-leak-check — see bash test/test-leak-check.sh"; fi

@@ -5,13 +5,62 @@
 set -euo pipefail
 
 RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
-KB="${RDA_KANBAN:-$HOME/GitHub/roberdan-os/kanban}"
-mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
 # repo ROOT (independent of $KB, which under tests points at a temp fixture
 # dir) — needed so `kb plans`/`kb plan`/`kb sched` resolve docs/ and
 # proposals/ from the real repo no matter what directory `kb` is invoked from.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# --- Federation read-path (design §2a/§2b) ---------------------------------
+# The registry (~/.roberdan-os/kanban-registry, local-only, one repo path per
+# line, written by `kb init`) is the source of truth for "which repos have a
+# federated, privacy-initialized board". A blind filesystem scan cannot tell an
+# initialized board (gitignored + leak-check) from a raw kanban/ dir made by
+# hand (the MirrorBuddy hazard) — so discovery is the explicit registry, never a
+# scan. Parsing degrades to empty, never crashes.
+REGISTRY="${RDA_KANBAN_REGISTRY:-$RDA_HOME/kanban-registry}"
+_registry_repos() {
+  [ -f "$REGISTRY" ] || return 0
+  grep -vE '^[[:space:]]*(#|$)' "$REGISTRY" 2>/dev/null || true
+}
+_in_registry() {
+  local p="$1" line
+  while IFS= read -r line; do
+    [ -n "$line" ] && [ "$line" = "$p" ] && return 0
+  done < <(_registry_repos)
+  return 1
+}
+# Board resolution (gbrain-pin style, design §2b):
+#   RDA_KANBAN env  →  cwd's git repo IF it is roberdan-os itself OR registered
+#                   →  else roberdan-os's own board (today's default — additive).
+# KB_MATCHED=1: cwd resolved to a concrete recognized board (home or registered)
+# or RDA_KANBAN was set. KB_MATCHED=0: we fell back — so the default `view`
+# outside any recognized repo shows the aggregated board instead of home.
+KB_MATCHED=0
+KB=""
+# Assigns the globals KB + KB_MATCHED directly (NOT via command substitution —
+# a $(...) subshell would discard the KB_MATCHED assignment).
+_resolve_kb() {
+  if [ -n "${RDA_KANBAN:-}" ]; then KB_MATCHED=1; KB="$RDA_KANBAN"; return 0; fi
+  local root
+  root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -n "$root" ] && { [ "$root" = "$ROOT" ] || _in_registry "$root"; }; then
+    KB_MATCHED=1; KB="$root/kanban"; return 0
+  fi
+  KB_MATCHED=0; KB="$ROOT/kanban"
+}
+_resolve_kb
+mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
 cmd="${1:-view}"; [ $# -gt 0 ] && shift || true
+
+# portable mtime (macOS BSD stat first, GNU stat fallback, else 0)
+_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+# unique repo roots for aggregation: roberdan-os home first, then registry entries.
+_board_roots() {
+  printf '%s\n' "$ROOT"
+  _registry_repos | while IFS= read -r r; do
+    [ -n "$r" ] && [ "$r" != "$ROOT" ] && printf '%s\n' "$r"
+  done
+}
 
 _field() { grep -m1 "^$2:" "$1" 2>/dev/null | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"\$//"; }
 # Portable in-place status edit: `sed -i ''` is BSD-only syntax (macOS) and breaks under
@@ -104,7 +153,9 @@ _board() {
 usage() {
   echo 'kb — gated kanban. Commands:'
   echo ' view:'
-  echo '  kb                            view whole board (todo+doing+done)'
+  echo '  kb                            view whole board (todo+doing+done); aggregate if outside a repo'
+  echo '  kb all | kb g                 AGGREGATED view across every registered board (cards tagged repo:)'
+  echo '  kb handoff                    per-repo handoff/latest.md (in a repo) or aggregated (outside)'
   echo '  kb list | kb ls                plain vertical list, all columns'
   echo '  kb todo | kb doing | kb done  view one column'
   echo '  kb show <id>                  show a card'
@@ -284,8 +335,63 @@ _sched() {
   return 0
 }
 
+# kb all / kb g — aggregated todo+doing across every registered board (+ home),
+# each card tagged with its repo:. Read-only. Ids are per-repo unique only, so
+# repo: is always rendered alongside the id (design §2b, @rex #2).
+_all() {
+  local root board any=0 f col
+  echo "=== AGGREGATED BOARD — active cards across all registered repos ==="
+  while IFS= read -r root; do
+    [ -n "$root" ] || continue
+    board="$root/kanban"
+    [ -d "$board" ] || continue
+    for col in todo doing; do
+      for f in "$board/$col"/*.md; do
+        [ -e "$f" ] || continue
+        case "$(basename "$f")" in _*) continue;; esac
+        any=1
+        printf '  %-5s [%s] (%s) %s\n' "$col" "$(basename "$f" .md)" "$(_repo_tag "$f")" "$(_field "$f" title)"
+      done
+    done
+  done < <(_board_roots)
+  [ "$any" -eq 0 ] && echo "  (no active cards across registered boards)"
+  return 0
+}
+
+# kb handoff — inside a recognized repo: that repo's handoff/latest.md. Otherwise
+# (aggregate): concatenate every registered repo's handoff/latest.md newest-first
+# by mtime, each section tagged with its repo (design §2b). handoff-protocol.md /
+# context-primer.md stay versioned canon and are not touched here.
+_handoff() {
+  if [ "$KB_MATCHED" -eq 1 ]; then
+    local root="${KB%/kanban}" hf
+    hf="$root/handoff/latest.md"
+    if [ -f "$hf" ]; then cat "$hf"; else echo "(no handoff/latest.md in $(basename "$root"))"; fi
+    return 0
+  fi
+  local root hf rows=() any=0
+  while IFS= read -r root; do
+    [ -n "$root" ] || continue
+    hf="$root/handoff/latest.md"
+    [ -f "$hf" ] || continue
+    any=1
+    rows+=("$(_mtime "$hf")|$root")
+  done < <(_board_roots)
+  if [ "$any" -eq 0 ]; then echo "(no handoff/latest.md across registered boards)"; return 0; fi
+  printf '%s\n' "${rows[@]}" | sort -t'|' -k1,1 -r | while IFS='|' read -r _ root; do
+    echo "=== handoff — $(basename "$root") ==="
+    cat "$root/handoff/latest.md"
+    echo
+  done
+  return 0
+}
+
 case "$cmd" in
-  view|board|"") _board ;;        # visual kanban (default)
+  view|board|"")                   # visual kanban (default); aggregate if cwd
+    if [ "$KB_MATCHED" -eq 0 ]; then _all; else _board; fi
+    ;;
+  all|g) _all ;;                   # aggregated view across the registry
+  handoff) _handoff ;;             # per-repo (in a repo) or aggregated live state
   list|ls)                         # plain vertical list
     echo "TO DO:";  _list todo
     echo "DOING:";  _list doing
