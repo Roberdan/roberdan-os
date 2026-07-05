@@ -3,6 +3,22 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [Unreleased]
+
+Feedback from an external review of the public repo (via Grok) converged with the earlier
+focus-group finding: forking this for yourself was underspecified as "adapt one file."
+
+### Added
+- `bin/fork-identity.sh` — dry-run-by-default script that renames the `roberdan-twin` agent,
+  `RDA_` env prefix, `~/.roberdan-os` home dir and `behavior/roberto-voice.md` across the live
+  canon for a fork, in one pass. Refuses `--apply` against the real `Roberdan/roberdan-os` origin
+  without `--force`. Deliberately leaves `docs/archive/`, dated plan/report docs, `eval/tasks/`
+  fixtures and `claude-ai-skill/roberto-mode/` untouched (mechanical rename would corrupt them) —
+  prints them as a manual-review checklist instead. Tested end-to-end on a scratch clone
+  (renamed + `test/validate.sh` still ALL GREEN afterward).
+- `docs/QUICKSTART-for-forkers.md` — the 5-step fast path (clone → bootstrap → fork-identity.sh →
+  write your own voice/privacy files → validate).
+
 ## [v1.2.0] - 2026-07-04
 
 Prepared the repo for public release.

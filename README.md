@@ -98,18 +98,13 @@ else skips that flag and the twin degrades gracefully to `[placeholder]`.
 ## License
 
 [MIT](LICENSE). The canon (behavior, rules, agents, skills, hooks, loop, kanban tooling) is
-generic and reusable — but Roberto's identity runs deeper through it than one file. Forking it
-for yourself means at minimum:
-- Renaming the `roberdan-twin` agent ([`agents/roberdan-twin.md`](agents/roberdan-twin.md)) and
-  rewriting [`behavior/roberto-voice.md`](behavior/roberto-voice.md) in your own voice.
-- Swapping every `~/.roberdan-os/` path and `RDA_`-prefixed env var (`factory/`, `bin/`,
-  `hooks/`) for your own namespace.
-- Grepping `AGENTS.md` and `behavior/roberto-mode.md` for "Roberto"/"roberdan" — dozens of
-  mentions, not one.
-- Writing your own `private/.denylist` and `~/.roberdan-os/private/profile.md` before your first
-  commit (see Privacy below) — his is meaningless to you and yours doesn't exist yet.
-
-None of this is hard, but it's a real pass across the repo, not a single-sentence edit.
+generic and reusable — but Roberto's identity runs deeper through it than one file (the
+`roberdan-twin` agent, `RDA_`-prefixed env vars, the `~/.roberdan-os` home directory,
+`behavior/roberto-voice.md`). **[`docs/QUICKSTART-for-forkers.md`](docs/QUICKSTART-for-forkers.md)**
+is the fast path — it walks through `bin/fork-identity.sh` (renames all of the above across the
+repo in one pass, dry-run by default) plus the parts that still need your judgment (rewriting the
+voice file, your own privacy/denylist setup). None of it is hard, but it's a real pass across the
+repo, not a single-sentence edit — the script does the mechanical part, you do the rest.
 
 ## Privacy
 
