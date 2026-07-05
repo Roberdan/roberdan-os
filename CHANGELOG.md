@@ -10,8 +10,8 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   `identity/` (voice, operator profile, twin persona, `identity.conf`). Engine files no
   longer embed identity, so `git merge upstream/main` stays conflict-free on engine files
   forever. See docs/plan-2026-07-05-engine-identity-split.md.
-- **`behavior/roberto-voice.md` → `identity/voice.md`** (moved, content byte-identical).
-  Update any local reference.
+- **`behavior/roberto-voice.md` → `identity/voice.md`** (moved; content unchanged except
+  one internal self-reference, `roberdan-twin` → `twin`). Update any local reference.
 - **`agents/roberdan-twin.md` → `agents/twin.md`**, invoked as **`@twin`** (was
   `@roberdan-twin`). The role prose is now operator-neutral engine; the persona moved to
   `identity/twin-persona.md`.
