@@ -1,13 +1,29 @@
 # roberdan-os
 
+**A Personal Cognitive OS implementing an Agentic Digital Twin architecture.**
+
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![validate](https://github.com/Roberdan/roberdan-os/actions/workflows/validate.yml/badge.svg)](https://github.com/Roberdan/roberdan-os/actions/workflows/validate.yml)
 
-A personal behavioral canon for AI coding agents: one file (`AGENTS.md`) every tool reads the
-same way, hard-coded **human-approval gates** an agent can never cross on its own (merges,
-force-pushes, spend, deletions, publication), and an **eval harness** that measures whether the
-canon actually changes agent output — instead of just asserting that it does. Not a plain-English
+Industrial digital twins model a machine so you can predict and steer it. roberdan-os applies
+the same idea to a person: a persistent, versioned representation of how one individual works,
+writes, decides and delegates — read identically by every AI tool he uses. One file
+(`AGENTS.md`) every agent reads the same way, hard-coded **human-approval gates** an agent can
+never cross on its own (merges, force-pushes, spend, deletions, publication), and an **eval
+harness** that measures whether the canon actually changes agent output — instead of just
+asserting that it does. Layer map: [`ARCHITECTURE.md`](ARCHITECTURE.md). Not a technical
 read? Start with [`docs/roberdan-os-paper-en.md`](docs/roberdan-os-paper-en.md) instead.
+
+## What it is — and what it is not
+
+It **is**: the live, daily-used instance of one person's agentic system — behavioral canon,
+digital twin, human gates, local-first memory, self-improving meta-loop — published as a
+worked example you can fork ([`identity/`](identity/README.md) is the only directory you
+need to change).
+
+It is **not**: a chatbot, a prompt library, a second-brain/notes app, a generic multi-agent
+framework, or a hosted product. There is no server and no account — it configures the agentic
+tools you already run (Claude Code, Copilot, Codex, …) around one identity: yours.
 
 Single canonical source of Roberto D'Angelo's agentic system. One versioned
 source from which every tool (Claude Code, GitHub Copilot CLI+VS Code, Codex,
@@ -28,6 +44,8 @@ Day-to-day operator guide (kb, factory, recall, gates): [`docs/USAGE.md`](docs/U
 | Component | Where |
 |---|---|
 | Universal entry | [`AGENTS.md`](AGENTS.md) |
+| Layer map | [`ARCHITECTURE.md`](ARCHITECTURE.md) — how the directories compose into an Agentic Digital Twin |
+| Identity (forker-editable) | [`identity/`](identity/README.md) — voice, operator profile, twin persona, `identity.conf` |
 | Behavior | `behavior/roberto-mode.md` (engineering) + `identity/voice.md` (voice) + `behavior/thinking-toolkit.md` (reasoning) |
 | Rules | `rules/constitution.md` (values + ethics) + `rules/best-practices.md` |
 | Agents | `agents/` — baccio, rex, luca, thor, socrates, board, wanda, twin |
@@ -106,6 +124,16 @@ is the fast path — `bin/identity-init.sh` scaffolds your `identity/` (dry-run 
 renames no engine file), then you rewrite the prose in your own words and set
 `RDA_HOME=~/.<you>-os` (a value, not a file edit; the `RDA_` prefix itself is fixed engine
 namespace). The merge-clean guarantee is tested, not asserted: `test/test-fork-merge.sh`.
+
+## Relationship to Convergio
+
+[Convergio](https://github.com/Roberdan/convergio) is the same philosophy at platform scale:
+evidence-first discipline, Thor done-gates, human gates on irreversible actions — enforced by a
+Rust daemon with hash-chained audit, for building vertical accelerators. roberdan-os is the
+personal-scale instance of those principles, organized around one individual instead of a
+platform. Convergio's vision puts it this way: Convergio is the municipality; roberdan-os is
+one citizen's own house, built to the same building codes. Neither depends on the other —
+Convergio is an optional observer of the loop, never a single point of failure.
 
 ## Privacy
 
