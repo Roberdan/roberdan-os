@@ -4,7 +4,8 @@
 # Launched by launchd com.roberdan.rda-evolve. Idempotent, non-blocking.
 set -euo pipefail
 
-state_dir="${RDA_EVOLVE_STATE:-$HOME/.roberdan-os/evolve}"
+RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
+state_dir="${RDA_EVOLVE_STATE:-$RDA_HOME/evolve}"
 repo_root="$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null || echo "$HOME/GitHub/roberdan-os")"
 proposals="$repo_root/proposals"
 seen="$state_dir/seen"            # flat: one line "name=sha256" per source

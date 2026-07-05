@@ -4,7 +4,8 @@
 # Resumable: state = filesystem (queue/ -> done/). Launched by launchd or by hand.
 set -euo pipefail
 
-FACTORY="${RDA_FACTORY:-$HOME/.roberdan-os/factory}"
+RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
+FACTORY="${RDA_FACTORY:-$RDA_HOME/factory}"
 Q="$FACTORY/queue"; DONE="$FACTORY/done"; LOG="$FACTORY/logs"; FAILED="$FACTORY/failed"; STATE="$FACTORY/state"
 mkdir -p "$Q" "$DONE" "$LOG" "$FAILED" "$STATE"
 # Default scoped to roberdan-os, not all of ~/GitHub: --dangerously-skip-permissions grants

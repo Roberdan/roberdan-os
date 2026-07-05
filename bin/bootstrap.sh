@@ -8,6 +8,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 
 DOSSIER=""
 [ "${1:-}" = "--dossier" ] && DOSSIER="${2:-}"
@@ -26,14 +27,14 @@ mkdir -p "$HOME/.claude/agents"
 for a in agents/*.md; do n="$(basename "$a")"; ln -sf "$ROOT/$a" "$HOME/.claude/agents/$n"; done
 echo "  agents symlinked into ~/.claude/agents/ ($(ls agents/*.md | wc -l | tr -d ' '))"
 
-# 4) Confidential dossier → ~/.roberdan-os/private (local-only, never in git)
+# 4) Confidential dossier → $RDA_HOME/private (local-only, never in git)
 if [ -n "$DOSSIER" ] && [ -f "$DOSSIER" ]; then
-  mkdir -p "$HOME/.roberdan-os/private"
-  cp "$DOSSIER" "$HOME/.roberdan-os/private/roberto-profile.md"
-  chmod 600 "$HOME/.roberdan-os/private/roberto-profile.md"
-  echo "  dossier installed (600) in ~/.roberdan-os/private/"
-elif [ -f "$HOME/.roberdan-os/private/roberto-profile.md" ]; then
-  echo "  dossier already present in ~/.roberdan-os/private/"
+  mkdir -p "$RDA_HOME/private"
+  cp "$DOSSIER" "$RDA_HOME/private/roberto-profile.md"
+  chmod 600 "$RDA_HOME/private/roberto-profile.md"
+  echo "  dossier installed (600) in $RDA_HOME/private/"
+elif [ -f "$RDA_HOME/private/roberto-profile.md" ]; then
+  echo "  dossier already present in $RDA_HOME/private/"
 else
   echo "  ⚠ no dossier: the twin will degrade to [placeholder]. Pass --dossier <path> to install it."
 fi

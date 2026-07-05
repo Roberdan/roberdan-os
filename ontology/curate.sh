@@ -5,11 +5,12 @@
 # See ontology/ontology-protocol.md. Launched by launchd. bash-3.2 + BSD-safe.
 set -euo pipefail
 
-quar="${RDA_QUARANTINE:-$HOME/.roberdan-os/learnings/quarantine}"
+RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
+quar="${RDA_QUARANTINE:-$RDA_HOME/learnings/quarantine}"
 default_vault="$HOME/Obsidian/Roberdan's Vault"   # apostrophe is fine in plain double quotes
 vault="${RDA_VAULT:-$default_vault}"              # ...but NOT inside ${:-} (breaks bash)
 dest="$vault/agent-learnings"
-state="${RDA_EVOLVE_STATE:-$HOME/.roberdan-os/evolve}"
+state="${RDA_EVOLVE_STATE:-$RDA_HOME/evolve}"
 report="$state/hygiene-$(date +%Y-%m-%d).md"
 mkdir -p "$dest" "$state"
 

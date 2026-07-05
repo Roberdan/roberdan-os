@@ -4,7 +4,8 @@
 # See factory/factory-protocol.md.
 set -euo pipefail
 
-FACTORY="${RDA_FACTORY:-$HOME/.roberdan-os/factory}"
+RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
+FACTORY="${RDA_FACTORY:-$RDA_HOME/factory}"
 Q="$FACTORY/queue"; mkdir -p "$Q"
 task="${1:?task text or file required}"
 name="${2:-task-$(date +%Y%m%d-%H%M%S)}"

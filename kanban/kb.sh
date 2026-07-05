@@ -4,6 +4,7 @@
 # Every card carries a Definition of Done + Acceptance criteria. See kanban/README.md.
 set -euo pipefail
 
+RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 KB="${RDA_KANBAN:-$HOME/GitHub/roberdan-os/kanban}"
 mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
 # repo ROOT (independent of $KB, which under tests points at a temp fixture
@@ -261,7 +262,7 @@ _sched() {
 
   echo
   echo "=== FACTORY STATE ==="
-  local fdir="${RDA_FACTORY:-$HOME/.roberdan-os/factory}" qn fn
+  local fdir="${RDA_FACTORY:-$RDA_HOME/factory}" qn fn
   if [ -d "$fdir" ]; then
     qn="$(ls "$fdir/queue" 2>/dev/null | wc -l | tr -d ' ' || true)"
     fn="$(ls "$fdir/failed" 2>/dev/null | wc -l | tr -d ' ' || true)"
