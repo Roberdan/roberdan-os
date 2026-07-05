@@ -19,15 +19,20 @@ roberdan-os keeps its own `kanban/` and behaves exactly as before; the change is
 
 ## MirrorBuddy — GATE NOT CROSSED (documented, deliberate)
 
-Two MirrorBuddy cards currently live in **roberdan-os**'s board, gitignored, with `repo: MirrorBuddy`:
+Four `repo: MirrorBuddy` cards live in **roberdan-os**'s board, all gitignored, none tracked —
+two still open in `todo/`, two archived in `done/`:
 
-| id | title (abridged) |
-|---|---|
-| `260703-224312` | MirrorBuddy AI-Act P2 — gaps (watermark, Trial age-verify, data-governance, …) |
-| `260703-224313` | MirrorBuddy AI-Act — checklist: legal sign-off + open nodes |
+| id | column | title (abridged) |
+|---|---|---|
+| `260703-224312` | todo | MirrorBuddy AI-Act P2 — gaps (watermark, Trial age-verify, data-governance, …) |
+| `260703-224313` | todo | MirrorBuddy AI-Act — checklist: legal sign-off + open nodes |
+| `260703-224310` | done | MirrorBuddy AI-Act P0 — code fixes (closed via PR #500 on MirrorBuddy, `approved_by: roberto`) |
+| `260703-224311` | done | MirrorBuddy AI-Act P1 — compliance doc alignment (closed earlier) |
 
-These **remain exactly where they are** — not moved, not physically federated into
-`~/GitHub/MirrorBuddy`. The reasons are hard gates:
+All four **remain exactly where they are** — not moved, not physically federated into
+`~/GitHub/MirrorBuddy`. The `done/` ones were closed by real, audited work in MirrorBuddy's own
+worktrees (not by this session's dispatcher, which refuses structurally). The reasons the two
+open ones aren't federated are hard gates:
 
 - **`kb init` on MirrorBuddy is a human gate, not crossed.** MirrorBuddy is a shared
   (Fight the Stroke) repo with a **standalone** `AGENTS.md` and does **not** gitignore `kanban/`
