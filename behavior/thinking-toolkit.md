@@ -1,6 +1,6 @@
 # thinking-toolkit — how to reason well (first-principles + repertoire)
 
-> Shared cognitive engine of the canon. Used by `roberdan-twin` (to think through
+> Shared cognitive engine of the canon. Used by `twin` (to think through
 > Roberto's work), `socrates` (to deconstruct) and `board` (to convene different lenses).
 > **It's not a checklist to run through.** It's a repertoire to draw *the right lens* from.
 

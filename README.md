@@ -30,7 +30,7 @@ Day-to-day operator guide (kb, factory, recall, gates): [`docs/USAGE.md`](docs/U
 | Universal entry | [`AGENTS.md`](AGENTS.md) |
 | Behavior | `behavior/roberto-mode.md` (engineering) + `identity/voice.md` (voice) + `behavior/thinking-toolkit.md` (reasoning) |
 | Rules | `rules/constitution.md` (values + ethics) + `rules/best-practices.md` |
-| Agents | `agents/` — baccio, rex, luca, thor, socrates, board, wanda, roberdan-twin |
+| Agents | `agents/` — baccio, rex, luca, thor, socrates, board, wanda, twin |
 | Skills | `skills/` — verify-done, ship, review, sync, auto-checkpoint |
 | Hooks | `hooks/` — main-guard, bash-guard, verify-done, autofmt, post-task-sync |
 | Loop | `loop/loop-protocol.md` |

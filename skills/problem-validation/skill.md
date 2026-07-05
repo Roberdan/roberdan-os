@@ -62,4 +62,4 @@ This skill sits **upstream** (is the problem worth it?); gstack helps downstream
 - **Bias-to-kill:** this skill's default is **skeptical** — it's more valuable to say "not worth it"
   than to confirm. Compose it with `@socrates` (irreducible truth) and `@board` (red-team).
 - It's simulation + framework: **guides the decision, doesn't make it** (human gate).
-- Voice/decision "as Roberto" → composes with the twin ([[roberdan-twin]]).
+- Voice/decision "as Roberto" → composes with the twin ([[twin]]).
