@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- evolve watcher — settimanale (lunedì 09:00). Vedi evolve/evolve-protocol.md.
-     Install: cp in ~/Library/LaunchAgents/ + launchctl load. Path repo da adattare se diverso. -->
+<!-- evolve watcher — settimanale (sabato 02:00). Vedi evolve/evolve-protocol.md.
+     Install: cp in ~/Library/LaunchAgents/ + launchctl load. Path repo da adattare se diverso.
+     Catch-up: con StartCalendarInterval, se il Mac è spento/dormiente all'ora prevista launchd
+     esegue il job al boot/wake successivo (a differenza di cron, che lo salta). -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -13,8 +15,8 @@
   </array>
   <key>StartCalendarInterval</key>
   <dict>
-    <key>Weekday</key><integer>1</integer>
-    <key>Hour</key><integer>9</integer>
+    <key>Weekday</key><integer>6</integer>
+    <key>Hour</key><integer>2</integer>
     <key>Minute</key><integer>0</integer>
   </dict>
   <key>StandardOutPath</key><string>/tmp/rda-evolve.log</string>
