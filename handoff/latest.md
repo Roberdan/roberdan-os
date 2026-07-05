@@ -29,10 +29,33 @@ Design of the split: `docs/plan-2026-07-05-engine-identity-split.md`. Previous h
    Convergio" section. GitHub Discussions enabled.
    Release: https://github.com/Roberdan/roberdan-os/releases/tag/v2.0.0
 
+## Afternoon/evening thread (2026-07-05) — multi-CLI orchestration + evolve + Fable
+
+- **Multi-CLI orchestration researched, decided.** CAO (AWS Labs runtime orchestrator) tested
+  + rejected (cross-provider handoff to Copilot broken out-of-the-box). **Pivot validated:**
+  kanban-as-handoff — `copilot -p` reads a card and executes it one-shot (no runtime orchestration).
+  Adversarial review (Fable/@board/@baccio) → external-runners-in-yolo REJECTED; Roberto chose
+  **federated kanban + sandboxed runners (restricted form)**. Design in
+  `docs/plan-2026-07-05-federated-kanban-multi-cli.md`; @rex APPROVE-WITH-CONCERNS + @luca
+  (dormant-mergeable) verdicts appended there. **Next (dedicated session):** @baccio incorporates
+  the fixes (leak-check fail-open→preflight #8, lock repo+id, dispatch wired-end-to-end,
+  egress-control + hard-wired refusal per @luca), THEN implement phases 1-5 (federation +
+  `runner:` label = zero external risk); dispatcher (6-7) stays dormant until OS isolation.
+- **evolve watcher rewired** (Saturday 02:00, launchd catch-up if Mac off): now drops a **kanban
+  card** per changelog novelty instead of a skeleton draft — any CLI executes it (no `claude -p`).
+- **New rule: "Wired End-to-End"** in `rules/best-practices.md` v3.3.0 + `verify-done` — features
+  must be reachable from a live path, not just present. (Roberto's rule.)
+- **Fable 5 + agent-skills analysis** (both links Roberto gave): Fable doc validates roberdan-os
+  on 5 axes; 2 surgical fixes applied — effort doctrine (high/xhigh/low) in the model policy +
+  a Fable-scoped section in `thinking-toolkit.md` (NOT in the model:opus agent bodies). addyosmani
+  24-skill import rejected (redundant + over-prescription degrades Fable); linked as reference only.
+
 ## Open threads
 
 - **PR Convergio #511** (docs/vision.md cross-ref, "one citizen's house" bullet) — OPEN,
   **merge is Roberto's gate**: https://github.com/Roberdan/convergio/pull/511
+- **Federated-kanban design** ready + reviewed, awaiting a dedicated session to update
+  (@baccio) + implement phases 1-5. See afternoon thread above.
 - Deferred until real demand signal (watch Discussions/forks/traffic): canon levels, metrics
   dashboard, community section, further fork tooling (`twin_handle` generation is scaffolded
   in identity.conf but unconsumed — documented honestly there).
