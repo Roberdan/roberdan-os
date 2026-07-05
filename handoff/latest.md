@@ -50,12 +50,37 @@ Design of the split: `docs/plan-2026-07-05-engine-identity-split.md`. Previous h
   a Fable-scoped section in `thinking-toolkit.md` (NOT in the model:opus agent bodies). addyosmani
   24-skill import rejected (redundant + over-prescription degrades Fable); linked as reference only.
 
+## Federated kanban IMPLEMENTED (2026-07-06, v2.2.0)
+
+Phases 1-6 built + released. @rex APPROVE + @thor PASS, every design fix proven empirically.
+- **Read-path** (`kb` cwd-scoped, `kb all`/`g` aggregated, `kb handoff`, explicit registry),
+  **`kb init`** (per-repo privacy: gitignore columns, de-track, history-scan, leak-check hook),
+  **`runner:`/`human_gates:` + `kb lint`**, **atomic claim** (`repo+id` mkdir-lock) +
+  **`factory/lib.sh`** extraction, **dispatcher wired but DORMANT** (`kb dispatch` →
+  `factory/dispatch-runner.sh`, preflight #5 hard-wired `readonly` refuse — proven that even
+  `OS_FLOOR_PRESENT=1` can't flip it; #8 closes leak-check fail-open).
+- **Zero external-runner risk**: the dispatcher refuses every dispatch until a reviewed code
+  edit lands the OS floor (phase 7). shellcheck gate extended to the new scripts.
+- **⚠️ Security event:** during a credential-helper test the subagent's `git credential fill`
+  printed a live `gho_` token into its transcript. Deliverable is CLEAN (0 tokens in tree/history,
+  gitleaks clean) — token only in the ephemeral transcript. **Roberto: consider rotating the gh
+  token** (revoke "GitHub CLI" OAuth app + re-login).
+- **MirrorBuddy P0 card `260703-224310` closed elsewhere** (PR #500 on MirrorBuddy, worktree
+  `ai-act-p0`, `approved_by: roberto`) during this window — NOT by this session's dispatcher
+  (which refuses). Now in `done/`. Open MirrorBuddy cards: 224312 (P2), 224313 (legal sign-off).
+
 ## Open threads
 
-- **PR Convergio #511** (docs/vision.md cross-ref, "one citizen's house" bullet) — OPEN,
-  **merge is Roberto's gate**: https://github.com/Roberdan/convergio/pull/511
-- **Federated-kanban design** ready + reviewed, awaiting a dedicated session to update
-  (@baccio) + implement phases 1-5. See afternoon thread above.
+- **PR Convergio #511** — OPEN, blocked by an INDEPENDENT CI failure (RUSTSEC-2026-0190 on
+  `anyhow`, team fixing on another branch). Self-merges once the RUSTSEC clears. Roberto's gate:
+  https://github.com/Roberdan/convergio/pull/511
+- **Federated kanban — remaining human gates (by design):** (1) **phase 7** = OS-isolation floor
+  (dedicated uid + per-uid egress-control + empty keychain) — a REVIEWED code edit turns off
+  preflight #5; needs its own design doc + @rex/@luca. Until then the dispatcher stays dormant.
+  (2) **`kb init` on MirrorBuddy** (+ physically federating cards 224312/224313 into
+  `~/GitHub/MirrorBuddy`) — touches a shared FightTheStroke repo.
+- **`~/.claude/CLAUDE.md` should be pushed** — the gh token rotation + the effort-doctrine edit
+  live there (private, outside the repo).
 - Deferred until real demand signal (watch Discussions/forks/traffic): canon levels, metrics
   dashboard, community section, further fork tooling (`twin_handle` generation is scaffolded
   in identity.conf but unconsumed — documented honestly there).
