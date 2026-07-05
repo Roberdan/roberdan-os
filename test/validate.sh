@@ -55,6 +55,10 @@ for k in kanban/todo kanban/doing; do
 done
 [ "$found" -eq 0 ] && printf "  skip: no active todo/doing cards to lint\n"
 
+# federated additive-schema lint (runner: grammar + human_gates:↔human-only, design §2c/§3)
+section "frontmatter — federated card schema (runner:, human_gates:↔human-only)"
+if bash kanban/lint-cards.sh kanban >/dev/null 2>&1; then ok "runner/human_gates schema clean"; else err "runner/human_gates lint — see bash kanban/lint-cards.sh kanban"; fi
+
 # --- 2) Link check (relative markdown; exempts [[wikilink]] and http) --------
 section "link check (relative markdown; [[wikilink]] exempted)"
 broken=0

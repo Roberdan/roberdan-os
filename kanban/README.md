@@ -49,6 +49,49 @@ the id whenever it fits the column width, otherwise it degrades to the bare id (
 the id itself — that's the key you pass to `show`/`start`/`finish`). Legacy cards with no `repo:`
 render as `(—)` instead of crashing.
 
+## Federation — one board per repo, one aggregating `kb`
+
+Cards live **per-repo** (each repo's own gitignored `kanban/`), and a global `kb` aggregates
+them. See `docs/plan-2026-07-05-federated-kanban-multi-cli.md` for the full design.
+
+```
+kb                 # inside a repo: that repo's board. Outside any repo: aggregated.
+kb all | kb g      # aggregated view across every registered board (cards tagged repo:)
+kb handoff         # per-repo handoff/latest.md (in a repo) or aggregated (outside)
+kb init [repo]     # make a repo safe to hold cards — idempotent (see below)
+kb lint            # schema lint for the optional federated fields
+```
+
+**Discovery is an explicit registry, never a scan.** `kb init <repo>` is the single act that
+makes a repo safe to hold cards and registers it in `~/.roberdan-os/kanban-registry` (local-only).
+It: scaffolds `kanban/{todo,doing,done}`; gitignores the card columns; de-tracks any card content
+already committed (`git rm --cached`, scoped to the columns — never your tracked `kb.sh`/README);
+scans **local history** for card blobs (pushed → **refuses**, human gate #4; local-only → loud
+warning); installs a leak-check pre-commit hook. A raw `kanban/` dir made by hand is **not**
+discovered — only `kb init`'d boards are, so "discovered" ≡ "privacy-initialized". `kb init` does
+**not** make a repo runner-eligible (that is the separate, narrower `runner-allowlist`).
+
+> roberdan-os's own `handoff/latest.md` is currently **tracked** canon-ish state; `kb init` **flags**
+> it and does **not** silently change that tracking (design §5 note). An untracked `latest.md` in a
+> generic repo gets gitignored normally.
+
+## Optional card fields (additive — every one is optional; existing cards are unaffected)
+
+```
+runner: copilot-cli/opus   # DECLARATIVE intent label. Grammar: <cli>/<model> | human-only
+                           #   <cli> ∈ claude | copilot-cli | ollama
+                           #   absent → Claude-native (factory / Agent tool) — today's behavior
+                           #   human-only → SENTINEL: touches a gated surface, never external-runnable
+human_gates: merge, push   # optional audit list: merge|push|spend|publish|delete|roberto-name
+claimed_by:                # set ONLY by the atomic claim (never by hand): "<cli>@<host>/<pid>"
+claimed_at:                # UTC ISO-8601, set atomically with claimed_by
+```
+
+`runner:` is **intent, not authority** — it never *causes* an external CLI to run (default stays
+Claude-native). `kb lint` enforces two rules: `runner:` grammar, and **`human_gates:` non-empty ⇒
+`runner:` must be `human-only`** (a gated-surface card must never be runner-eligible). This is a
+Layer-1 label — fallible by omission; the real gate is the dispatcher's Layer-2 code (see the design).
+
 ## Honest limit: `--by` is a DISCIPLINE gate, not a security boundary
 
 `kb start <id> --by roberto` does **not** verify the caller actually is Roberto — any process

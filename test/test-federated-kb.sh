@@ -223,6 +223,111 @@ else
   err "handoff tracked-flag wrong (rc=$rc flagged=$flagged tracked=$still_tracked not_ignored=$not_ignored) — got: $out"
 fi
 
+# =====================================================================
+# PHASE 3 — runner: metadata + schema lint (Layer-1 label only)
+# =====================================================================
+
+mk_card() {  # $1=board $2=id  then heredoc body on stdin
+  local board="$1" id="$2"
+  mkdir -p "$board/todo" "$board/doing" "$board/done"
+  cat > "$board/todo/$id.md"
+}
+
+section "phase3: a plain card (no runner:/human_gates:) passes lint (fields are optional)"
+LB="$TMP/lintBoard"
+mk_card "$LB" 260705-400000 <<'EOF'
+---
+title: Plain card, no federated fields
+repo: roberdan-os
+dod: "d"
+acceptance: "a"
+status: todo
+created: 2026-07-05
+---
+EOF
+if RDA_KANBAN="$LB" bash kanban/lint-cards.sh >/dev/null 2>&1; then
+  ok "existing-shape card with no runner:/human_gates: passes lint unchanged"
+else
+  err "lint rejected a plain card (should be a no-op — all new fields optional)"
+fi
+
+section "phase3: runner: human-only is valid; a well-formed <cli>/<model> is valid"
+mk_card "$LB" 260705-400001 <<'EOF'
+---
+title: Human-only gated card
+repo: roberdan-os
+dod: "d"
+acceptance: "a"
+status: todo
+created: 2026-07-05
+runner: human-only
+human_gates: merge, push
+---
+EOF
+mk_card "$LB" 260705-400002 <<'EOF'
+---
+title: Copilot-runnable card
+repo: orca
+dod: "d"
+acceptance: "a"
+status: todo
+created: 2026-07-05
+runner: copilot-cli/opus
+---
+EOF
+if RDA_KANBAN="$LB" bash kanban/lint-cards.sh >/dev/null 2>&1; then
+  ok "runner: human-only (with human_gates) + runner: copilot-cli/opus both pass"
+else
+  err "lint rejected valid runner: values"
+fi
+
+section "phase3: human_gates: set but runner: NOT human-only is a LINT ERROR (§6.6)"
+BAD="$TMP/lintBad"
+mk_card "$BAD" 260705-400003 <<'EOF'
+---
+title: Gated surface wrongly marked runner-eligible
+repo: orca
+dod: "d"
+acceptance: "a"
+status: todo
+created: 2026-07-05
+runner: copilot-cli/opus
+human_gates: push
+---
+EOF
+if RDA_KANBAN="$BAD" bash kanban/lint-cards.sh >/dev/null 2>&1; then
+  err "lint ACCEPTED a card with human_gates: but runner: != human-only (must fail)"
+else
+  ok "lint fails a card declaring human_gates: while not runner: human-only"
+fi
+
+section "phase3: an invalid runner: value (unknown cli) is a LINT ERROR"
+BAD2="$TMP/lintBad2"
+mk_card "$BAD2" 260705-400004 <<'EOF'
+---
+title: Bogus runner cli
+repo: orca
+dod: "d"
+acceptance: "a"
+status: todo
+created: 2026-07-05
+runner: gpt-cli/whatever
+---
+EOF
+if RDA_KANBAN="$BAD2" bash kanban/lint-cards.sh >/dev/null 2>&1; then
+  err "lint ACCEPTED an unknown runner cli (gpt-cli) — must fail"
+else
+  ok "lint fails an unknown runner: cli (grammar enforced)"
+fi
+
+section "phase3: kb lint routes to lint-cards.sh on the resolved board"
+if RDA_KANBAN="$LB" bash "$KB" lint >/dev/null 2>&1 \
+   && ! RDA_KANBAN="$BAD" bash "$KB" lint >/dev/null 2>&1; then
+  ok "kb lint passes a clean board and fails a bad board"
+else
+  err "kb lint did not route to lint-cards.sh correctly"
+fi
+
 # ---------------------------------------------------------------------------
 if [ "$FAIL" -eq 0 ]; then
   echo; echo "test-federated-kb: ✅ ALL GREEN"; exit 0
