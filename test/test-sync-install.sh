@@ -30,6 +30,25 @@ else
   ok "--emit-only left $SKILLS_DIR untouched (does not exist)"
 fi
 
+# Regression guard: descriptions contain ': ' (colon+space) and apostrophes, which
+# break an UNQUOTED YAML scalar ("mapping values are not allowed"). The generator
+# must emit every frontmatter description as a double-quoted scalar so the wrapper
+# parses. Emit into a clean temp dir (RDA_SYNC_OUT) so stale local artifacts under
+# the repo's platforms/ can't pollute the check. No pyyaml dependency.
+section "generated wrappers: frontmatter description is a quoted YAML scalar"
+FM_OUT="$TMP/fm-emit"
+RDA_SYNC_OUT="$FM_OUT" bash bin/sync.sh --emit-only >/dev/null 2>&1
+bad_fm=0
+for w in "$FM_OUT"/claude/skills/*/SKILL.md "$FM_OUT"/claude/agents/*.md; do
+  [ -e "$w" ] || continue
+  descline="$(grep -m1 -E '^description:' "$w")"
+  case "$descline" in
+    'description: "'*'"') : ;;  # ok: quoted scalar
+    *) err "unquoted/invalid description frontmatter in ${w#$FM_OUT/}: $descline"; bad_fm=1 ;;
+  esac
+done
+[ "$bad_fm" -eq 0 ] && ok "all generated wrapper descriptions are quoted YAML scalars"
+
 # Fixture: a skill already present at a name that will collide with a generated one
 # ("sync" is always generated from skills/sync/skill.md), simulating another skill
 # system (e.g. gstack) that got there first.

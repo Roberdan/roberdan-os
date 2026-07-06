@@ -77,6 +77,12 @@ fm() { grep -m1 -E "^$2:" "$1" 2>/dev/null | sed -E "s/^$2:[[:space:]]*//; s/^[\
 # Stable file ordering (sort) for deterministic output.
 list() { find "$1" -maxdepth "${3:-1}" -name "$2" 2>/dev/null | LC_ALL=C sort; }
 
+# YAML-safe double-quoted scalar for frontmatter values. Descriptions contain
+# ': ' (colon+space), apostrophes and other YAML specials that break an
+# unquoted scalar (mapping-values error). Escape backslash then double-quote,
+# wrap in "" so the emitted frontmatter always parses.
+yaml_dq() { printf '"%s"' "$(printf '%s' "${1:-}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
+
 emit_global_agents_pointer() {
   # Content of the thin AGENTS.md pointer installed OUTSIDE this repo (parent
   # ~/GitHub, plus any AGENTS.md-native tool's global instructions dir: codex,
@@ -120,7 +126,7 @@ EOF
     cat > "$d/skills/$name/SKILL.md" <<EOF
 ---
 name: $name
-description: $desc
+description: $(yaml_dq "$desc")
 ---
 
 # $name (wrapper)
@@ -137,7 +143,7 @@ EOF
     cat > "$d/agents/$aname.md" <<EOF
 ---
 name: $aname
-description: $adesc
+description: $(yaml_dq "$adesc")
 ---
 
 Canonical persona: \`agents/$aname.md\` in roberdan-os (full frontmatter: model, tools,
