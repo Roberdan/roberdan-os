@@ -3,6 +3,23 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.4.0] - 2026-07-06
+
+### Added
+- **Pause / Resume — never lose work on a break or reboot.** A canonical, cross-tool contract
+  (any `AGENTS.md` reader inherits it) plus tooling:
+  - **`kb pause ["next step"]`** writes a lean, per-repo, gitignored checkpoint
+    (`<repo>/handoff/resume.md`, cwd-scoped like `kb`/`kb handoff`): the next-step note + mechanical
+    state (HEAD, dirty count, doing card). **`kb resume`** reads it (`--all` aggregates across repos,
+    `--done` clears it). Per-repo by design — same shape as the federated kanban.
+  - **Always-on lean auto-save:** a `Stop` hook (`hooks/auto-checkpoint.sh`) runs `kb pause --auto`
+    after every turn — refreshes mechanical state, **preserves the human note**, overwrites one file
+    (fixed sections, never a growing log). Even an unannounced crash loses at most the current turn.
+  - The `SessionStart` context hook surfaces a pending checkpoint at the top, so a fresh session
+    (post-reboot) immediately notices "continua" work.
+  - Canon: `AGENTS.md § Pause & Resume` (trigger phrases, safe-point rule). Design:
+    `docs/plan-2026-07-06-pause-resume-checkpoint.md`.
+
 ## [v2.3.0] - 2026-07-06
 
 ### Added
