@@ -3,6 +3,18 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.4.2] - 2026-07-06
+
+### Fixed
+- **Skill/agent wrappers broke skill loading in Copilot CLI.** `bin/sync.sh` wrote the frontmatter
+  `description:` as an *unquoted* YAML scalar. Descriptions contain `: ` (colon+space) and
+  apostrophes, so any such description failed to parse (`mapping values are not allowed`) — silently
+  dropping the affected skills at load time (`focus-group`, `premortem`, `problem-validation` were
+  the casualties). The generator now emits every description as a double-quoted, escaped scalar
+  (new `yaml_dq` helper, applied to both skill and agent wrappers). Added a regression guard in
+  `test/test-sync-install.sh` that emits into a clean temp dir and asserts every generated wrapper
+  description is a quoted YAML scalar.
+
 ## [v2.4.1] - 2026-07-06
 
 ### Fixed
