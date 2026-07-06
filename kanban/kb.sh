@@ -53,7 +53,10 @@ mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
 cmd="${1:-view}"; [ $# -gt 0 ] && shift || true
 
 # portable mtime (macOS BSD stat first, GNU stat fallback, else 0)
-_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+# GNU (-c) FIRST: on macOS `stat -c` fails cleanly (unknown flag → exit 1, empty stdout) so the
+# BSD `-f` fallback runs; the reverse order breaks on Linux, where `stat -f` means --file-system
+# and prints multi-line garbage for `%m`+file instead of failing (CI-only bug, seen 2026-07-06).
+_mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; }
 # unique repo roots for aggregation: roberdan-os home first, then registry entries.
 _board_roots() {
   printf '%s\n' "$ROOT"
