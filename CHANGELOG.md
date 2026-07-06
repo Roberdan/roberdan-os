@@ -15,6 +15,17 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   `test/test-sync-install.sh` that emits into a clean temp dir and asserts every generated wrapper
   description is a quoted YAML scalar.
 
+## [v2.5.0] - 2026-07-06
+
+### Added
+- **"No False Done" — the cardinal reliability rule** (`rules/best-practices.md` v3.4.0, top of
+  file; reinforced in the `verify-done` skill). Never claim done/verified/working/green/released
+  until the evidence for THAT claim is observed end-to-end: a claim needs evidence for itself
+  ("released" ⇒ CI green on the release commit confirmed, not "I pushed"), whole-system not just
+  the touched part, "should/probably" ≠ "is", prefer a mechanical gate that carries the evidence,
+  and on a wrong claim say so first with the fact. Documents the real 2026-07-06 miss (v2.4.0
+  announced released while its CI was red). The lever is verification + gates, not temperature.
+
 ## [v2.4.1] - 2026-07-06
 
 ### Fixed
