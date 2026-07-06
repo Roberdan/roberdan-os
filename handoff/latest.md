@@ -1,4 +1,35 @@
-# Handoff — session 2026-07-04/05 (public release + v2.0.0 engine/identity split)
+# Handoff — session 2026-07-04/06 (public release → v2.3.0)
+
+## ⏸️ RESUME POINT (updated 2026-07-06, before a reboot)
+
+**Nothing is mid-flight — safe to reboot.** Everything is committed + pushed (main == origin,
+tree clean), CI green, latest release **v2.3.0**. The kanban cards are files on disk (survive
+reboot); the evolve launchd job re-fires at boot.
+
+**If Roberto says "continua / riprendi da dove eri arrivato":** there is no half-done work to
+finish. The next actions are the human gates below (they wait on Roberto, not on an agent). The
+one piece of active BUILD work in flight when we paused: **the pause/resume + auto-checkpoint
+mechanism** Roberto asked for (a `kb pause`/`kb resume` + a lean Stop-hook auto-save) — if that
+wasn't finished before the reboot, resume by checking `git log` for its commits; if absent,
+re-read this session's tail and rebuild it from the design (kb pause writes `$RDA_HOME/resume.md`,
+a lean overwritten checkpoint; a Stop hook keeps it current; canon in AGENTS.md § Pause & Resume).
+
+**Human gates still open (Roberto's, by design):**
+1. **Rotate the gh token** — a live `gho_` was printed into a subagent transcript during a
+   credential test (repo is clean: 0 in tree/history/gitleaks). Revoke "GitHub CLI" OAuth +
+   re-login if you want to be safe.
+2. **PR Convergio #511** — self-merges once its independent RUSTSEC-2026-0190 (`anyhow`) clears.
+3. **MirrorBuddy cards** 224312 (P2) / 224313 (legal sign-off) — legal/product decisions.
+   (P0 224310 already closed via PR #500; P1 224311 done.)
+4. **Federated-kanban phase 7** (activate the dormant dispatcher: OS-isolation floor) + **`kb init`
+   on MirrorBuddy** (shared repo) — both need a reviewed code edit / your go-ahead.
+
+## What this session did (three days, one thread)
+
+Releases shipped: v2.0.0 (engine/identity split) → v2.1.0 (Wired rule + evolve card-based watcher
++ Fable-5 guidance) → v2.2.0 (federated kanban + dormant multi-CLI dispatcher, @rex+@thor) →
+v2.2.1 (CI stat-portability fix) → v2.3.0 (aggregated 3-column board + font-independent ASCII
+alignment). All gate-verified locally AND in Linux CI; badge green.
 
 **For a fresh agent:** read this + `kb` + `MEMORY.md`, then `gbrain search` what you need.
 Design of the split: `docs/plan-2026-07-05-engine-identity-split.md`. Previous handoff
