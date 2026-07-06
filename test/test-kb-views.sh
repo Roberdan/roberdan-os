@@ -57,8 +57,8 @@ verified_at: 2026-07-01
 body
 EOF
 out="$(RDA_KANBAN="$KB" bash kanban/kb.sh history 2>&1)"; rc=$?
-if [ "$rc" -eq 0 ] && echo "$out" | grep -q '\[probe-legacy\] (—) Legacy probe card (no repo field) (verified 2026-07-01)'; then
-  ok "history degrades a missing repo: to (—) instead of crashing"
+if [ "$rc" -eq 0 ] && echo "$out" | grep -q '\[probe-legacy\] (-) Legacy probe card (no repo field) (verified 2026-07-01)'; then
+  ok "history degrades a missing repo: to (-) instead of crashing"
 else
   err "history did not degrade gracefully on a card with no repo: — got: $out"
 fi
@@ -112,7 +112,7 @@ echo "$out" | grep -q '\[list-probe\] (convergio) List probe objective' \
   && ok "kb list shows [id] (repo) title" \
   || err "kb list did not show repo+title as expected — got: $out"
 
-section "kb todo: a card with no repo: (legacy) degrades to (—) instead of crashing"
+section "kb todo: a card with no repo: (legacy) degrades to (-) instead of crashing"
 cat > "$LKB/todo/list-legacy.md" <<'EOF'
 ---
 title: Legacy list card
@@ -124,8 +124,8 @@ created: 2026-07-01
 body
 EOF
 out="$(RDA_KANBAN="$LKB" bash kanban/kb.sh todo 2>&1)"; rc=$?
-if [ "$rc" -eq 0 ] && echo "$out" | grep -q '\[list-legacy\] (—) Legacy list card'; then
-  ok "kb todo degrades a missing repo: to (—) instead of crashing"
+if [ "$rc" -eq 0 ] && echo "$out" | grep -q '\[list-legacy\] (-) Legacy list card'; then
+  ok "kb todo degrades a missing repo: to (-) instead of crashing"
 else
   err "kb todo did not degrade gracefully on a card with no repo: — got: $out"
 fi
