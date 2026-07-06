@@ -35,3 +35,6 @@ eval/results/
 # Build artifact — regenerate with the make-pdf skill against docs/roberdan-os-paper-en.md.
 docs/*.pdf
 .gbrain-source
+
+# Pause/resume checkpoint — ephemeral local runtime state, per-repo (see kb pause/resume).
+handoff/resume.md
