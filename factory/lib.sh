@@ -114,7 +114,9 @@ RDA_LOCK_TIMEOUT="${RDA_LOCK_TIMEOUT:-1800}"   # seconds; the stale sweep uses 2
 
 # sanitize a repo/id token so it is safe as a single path component
 _lock_slug() { printf '%s' "$1" | tr '/ :@.' '_____'; }
-_lock_epoch() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+# GNU (-c) FIRST — see kanban/kb.sh:_mtime for the why (macOS -c fails clean; Linux -f is
+# --file-system and prints garbage, not a clean failure). Same CI-only portability bug.
+_lock_epoch() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; }
 
 _lock_stamp() {  # write pid + heartbeat into an acquired lock dir
   local d="$1"
