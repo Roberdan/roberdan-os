@@ -1,12 +1,44 @@
 ---
 name: best-practices
-version: "3.3.0"
-last_updated: "2026-07-05"
+version: "3.4.0"
+last_updated: "2026-07-06"
 ---
 
 # Best Practices
 
 Guidelines for quality across every project. These are expectations, not hooks.
+
+## No False Done (the cardinal reliability rule)
+
+**Never claim something is done, verified, working, green, released, or "a posto" until you have
+observed the evidence for THAT claim, end-to-end, yourself.** This is the top rule because a
+confident-but-wrong "all good" is the single most damaging thing an agent can do — it makes the
+whole system untrustworthy. It outranks speed, tidiness, and looking competent.
+
+- **A claim needs evidence for the claim itself, not for a neighbour.** "Released" ⇒ the CI run
+  on the release commit is confirmed green (not "I pushed"). "Tests pass" ⇒ you ran them and read
+  the output (not "they should"). "It works" ⇒ you drove the real path and saw it. "Done" ⇒ every
+  acceptance criterion checked.
+- **Whole-system, not the part you touched.** If you verified piece A but B/C are unchecked, you
+  are NOT done — say exactly what is verified and what isn't. Partial truth stated as total is a
+  false done.
+- **"Should / probably / I think it's fine" ≠ "is".** Never present an inference or a hope as a
+  verified fact. If you haven't checked, say "not verified yet" and go check — or say plainly you
+  can't.
+- **Prefer a mechanical gate over your own assurance.** Move the evidence OUT of your words: a CI
+  check, a test run, a `git status`, a grep for the caller. The gate's GREEN is the claim, not your
+  sentence. (Pairs with § Wired End-to-End.)
+- **When you got it wrong, say so first, with the fact.** No burying, no "as I said". Acknowledge,
+  show the evidence, fix. Conviction over agreeableness — a correction now beats a false "done".
+- **The lever is verification + gates, not model temperature.** Temperature governs output
+  variety, not honesty; a cold model states falsehoods just as confidently. Reliability comes from
+  checking before claiming and from gates that carry the evidence, never from a sampling knob.
+
+**Real failure this rule exists to prevent** (2026-07-06): an agent announced "v2.4.0 released,
+all set" while the release commit's CI was in fact **red** — a `--auto` change had been left
+uncommitted, so `main` was broken. "Released" had been claimed on "I pushed", not on a confirmed
+green CI run. The fix that should have been the habit: wait for the CI conclusion, read it, THEN
+say released.
 
 ## Code Style
 

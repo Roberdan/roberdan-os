@@ -9,6 +9,13 @@ providers: [claude, copilot, codex]
 **Done is not "should work."** It's Roberto's cardinal principle. Use this
 skill before declaring any task complete.
 
+**No false done (see `rules/best-practices.md § No False Done`).** Never say done / verified /
+working / green / released until you've observed the evidence for THAT claim, end-to-end,
+yourself. A claim needs evidence for the claim itself ("released" ⇒ CI green on the release commit
+confirmed, not "I pushed"); whole-system, not just the part you touched; "should/probably" is not
+"is". A confident-but-wrong "all good" is the most damaging thing you can do — it breaks trust in
+the whole system. Prefer a mechanical gate that carries the evidence over your own assurance.
+
 ## The 3 mandatory conditions
 1. **Evidence** — concrete artifacts attached: commit SHA, PR link, file path, test output.
 2. **Verified empirically** — actually tested, not estimated. Show the output, not the estimate.
