@@ -129,7 +129,13 @@ if bash test/test-kb-views.sh >/dev/null 2>&1; then ok "kb views green"; else er
 
 # --- 6c) federated kanban + dormant dispatcher --------------------------------
 section "federated kanban (cwd-scoping, kb all/handoff, init, locks, dormant dispatcher)"
-if bash test/test-federated-kb.sh >/dev/null 2>&1; then ok "federated kb + dispatcher gates green"; else err "test-federated-kb — see bash test/test-federated-kb.sh"; fi
+# On failure, surface the test's own output (indented) instead of hiding it behind a "see …"
+# pointer — a failing gate must show the evidence, especially for CI-only failures.
+_fedkb_out="$(bash test/test-federated-kb.sh 2>&1)"
+if [ $? -eq 0 ]; then ok "federated kb + dispatcher gates green"; else
+  printf '%s\n' "$_fedkb_out" | grep -iE '===|ok:|err|FAIL|got:|outside=|inside=|rc=' | sed 's/^/    /'
+  err "test-federated-kb failed (output above)"
+fi
 
 # --- 6d) dispatcher WIRED even while dormant (@rex #5) ------------------------
 # A module that exists but has no live entry-path is not "wired" — dormancy must
