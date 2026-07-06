@@ -76,8 +76,11 @@ _set_status() {
   sed "s/^status:.*/status: $v/" "$f" > "$tmp" && mv "$tmp" "$f"
 }
 _repo_tag() {
+  # ASCII "-" (not an em-dash) for a missing repo: box cells are padded with printf %-*s,
+  # which counts BYTES, so a multibyte glyph would shift that row's right border. Keep the
+  # whole board ASCII (1 byte = 1 char = 1 cell) → alignment holds on any font/terminal.
   local repo; repo="$(_field "$1" repo)"
-  printf '%s' "${repo:-—}"
+  printf '%s' "${repo:--}"
 }
 # board cells are id-first (the id is the key you pass to show/start/finish — it must
 # never be truncated). Append " (repo)" only when it fits within the column's content
@@ -160,7 +163,7 @@ _board() {
       narch=$((narch + $(grep -cE '^\| [0-9]+ \|' "$_af" 2>/dev/null || true)))
     done
   done
-  local done_label=" ✅ DONE ($ntot"
+  local done_label=" DONE ($ntot"
   [ "$narch" -gt 0 ] && done_label="$done_label +$narch arch"
   done_label="$done_label)"
   local nt=${#T[@]} nd=${#D[@]} nn=${#N[@]} rows
@@ -168,7 +171,9 @@ _board() {
   [ $rows -eq 0 ] && rows=1
   local ln; ln="$(printf '─%.0s' $(seq 1 $W))"
   printf '┌%s┬%s┬%s┐\n' "$ln" "$ln" "$ln"
-  printf '│%-*s│%-*s│%-*s│\n' $W " 📋 TO DO ($nt)" $W " 🔵 DOING ($nd)" $W "$done_label"
+  # Header labels are ASCII-only (no emoji): emoji render 2 cells wide but printf counts them
+  # as 1 (or as their byte length), so they'd desync the header's │ separators from the rows.
+  printf '│%-*s│%-*s│%-*s│\n' $W " TO DO ($nt)" $W " DOING ($nd)" $W "$done_label"
   printf '├%s┼%s┼%s┤\n' "$ln" "$ln" "$ln"
   for ((i=0; i<rows; i++)); do
     printf '│ %-*.*s │ %-*.*s │ %-*.*s │\n' \
