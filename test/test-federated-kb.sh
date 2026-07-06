@@ -511,6 +511,39 @@ else
   err "kb dispatch did not route to the dispatcher (rc=$rc) — got: $out"
 fi
 
+# =====================================================================
+# PAUSE / RESUME — per-repo checkpoint (kb pause / resume / --auto / --done)
+# =====================================================================
+PRR="$TMP/pauseRepo"; mkdir -p "$PRR/kanban/todo" "$PRR/kanban/doing" "$PRR/kanban/done"
+RF="$PRR/handoff/resume.md"
+
+section "pause: kb pause writes a per-repo checkpoint with the note + mechanical state"
+RDA_KANBAN="$PRR/kanban" bash "$KB" pause "MY-NEXT-STEP-MARKER" >/dev/null 2>&1
+if [ -f "$RF" ] && grep -q 'MY-NEXT-STEP-MARKER' "$RF" && grep -q '## Mechanical state' "$RF"; then
+  ok "kb pause wrote handoff/resume.md with the note and mechanical state"
+else
+  err "kb pause did not write a proper checkpoint — got: $(cat "$RF" 2>&1)"
+fi
+
+section "pause: kb pause --auto preserves the human note, refreshes mechanical state (lean overwrite)"
+before_lines=$(wc -l < "$RF")
+RDA_KANBAN="$PRR/kanban" bash "$KB" pause --auto >/dev/null 2>&1
+after_lines=$(wc -l < "$RF")
+if grep -q 'MY-NEXT-STEP-MARKER' "$RF" && [ "$after_lines" -le "$((before_lines + 2))" ]; then
+  ok "--auto kept the note and did not grow the file into a log (overwrite, not append)"
+else
+  err "--auto lost the note or grew the file (before=$before_lines after=$after_lines)"
+fi
+
+section "resume: kb resume prints the checkpoint; --done clears it"
+out="$(RDA_KANBAN="$PRR/kanban" bash "$KB" resume 2>&1)"
+RDA_KANBAN="$PRR/kanban" bash "$KB" resume --done >/dev/null 2>&1
+if echo "$out" | grep -q 'MY-NEXT-STEP-MARKER' && [ ! -f "$RF" ]; then
+  ok "kb resume shows the checkpoint; kb resume --done removes it"
+else
+  err "resume/--done misbehaved (still exists=$([ -f "$RF" ] && echo yes || echo no)) — got: $out"
+fi
+
 # ---------------------------------------------------------------------------
 if [ "$FAIL" -eq 0 ]; then
   echo; echo "test-federated-kb: ✅ ALL GREEN"; exit 0
