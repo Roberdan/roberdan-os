@@ -3,6 +3,19 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.2.1] - 2026-07-06
+
+### Fixed
+- **CI-only failure of `test-federated-kb` (green on macOS, red on Linux CI).** `_mtime`
+  (`kanban/kb.sh`) and `_lock_epoch` (`factory/lib.sh`) tried BSD `stat -f %m` before GNU
+  `stat -c %Y`. That order is fine on macOS but broken on Linux, where `stat -f` means
+  `--file-system` and prints multi-line garbage for `%m`+file instead of failing cleanly — so
+  `_mtime` returned junk, the `mtime|root` row corrupted, and `kb handoff`'s aggregated view
+  rendered empty, failing the gate only in CI. Inverted to GNU-first (macOS's `stat -c` fails
+  cleanly, so the BSD fallback still runs). `test/validate.sh` now also surfaces the
+  `test-federated-kb` output on failure instead of hiding it behind a "see …" pointer — a
+  failing gate must show its evidence, which is what pinned this down.
+
 ## [v2.2.0] - 2026-07-06
 
 Non-breaking: the kanban goes federated and a multi-CLI dispatcher lands **wired but provably
