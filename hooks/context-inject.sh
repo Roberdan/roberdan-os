@@ -7,6 +7,15 @@
 
 ROOT="$HOME/GitHub/roberdan-os"
 echo "## roberdan-os — session context (auto-injected)"
+# A pending pause/resume checkpoint takes top billing — a fresh session (e.g. after a reboot)
+# must notice it immediately. See kb pause/resume + AGENTS.md § Pause & Resume.
+if [ -f "$ROOT/handoff/resume.md" ]; then
+  echo
+  echo "### ⏸️ PAUSED — a resume checkpoint is waiting. Roberto likely wants \"continua\"."
+  sed 's/^/  /' "$ROOT/handoff/resume.md"
+  echo "  (full: \`kb resume\` · clear when resumed: \`kb resume --done\`)"
+  echo
+fi
 echo "You are the orchestrator. For full context read (durable, not this chat):"
 echo "- \`$ROOT/handoff/latest.md\` — current thread, decisions, open threads"
 echo "- \`$ROOT/handoff/context-primer.md\` — how to load task-specific context (gbrain search)"

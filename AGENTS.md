@@ -112,6 +112,27 @@ compliance against a checklist, not that Roberto himself prefers the with-canon 
 
 ---
 
+## Pause & Resume (never lose work on a break/reboot)
+
+A canonical, cross-tool contract so Roberto can step away or reboot at any moment and lose
+nothing. Every agent that reads this file (Claude, Copilot, Codex, …) honors it.
+
+- **On "devo andare" / "metti in pausa" / "fermati" / "pausa" / "stop" / "vado":**
+  1. Bring work to a **safe point** — never leave git or a file half-written; commit a WIP phase
+     if needed (per-phase commits are the real durable checkpoint).
+  2. Run **`kb pause "<what I was doing + the precise next step>"`** — writes the lean, overwritten
+     per-repo checkpoint `<repo>/handoff/resume.md` (gitignored; cwd-scoped like `kb`/`kb handoff`).
+  3. Confirm it's safe to leave: "puoi andare; dì «continua» per riprendere."
+- **On "continua" / "continua da dove eri arrivato" / "riprendi":** read `kb resume` (the
+  `SessionStart` hook already surfaces a pending checkpoint) + `handoff/latest.md` + `kb`, continue
+  from the note's next step, then **`kb resume --done`** to clear it.
+- **Always-on auto-save:** the `Stop` hook ([`hooks/auto-checkpoint.sh`](hooks/auto-checkpoint.sh))
+  runs `kb pause --auto` after every turn — refreshes the mechanical state (HEAD, dirty count,
+  doing card), **preserves the human next-step note**. Lean by construction: one overwritten file,
+  fixed sections, never a growing log. So even an unannounced crash loses at most the current turn.
+
+---
+
 ## Human gates
 
 Autonomy ≠ black box. These **always** go through Roberto (direct message):
