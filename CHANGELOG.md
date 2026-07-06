@@ -3,6 +3,23 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.3.0] - 2026-07-06
+
+### Added
+- **The aggregated `kb` view is a real three-column kanban.** `kb all` / `kb g` (and `kb` run
+  outside any repo) now render the TO DO / DOING / DONE board shape aggregated across every
+  registered board — each card still tagged with its `repo:` — instead of a flat list. `_board`
+  gained `--all`: it collects all columns from home + the registry, sorts DONE newest-first
+  cross-repo, and sums archived-goal counts. The flat-list `_all` was removed (dead code once
+  both dispatch sites route to `_board --all`). `kb list`/`ls` stays the plain vertical list.
+
+### Fixed
+- **Font-independent board alignment.** The board's `│` separators didn't line up with the rows:
+  the header used emoji (📋 🔵 ✅), which render 2 cells wide but `printf %-*s` counts as 1, and a
+  missing `repo:` rendered as an em-dash (`—`, 3 bytes / 1 cell) — both desync the columns and both
+  are font/terminal-dependent. The board is now ASCII-only (1 byte = 1 char = 1 cell), so alignment
+  holds on any font, terminal, or bash version (verified: every `│` column at an identical position).
+
 ## [v2.2.1] - 2026-07-06
 
 ### Fixed
