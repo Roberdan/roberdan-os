@@ -189,6 +189,8 @@ usage() {
   echo '  kb                            view whole board (todo+doing+done); aggregate if outside a repo'
   echo '  kb all | kb g                 AGGREGATED view across every registered board (cards tagged repo:)'
   echo '  kb handoff                    per-repo handoff/latest.md (in a repo) or aggregated (outside)'
+  echo '  kb pause ["next step"]        write a resume checkpoint for this repo (safe to leave/reboot)'
+  echo '  kb resume [--all|--done]      read the checkpoint (--all aggregates; --done clears it)'
   echo '  kb list | kb ls                plain vertical list, all columns'
   echo '  kb todo | kb doing | kb done  view one column'
   echo '  kb show <id>                  show a card'
@@ -372,6 +374,47 @@ _sched() {
   return 0
 }
 
+# kb pause [note] — write a lean, overwritten resume checkpoint for the CURRENT repo (cwd-scoped,
+# same resolution as kb/kb handoff). Per-repo, gitignored, ephemeral. Fixed sections, never a log.
+_pause() {
+  local root rf note head subj dirty dcard f
+  root="${KB%/kanban}"; rf="$root/handoff/resume.md"; mkdir -p "$root/handoff"
+  note="${1:-}"
+  head="$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo '?')"
+  subj="$(git -C "$root" log -1 --format=%s 2>/dev/null || echo '?')"
+  dirty="$(git -C "$root" status --porcelain 2>/dev/null | grep -c . || true)"
+  dcard=""; for f in "$KB/doing"/*.md; do [ -e "$f" ] && { dcard="$(basename "$f" .md) — $(_field "$f" title)"; break; }; done
+  {
+    echo "# RESUME — $(basename "$root")  (paused $(date -u +%Y-%m-%dT%H:%M:%SZ))"
+    echo
+    echo "## Next step (what I was doing)"
+    echo "${note:-(no note — on resume, re-read handoff/latest.md + \`kb\`)}"
+    echo
+    echo "## Mechanical state"
+    echo "- HEAD: $head $subj"
+    echo "- uncommitted files: $dirty"
+    echo "- doing card: ${dcard:-(none)}"
+    echo
+    echo "_Resume: say \"continua\". Clear when resumed: \`kb resume --done\`._"
+  } > "$rf"
+  echo "paused → $rf"
+  echo "safe to reboot / leave; say \"continua\" to resume."
+}
+# kb resume [--all|--done] — read the checkpoint (current repo; --all or outside a repo aggregates)
+_resume() {
+  local root rf r any=0
+  root="${KB%/kanban}"; rf="$root/handoff/resume.md"
+  if [ "${1:-}" = "--done" ]; then rm -f "$rf"; echo "resume checkpoint cleared"; return 0; fi
+  if [ "${1:-}" = "--all" ] || [ "$KB_MATCHED" -eq 0 ]; then
+    while IFS= read -r r; do
+      [ -n "$r" ] && [ -f "$r/handoff/resume.md" ] && { echo "=== $(basename "$r") ==="; cat "$r/handoff/resume.md"; echo; any=1; }
+    done < <(_board_roots)
+    [ "$any" -eq 0 ] && echo "(no active pause checkpoints across registered repos)"
+    return 0
+  fi
+  if [ -f "$rf" ]; then cat "$rf"; else echo "(no active pause checkpoint in $(basename "$root"))"; fi
+}
+
 # kb all / kb g — the aggregated view is `_board --all` (real three-column kanban across
 # every registered board, cards tagged with repo:). A flat-list variant used to live here;
 # it was replaced by the board shape (design §2b, @rex #2; Roberto's preference for the
@@ -544,6 +587,8 @@ case "$cmd" in
   dispatch) bash "$ROOT/factory/dispatch-runner.sh" "$@" ;;   # restricted external-CLI dispatcher (DORMANT — always refuses)
   all|g) _board --all ;;           # aggregated three-column board across the registry
   handoff) _handoff ;;             # per-repo (in a repo) or aggregated live state
+  pause) _pause "${1:-}" ;;         # write a resume checkpoint (safe to leave)
+  resume) _resume "${1:-}" ;;       # read it (--all aggregates, --done clears)
   list|ls)                         # plain vertical list
     echo "TO DO:";  _list todo
     echo "DOING:";  _list doing
