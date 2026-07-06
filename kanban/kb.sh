@@ -379,7 +379,14 @@ _sched() {
 _pause() {
   local root rf note head subj dirty dcard f
   root="${KB%/kanban}"; rf="$root/handoff/resume.md"; mkdir -p "$root/handoff"
-  note="${1:-}"
+  if [ "${1:-}" = "--auto" ]; then
+    # lean auto-save (Stop hook): refresh mechanical state, PRESERVE the human next-step note.
+    note=""
+    [ -f "$rf" ] && note="$(awk '/^## Next step/{f=1;next} /^## Mechanical state/{f=0} f' "$rf" | sed '/^[[:space:]]*$/d')"
+    note="${note:-(auto-checkpoint — no explicit note yet; on resume re-read handoff/latest.md + \`kb\`)}"
+  else
+    note="${1:-}"
+  fi
   head="$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo '?')"
   subj="$(git -C "$root" log -1 --format=%s 2>/dev/null || echo '?')"
   dirty="$(git -C "$root" status --porcelain 2>/dev/null | grep -c . || true)"
