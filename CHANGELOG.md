@@ -3,6 +3,13 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.4.1] - 2026-07-06
+
+### Fixed
+- Completed v2.4.0: `kb pause --auto` (the lean variant the Stop hook and the test depend on) was
+  added to `kanban/kb.sh` but left unstaged in the phase-2 commit, so on `main` the auto-checkpoint
+  hook and its CI test were broken (green locally, red in CI). Now committed.
+
 ## [v2.4.0] - 2026-07-06
 
 ### Added
