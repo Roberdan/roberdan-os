@@ -15,10 +15,10 @@ err()     { printf "  FAIL: %s\n" "$1"; FAIL=1; }
 ok()      { printf "  ok: %s\n" "$1"; }
 
 # --- 1) Frontmatter lint -----------------------------------------------------
-section "frontmatter — agents (name, description, model, tools, constraints, version, maturity)"
+section "frontmatter — agents (name, description, model, effort, tools, constraints, version, maturity)"
 for a in $(find agents -maxdepth 1 -name '*.md' | LC_ALL=C sort); do
   miss=""
-  for k in name description model tools constraints version maturity; do
+  for k in name description model effort tools constraints version maturity; do
     grep -qE "^$k:" "$a" || miss="$miss $k"
   done
   # model must be quoted
@@ -100,6 +100,17 @@ else
   err "drift: bin/sync.sh --emit-only is non-deterministic across runs"
   printf '%s\n' "$diff_out" | sed 's/^/    /'
 fi
+# H1 guard (rex, HIGH 2026-07-07): the emitted settings snippet must contain NO
+# unexpanded $VAR — an undefined var expands empty on merge and kills the hooks silently.
+if [ -f "$d1/claude/settings-hooks.json" ]; then
+  if grep -qE '\$[A-Za-z_]' "$d1/claude/settings-hooks.json"; then
+    err "settings-hooks.json carries an unexpanded \$VAR (hooks would die silently on a fresh merge)"
+  else
+    ok "settings-hooks.json fully expanded (absolute hook paths, no \$VAR)"
+  fi
+else
+  err "settings-hooks.json missing from emitted output"
+fi
 rm -rf "$d1" "$d2"
 
 # --- 4) Shellcheck -----------------------------------------------------------
@@ -163,6 +174,10 @@ if bash test/test-sync-install.sh >/dev/null 2>&1; then ok "install symlink/skip
 # --- 8b) hooks/autofmt.sh input contract (stdin JSON; the old env-var API was a silent no-op) ---
 section "autofmt hook — stdin JSON input contract"
 if bash test/test-autofmt.sh >/dev/null 2>&1; then ok "autofmt receives files via stdin JSON (see bash test/test-autofmt.sh)"; else err "test-autofmt — see bash test/test-autofmt.sh"; fi
+
+# --- 8c) loop receipts emitter (schema, append-only, opt-in placement, no pollution) ---
+section "loop receipts — loop/receipt.sh emitter contract"
+if bash test/test-receipts.sh >/dev/null 2>&1; then ok "receipt emitter green (see bash test/test-receipts.sh)"; else err "test-receipts — see bash test/test-receipts.sh"; fi
 
 # --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
 # eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The
