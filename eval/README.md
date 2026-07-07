@@ -16,11 +16,90 @@ prefer the with-canon output. The judge is a third headless `claude` call, not R
 that gap requires his eyes on a sample of real transcripts — this harness produces exactly the
 sample worth showing him, it doesn't replace the showing.
 
+## The mechanism limitation — read this before trusting any result
+
+**The one recorded real run did not show the canon winning.** On the 8 core tasks it was 4–4
+(and 4–6 across all 10 judged runs once the 2 skill-type tasks are counted, favoring no-canon).
+That is a real result and it is reported honestly in `eval/results/report.md`.
+
+**Hold both hypotheses open — this section is not an alibi for the canon.** There are two honest
+readings of the loss, and this harness cannot yet distinguish them: (a) the measurement is
+impoverished (the mechanism gap below), so it under-counts what the canon does; **or (b) the canon
+genuinely adds less value than hoped, even when properly activated.** Both are live. The mechanism
+gap is real and documented below, but it does *not* license concluding "the canon would win if
+measured right" — that would be exactly the reward-hacking this repo forbids. The honest state is
+**"we don't know yet,"** not "the canon is under-measured." A better apparatus (below) could still
+return a null or negative result, and that would count.
+
+Here is the mechanism gap, stated plainly:
+
+- **Condition B prepends the canon as passive text.** `eval/run-eval.sh` reads the task's declared
+  `canon:` file(s) and pastes them verbatim ahead of the prompt, then makes a single headless
+  `claude -p` call. That is the *entire* activation.
+- **The real system does not work by pasting text.** In a live session the canon reaches the agent
+  through **selective activation**: `AGENTS.md`/`CLAUDE.md` point at behavior/rules on demand,
+  **hooks fire** (Stop-hook auto-pause, autofmt, post-task-sync — which itself runs leak-check), **subagents get
+  invoked** at the right moment (`@thor` as the done-gate, `@rex` for review, `@twin` for voice,
+  `@board` for red-teaming), and **skills load as multi-step procedures** when their trigger is
+  hit. None of that is a static string prepended to a prompt.
+- **So prepend-as-context under-represents the canon for *all* file types, not just skills.** The
+  README already conceded the narrow case — a `skills/*/skill.md` is written to be *invoked*, not
+  pasted, so `eval/report.sh` excludes those 2 tasks from the aggregate (see the "Skill-type canon
+  tasks" methodology note it generates). The broader, more important point: even a `behavior/*.md`
+  or `rules/*.md` file, pasted whole into a single one-shot call, loses the *timing* and *agentic
+  structure* that makes the canon work — it can dilute a short answer with tens of KB of guidance,
+  or trigger an intake/clarify ritual where the task wanted a direct take. A single passive prepend
+  cannot reproduce "the right agent fired at the right moment."
+
+**What a realistic eval would need** (and what this harness does **not** do — stated so nobody
+mistakes the aspiration for a delivered capability):
+
+- Run each condition through the **actual activation path**: a session with `AGENTS.md`/`CLAUDE.md`
+  wired, hooks installed (`bin/install-hooks.sh`), and subagents/skills reachable — so the canon
+  is *selected and invoked*, not *pasted*. Condition A would be the same harness with that wiring
+  removed.
+- Judge **multi-turn transcripts and side effects** (did `@thor` block a false done? did a hook
+  catch a leak? did the paused plan actually get driven to its terminal condition?), not a single
+  text blob — because most of what the canon does is procedural and only visible over a trajectory.
+- Use **repeated trials** and ideally a **cross-family judge** to separate signal from variance and
+  from same-family self-preference.
+
+Building that is future work; it is **not** built here. Tasks `13-release-confirm-ci` and
+`14-resume-whole-plan` (added below) are execution-flavored precisely to make this visible: run
+under the current prepend harness they *may* show the same confound as the skill tasks (a
+procedural, agentic behavior flattened into one passive answer). If they lose, that is *consistent
+with* the mechanism limitation — but it is **not** pre-committed to only ever indict the harness:
+a loss under a *properly activated* eval would instead be a signal about the canon itself, and this
+apparatus can't yet tell which. Note also that the mechanism gap is sharper for `skills/*.md` (a
+skill has a formal invocation protocol the prepend flattens) than for `behavior/*.md`/`rules/*.md`,
+which genuinely are meant to reach a session as read context — so "prepend under-represents
+everything equally" is itself only partly true. Fixing the tasks (below) makes them more realistic;
+it does **not** fix the mechanism, and this PR does not claim to.
+
+## Fixture inventory vs. what's been run
+
+Fixtures on disk and fixtures with a recorded result are different numbers — do not conflate them:
+
+- **17 fixtures exist** on disk (`eval/tasks/01-*.md` … `17-*.md`).
+- **10 have ever been run/judged** in a recorded report: `eval/results/report.md` (generated
+  2026-07-02, covering tasks `01`–`10`). That file is **gitignored** (`eval/results/` is generated
+  output, not tracked) — no run snapshot is committed to the repo; it lives only on the machine
+  that generated it.
+- **7 fixtures are NOT-YET-RUN**: `11` and `12` were added *after* the 2026-07-02 run and never
+  appear in it; `13`–`17` are new in this change. None has a recorded verdict.
+
+So "4–4 / 4–6" refers to the 10-task 2026-07-02 run, not to all 17 fixtures. Re-running
+`eval/run-eval.sh && eval/judge.sh && eval/report.sh` on a machine with a real `claude` binary is
+what would produce current-canon numbers across all 17 — and even then, subject to the mechanism
+limitation above.
+
 ## Method
 
-**N=12 representative tasks × 2 conditions × blind pairwise judging.**
+**17 representative task fixtures × 2 conditions × blind pairwise judging.** Fixture count and
+*run* count are not the same — see "Fixture inventory vs. what's been run" below before reading any
+numbers.
 
-1. **Tasks** (`eval/tasks/*.md`) — 12 small, self-contained fixtures across the 6 surface
+1. **Tasks** (`eval/tasks/*.md`) — small, self-contained fixtures across the 6 surface
    categories the canon most visibly shapes: `code-fix`, `code-review`, `email-draft`,
    `status-update`, `triage`, `done-claim`. Each is written so a canon-naive agent's *default*
    behavior plausibly violates something specific — claiming done without test output, writing a
@@ -126,7 +205,7 @@ verified in this container:
 **To get the real numbers, on a machine with Claude Code installed:**
 
 ```bash
-eval/run-eval.sh          # condition A + B for all 12 tasks -> eval/results/<id>/{a,b}.md
+eval/run-eval.sh          # condition A + B for all 17 tasks -> eval/results/<id>/{a,b}.md
 eval/judge.sh              # blind pairwise judging -> eval/results/<id>/verdict.md
 eval/report.sh              # aggregate -> eval/results/report.md
 ```
@@ -141,7 +220,7 @@ want to keep a dated snapshot; otherwise regenerate on demand.
 
 | Path | What |
 |---|---|
-| `eval/tasks/*.md` | 12 task fixtures (prompt + checklist + `canon:` pointer) |
+| `eval/tasks/*.md` | 17 task fixtures (prompt + checklist + `canon:` pointer) — 10 run, 7 NOT-YET-RUN; see "Fixture inventory vs. what's been run" |
 | `eval/lib.sh` | shared bash helpers: frontmatter/section parsing, `claude` resolution, JSON extraction, banner stripping |
 | `eval/run-eval.sh` | generates condition A/B outputs |
 | `eval/judge.sh` | blind pairwise judging |
@@ -151,8 +230,14 @@ want to keep a dated snapshot; otherwise regenerate on demand.
 
 ## Caveats (see also `eval/report.sh`'s closing section, generated fresh each run)
 
-- **Small N.** 12 hand-written fixtures, not a representative sample of everything the canon
-  touches.
+- **Small N, and most not yet run.** 17 hand-written fixtures, of which only 10 have a recorded
+  result (see "Fixture inventory vs. what's been run"); not a representative sample of everything
+  the canon touches.
+- **Passive prepend under-represents the canon.** The single biggest caveat — see "The mechanism
+  limitation" up top. A null/negative result measures this impoverished activation path, not the
+  live system (hooks, subagents, on-demand skills), so it is **weak evidence in either
+  direction** — neither proof the canon lost, nor proof it would win if properly measured. The
+  honest read stays "we don't know yet" (per that section's "hold both hypotheses open").
 - **Single judge model, same family as the subject — declared self-preference risk.** Judge and
   subject share whatever blind spots the underlying model has — the same caveat
   `docs/roberdan-os-paper-en.md` makes about focus-group persona sycophancy: a simulated evaluator
