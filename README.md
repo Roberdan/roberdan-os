@@ -62,6 +62,7 @@ Day-to-day operator guide (kb, factory, recall, gates): [`docs/USAGE.md`](docs/U
 | Meta-loop | `learn/` (capture+distill) + `evolve/` (weekly upstream watch) |
 | Eval (does the canon work?) | [`eval/README.md`](eval/README.md) — with/without-canon A/B + blind judge, agent-agnostic (`RDA_EVAL_AGENT_CMD`), mirrors §9.1 of `docs/roberdan-os-paper-en.md` |
 | Test suite | `test/validate.sh` (full CI gate) + `test/test-*.sh` (factory-kb, kb-views, federated-kb, sync-install, autofmt, fork-merge, leak-check) |
+| Install | `bin/bootstrap.sh` (agents+kb) · `bin/install-hooks.sh --apply` (hooks, idempotent) · `bin/sync.sh --install` (skills) |
 | Per-platform wrappers | `platforms/` — generated locally by `bin/sync.sh --emit-only`, gitignored, not committed |
 | Web bundle | `bin/make-bundle.sh` → pasteable doc (excludes `private/`) |
 
@@ -112,18 +113,21 @@ git clone https://github.com/Roberdan/roberdan-os.git
 cd roberdan-os
 bin/bootstrap.sh                    # generates wrappers, symlinks agents into ~/.claude/agents
                                      # + kb into ~/.local/bin, runs test/validate.sh
+bin/install-hooks.sh --apply        # merges the five-event hook set into ~/.claude/settings.json
+                                     # (idempotent, backs up first — makes Pause & Resume always-on)
 bin/sync.sh --install               # symlinks the skill wrappers into ~/.claude/skills (and
                                      # ~/.copilot/skills if present) — validate's tool-coverage
                                      # gate expects this once ~/.claude exists
 ```
 
-`bootstrap.sh` is idempotent and non-destructive: it never overwrites `~/.claude/CLAUDE.md` or
-`settings.json` — it prints the blocks to add by hand, including the **generated hook snippet**
-`platforms/claude/settings-hooks.json` (SessionStart context-inject, PreToolUse guards,
-PostToolUse autofmt, PreCompact + Stop auto-checkpoint: merging it is what makes the canon's
-Pause & Resume "always-on"). Pass `--dossier /path/to/profile.md` only if you have Roberto's
-own confidential profile — everyone else skips that flag and the twin degrades gracefully to
-`[placeholder]`.
+Everything the engine needs is installed by those three commands — no hand-editing of JSON.
+`install-hooks.sh` is **additive and non-destructive**: it only adds roberdan-os hook entries
+that aren't already present (dedup by command), never touches your other hooks, and backs up
+`settings.json` before writing (dry-run without `--apply`). The only genuinely manual step left
+is a one-line pointer block in your *personal* `~/.claude/CLAUDE.md` (curated config the engine
+deliberately never overwrites); `bootstrap.sh` prints it. Pass `--dossier /path/to/profile.md`
+only if you have Roberto's own confidential profile — everyone else skips that flag and the twin
+degrades gracefully to `[placeholder]`.
 
 ## License
 
