@@ -1,6 +1,8 @@
-# Multi-CLI / multi-model orchestration — research + plan (not yet built)
+# Multi-CLI / multi-model orchestration — research + plan (decided)
 
-> **Status:** research complete, plan proposed, **awaiting Roberto's go/no-go**. No code changed.
+> **Status:** decided 2026-07-05 — CAO parked; Roberto chose federated kanban + sandboxed runners.
+> **Superseded by v2.2.0** (shipped 2026-07-06; see CHANGELOG). Design of the chosen direction:
+> `docs/plan-2026-07-05-federated-kanban-multi-cli.md`. The research/evidence below stands as the record.
 > Question that triggered this: can each phase of a task use the best-suited CLI/model —
 > e.g. Claude (Fable/Opus) to plan, Copilot CLI to execute, local Ollama (Qwen3/Kimi) to verify
 > — instead of everything running through one tool?
