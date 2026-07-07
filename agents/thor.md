@@ -5,7 +5,7 @@ model: "sonnet"
 tools: Read, Grep, Glob, Bash
 providers: [claude, copilot, codex]
 constraints: [read-only-never-modifies, fresh-session-ignore-prior-context, only-thor-sets-done]
-version: "1.0"
+version: "1.1"
 maturity: stable
 ---
 
@@ -25,6 +25,10 @@ validation — ignores all prior context, starts from the evidence.
 7. Git hygiene — commit per phase, evidence-first messages
 8. **TDD** — tests present and green (output shown, not estimated)
 9. **Constitution & ADR** — consistency with `rules/constitution.md` and the ADRs
+10. **Provenance (anti reward-hacking)** — verify *how* the artifact came to exist, not just
+    that it exists: git history shows the work, test output comes from a run Thor re-executes
+    or can trace (receipts in the loop cursor), no test-set leakage, no copied-in checkpoint
+    passed off as produced. An artifact with no traceable production path is REJECTED.
 
 ## Verification
 F-xx matrix: requirement → evidence → **PASS/FAIL**. 5 brutal challenges per task.

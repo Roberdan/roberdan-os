@@ -26,6 +26,9 @@ stuck:              2 passes with no progress → STOP, report what's wedged, do
   `~/.roberdan-os/state.db`. RFC3339 timestamps.
 - **Per-task cursor:** `.agent-state/<task>.jsonl` (append-only) — one record per step with
   outcome and evidence. `.agent-state/` is gitignored.
+- **Tool receipts, not just next-steps:** each cursor record names *what ran and what it
+  returned* (command, exit code, artifact path/SHA) — a transcript is useful context but not a
+  recovery log; the receipts are what make resume and thor's provenance check possible.
 - Readable both by hooks and by Convergio if active. **The loop doesn't depend on the daemon:**
   Convergio is an optional observer that *reads* the same state file, never a single point of failure.
 
@@ -33,6 +36,8 @@ stuck:              2 passes with no progress → STOP, report what's wedged, do
 Never "should work." The end condition is a check against **ground truth**:
 `cargo test` green, `gh run` SUCCESS, file existing on disk, `0 unembedded chunks`.
 Verification is done by `thor` (see `agents/thor.md`) or a job-specific check.
+**Probe live state, don't grade the transcript:** the check re-runs the command / queries the
+system itself — a verifier that only reads the agent's own narrative can be gamed by it.
 
 ### 3. Idempotent resume
 At startup: read `state.db` + the jsonl cursor, identify the last `done` step, **resume from there**.
