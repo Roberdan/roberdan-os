@@ -32,7 +32,7 @@ Here is the mechanism gap, stated plainly:
   `claude -p` call. That is the *entire* activation.
 - **The real system does not work by pasting text.** In a live session the canon reaches the agent
   through **selective activation**: `AGENTS.md`/`CLAUDE.md` point at behavior/rules on demand,
-  **hooks fire** (Stop-hook auto-pause, post-task-sync, autofmt, leak-check), **subagents get
+  **hooks fire** (Stop-hook auto-pause, autofmt, post-task-sync — which itself runs leak-check), **subagents get
   invoked** at the right moment (`@thor` as the done-gate, `@rex` for review, `@twin` for voice,
   `@board` for red-teaming), and **skills load as multi-step procedures** when their trigger is
   hit. None of that is a static string prepended to a prompt.
