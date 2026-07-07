@@ -3,17 +3,31 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
-## [v2.4.2] - 2026-07-06
+## [v2.6.0] - 2026-07-07
+
+### Changed
+- **Resume the WHOLE plan, not just the paused task.** The pause checkpoint is single-task by
+  design, and on a session restart the agent tunneled on it — it drove only the checkpointed
+  next-step and looked at the rest of the backlog only when prompted. Fixed on two levers: (1)
+  `kb resume` now prints the checkpoint **plus the live backlog** (todo + doing) with a reminder
+  that the checkpoint is the re-entry *point*, the board + `handoff/latest.md` are the *scope*; (2)
+  AGENTS.md § Pause & Resume reworded — "continua/riprendi" means re-hydrate and drive the whole
+  plan forward, every open thread and pending decision, with human gates still applying on resume
+  (`todo->doing` stays Roberto's; never auto-cross a gate).
 
 ### Fixed
-- **Skill/agent wrappers broke skill loading in Copilot CLI.** `bin/sync.sh` wrote the frontmatter
-  `description:` as an *unquoted* YAML scalar. Descriptions contain `: ` (colon+space) and
-  apostrophes, so any such description failed to parse (`mapping values are not allowed`) — silently
-  dropping the affected skills at load time (`focus-group`, `premortem`, `problem-validation` were
-  the casualties). The generator now emits every description as a double-quoted, escaped scalar
-  (new `yaml_dq` helper, applied to both skill and agent wrappers). Added a regression guard in
-  `test/test-sync-install.sh` that emits into a clean temp dir and asserts every generated wrapper
-  description is a quoted YAML scalar.
+- **`kb init` no longer pollutes a shared repo's history, and ignores the right file.** Two coupled
+  bugs (Roberto's decision, option B): (1) it appended federation ignores to the committed
+  `.gitignore`, so federating a repo wrote Roberto-machine-only noise into shared history — now they
+  go to the **local `.git/info/exclude`** (self-sufficient on any machine, unlike a global
+  `core.excludesfile`, without touching shared git state; shared across worktrees via the common git
+  dir). (2) It ignored `handoff/latest.md` (roberdan-os's *tracked* canon file) instead of
+  `handoff/resume.md` (the ephemeral per-repo pause checkpoint `kb pause` actually writes) — so the
+  rule matched a file that never exists in siblings. This was the exact stale-rule mess found in
+  Fabrica/MirrorBuddy/convergio, whose committed `.gitignore` lines came from the old `kb init`.
+  Test strengthened: asserts `resume.md` is excluded and the committed `.gitignore` is never touched.
+  Federation design + migration docs aligned to the new mechanism (the gate to federate a *shared*
+  team repo stands — it's now an organizational, not a git-history, decision).
 
 ## [v2.5.0] - 2026-07-06
 
@@ -25,6 +39,18 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   the touched part, "should/probably" ≠ "is", prefer a mechanical gate that carries the evidence,
   and on a wrong claim say so first with the fact. Documents the real 2026-07-06 miss (v2.4.0
   announced released while its CI was red). The lever is verification + gates, not temperature.
+
+## [v2.4.2] - 2026-07-06
+
+### Fixed
+- **Skill/agent wrappers broke skill loading in Copilot CLI.** `bin/sync.sh` wrote the frontmatter
+  `description:` as an *unquoted* YAML scalar. Descriptions contain `: ` (colon+space) and
+  apostrophes, so any such description failed to parse (`mapping values are not allowed`) — silently
+  dropping the affected skills at load time (`focus-group`, `premortem`, `problem-validation` were
+  the casualties). The generator now emits every description as a double-quoted, escaped scalar
+  (new `yaml_dq` helper, applied to both skill and agent wrappers). Added a regression guard in
+  `test/test-sync-install.sh` that emits into a clean temp dir and asserts every generated wrapper
+  description is a quoted YAML scalar.
 
 ## [v2.4.1] - 2026-07-06
 
