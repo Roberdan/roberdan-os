@@ -123,9 +123,13 @@ nothing. Every agent that reads this file (Claude, Copilot, Codex, …) honors i
   2. Run **`kb pause "<what I was doing + the precise next step>"`** — writes the lean, overwritten
      per-repo checkpoint `<repo>/handoff/resume.md` (gitignored; cwd-scoped like `kb`/`kb handoff`).
   3. Confirm it's safe to leave: "puoi andare; dì «continua» per riprendere."
-- **On "continua" / "continua da dove eri arrivato" / "riprendi":** read `kb resume` (the
-  `SessionStart` hook already surfaces a pending checkpoint) + `handoff/latest.md` + `kb`, continue
-  from the note's next step, then **`kb resume --done`** to clear it.
+- **On "continua" / "continua da dove eri arrivato" / "riprendi":** the checkpoint is the
+  re-entry **POINT** (where I was), not the **SCOPE** (everything in flight). Read `kb resume`
+  (now prints the pending checkpoint **plus the live backlog** — todo + doing; the `SessionStart`
+  hook surfaces it too) + `handoff/latest.md`, then **re-hydrate and drive the WHOLE plan forward**
+  — every open thread and pending decision, not only the paused task's next step. Human gates still
+  apply on resume: `todo->doing` stays Roberto's, never auto-cross a gate. Clear the checkpoint with
+  **`kb resume --done`** once truly resumed.
 - **Always-on auto-save:** the `Stop` hook ([`hooks/auto-checkpoint.sh`](hooks/auto-checkpoint.sh))
   runs `kb pause --auto` after every turn — refreshes the mechanical state (HEAD, dirty count,
   doing card), **preserves the human next-step note**. Lean by construction: one overwritten file,
