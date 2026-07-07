@@ -420,6 +420,16 @@ _resume() {
     return 0
   fi
   if [ -f "$rf" ]; then cat "$rf"; else echo "(no active pause checkpoint in $(basename "$root"))"; fi
+  # Resume is the WHOLE plan, not just the checkpoint above. The checkpoint is the
+  # re-entry POINT (where I was); the board + handoff are the SCOPE (everything in
+  # flight). Surface the live backlog here so a restart re-hydrates all of it, not
+  # only the paused task — the failure mode this exists to prevent.
+  echo
+  echo "── Resume the WHOLE plan, not just the checkpoint above — live backlog: ──"
+  echo "  TO DO:";  _list todo
+  echo "  DOING:";  _list doing
+  echo "  Open threads + decisions live in handoff/latest.md — read it before restarting."
+  echo "  Gates still apply on resume: todo->doing is Roberto's; never auto-cross a human gate."
 }
 
 # kb all / kb g — the aggregated view is `_board --all` (real three-column kanban across
