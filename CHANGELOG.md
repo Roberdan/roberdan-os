@@ -3,6 +3,38 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.7.1] - 2026-07-07
+
+### Fixed
+- **H1 (rex, HIGH): generated `settings-hooks.json` carried literal `$RDA_OS`** — a variable
+  defined nowhere. A verbatim merge on a fresh install/fork expanded it empty
+  (`/hooks/main-guard.sh`) and the security guards died silently. `bin/sync.sh` now expands
+  the repo root at generation time (as `bootstrap.sh` already did); same expansion for the
+  codex README snippet. New `validate.sh` guard: the emitted snippet must contain no
+  unexpanded `$VAR` (`ok: settings-hooks.json fully expanded`).
+
+### Added
+- **Audit addendum §5** in `docs/report-2026-07-07-best-practices-2026.md` — third-session
+  independent verification of the v2.7.0 release claims: actor map corrected (THREE concurrent
+  sessions, not two), 6/6 release claims re-verified empirically, AGENTS.md session-tax measure
+  updated to the post-compression truth (161 lines / ~1.259 words ≈ ~1.7k tokens; the §4 table
+  reported the pre-compression 183 / ~2.9k).
+- **Tool-receipts emitter wired for real** (closes the rex HIGH "declared but unwired" gap,
+  Roberto's go): `loop/receipt.sh` appends JSONL receipts `{ts, task, cmd, exit, artifact,
+  note}` to the loop cursor; the Stop-hook auto-checkpoint emits a mechanical per-turn receipt
+  (`session.jsonl`) automatically. Placement is opt-in-safe (in-repo `.agent-state/` only where
+  already ignored; else `$RDA_HOME/state/receipts/<repo>/`). `test/test-receipts.sh` (5 cases)
+  wired into validate.sh §8c; loop-protocol + thor gate #10 updated to the real contract.
+- **Docs freshness pass** (audit H1-H4/M1-M10/L1-L4, all findings verified): bootstrap now
+  installs the `kb` symlink and points its manual steps at the generated five-event hook
+  snippet; QUICKSTART adds the `bin/sync.sh --install` step (its ALL-GREEN promise was false
+  for forkers); README status/tables/prerequisites refreshed (python3 required); `docs/plan.md`
+  banner'd as historical; kanban/USAGE document `kb pause/resume` + federation; scheduling
+  cadence corrected (evolve = Sat 02:00); factory-protocol dead flag `RDA_FACTORY_PARALLEL`
+  marked planned-not-implemented; ARCHITECTURE notes the native CLAUDE.md symlink path.
+- **validate.sh**: agent frontmatter lint now requires `effort:` (so the new field can't
+  silently drift off an agent) + §8c receipts gate.
+
 ## [v2.7.0] - 2026-07-07
 
 ### Added

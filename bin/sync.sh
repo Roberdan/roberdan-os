@@ -190,6 +190,11 @@ EOF
   }
 }
 EOF
+  # H1 (rex, HIGH 2026-07-07): $RDA_OS is defined NOWHERE — a verbatim merge of the
+  # snippet on a fresh install/fork expands it empty ("/hooks/main-guard.sh") and the
+  # guards die silently. Expand the repo root at generation time, like bootstrap.sh.
+  sed "s|[\$]RDA_OS|$ROOT|g" "$d/settings-hooks.json" > "$d/settings-hooks.json.tmp" \
+    && mv "$d/settings-hooks.json.tmp" "$d/settings-hooks.json"
 }
 
 emit_copilot() {
@@ -240,6 +245,9 @@ at the roberdan-os root (or symlink `AGENTS.md` into the target repo).
 Config snippet (if an explicit instructions file is needed):
     codex --instructions "$RDA_OS/AGENTS.md"
 EOF
+  # Same H1 expansion for the doc snippet — a copy-pasted command must be runnable.
+  sed "s|[\$]RDA_OS|$ROOT|g" "$d/README.md" > "$d/README.md.tmp" \
+    && mv "$d/README.md.tmp" "$d/README.md"
 }
 
 emit_hermes() {
