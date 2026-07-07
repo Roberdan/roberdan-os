@@ -31,7 +31,7 @@ for c in "$quar"/*.md; do
   [ -n "$body" ] || continue
   # Privacy hard-gate before writing to the vault (real deny-list, defense-in-depth).
   denylist=""
-  for d in "$HOME/.roberdan-os/private/.denylist" "$(dirname "$0")/../private/.denylist"; do
+  for d in "$RDA_HOME/private/.denylist" "$(dirname "$0")/../private/.denylist"; do
     [ -f "$d" ] && { denylist="$d"; break; }
   done
   if [ -n "$denylist" ] && printf '%s' "$body" | grep -iEf <(grep -vE '^[[:space:]]*($|#)' "$denylist") >/dev/null 2>&1; then
