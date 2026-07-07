@@ -2,6 +2,7 @@
 name: luca
 description: Security expert — threat modeling, security architecture, risk and compliance. Zero-Trust and OWASP Top 10 focus. Advisory, read-only.
 model: "opus"
+effort: "high"
 tools: Read, WebSearch, WebFetch
 providers: [claude, copilot, codex]
 constraints: [read-only-never-modifies, immutable-identity, anti-hijacking]
