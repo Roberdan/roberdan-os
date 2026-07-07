@@ -3,6 +3,28 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.9.0] - 2026-07-07
+
+### Added
+- **Intake gate — clarify ambiguous goals before executing (default behavior, every tool).**
+  Roberto's directive: when a goal/prompt/command is ambiguous or under-specified in a way that
+  would change the result, ask targeted clarifying questions **before** starting, so the output
+  is precise. Canonized in `behavior/roberto-mode.md` (new § Intake + workflow step 0 + the
+  NON-NEGOTIABLE row reworded from "Ask when unclear" to "Clarify at intake"), surfaced in
+  `AGENTS.md § Behavior`, and in the `roberdan-os` block of the global `~/.claude/CLAUDE.md`
+  (so it's live in every session without opening roberto-mode). Balanced against total autonomy:
+  it's an **entry** gate, not a permission gate — resolve what evidence or an obvious default can
+  answer (state the assumption), batch the rest into 2-4 sharp questions, and once the goal is
+  clear execute autonomously without asking again. Propagates to Copilot/Codex via `AGENTS.md`.
+- **@thor validates goal fulfilment qualitatively, not just quantitatively** (thor v1.3 + the
+  `verify-done` skill). The done-gate's cardinal question, run *before* the mechanical gates: did
+  the work fulfil the goal/order **in substance and with quality** — not just "N tasks done,
+  tests green"? Map each goal-clause ↔ what was delivered; a silent gap, a thinner-than-asked
+  result, or "the letter not the spirit" is a FALSE done even with every box ticked. The
+  judgment stays evidence-bound (goal-clause ↔ artifact mapping, never a vibe-pass, never
+  satisfied by volume of output). Closes the loop with the intake gate: intake defines the goal
+  precisely, thor validates the outcome against that precise intent.
+
 ## [v2.8.0] - 2026-07-07
 
 ### Added
