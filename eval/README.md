@@ -20,10 +20,16 @@ sample worth showing him, it doesn't replace the showing.
 
 **The one recorded real run did not show the canon winning.** On the 8 core tasks it was 4–4
 (and 4–6 across all 10 judged runs once the 2 skill-type tasks are counted, favoring no-canon).
-That is a real result and it is reported honestly in `eval/results/report.md`. It does **not**
-mean "the canon is worthless" — it means **this harness measures a specific, impoverished version
-of the canon**, and a null/negative result here is a fact about *this setup*, not about the system
-as it actually runs.
+That is a real result and it is reported honestly in `eval/results/report.md`.
+
+**Hold both hypotheses open — this section is not an alibi for the canon.** There are two honest
+readings of the loss, and this harness cannot yet distinguish them: (a) the measurement is
+impoverished (the mechanism gap below), so it under-counts what the canon does; **or (b) the canon
+genuinely adds less value than hoped, even when properly activated.** Both are live. The mechanism
+gap is real and documented below, but it does *not* license concluding "the canon would win if
+measured right" — that would be exactly the reward-hacking this repo forbids. The honest state is
+**"we don't know yet,"** not "the canon is under-measured." A better apparatus (below) could still
+return a null or negative result, and that would count.
 
 Here is the mechanism gap, stated plainly:
 
@@ -60,11 +66,15 @@ mistakes the aspiration for a delivered capability):
 
 Building that is future work; it is **not** built here. Tasks `13-release-confirm-ci` and
 `14-resume-whole-plan` (added below) are execution-flavored precisely to make this visible: run
-under the current prepend harness they would likely show the *same* confound as the skill tasks
-(a procedural, agentic behavior flattened into one passive answer) — which is evidence **for** this
-limitation, not against the canon. The honest conclusion from the recorded run is therefore: *this
-measurement apparatus cannot yet see most of what the canon does.* Fixing the tasks (below) makes
-them more realistic; it does **not** fix the mechanism, and this PR does not claim to.
+under the current prepend harness they *may* show the same confound as the skill tasks (a
+procedural, agentic behavior flattened into one passive answer). If they lose, that is *consistent
+with* the mechanism limitation — but it is **not** pre-committed to only ever indict the harness:
+a loss under a *properly activated* eval would instead be a signal about the canon itself, and this
+apparatus can't yet tell which. Note also that the mechanism gap is sharper for `skills/*.md` (a
+skill has a formal invocation protocol the prepend flattens) than for `behavior/*.md`/`rules/*.md`,
+which genuinely are meant to reach a session as read context — so "prepend under-represents
+everything equally" is itself only partly true. Fixing the tasks (below) makes them more realistic;
+it does **not** fix the mechanism, and this PR does not claim to.
 
 ## Fixture inventory vs. what's been run
 
