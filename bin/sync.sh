@@ -152,9 +152,16 @@ EOF
   done
 
   # Hook snippet for settings.json (merge by hand, not installed).
+  # SessionStart has NO matcher on purpose: it fires on startup/resume/clear/compact,
+  # so the context re-injects itself after a compaction too (2026 compaction-resilience).
+  # PreCompact checkpoints durable state BEFORE the window is compressed; Stop keeps the
+  # canonical always-on auto-checkpoint (AGENTS.md § Pause & Resume).
   cat > "$d/settings-hooks.json" <<'EOF'
 {
   "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/context-inject.sh 2>/dev/null || true" }] }
+    ],
     "PreToolUse": [
       { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/main-guard.sh" }] },
       { "matcher": "Bash",        "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/bash-guard.sh" }] }
@@ -162,10 +169,14 @@ EOF
     "PostToolUse": [
       { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/autofmt.sh" }] }
     ],
+    "PreCompact": [
+      { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/auto-checkpoint.sh" }] }
+    ],
     "Stop": [
       { "hooks": [
           { "type": "command", "command": "$RDA_OS/hooks/verify-done.sh" },
-          { "type": "command", "command": "$RDA_OS/hooks/post-task-sync.sh" }
+          { "type": "command", "command": "$RDA_OS/hooks/post-task-sync.sh" },
+          { "type": "command", "command": "bash $RDA_OS/hooks/auto-checkpoint.sh" }
       ] }
     ]
   }
