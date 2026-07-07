@@ -3,6 +3,49 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.10.0] - 2026-07-07
+
+Two parallel worktree+PR streams (the new norm — see below), each @rex-reviewed and @thor
+qualitative-gated, merged into main. Addresses two of the honest gaps the v2.7.1 README disclosed.
+
+### Added
+- **The self-improving meta-loop now actually promotes** (PR #2, closes the biggest prose-vs-reality
+  gap). Before: `learn→ontology` captured only boilerplate, `distill` wrote `class: TODO` always,
+  `curate` skipped TODO → **zero promotions ever**. Now: `learn/classify.sh` is a real deterministic
+  classifier over ADR-0001's 5-class taxonomy (no network/LLM, CI-safe); `distill` emits a real
+  class; `curate` promotes human-approved candidates. Promotion stays **human-gated** (`approved:
+  true` is Roberto's). `test/test-metaloop.sh` proves capture→distill→approve→promote end-to-end.
+  - **Approval gate hardened** (rex HIGH): the gate now reads the YAML frontmatter block only
+    (`_frontmatter()`), so a captured signal whose body begins `approved: true …` can no longer
+    self-promote past the human gate. Regression-tested.
+  - **Backlog unstuck** (rex MED): `learn/backfill-classify.sh` re-classified the real 619-item
+    `class: TODO` backlog — 617 legacy `- session … cwd=` boilerplate pings archived, 2 real
+    learnings surfaced for approval, **0 promotions, vault untouched** (backup taken first).
+  - **Ephemera filter fixed**: it missed the bulleted legacy form (`- session … cwd=`), so pings
+    slipped into quarantine misclassified — now dropped, with a unit case that also proves it
+    doesn't over-match a real sentence mentioning "session"/"cwd".
+- **Realistic eval fixtures + honest mechanism limit** (PR #1). 5 new task fixtures
+  (`eval/tasks/13-17`) grounded in real public repo work (release-confirm-CI, resume-whole-plan,
+  surgical-edit, review-comment, warm-intro), privacy-safe. `eval/README.md` now states plainly
+  that the harness injects the canon as *passive prepended text* — which under-represents the live
+  system (selective activation, hooks, subagents) — and **holds both hypotheses open**: the null
+  result may be an impoverished measurement OR the canon genuinely adding less value than hoped.
+  Honest state: "we don't know yet." No numbers fudged (the 4–6 result stands). Fixture inventory
+  reconciled: 17 exist, 10 ever run, 7 not-yet-run.
+- **Parallel-work norm** (`rules/best-practices.md` v3.6.0): parallelizing inside one repo = one
+  `git worktree` + branch + PR per stream, disjoint file ownership, shared merge-prone files bumped
+  once sequentially, each stream ends in a PR (CI → @rex → @thor → merge). Never two writers on one
+  checkout. Born from today's concurrent-session scar.
+- **Intake gate + qualitative done-gate** (v2.9.0, folded in): clarify ambiguous goals before
+  executing; @thor validates goal fulfilment in substance, not just green tests. Both proved their
+  worth this release — @thor rejected an eval framing that was quantitatively fine but
+  interpretively one-sided, catching a dishonesty the mechanical checks couldn't.
+
+### Changed
+- README "Real vs. aspirational" map updated: the `learn→ontology` meta-loop moves from
+  *scaffolding* to *works (human-gated)*; only `evolve` (never fired) and deliberate auto-promotion
+  remain in the scaffolding column.
+
 ## [v2.9.0] - 2026-07-07
 
 ### Added
