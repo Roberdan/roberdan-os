@@ -195,7 +195,7 @@ usage() {
   echo '  kb todo | kb doing | kb done  view one column'
   echo '  kb show <id>                  show a card'
   echo ' federation:'
-  echo '  kb init [repo]                make a repo safe to hold cards (gitignore+de-track+hook+register; idempotent)'
+  echo '  kb init [repo]                make a repo safe to hold cards (local-exclude+de-track+hook+register; idempotent)'
   echo '  kb lint                       schema lint: runner: grammar + human_gates:↔human-only'
   echo '  kb dispatch <id> [cli]        restricted external-CLI dispatcher — DORMANT (hard-wired to refuse)'
   echo ' gates:'
@@ -480,18 +480,25 @@ _kb_init() {
     tracked_handoff=1
   fi
 
-  # 2) gitignore-append (idempotent; never rewrite the target's gitignore wholesale)
-  gi="$root/.gitignore"; touch "$gi"
-  local -a need=(kanban/todo/ kanban/doing/ kanban/done/)
-  [ "$tracked_handoff" -eq 0 ] && need+=(handoff/latest.md)
+  # 2) ignore-write to .git/info/exclude — LOCAL, per-repo, NEVER the committed
+  #    .gitignore (Roberto 2026-07-07): federation noise must not pollute a shared
+  #    repo's history. A local exclude keeps kb init self-sufficient on any machine
+  #    it runs on (unlike a global core.excludesfile) without touching shared git
+  #    state. Shared across worktrees via the common git dir. Idempotent.
+  gi="$(git -C "$root" rev-parse --git-path info/exclude 2>/dev/null)"
+  case "$gi" in /*) ;; *) gi="$root/$gi";; esac
+  mkdir -p "$(dirname "$gi")"; touch "$gi"
+  # handoff/resume.md is the per-repo pause checkpoint `kb pause` writes — ephemeral,
+  # NEVER the tracked handoff/latest.md canon file. Always exclude it (never tracked).
+  local -a need=(kanban/todo/ kanban/doing/ kanban/done/ handoff/resume.md)
   for line in "${need[@]}"; do
     if ! grep -qxF "$line" "$gi" 2>/dev/null; then
-      printf '%s\n' "$line" >> "$gi"; echo "  gitignore += $line"
+      printf '%s\n' "$line" >> "$gi"; echo "  exclude += $line"
     fi
   done
   if [ "$tracked_handoff" -eq 1 ]; then
-    echo "  FLAG: handoff/latest.md is TRACKED in $(basename "$root") — federating it as"
-    echo "        gitignored state is a SEPARATE human decision (design §5 note); NOT changed."
+    echo "  FLAG: handoff/latest.md is TRACKED in $(basename "$root") — left untouched"
+    echo "        (federating it as ignored state is a SEPARATE human decision; §5 note)."
   fi
 
   # 3) de-track already-committed CARD content (git rm --cached, keep working copy)
