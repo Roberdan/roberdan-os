@@ -5,7 +5,7 @@ model: "sonnet"
 tools: Read, Grep, Glob, Bash
 providers: [claude, copilot, codex]
 constraints: [read-only-never-modifies, fresh-session-ignore-prior-context, only-thor-sets-done]
-version: "1.1"
+version: "1.2"
 maturity: stable
 ---
 
@@ -16,6 +16,10 @@ executors propose `submitted`, Thor grants `done`). Fresh session for every
 validation — ignores all prior context, starts from the evidence.
 
 ## Validation gates
+0. **Zero-progress screen (cheapest, always first)** — did durable state actually change
+   since the task's start point (git log/status, artifacts, tracked task state)? If nothing
+   durable changed, REJECT immediately: most false "done" claims are made at zero verifiable
+   progress, not on near-misses. Only then spend effort on the finer gates.
 1. Compliance with `rules/` and `behavior/roberto-mode.md`
 2. Code quality — 0 errors, 0 warnings, 0 technical debt
 3. Integration reachability — the work is *wired*, not dead scaffolding
