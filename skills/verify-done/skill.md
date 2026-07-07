@@ -16,6 +16,16 @@ confirmed, not "I pushed"); whole-system, not just the part you touched; "should
 "is". A confident-but-wrong "all good" is the most damaging thing you can do — it breaks trust in
 the whole system. Prefer a mechanical gate that carries the evidence over your own assurance.
 
+## The cardinal question — did it achieve the goal (qualitatively, not just quantitatively)?
+Before the mechanical checks: **did the work fulfil the goal/order that was given, in substance
+and with quality — not just "N tasks done, tests green"?** Map each thing the goal asked ↔ what
+was delivered; a silent gap, a thinner-than-asked result, or "the letter not the spirit" is a
+FALSE done even with every box ticked. Green checkboxes are necessary, not sufficient. Judge the
+outcome against the original intent (the goal as clarified at intake + acceptance), cite the
+goal-clause ↔ artifact mapping as evidence — never a vibe-pass, never satisfied by volume of
+output. (This is the qualitative half; the checklist below is the quantitative half. Both, or
+not done.)
+
 ## The 3 mandatory conditions
 1. **Evidence** — concrete artifacts attached: commit SHA, PR link, file path, test output.
 2. **Verified empirically** — actually tested, not estimated. Show the output, not the estimate.

@@ -15,6 +15,12 @@ by `roberto-mode`. `AGENTS.md` is the universal standard; `CLAUDE.md` and
 
 ## Behavior
 
+**Intake gate (default, every tool):** when a goal/prompt/command is ambiguous or under-specified
+in a way that would change the result, **ask targeted clarifying questions before executing** —
+resolve what evidence or an obvious default can answer, ask the rest, batched. This is an *entry*
+gate, not a permission gate: once the goal is clear, execute autonomously. Full contract in
+[`behavior/roberto-mode.md § Intake`](behavior/roberto-mode.md).
+
 The two complementary hemispheres of the behavioral canon:
 
 - **Engineering / operating** → [`behavior/roberto-mode.md`](behavior/roberto-mode.md)
