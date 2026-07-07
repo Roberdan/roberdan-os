@@ -71,6 +71,9 @@ you want to ship one.
 ## 5. Verify — including the merge-clean guarantee
 
 ```
+bin/sync.sh --install          # symlinks the skill wrappers into ~/.claude/skills — without
+                               # this, validate's tool-coverage gate FAILS on any machine
+                               # where ~/.claude exists ("run: bash bin/sync.sh --install")
 bash test/validate.sh          # → ✅ ALL GREEN (same gate the real repo runs)
 git status --porcelain         # → only identity/* should appear
 bash test/test-fork-merge.sh   # → proof: identity-only edits merge clean with upstream engine edits

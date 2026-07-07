@@ -106,8 +106,8 @@ the prompt from stdin, confirms no claude-specific flags reached it, and confirm
 
 ## What's real vs. what's stub
 
-**This container has no usable headless `claude` binary** — `eval_resolve_claude` in
-`eval/lib.sh` (same PATH + fallback-path resolution as `factory/run.sh`) comes back empty here.
+**On a machine without a usable headless `claude` binary** — where `eval_resolve_claude` in
+`eval/lib.sh` (same PATH + fallback-path resolution as `factory/run.sh`) comes back empty —
 The actual with/without-canon comparison using a real `claude` **has not been run**. What has been
 verified in this container:
 

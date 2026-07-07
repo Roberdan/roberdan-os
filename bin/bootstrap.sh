@@ -18,6 +18,7 @@ echo "== roberdan-os bootstrap =="
 # 1) Dependencies
 for dep in git jq; do command -v "$dep" >/dev/null 2>&1 || { echo "missing: $dep"; exit 1; }; done
 command -v shellcheck >/dev/null 2>&1 || echo "  (shellcheck missing — validate will use bash -n)"
+command -v python3 >/dev/null 2>&1 || echo "  (python3 missing — eval pipeline + leak-check tier (b) need it; validate won't be fully green)"
 
 # 2) Generate the wrappers from the canon
 bash bin/sync.sh --emit-only
@@ -32,6 +33,11 @@ if [ -L "$HOME/.claude/agents/roberdan-twin.md" ]; then
   rm -f "$HOME/.claude/agents/roberdan-twin.md"
   echo "  pruned stale symlink ~/.claude/agents/roberdan-twin.md (renamed to twin.md in v2.0.0)"
 fi
+
+# 3b) kb CLI → ~/.local/bin/kb (symlink; every doc invokes `kb` as a command)
+mkdir -p "$HOME/.local/bin"
+ln -sf "$ROOT/kanban/kb.sh" "$HOME/.local/bin/kb"
+echo "  kb symlinked into ~/.local/bin/kb (ensure ~/.local/bin is on PATH)"
 
 # 4) Confidential dossier → $RDA_HOME/private (local-only, never in git)
 if [ -n "$DOSSIER" ] && [ -f "$DOSSIER" ]; then
@@ -55,9 +61,14 @@ cat <<EOF
 1) Add the pointer block to ~/.claude/CLAUDE.md:
    ## roberdan-os — default = loop+roberto-mode; twin auto on communication/decisions;
    @board for high-stakes decisions; @thor done-gate. Canon: $ROOT/AGENTS.md
-2) Cautious hook in ~/.claude/settings.json (.hooks.PreToolUse):
-   { "matcher": "Bash", "hooks": [{ "type": "command", "command": "bash $ROOT/hooks/bash-guard.sh" }] }
-3) Copilot per-repo: copy the block from $ROOT/platforms/copilot/copilot-instructions.md
+2) Hooks in ~/.claude/settings.json — merge the GENERATED snippet (all five events:
+   SessionStart context-inject, PreToolUse guards, PostToolUse autofmt, PreCompact +
+   Stop auto-checkpoint — this is what makes Pause & Resume "always-on"):
+   $ROOT/platforms/claude/settings-hooks.json
+   (regenerate any time with: bash bin/sync.sh --emit-only)
+3) Skills: bash bin/sync.sh --install  (symlinks the skill wrappers; validate's
+   tool-coverage gate expects them once ~/.claude exists)
+4) Copilot per-repo: copy the block from $ROOT/platforms/copilot/copilot-instructions.md
    into the .github/copilot-instructions.md of whichever repos you want.
 
 Done. Open a new session to activate CLAUDE.md/hooks/agents.

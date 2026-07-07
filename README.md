@@ -36,10 +36,14 @@ behavior. `AGENTS.md` is the universal entry point; the runtime wrappers are gen
 
 ## Status
 
-Canon built (Phases 0-5) plus a tool-independence pass (2026-07-03, `@rex` APPROVE, `@thor`
-PASS). `test/validate.sh` green: frontmatter, links, drift, shellcheck, leak-check, factory+kb
-regression, tool-coverage. Full plan in [`docs/plan.md`](docs/plan.md); latest pass in
-[`docs/plan-2026-07-03-tool-independence.md`](docs/plan-2026-07-03-tool-independence.md).
+Latest release **v2.7.x** (2026-07-07): the best-practices-2026 pass — context/token-economy
+canon, agent supply-chain gate, provenance + zero-progress done-gates, `effort:` frontmatter on
+every agent, compaction-resilient hooks, root `CLAUDE.md → AGENTS.md` symlink; audited by `@rex`,
+gated by `@thor` (see [`docs/report-2026-07-07-best-practices-2026.md`](docs/report-2026-07-07-best-practices-2026.md)).
+`test/validate.sh` green: frontmatter, links, drift + snippet-expansion guard, shellcheck,
+leak-check, factory+kb+federated-kb regression, autofmt contract, fork-merge proof,
+eval-pipeline, tool-coverage. History in [`CHANGELOG.md`](CHANGELOG.md); original build plan
+(historical) in [`docs/plan.md`](docs/plan.md).
 Day-to-day operator guide (kb, factory, recall, gates): [`docs/USAGE.md`](docs/USAGE.md).
 
 | Component | Where |
@@ -50,14 +54,14 @@ Day-to-day operator guide (kb, factory, recall, gates): [`docs/USAGE.md`](docs/U
 | Behavior | `behavior/roberto-mode.md` (engineering) + `identity/voice.md` (voice) + `behavior/thinking-toolkit.md` (reasoning) |
 | Rules | `rules/constitution.md` (values + ethics) + `rules/best-practices.md` |
 | Agents | `agents/` — baccio, rex, luca, thor, socrates, board, wanda, twin |
-| Skills | `skills/` — verify-done, ship, review, sync, auto-checkpoint |
-| Hooks | `hooks/` — main-guard, bash-guard, verify-done, autofmt, post-task-sync |
+| Skills | `skills/` — verify-done, ship, review, sync, auto-checkpoint, focus-group, premortem, problem-validation |
+| Hooks | `hooks/` — context-inject, main-guard, bash-guard, verify-done, autofmt, post-task-sync, auto-checkpoint, pre-commit |
 | Loop | `loop/loop-protocol.md` |
 | Kanban | `kanban/` — durable, gated goal ledger (`kb`); see [`docs/USAGE.md`](docs/USAGE.md). Card content (`todo/ doing/ done/`) is gitignored, local-only |
 | Agent factory | `factory/` — unattended headless `claude -p` runs, sonnet default / opus opt-in |
 | Meta-loop | `learn/` (capture+distill) + `evolve/` (weekly upstream watch) |
 | Eval (does the canon work?) | [`eval/README.md`](eval/README.md) — with/without-canon A/B + blind judge, agent-agnostic (`RDA_EVAL_AGENT_CMD`), mirrors §9.1 of `docs/roberdan-os-paper-en.md` |
-| Test suite | `test/validate.sh` (full CI gate) + `test/test-*.sh` (factory/kb/sync-install/kb-views) |
+| Test suite | `test/validate.sh` (full CI gate) + `test/test-*.sh` (factory-kb, kb-views, federated-kb, sync-install, autofmt, fork-merge, leak-check) |
 | Per-platform wrappers | `platforms/` — generated locally by `bin/sync.sh --emit-only`, gitignored, not committed |
 | Web bundle | `bin/make-bundle.sh` → pasteable doc (excludes `private/`) |
 
@@ -77,7 +81,8 @@ skills to `~/.copilot/skills/`, gated per-tool on what's actually installed on t
 ## Prerequisites
 
 Required:
-- `git`, `jq`, `bash` (macOS ships all three).
+- `git`, `jq`, `bash` (macOS ships all three) and `python3` (the eval pipeline and the
+  leak-check hash tier need it — without it `test/validate.sh` won't be fully green).
 - An agentic CLI/IDE that reads `AGENTS.md` — this canon targets
   [Claude Code](https://claude.com/claude-code) primarily; Codex, GitHub Copilot CLI/VS Code,
   Cursor, opencode, Warp and hermes-agent read the same file natively (see Cross-tool support
@@ -105,14 +110,20 @@ recall).
 ```
 git clone https://github.com/Roberdan/roberdan-os.git
 cd roberdan-os
-bin/bootstrap.sh                    # generates wrappers, symlinks agents into ~/.claude/agents,
-                                     # runs test/validate.sh
+bin/bootstrap.sh                    # generates wrappers, symlinks agents into ~/.claude/agents
+                                     # + kb into ~/.local/bin, runs test/validate.sh
+bin/sync.sh --install               # symlinks the skill wrappers into ~/.claude/skills (and
+                                     # ~/.copilot/skills if present) — validate's tool-coverage
+                                     # gate expects this once ~/.claude exists
 ```
 
 `bootstrap.sh` is idempotent and non-destructive: it never overwrites `~/.claude/CLAUDE.md` or
-`settings.json`, it prints the pointer blocks to add by hand (see its output). Pass
-`--dossier /path/to/profile.md` only if you have Roberto's own confidential profile — everyone
-else skips that flag and the twin degrades gracefully to `[placeholder]`.
+`settings.json` — it prints the blocks to add by hand, including the **generated hook snippet**
+`platforms/claude/settings-hooks.json` (SessionStart context-inject, PreToolUse guards,
+PostToolUse autofmt, PreCompact + Stop auto-checkpoint: merging it is what makes the canon's
+Pause & Resume "always-on"). Pass `--dossier /path/to/profile.md` only if you have Roberto's
+own confidential profile — everyone else skips that flag and the twin degrades gracefully to
+`[placeholder]`.
 
 ## License
 

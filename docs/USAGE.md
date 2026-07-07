@@ -18,6 +18,25 @@ kb finish <id> --thor "<ev>"        # GATE: doing -> done, needs @thor + evidenc
 kb block <id> "<reason>"            # mark a card blocked, move it back to todo/
 ```
 
+**Pause & resume (the "devo andare / continua" flow — AGENTS.md § Pause & Resume):**
+
+```
+kb pause "<next step>"   # write the lean per-repo checkpoint handoff/resume.md (overwritten,
+                         # gitignored); a Stop hook already runs `kb pause --auto` every turn
+kb resume                # print the pending checkpoint + the live backlog (todo + doing)
+kb resume --done         # clear the checkpoint once truly resumed
+```
+
+**Federation (multi-repo boards):**
+
+```
+kb all | g               # aggregated 3-column board across every registered repo
+kb handoff               # cross-repo handoff view
+kb init                  # federate the current repo (excludes card columns + resume.md via
+                         # the local .git/info/exclude — never touches the shared .gitignore)
+kb lint                  # runner:/human_gates: schema check on all cards
+```
+
 Every card needs a `repo:` (which repo/scope it's about — a `~/GitHub` dir-name, or `personal`
 for non-code work), a `dod:` (Definition of Done) and `acceptance:` (how @thor verifies) before
 it can leave `todo/` — `kb start` refuses cards with `repo:` missing or a `FILL:` placeholder
@@ -120,10 +139,17 @@ inside those two gates.
 ## Verify the system itself
 
 ```
-bash test/validate.sh          # full CI gate: frontmatter, links, drift, shellcheck, leak-check, factory+kb
+bash test/validate.sh          # full CI gate: frontmatter, links, drift + snippet-expansion,
+                               # shellcheck, leak-check, factory+kb+federated-kb, autofmt
+                               # contract, fork-merge proof, eval-pipeline, tool-coverage
 bash test/test-factory-kb.sh   # factory + kb gate assertions only
 bash bin/check-embedder.sh     # gbrain bge-m3 patch durability
 ```
+
+Hooks on a new machine: merge the generated `platforms/claude/settings-hooks.json` into
+`~/.claude/settings.json` (all five events — SessionStart context-inject, PreToolUse guards,
+PostToolUse autofmt, PreCompact + Stop auto-checkpoint). `bin/sync.sh --emit-only` regenerates
+it; bootstrap's "Manual steps" point at it.
 
 `bin/install-git-hooks.sh` installs `hooks/pre-commit` (blocks any commit containing a
 denylisted confidential term) — run once per clone/worktree; `.git/hooks/` is not versioned by git.

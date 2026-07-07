@@ -4,9 +4,9 @@
 # overwrites one file (handoff/resume.md), refreshing only mechanical state and PRESERVING the
 # human next-step note. Never fail the turn — guard everything, always exit 0.
 #
-# Wire as a Stop hook in ~/.claude/settings.json (bin/bootstrap.sh prints the block):
-#   { "matcher": "", "hooks": [{ "type": "command",
-#       "command": "bash $HOME/GitHub/roberdan-os/hooks/auto-checkpoint.sh" }] }
+# Wire as a Stop (and PreCompact) hook in ~/.claude/settings.json — merge the generated
+# snippet platforms/claude/settings-hooks.json (bin/sync.sh --emit-only regenerates it;
+# bootstrap's "Manual steps" point at it).
 KB="${RDA_KB:-$HOME/GitHub/roberdan-os/kanban/kb.sh}"
 [ -x "$KB" ] || exit 0
 # kb resolves the current repo from cwd (registered board) else falls back to roberdan-os —
