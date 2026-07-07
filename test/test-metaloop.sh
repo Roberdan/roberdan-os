@@ -37,6 +37,17 @@ inbox_file="$RDA_INBOX/$(date +%Y-%m-%d)-metaloop-test.md"
 # --- 2) CAPTURE an ephemeral session marker (must be dropped, not promoted) ----
 bash "$CAP" --session "session $(date +%Y-%m-%dT%H:%M:%S) cwd=$ROOT"
 
+# --- 2b) UNIT: legacy BULLETED session boilerplate is ephemeral (bug 2026-07-07) ---
+# The old Stop hook wrote "- session <ts> cwd=<path>" (markdown bullet); the ephemera
+# filter matched only "^session" so 19 bulleted pings slipped into quarantine as `decision`.
+( . "$ROOT/learn/classify.sh"
+  rda_is_ephemeral "- session 2026-07-07T08:08:58 cwd=/Users/Roberdan/GitHub/mirrorBuddy" || exit 7
+  rda_is_ephemeral "  * session 2026-07-07T09:00:00 cwd=/tmp"                              || exit 7
+  # a real sentence that merely mentions the words must NOT be dropped
+  rda_is_ephemeral "lesson: the agent mishandled a session and lost cwd context" && exit 8
+  exit 0
+) || fail "rda_is_ephemeral mishandles bulleted legacy boilerplate or over-matches a real sentence (bug 2026-07-07)"
+
 # --- 3) DISTILL: real class (never TODO) + ephemera dropped ---------------------
 bash "$DIS"
 cands=("$RDA_QUARANTINE"/*.md)

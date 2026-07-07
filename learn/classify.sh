@@ -22,8 +22,12 @@ rda_class_valid() {
 rda_is_ephemeral() {
   local s="$1"
   case "$s" in "{kind:session}"*) return 0 ;; esac        # explicit capture --session marker
-  # legacy Stop-hook boilerplate: "session <ts> cwd=<path>" carrying no real lesson
-  printf '%s' "$s" | grep -qiE '^[[:space:]]*session[[:space:]].*cwd=' && return 0
+  # legacy Stop-hook boilerplate: "session <ts> cwd=<path>" carrying no real lesson.
+  # The old hook wrote it as a markdown bullet ("- session … cwd=…"), so allow an
+  # optional leading bullet/whitespace — else the boilerplate slips past the drop and
+  # pollutes quarantine (found 2026-07-07: 19 bulleted session pings misclassified as
+  # `decision` instead of dropped).
+  printf '%s' "$s" | grep -qiE '^[[:space:]]*([-*+][[:space:]]+)?session[[:space:]].*cwd=' && return 0
   return 1
 }
 
