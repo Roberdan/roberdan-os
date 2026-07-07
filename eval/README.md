@@ -235,7 +235,9 @@ want to keep a dated snapshot; otherwise regenerate on demand.
   the canon touches.
 - **Passive prepend under-represents the canon.** The single biggest caveat — see "The mechanism
   limitation" up top. A null/negative result measures this impoverished activation path, not the
-  live system (hooks, subagents, on-demand skills), so it must not be read as "the canon lost."
+  live system (hooks, subagents, on-demand skills), so it is **weak evidence in either
+  direction** — neither proof the canon lost, nor proof it would win if properly measured. The
+  honest read stays "we don't know yet" (per that section's "hold both hypotheses open").
 - **Single judge model, same family as the subject — declared self-preference risk.** Judge and
   subject share whatever blind spots the underlying model has — the same caveat
   `docs/roberdan-os-paper-en.md` makes about focus-group persona sycophancy: a simulated evaluator
