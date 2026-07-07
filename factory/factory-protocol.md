@@ -110,11 +110,12 @@ to whatever `--add-dir` points at.
 - Everything is **logged** (`logs/`); nothing is silent.
 - Prefer tasks that are **additive + verifiable** (write code + tests, draft a doc, research).
   Do NOT queue irreversible/outward-facing tasks for unattended runs.
-- Parallel tasks that mutate the same repo should use `git worktree` isolation (flag `RDA_FACTORY_PARALLEL`).
+- Parallel tasks that mutate the same repo should use `git worktree` isolation (planned —
+  no `RDA_FACTORY_PARALLEL` flag is implemented yet; today `run.sh` executes tasks serially).
 
 ## Config (env)
 
-`RDA_FACTORY` (default `~/.roberdan-os/factory`) · `RDA_FACTORY_WORKDIR` (default `~/GitHub`) ·
+`RDA_FACTORY` (default `~/.roberdan-os/factory`) · `RDA_FACTORY_WORKDIR` (default `~/GitHub/roberdan-os`) ·
 `RDA_FACTORY_MAX` (tasks/run, default 8) · `RDA_FACTORY_TIMEOUT` (default 1800s) ·
 `RDA_FACTORY_MODEL` (default model for tasks without a per-task `model:`, clamped to
 `sonnet`|`opus` — see "Model policy" above).

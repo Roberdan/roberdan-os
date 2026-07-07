@@ -16,6 +16,9 @@ kb add "<title>" --repo <r> [dod] [acc]   # new card in todo/ (repo required)
 kb edit <id>                         # fill Definition of Done + Acceptance + repo
 kb start <id> --by roberto           # GATE: todo->doing (needs Roberto's approval)
 kb finish <id> --thor "<ev>"         # GATE: doing->done (@thor validates with evidence)
+kb pause "<next step>"               # lean per-repo checkpoint handoff/resume.md (overwritten;
+                                     #   a Stop hook runs `kb pause --auto` after every turn)
+kb resume [--done]                   # show checkpoint + live backlog | clear when resumed
 ```
 
 ## The two gates (no rubber-stamping)
@@ -64,7 +67,8 @@ kb lint            # schema lint for the optional federated fields
 
 **Discovery is an explicit registry, never a scan.** `kb init <repo>` is the single act that
 makes a repo safe to hold cards and registers it in `~/.roberdan-os/kanban-registry` (local-only).
-It: scaffolds `kanban/{todo,doing,done}`; gitignores the card columns; de-tracks any card content
+It: scaffolds `kanban/{todo,doing,done}`; excludes the card columns + `handoff/resume.md` via the
+**local `.git/info/exclude`** (v2.6.0 — never the shared `.gitignore`); de-tracks any card content
 already committed (`git rm --cached`, scoped to the columns — never your tracked `kb.sh`/README);
 scans **local history** for card blobs (pushed → **refuses**, human gate #4; local-only → loud
 warning); installs a leak-check pre-commit hook. A raw `kanban/` dir made by hand is **not**

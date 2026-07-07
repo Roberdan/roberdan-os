@@ -19,7 +19,9 @@ reachable from anywhere, including a cloud/web session or the iPhone Claude app.
 
 ## To resume (fresh agent)
 
-A new agent's first move: read `handoff/latest.md` + `kanban/todo.md`+`doing.md` + `MEMORY.md`, and
-`gbrain search` for anything referenced. That reconstructs the working context in seconds, from
-durable state — no dependency on the previous (huge) conversation. This is the compounding loop:
-each session ends by leaving the next one smarter.
+A new agent's first move: read `handoff/latest.md` + the board (`kb`, card files in
+`kanban/todo/ doing/`) + **`kb resume`** (the pending pause checkpoint `handoff/resume.md`,
+kept fresh every turn by the Stop-hook auto-checkpoint — see AGENTS.md § Pause & Resume) +
+`MEMORY.md`, and `gbrain search` for anything referenced. That reconstructs the working context
+in seconds, from durable state — no dependency on the previous (huge) conversation. This is the
+compounding loop: each session ends by leaving the next one smarter.

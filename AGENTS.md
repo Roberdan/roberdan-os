@@ -108,7 +108,7 @@ Logic in plain markdown, tool-agnostic (wrappers are generated):
 
 ## Eval — does the canon actually change output?
 
-[`eval/README.md`](eval/README.md) — with/without-canon A/B on 10 representative tasks + blind
+[`eval/README.md`](eval/README.md) — with/without-canon A/B on 12 representative tasks + blind
 pairwise judging, the behavioral-canon counterpart to the retrieval ablation in
 `docs/roberdan-os-paper-en.md` §9.1. Honest limit stated up front there: it measures stated
 compliance against a checklist, not that Roberto himself prefers the with-canon output.

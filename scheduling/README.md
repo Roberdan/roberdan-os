@@ -4,8 +4,9 @@ OS-level scheduler (fires even with Claude closed). Cron-swappable. See [`docs/a
 
 | Job | Cadence | Runs |
 |---|---|---|
-| `com.roberdan.rda-evolve` | weekly (Mon 09:00) | `evolve/watch.sh` → draft proposals |
+| `com.roberdan.rda-evolve` | weekly (Sat 02:00, launchd catch-up if the Mac is off) | `evolve/watch.sh` → kanban cards |
 | `com.roberdan.rda-learn` | daily (02:30) | `learn/distill.sh` + `ontology/curate.sh` |
+| `com.roberdan.rda-factory` | nightly (01:00) — plist lives in [`factory/`](../factory/) | `factory/run.sh` (queued headless tasks) |
 
 ## Install
 

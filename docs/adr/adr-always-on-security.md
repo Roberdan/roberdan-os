@@ -2,7 +2,7 @@
 
 **Status:** Proposed (2026-07-01) · advisory · **Decide:** Roberto (human gate — spend/architecture/memory exposure)
 **Security lens:** luca-mode (zero-trust, OWASP-style) applied to a personal/indie setup
-**Relates to:** `docs/always-on-design.md` (Path A/B/C), `kanban/todo/G5-always-on.md`, `kanban/todo/FtS-ingest.md`
+**Relates to:** `docs/always-on-design.md` (Path A/B/C), `kanban/todo/G5-always-on.md`, `kanban/todo/FtS-ingest.md` (local-only cards — card content is never in git, see `kanban/README.md`)
 
 > This document is **material for deciding**, not a decision. G5 remains a human gate.
 > No kanban card is moved.

@@ -1,5 +1,11 @@
 # Plan — `roberdan-os`: single, cross-platform, loop-autonomous agentic system
 
+> **Historical — original build plan (June 2026), kept for provenance.** Superseded by what
+> actually shipped: see `CHANGELOG.md` + the dated `docs/plan-2026-07-0*.md` design docs.
+> Names below predate the v2.0.0 engine/identity split (`agents/roberdan-twin.md` →
+> `agents/twin.md`, `behavior/roberto-voice.md` → `identity/voice.md`) and the
+> gitignored-`platforms/` change (wrappers are generated, no longer committed).
+
 ## Context
 
 Roberto has ~200+ skills, ~300+ agents, hooks and personas scattered across 13+ repos, in 3+ formats, with no canonical source. The same agent (baccio, ali…) exists in 4-6 diverging copies; the global `~/.claude` config isn't even versioned. Two audits (2026-06-28 skill/agent, 2026-06-29 strategic Opus) mapped the problem: it isn't scarcity, it's **maintenance surface vs. real usage** — you probably use ~6 agents out of 87.

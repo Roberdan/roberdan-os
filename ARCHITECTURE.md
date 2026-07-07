@@ -46,6 +46,9 @@ Operator (or a schedule)
 
 1. **One canon, many runtimes.** `AGENTS.md` is the single source; per-tool wrappers are
    generated (`bin/sync.sh`), never hand-copied, never committed. Drift is a CI failure.
+   Exception by design: Claude Code reads the canon **natively** in-repo via the root
+   `CLAUDE.md → AGENTS.md` symlink (v2.7.0) — no wrapper on that path. Agent frontmatter
+   carries `model:` **and `effort:`** (2026) so cost/quality tiering travels with the canon.
 2. **Engine/identity split.** Forkers edit `identity/` only; engine files never embed identity.
    See [`docs/plan-2026-07-05-engine-identity-split.md`](docs/plan-2026-07-05-engine-identity-split.md).
 3. **Human gates are not advisory.** The seven gates in `AGENTS.md` are enforced by hooks and
