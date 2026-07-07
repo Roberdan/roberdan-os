@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 # PostToolUse auto-format. Silent on success. Never blocks.
 # Parametric: repo-root detection instead of a hardcoded frontend path.
+# Input contract: hooks receive JSON on stdin (.tool_input.file_path) — the old
+# CLAUDE_FILE_PATH env var is kept only as a legacy fallback for manual runs.
 set -u
-FILE="${CLAUDE_FILE_PATH:-}"
+FILE=""
+if [ ! -t 0 ]; then
+  input="$(cat 2>/dev/null || true)"
+  FILE="$(printf '%s' "$input" | jq -r '.tool_input.file_path // ""' 2>/dev/null || true)"
+fi
+[ -z "$FILE" ] && FILE="${CLAUDE_FILE_PATH:-}"
 [ -z "$FILE" ] || [ ! -f "$FILE" ] && exit 0
 
 # Repo-root of the file (worktree-aware) to resolve the local JS toolchain.
