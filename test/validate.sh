@@ -179,6 +179,10 @@ if bash test/test-autofmt.sh >/dev/null 2>&1; then ok "autofmt receives files vi
 section "loop receipts — loop/receipt.sh emitter contract"
 if bash test/test-receipts.sh >/dev/null 2>&1; then ok "receipt emitter green (see bash test/test-receipts.sh)"; else err "test-receipts — see bash test/test-receipts.sh"; fi
 
+# --- 8d) install-hooks: settings.json merge is additive/idempotent/non-destructive ---
+section "install-hooks — settings.json merge contract"
+if bash test/test-install-hooks.sh >/dev/null 2>&1; then ok "install-hooks merge green (see bash test/test-install-hooks.sh)"; else err "test-install-hooks — see bash test/test-install-hooks.sh"; fi
+
 # --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
 # eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The
 # actual with/without-canon comparison needs a real `claude` binary and Roberto's own machine —

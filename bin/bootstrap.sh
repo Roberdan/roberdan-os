@@ -57,17 +57,15 @@ bash test/validate.sh >/dev/null 2>&1 && echo "  validate: ✅ green" || echo " 
 # 6) Gated steps (NOT executed — add these by hand)
 cat <<EOF
 
-== Manual steps (gated) ==
-1) Add the pointer block to ~/.claude/CLAUDE.md:
+== Next steps ==
+1) Hooks (one command, idempotent, backs up settings.json first — this is what makes
+   Pause & Resume "always-on"): bash bin/install-hooks.sh --apply
+   (dry-run without --apply; regenerate the snippet with bash bin/sync.sh --emit-only)
+2) Skills: bash bin/sync.sh --install  (symlinks the skill wrappers; validate's
+   tool-coverage gate expects them once ~/.claude exists)
+3) Add the pointer block to ~/.claude/CLAUDE.md (curated personal config — by hand):
    ## roberdan-os — default = loop+roberto-mode; twin auto on communication/decisions;
    @board for high-stakes decisions; @thor done-gate. Canon: $ROOT/AGENTS.md
-2) Hooks in ~/.claude/settings.json — merge the GENERATED snippet (all five events:
-   SessionStart context-inject, PreToolUse guards, PostToolUse autofmt, PreCompact +
-   Stop auto-checkpoint — this is what makes Pause & Resume "always-on"):
-   $ROOT/platforms/claude/settings-hooks.json
-   (regenerate any time with: bash bin/sync.sh --emit-only)
-3) Skills: bash bin/sync.sh --install  (symlinks the skill wrappers; validate's
-   tool-coverage gate expects them once ~/.claude exists)
 4) Copilot per-repo: copy the block from $ROOT/platforms/copilot/copilot-instructions.md
    into the .github/copilot-instructions.md of whichever repos you want.
 

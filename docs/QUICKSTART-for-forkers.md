@@ -71,6 +71,8 @@ you want to ship one.
 ## 5. Verify — including the merge-clean guarantee
 
 ```
+bin/install-hooks.sh --apply   # wire the five-event hook set into ~/.claude/settings.json
+                               # (idempotent, non-destructive, backs up first)
 bin/sync.sh --install          # symlinks the skill wrappers into ~/.claude/skills — without
                                # this, validate's tool-coverage gate FAILS on any machine
                                # where ~/.claude exists ("run: bash bin/sync.sh --install")
