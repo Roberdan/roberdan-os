@@ -46,6 +46,10 @@ kanban and handoff, not a global exception.
   Lean: overwrite, never append.
 - **`kb resume`** — cwd repo's checkpoint; `kb resume --all` (or outside a repo) aggregates every
   registered repo's checkpoint; `kb resume --done` clears it after resuming.
+  *(Enhanced 2026-07-07, CHANGELOG v2.6.0: `kb resume` now also prints the live backlog (todo + doing)
+  so a restart re-hydrates the WHOLE plan, not just the paused task. The checkpoint is the re-entry
+  point; the board + `handoff/latest.md` are the scope. Fixes the "continues from the exact next step"
+  tunnel where a resumed session drove only the single checkpointed task.)*
 - **`kb pause --auto`** — the lean variant the Stop hook calls: refresh only the mechanical fields
   (HEAD, git, doing, timestamp), **preserve the human note** from the last explicit `kb pause`.
 

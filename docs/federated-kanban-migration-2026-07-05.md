@@ -35,10 +35,13 @@ worktrees (not by this session's dispatcher, which refuses structurally). The re
 open ones aren't federated are hard gates:
 
 - **`kb init` on MirrorBuddy is a human gate, not crossed.** MirrorBuddy is a shared
-  (Fight the Stroke) repo with a **standalone** `AGENTS.md` and does **not** gitignore `kanban/`
-  (verified in the design, 2026-07-05). Running `kb init` there would append to its `.gitignore`
-  and install a hook — i.e. modify a shared external repo. That is a human decision (AGENTS.md
-  §gate-umani: "cambi … su repo condivisi"). This session did **not** touch MirrorBuddy.
+  (Fight the Stroke) repo with a **standalone** `AGENTS.md`. Federating it — putting Roberto's
+  personal kanban into a team repo's workflow — installs a pre-commit hook and de-tracks any
+  already-committed card content, and is above all an *organizational* decision on a shared repo.
+  That is a human decision (AGENTS.md §gate-umani: "cambi … su repo condivisi"). This session did
+  **not** touch MirrorBuddy. *(Note 2026-07-07: `kb init` no longer appends to a shared `.gitignore`
+  — federation ignores now go to the LOCAL `.git/info/exclude` (CHANGELOG v2.6.0), so the mechanism
+  is less invasive, but the gate stands: federating a shared team repo is a human call.)*
 - **Physical migration of the cards to `~/GitHub/MirrorBuddy/kanban/` is therefore also gated.**
   Moving them requires `kb init`'ing MirrorBuddy first (to open the privacy window there), which is
   the un-crossed gate above. Until a human runs `kb init` on MirrorBuddy, the cards stay in

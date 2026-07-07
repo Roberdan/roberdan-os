@@ -227,11 +227,15 @@ without the floor (§Node 3b/3c, §7, §8).
 `kb init <repo>` is the single act that makes a repo safe to hold cards. It is **idempotent** and does:
 
 1. `mkdir -p <repo>/kanban/{todo,doing,done}`.
-2. Ensure `<repo>/.gitignore` ignores `kanban/todo/`, `kanban/doing/`, `kanban/done/`, and
-   `handoff/latest.md` (scoped to the state file — **not** `handoff/`, which in roberdan-os also holds
-   the versioned protocol/primer). Append only the lines not already present (never rewrite a target
-   repo's gitignore wholesale).
-3. **De-track any card/handoff content already committed.** Appending to `.gitignore` does **not**
+2. Ensure the repo **locally ignores** `kanban/todo/`, `kanban/doing/`, `kanban/done/`, and the
+   per-repo pause checkpoint `handoff/resume.md` (the ephemeral file `kb pause` writes — **not**
+   `handoff/latest.md`, roberdan-os's *tracked* canon state, nor `handoff/` itself, which also holds
+   the versioned protocol/primer). These lines go to **`.git/info/exclude`** — the repo's LOCAL ignore
+   — **never the committed `.gitignore`**: federation noise is Roberto-machine-only, so committing
+   ignore rules would pollute a shared repo's history for a file no collaborator ever generates. Append
+   only lines not already present. *(Changed 2026-07-07 from a committed-`.gitignore` append with the
+   wrong filename `handoff/latest.md` — see CHANGELOG v2.6.0.)*
+3. **De-track any card/handoff content already committed.** Adding a local exclude entry does **not**
    stop git tracking a file it already tracks. So `kb init` runs `git -C <repo> ls-files kanban/
    handoff/latest.md` and, for any match, `git rm --cached` it (leaving the working copy).
 4. **Scan LOCAL git history for already-committed card/handoff content (review fix, @rex #6).**
@@ -510,10 +514,10 @@ validate.sh              # EXTENDED — human_gates↔human-only lint + wired-ch
 **A generic federated repo** (e.g. `~/GitHub/orca/`) after `kb init`:
 ```
 orca/
-  .gitignore             # + kanban/todo|doing|done/, handoff/latest.md   (appended, not rewritten)
+  .git/info/exclude      # + kanban/todo|doing|done/, handoff/resume.md   (LOCAL ignore, appended — never the committed .gitignore)
   .git/hooks/pre-commit  # calls roberdan-os leak-check on staged tree (interactive safety)
-  kanban/todo|doing|done # local cards, gitignored — never committed
-  handoff/latest.md      # per-repo handoff, gitignored
+  kanban/todo|doing|done # local cards, locally-excluded — never committed
+  handoff/resume.md      # per-repo pause checkpoint, locally-excluded (ephemeral)
 ```
 No roberdan-os canon is copied in. The repo's AGENTS.md is irrelevant to the gates — they are applied
 from the dispatcher. This is the MirrorBuddy lesson operationalized.
@@ -575,7 +579,7 @@ when all are green.
 
 1. **Federation read-path** — `kb` cwd-scoping + `kb all` + `kb handoff` + registry parsing
    (read-only). No new gate. Tests: view/aggregation. *(Layer 1, zero risk.)*
-2. **`kb init` + per-repo privacy** — scaffolding, gitignore-append, **de-track already-tracked
+2. **`kb init` + per-repo privacy** — scaffolding, local-exclude write (`.git/info/exclude`), **de-track already-tracked
    content**, **scan + flag un-pushed local-history card content** (human-gate escalation if already
    pushed, loud warning if local-only, @rex #6), pre-commit hook, registry write.
    Tests: idempotency, `git check-ignore`, de-track, local-history flag, leak-check wiring.
