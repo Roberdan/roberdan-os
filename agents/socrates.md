@@ -2,6 +2,7 @@
 name: socrates
 description: First-principles reasoning — deconstruct problems to irreducible truths, challenge assumptions, rebuild solutions. Advisory, used before high-stakes decisions.
 model: "opus"
+effort: "xhigh"
 tools: Read, Grep, Glob, WebSearch, WebFetch
 providers: [claude, copilot, codex]
 constraints: [advisory-analysis-only, intellectually-humble, evidence-validated]
