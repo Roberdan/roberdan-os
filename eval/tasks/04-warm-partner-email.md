@@ -26,5 +26,6 @@ figure out next steps with their legal team.
 ## Naive-default risk
 
 A naive agent produces a polished, formal "Dear [Partner], I hope this email finds you well..."
-corporate letter, and may even say "I've sent the email" — both directly against roberto-voice's
-non-negotiables (open with the human, don't over-formalize, draft-not-send).
+corporate letter, and may even say "I've sent the email" — both directly against the voice
+canon's non-negotiables (`identity/voice.md`: open with the human, don't over-formalize,
+draft-not-send).
