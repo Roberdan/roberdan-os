@@ -1,7 +1,7 @@
 ---
 name: best-practices
-version: "3.4.0"
-last_updated: "2026-07-06"
+version: "3.5.0"
+last_updated: "2026-07-07"
 ---
 
 # Best Practices
@@ -91,6 +91,31 @@ Concrete failure modes this rule exists to catch (all seen in this repo or its w
 **Prefer a mechanical proof.** Where feasible, add a check that fails when a feature is unwired
 (a coverage gate, a grep-for-caller test, a link check) rather than relying on a human to notice.
 An unwired feature that ships green is worse than one that fails loudly.
+
+## Context & Token Economy
+
+Context is a finite resource with diminishing returns ("context rot"): every always-loaded token
+competes with the tokens that matter. (Anthropic — effective context engineering 2025-09; Claude
+Code best practices, current 2026.)
+
+- **Always-loaded instruction files stay lean** — target ≤200 lines each. Per-line test: *would
+  removing this cause the agent to make mistakes? If not, cut it.* A rule the agent keeps
+  violating inside a long file means the file is too long: convert that rule into a **hook**
+  (deterministic), don't add more prose (advisory).
+- **Just-in-time retrieval over pre-loading.** Keep pointers (paths, queries, `[[wikilinks]]`) in
+  context; pull content on demand (gbrain, grep). Knowledge that applies *sometimes* belongs in a
+  skill (progressive disclosure: only name+description load at startup), never in the canon.
+- **Subagents isolate exploration.** Burn search tokens inside the subagent, return a condensed
+  summary; never dump raw exploration into the orchestrator's context.
+- **Cache discipline.** Static content first and byte-stable (no timestamps/volatile state in
+  always-loaded files); pick model + effort once, early — mid-session switches invalidate the
+  prompt cache and recompute everything.
+- **Durable state on disk beats in-conversation state — for cost too.** A kanban card / checkpoint
+  file is read once per resume; conversation state is re-paid every turn. Prefer CLIs (`gh`, `kb`)
+  over verbose API dumps — the most context-efficient interface to external services.
+- **A runaway loop is a cost incident before it's a quality incident.** Two consecutive passes
+  with no progress → stop and surface what's wedged (loop-protocol); meter long jobs against
+  their terminal condition, never "keep trying".
 
 ## Persuasion Guardrails
 
@@ -202,6 +227,17 @@ Input: validate client + server, allowlists, sanitize. XSS: escape, CSP, DOMPuri
 Secrets: env vars, `.env` gitignored. Auth: OAuth 2.0 / OIDC, RBAC server-side.
 Transport: HTTPS, HSTS, secure cookies, TLS 1.2+. Privacy: GDPR, data minimization, consent.
 Inclusive language: gender-neutral, allowlist / blocklist, primary / replica, person-first.
+
+**Agent supply chain.** Skills, MCP servers and plugins are an active attack surface (Snyk
+ToxicSkills 2026-02: 36.8% of 3,984 marketplace skills had ≥1 flaw, 76 confirmed malicious;
+malicious MCP servers can inject via tool *descriptions* alone). Rules:
+
+- No third-party skill/MCP server enters the stack without a review of its SKILL.md + bundled
+  scripts; **re-review on every update** (same habit as `check-embedder.sh` after gbrain upgrades).
+- A session that can read `private/` never gets an unreviewed MCP server attached.
+- Assume prompt injection eventually succeeds; the control is **blast radius**, not prose: least-
+  privilege tools (read-mail ≠ send-mail), draft-not-send as a *security* boundary, secrets
+  physically unreachable from where generated code runs.
 
 ## Repository Setup
 
