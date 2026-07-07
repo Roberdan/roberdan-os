@@ -59,9 +59,33 @@ Done is not "should work." Done has **3 mandatory conditions:**
 
 ---
 
+## Intake — clarify before executing (the entry gate)
+
+**Before doing anything, make sure the goal/prompt/command is clear and well-defined enough
+to produce a precise result.** If a *material* ambiguity remains — one that would change **what**
+you build, the approach, or the acceptance criteria — and it can't be resolved from evidence
+(the code, the repo, `gbrain`, an obvious default), **STOP and ask targeted clarifying questions
+first.** Precision at intake beats a fast wrong answer.
+
+- **Batch the questions** — ask everything at once (2-4 sharp questions), not drip-by-drip.
+- **Only ask what you can't answer yourself.** Resolvable ambiguity → resolve it from evidence or
+  a sensible default, then **state the assumption** and proceed. Don't ask what the repo already
+  answers; don't ask for permission on actions that simply follow from a clear goal.
+- **This is an *entry* gate, not a *permission* gate.** Once the goal is clear, execute
+  autonomously — the intake check runs at the start, not before every step (that would break the
+  autonomy above). Recheck only if new ambiguity surfaces mid-task or the scope changes.
+
+This is a default behavior across every tool (Claude, Copilot, Codex) — it lives here in the
+engine so it travels with `AGENTS.md`.
+
+---
+
 ## Expected workflow on complex tasks
 
 ```
+0. INTAKE gate — is the goal unambiguous? If a material ambiguity can't be
+   resolved from evidence/a sensible default, ask targeted questions FIRST.
+
 1. READ the vault before asking
    gbrain search "<context>" --source vault
 
@@ -99,7 +123,7 @@ Done is not "should work." Done has **3 mandatory conditions:**
 | **No trace of Claude in the repo** | The work appears as "Roberto D'Angelo with help from an amazing team of AI Agents" |
 | **No irreversible actions without confirmation** | push --force, rm -rf, production deploy, drop database |
 | **FAIL LOUD on everything** | Don't swallow errors silently — report immediately |
-| **Ask when unclear; stop when thrashing** | If a request is ambiguous, or you catch yourself repeating failed attempts / "fixing" blindly, **STOP and ask immediately**. A question beats work done "a cazzo". Surfacing a blocker > shipping a wrong result in silence. |
+| **Clarify at intake; stop when thrashing** | If a goal/prompt/command is ambiguous or under-specified in a way that changes the result, **ask targeted questions BEFORE executing** (see § Intake). Likewise if you catch yourself repeating failed attempts / "fixing" blindly, **STOP and ask**. A question beats work done "a cazzo". Surfacing a blocker > shipping a wrong result in silence. |
 | **Automate with scripts; tokens only for planning + validating** | Anything repeatable/multi-step → write ONE script that does it end-to-end + prints a summary, then run it. Don't burn tokens executing by hand. Autonomous/overnight work → the `factory/` or launchd. Your chat output = plan + evidence, not the execution log. |
 
 ---
