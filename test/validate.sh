@@ -118,7 +118,7 @@ section "shellcheck (hooks + bin + test + eval + factory + dispatcher shims + li
 # factory/*.sh, the runner-shims and kanban/lint-cards.sh are security-sensitive (dispatcher
 # sandbox path) — kept in the gate, not just hand-checked (rex nit #1). kanban/kb.sh is
 # deliberately NOT globbed: it carries pre-existing SC1010/SC2010 warnings in untouched code.
-SHELLCHECK_TARGETS=(hooks/*.sh bin/*.sh test/*.sh eval/*.sh factory/*.sh factory/runner-shims/* kanban/lint-cards.sh)
+SHELLCHECK_TARGETS=(hooks/*.sh bin/*.sh test/*.sh eval/*.sh factory/*.sh factory/runner-shims/* kanban/lint-cards.sh learn/*.sh ontology/*.sh)
 if command -v shellcheck >/dev/null 2>&1; then
   if shellcheck -S warning "${SHELLCHECK_TARGETS[@]}"; then ok "shellcheck clean"; else err "shellcheck warning/error"; fi
 else
@@ -182,6 +182,13 @@ if bash test/test-receipts.sh >/dev/null 2>&1; then ok "receipt emitter green (s
 # --- 8d) install-hooks: settings.json merge is additive/idempotent/non-destructive ---
 section "install-hooks — settings.json merge contract"
 if bash test/test-install-hooks.sh >/dev/null 2>&1; then ok "install-hooks merge green (see bash test/test-install-hooks.sh)"; else err "test-install-hooks — see bash test/test-install-hooks.sh"; fi
+
+# --- 8e) meta-loop wired end-to-end (capture -> distill[real class] -> curate promotes) ---
+# The self-improving loop must actually PROMOTE an approved learning, not stall at
+# `class: TODO`. Proves capture->distill(real class)->human-approve->curate-promotes,
+# plus the two honesty gates (ephemera dropped, unapproved never promoted).
+section "meta-loop — capture -> distill -> curate promotion (test/test-metaloop.sh)"
+if bash test/test-metaloop.sh >/dev/null 2>&1; then ok "meta-loop promotes end-to-end (see bash test/test-metaloop.sh)"; else err "test-metaloop — see bash test/test-metaloop.sh"; fi
 
 # --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
 # eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The
