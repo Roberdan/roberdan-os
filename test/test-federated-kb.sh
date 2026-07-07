@@ -151,22 +151,27 @@ GR="$(cd "$GR" && pwd -P)"   # canonicalize (git --show-toplevel resolves symlin
 REGI="$TMP/reg-init"
 out="$(RDA_KANBAN_REGISTRY="$REGI" bash "$KB" init "$GR" 2>&1)"; rc=$?
 gi_ok=0; git -C "$GR" check-ignore kanban/todo/x.md >/dev/null 2>&1 && gi_ok=1
+# the per-repo pause checkpoint is handoff/resume.md (NOT latest.md) — must be excluded
+res_ok=0; git -C "$GR" check-ignore handoff/resume.md >/dev/null 2>&1 && res_ok=1
+# option B guarantee: the committed .gitignore is NEVER touched (no shared-history pollution)
+clean_gi=0; [ ! -e "$GR/.gitignore" ] || ! grep -qxF 'kanban/todo/' "$GR/.gitignore" 2>/dev/null && clean_gi=1
 hook_ok=0; [ -f "$GR/.git/hooks/pre-commit" ] && grep -q 'leak-check' "$GR/.git/hooks/pre-commit" && hook_ok=1
 reg_ok=0; grep -qxF "$GR" "$REGI" 2>/dev/null && reg_ok=1
-if [ "$rc" -eq 0 ] && [ "$gi_ok" -eq 1 ] && [ "$hook_ok" -eq 1 ] && [ "$reg_ok" -eq 1 ]; then
-  ok "kb init: card paths gitignored + leak-check hook installed + repo registered"
+if [ "$rc" -eq 0 ] && [ "$gi_ok" -eq 1 ] && [ "$res_ok" -eq 1 ] && [ "$clean_gi" -eq 1 ] && [ "$hook_ok" -eq 1 ] && [ "$reg_ok" -eq 1 ]; then
+  ok "kb init: card paths + resume.md excluded (local), committed .gitignore untouched, hook + registry set"
 else
-  err "kb init incomplete (rc=$rc gitignore=$gi_ok hook=$hook_ok registry=$reg_ok) — got: $out"
+  err "kb init incomplete (rc=$rc excl=$gi_ok resume=$res_ok clean_gitignore=$clean_gi hook=$hook_ok registry=$reg_ok) — got: $out"
 fi
 
-section "phase2: kb init is idempotent (re-run adds no duplicate gitignore/registry lines)"
+section "phase2: kb init is idempotent (re-run adds no duplicate exclude/registry lines)"
 RDA_KANBAN_REGISTRY="$REGI" bash "$KB" init "$GR" >/dev/null 2>&1; rc=$?
 reg_count="$(grep -cxF "$GR" "$REGI" 2>/dev/null || echo 0)"
-gi_count="$(grep -cxF 'kanban/todo/' "$GR/.gitignore" 2>/dev/null || echo 0)"
+# federation ignores live in .git/info/exclude (local, never the committed .gitignore)
+gi_count="$(grep -cxF 'kanban/todo/' "$GR/.git/info/exclude" 2>/dev/null || echo 0)"
 if [ "$rc" -eq 0 ] && [ "$reg_count" -eq 1 ] && [ "$gi_count" -eq 1 ]; then
-  ok "kb init re-run is idempotent (registry x$reg_count, gitignore line x$gi_count)"
+  ok "kb init re-run is idempotent (registry x$reg_count, exclude line x$gi_count)"
 else
-  err "kb init not idempotent (rc=$rc registry=$reg_count gitignore=$gi_count)"
+  err "kb init not idempotent (rc=$rc registry=$reg_count exclude=$gi_count)"
 fi
 
 section "phase2: kb init de-tracks already-committed card content AND flags local history"
