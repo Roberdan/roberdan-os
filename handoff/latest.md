@@ -1,17 +1,32 @@
-# Handoff — session 2026-07-07 (v2.6.0; best-practices audit in flight)
+# Handoff — session 2026-07-07 (v2.7.0 released; best-practices pass DONE)
 
 > Previous handoff (04→06 July: public release → v2.3.0, federated kanban, engine/identity
 > split, scars) is superseded — retrievable via `git log -- handoff/latest.md`.
 
-## ⏸️ RESUME POINT (updated 2026-07-07)
+## ⏸️ RESUME POINT (updated 2026-07-07, post v2.7.0)
 
-**One thing in flight:** `kanban/doing/260707-bestpractices-audit.md` — 2026 best-practices
-review + apply + full repo audit (efficiency/effectiveness/autonomy/reliability/cost-tokens),
-commissioned by Roberto via /goal. Phase state lives in the card. Everything else is committed
-+ pushed, main == origin, latest release **v2.6.0**.
+**Nothing mid-flight.** The best-practices-2026 pass (Roberto's /goal) is DONE: card
+`260707-bestpractices-audit` closed by @thor (PASS F-01..F-10), release **v2.7.0** pushed
+(`dec62b3`, CI `validate: success` confirmed). Two sessions ran the same goal concurrently on
+this checkout and reconciled — see `docs/report-2026-07-07-best-practices-2026.md` §4 (rex
+verdict + fixes) and the session-B report next to it. **Scar:** before committing here, check
+for a concurrent writer (`git status` + diff of files you didn't touch); stage explicit
+paths, never `git add -A`.
+
+**New decisions waiting on Roberto (report §3):** (a) slim the global `~/.claude/CLAUDE.md`
+(224 righe ≈ 4.4k token in ogni sessione; −45% fattibile dedupando le tre sezioni gbrain +
+skill `gbrain-ops`); (b) install the not-yet-wired hooks (main-guard/autofmt/verify-done)
+into live settings — or accept `pre-completion-gate.sh` as the machine-local equivalent;
+(c) wire a real `.agent-state/*.jsonl` receipts emitter (canon now states the honest limit).
 
 ## Shipped since last handoff (all on main, CI green)
 
+- **v2.7.0** — best-practices 2026 pass (two sessions, rex-audited, thor PASS): compaction-
+  resilience hooks (PreCompact checkpoint, post-compact re-inject) + autofmt stdin-contract
+  fix con regression test; canone: Context & Token Economy, agent supply-chain gate, thor
+  Provenance #10 + zero-progress #0, tool-receipts honest wiring, twin AI-Act Art. 50;
+  `effort:` frontmatter su tutti gli agenti; root `CLAUDE.md → AGENTS.md` symlink;
+  AGENTS.md §Pause&Resume/§Privacy −30%; Convergio optional observer in roberto-mode.
 - **v2.4.0→2.4.2** — pause/resume + auto-checkpoint (`kb pause/resume`, Stop-hook auto-save);
   fixes: unstaged `kb pause --auto`, YAML quoting that broke generated skill wrappers.
 - **v2.5.0** — **No False Done** cardinal rule (best-practices v3.4.0 + verify-done skill).
@@ -45,7 +60,9 @@ commissioned by Roberto via /goal. Phase state lives in the card. Everything els
 
 ## Next action
 
-Finish the best-practices audit card: research distilled → gap analysis → apply (commit per
-phase, human gates respected) → @rex + @thor → report to Roberto with measured before/after.
+No agent work queued. Per the Meta-Card Budget: the next card should be **external-facing**
+(Convergio / Fight the Stroke / Microsoft work), not more self-improvement — this pass
+explicitly closed the "2026 alignment" thread. Roberto's pending decisions are in the
+RESUME POINT above.
 
 **For a fresh agent:** read this + `kb` + `MEMORY.md`; `gbrain search` anything referenced.
