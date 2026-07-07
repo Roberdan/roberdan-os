@@ -85,3 +85,17 @@ MCP in-process SDK.
 **Sintesi:** architettura confermata allo stato dell'arte 2026; il gap è di *enforcement*
 (ciò che il canone promette dev'essere wired e testato da validate.sh) e di *leve economiche*
 2026 non ancora attivate (effort ✅ · caching/batch/defer ⬜). Nessun cambio architetturale.
+
+---
+
+## Addendum (2026-07-07 sera) — bug kb scoperto sul campo
+
+**`kb add` collide sugli ID al secondo:** l'ID card è `%y%m%d-%H%M%S`; N add nello stesso
+secondo (es. da uno script) producono lo STESSO id e le card si sovrascrivono in silenzio
+(6 card → 1 sopravvissuta, osservato su Fabrica). Fix proposto in `kanban/kb.sh`: suffisso
+di unicità (contatore o `%N`ms) o guard "id esiste già → bump". Workaround: `sleep 1.1` tra add.
+
+**`kb lint` rotto:** invoca `~/.local/kanban/lint-cards.sh` che non esiste (probabile path
+drift nell'install: lo script vive nel repo, non in `~/.local/kanban/`). Il lint schema
+runner:/human_gates: dichiarato nell'help è quindi non eseguibile. Fix: risolvere il path
+dal repo (`$RDA_OS/kanban/…`) o installare lo script accanto a `kb`.
