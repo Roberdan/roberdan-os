@@ -51,6 +51,13 @@ Roberto's and is **not** auto-crossed for any class — including `tool-quirk`/`
   `approved: true` for all classes. The mechanism is complete end-to-end (a classified,
   approved learning is provably promoted, see `test/test-metaloop.sh`); the only step still
   human-in-the-loop is flipping `approved:` — deliberately, per gate #4.
+- **The approval gate reads the YAML frontmatter block only**, never a whole-file grep — a
+  captured signal whose body text happens to begin `approved: true …` cannot self-promote past
+  the human gate (regression-tested; rex HIGH, 2026-07-07).
+- **Backlog migration:** candidates the old distill stub left at `class: TODO` (their inbox
+  source already consumed) are unstuck by a one-off `learn/backfill-classify.sh` — it
+  re-classifies them in place from their own body, tombstones ephemera, and **never promotes
+  or touches `approved:`**. Run it once on a machine that accumulated pre-fix TODO candidates.
 
 ## Anti-degradation
 
