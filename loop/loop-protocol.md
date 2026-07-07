@@ -26,9 +26,13 @@ stuck:              2 passes with no progress → STOP, report what's wedged, do
   `~/.roberdan-os/state.db`. RFC3339 timestamps.
 - **Per-task cursor:** `.agent-state/<task>.jsonl` (append-only) — one record per step with
   outcome and evidence. `.agent-state/` is gitignored.
-- **Tool receipts, not just next-steps:** each cursor record names *what ran and what it
-  returned* (command, exit code, artifact path/SHA) — a transcript is useful context but not a
-  recovery log; the receipts are what make resume and thor's provenance check possible.
+- **Tool receipts, not just next-steps:** every durable checkpoint carries *what ran and what
+  it returned* (command, exit code, artifact path/SHA) — a transcript is useful context but not
+  a recovery log; the receipts are what make resume and thor's provenance check possible.
+  **Wired today:** evidence-first phase-commit messages + kb card audit lines. The
+  `.agent-state/<task>.jsonl` cursor is the *declared format* for runners that emit one —
+  **honest limit: no in-repo tool writes it yet**; wire an emitter before leaning on it
+  (Wired End-to-End rule).
 - Readable both by hooks and by Convergio if active. **The loop doesn't depend on the daemon:**
   Convergio is an optional observer that *reads* the same state file, never a single point of failure.
 

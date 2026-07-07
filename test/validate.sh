@@ -160,6 +160,10 @@ if bash test/test-fork-merge.sh >/dev/null 2>&1; then ok "merge-clean proof gree
 section "sync.sh --install — skills symlink step (isolated via RDA_CLAUDE_SKILLS_DIR)"
 if bash test/test-sync-install.sh >/dev/null 2>&1; then ok "install symlink/skip logic verified (see bash test/test-sync-install.sh)"; else err "test-sync-install — see bash test/test-sync-install.sh"; fi
 
+# --- 8b) hooks/autofmt.sh input contract (stdin JSON; the old env-var API was a silent no-op) ---
+section "autofmt hook — stdin JSON input contract"
+if bash test/test-autofmt.sh >/dev/null 2>&1; then ok "autofmt receives files via stdin JSON (see bash test/test-autofmt.sh)"; else err "test-autofmt — see bash test/test-autofmt.sh"; fi
+
 # --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
 # eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The
 # actual with/without-canon comparison needs a real `claude` binary and Roberto's own machine —

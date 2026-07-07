@@ -101,7 +101,10 @@ Code best practices, current 2026.)
 - **Always-loaded instruction files stay lean** — target ≤200 lines each. Per-line test: *would
   removing this cause the agent to make mistakes? If not, cut it.* A rule the agent keeps
   violating inside a long file means the file is too long: convert that rule into a **hook**
-  (deterministic), don't add more prose (advisory).
+  (deterministic), don't add more prose (advisory). *Scope note:* in Claude Code this file is
+  JIT-loaded, but the ChatGPT/web **bundle** (`bin/make-bundle.sh`) concatenates it verbatim
+  into an always-loaded context — this file is over the bar itself, so the standing duty here
+  is **prune before adding**, and trim on the next canon pass.
 - **Just-in-time retrieval over pre-loading.** Keep pointers (paths, queries, `[[wikilinks]]`) in
   context; pull content on demand (gbrain, grep). Knowledge that applies *sometimes* belongs in a
   skill (progressive disclosure: only name+description load at startup), never in the canon.
