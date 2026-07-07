@@ -3,6 +3,32 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.8.0] - 2026-07-07
+
+### Added
+- **`bin/install-hooks.sh` — the repo now self-installs its Claude Code hooks.** Closes the last
+  "manual step" gap in reusability: `clone → bootstrap → install-hooks --apply → sync --install`
+  is a complete, zero-hand-edit setup on a fresh machine. The script merges the *generated*
+  five-event hook snippet (`platforms/claude/settings-hooks.json`) into the real
+  `~/.claude/settings.json` **additively** (only adds roberdan-os entries not already present,
+  dedup by command — never touches the user's other hooks), **idempotently** (second run is a
+  no-op), with a timestamped **backup** first and a post-write JSON-validity check. Dry-run by
+  default; `--apply` writes. `RDA_CLAUDE_SETTINGS` overrides the target for testing.
+  `test/test-install-hooks.sh` proves all five properties; wired into validate.sh §8d.
+- **bootstrap + README + QUICKSTART** now present the three-command install (bootstrap →
+  install-hooks → sync --install) instead of hand-editing JSON. The only remaining manual step
+  is the one-line pointer block in the operator's *personal* `~/.claude/CLAUDE.md` (curated
+  config the engine deliberately never overwrites).
+
+### Note on the reusability boundary
+Three layers, made explicit: **(1) public engine** (agents, skills, hooks, kb, canon, install
+scripts) — fully in-repo, installed by the three commands; **(2) forker identity** (`identity/`)
+— the one directory a fork edits; **(3) operator's personal machine config** (the global
+`~/.claude/CLAUDE.md` with absolute paths / gbrain fork / launchd job names, the `gbrain-ops`
+runbook, the confidential dossier) — deliberately *not* in the public repo, by the
+privacy/identity split. Replicating layer 3 across the operator's *own* machines is a separate
+private overlay, not a defect in the public repo.
+
 ## [v2.7.1] - 2026-07-07
 
 ### Fixed
