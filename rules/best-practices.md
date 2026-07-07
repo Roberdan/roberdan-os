@@ -1,6 +1,6 @@
 ---
 name: best-practices
-version: "3.5.0"
+version: "3.6.0"
 last_updated: "2026-07-07"
 ---
 
@@ -185,6 +185,27 @@ Before `git push` or PR creation, run the full local pipeline:
 5. Build: `cargo build` / `npm run build`
 
 If any step fails, fix and re-run ALL checks. Do NOT push with known failures.
+
+## Parallel work — worktree + PR, never concurrent commits on one checkout
+
+**When work is parallelized inside a single repo, each parallel stream gets its own `git worktree`
++ branch + PR. Never run two agents/sessions committing to the same working checkout.** This is a
+hard rule, born from a real scar (2026-07-07: two sessions on the same checkout re-edited each
+other's files — duplicate frontmatter keys, interleaved commits, a near-collision on the release).
+
+- **One worktree per stream:** `git worktree add ../<repo>-<feature> -b <type>/<feature>` off the
+  base branch. Each worktree has its own index and HEAD, so parallel writers can't fight
+  `.git/index.lock` or clobber each other's staged work — this is exactly what worktrees are for.
+- **Disjoint file ownership:** give each stream a non-overlapping file set. Keep shared, merge-prone
+  files (`VERSION`, `CHANGELOG.md`, `README.md`) OUT of the parallel branches — bump/write them once,
+  sequentially, at merge/release time, so PRs stay conflict-free.
+- **Each stream ends in a PR**, not a direct push to the shared branch: push the branch, let CI go
+  green, `@rex` reviews, `@thor` runs the qualitative done-gate, then merge (merge commit only).
+  Merge PRs **one at a time** and re-check CI between merges.
+- **Sequential work on a personal repo may still commit to the base branch directly** (that's the
+  normal solo flow). The worktree+PR rule triggers specifically when you *parallelize* — the moment
+  there is more than one writer, isolation is mandatory.
+- After merge: `git worktree remove` the stream's worktree and delete its branch.
 
 ## Merge Discipline
 
