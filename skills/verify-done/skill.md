@@ -21,6 +21,14 @@ the whole system. Prefer a mechanical gate that carries the evidence over your o
 2. **Verified empirically** — actually tested, not estimated. Show the output, not the estimate.
 3. **Systems in sync** — vault (Obsidian) + Convergio twin plan + in-repo docs aligned.
 
+## Zero-progress screen (cheapest check, run it FIRST)
+Before the checklist: **did any durable state actually change since the task started?**
+Compare git (`log`/`status`), produced artifacts, or the tracked task state against the
+start point. If nothing durable changed, the "done" claim is rejected outright — no need
+for finer checks. Most false dones are declared at **zero** verifiable progress, not on
+near-misses (observed 65–88% across agent benchmarks, arXiv:2606.09863), so this one
+cheap predicate catches the majority of them.
+
 ## Checklist (NON-NEGOTIABLE)
 - [ ] 0 build errors
 - [ ] 0 warnings (treated as errors)
