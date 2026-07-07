@@ -3,6 +3,69 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.7.0] - 2026-07-07
+
+### Added
+- **Context & Token Economy** section in `rules/best-practices.md` (v3.5.0): always-loaded
+  instruction files ≤200 lines with the "would removing this cause mistakes?" per-line test,
+  just-in-time retrieval over pre-loading, subagent exploration isolation, prompt-cache
+  discipline (stable prefix, model+effort picked once), durable state on disk over
+  in-conversation state, runaway loop = cost incident. (Anthropic context-engineering +
+  Claude Code best practices, 2026.)
+- **Agent supply-chain rules** in `rules/best-practices.md` § Security: third-party skills/MCP
+  servers reviewed before install and re-reviewed on update; no unreviewed MCP server in a
+  session that can read `private/`; blast-radius over prompt-level pleading. (Snyk ToxicSkills
+  2026-02; OWASP Agentic Top 10 2025-12.)
+- **Provenance gate in @thor** (v1.1, gate #10): verify *how* an artifact came to exist (git
+  history, re-run/traceable test output, loop-cursor receipts), not just that it exists — anti
+  reward-hacking. (EvilGenie benchmark + Anthropic evals guidance, 2026.)
+- **Tool receipts in the loop cursor** (`loop/loop-protocol.md`): each step records what ran and
+  what it returned (command, exit code, artifact SHA) — a transcript is context, not a recovery
+  log; verification probes live state, never grades the transcript. (Managed Agents, 2026-04.)
+- **Delegation-not-impersonation guardrail in @twin** (v2.1): machine-readable trails sign as
+  the operator's assistant; EU AI Act Art. 50 disclosure norm (operative 2026-08-02) if a fully
+  automated external interaction is ever enabled — draft-not-send unchanged.
+- **Root `CLAUDE.md → AGENTS.md` symlink**: Claude Code loads the canon natively in-repo
+  (official recommendation for AGENTS.md-native repos); forkers get oriented without the
+  SessionStart hook installed.
+- **`effort: xhigh` frontmatter** on board/socrates (subagent frontmatter supports effort in
+  2026) — the effort doctrine's hardest capability-sensitive calls, now wired.
+
+### Fixed
+- **`hooks/autofmt.sh` was a silent no-op**: it read `CLAUDE_FILE_PATH`, an env var the modern
+  hook API never sets (hooks receive JSON on stdin). Now parses `.tool_input.file_path` from
+  stdin, legacy env var kept as manual-run fallback.
+- **`settings-hooks.json` snippet drifted from the canon**: it lacked the SessionStart
+  context-inject and the Stop auto-checkpoint that AGENTS.md § Pause & Resume declares
+  always-on. Now emitted complete, plus a PreCompact checkpoint so durable state is saved
+  *before* the context window is compressed (SessionStart with no matcher re-injects after
+  compact too).
+
+### Changed
+- Best-practices research pass 2026-07-07 documented in
+  `docs/report-2026-07-07-best-practices-2026.md` (research synthesis, gap analysis, applied
+  vs proposed — incl. the ~6.4k-token global `~/.claude/CLAUDE.md` slimming proposal left to
+  Roberto), with the full-repo audit (efficiency, effectiveness, autonomy, reliability,
+  cost/token). **Two sessions ran the same goal concurrently** and converged: session B's
+  disjoint-file pass (`docs/report-2026-07-07-best-practices-2026-session-b.md`) landed the
+  complements below; @rex audited both (APPROVE-WITH-CONCERNS → concerns fixed in this release).
+- **Session B (same pass, disjoint files):** AGENTS.md § Pause & Resume + § Privacy compressed
+  ~30% at equal contract; **zero-progress screen** as gate #0 in @thor (v1.2) and
+  `verify-done.sh` (cheapest predicate first: durable state must have changed at all);
+  explicit hook timeouts + `disable-model-invocation` passthrough in generated skill wrappers
+  (ship gated); Convergio demoted to optional observer everywhere in roberto-mode (no
+  done-gate deadlock on a daemon that isn't running); context-inject cry-wolf fix (loud
+  PAUSED banner only on explicit `kb pause`); `curate.sh` atomic per-candidate vault commits;
+  `verify-done.sh` parses the real top-level manifest version; `effort:` frontmatter across
+  all agents (baccio/luca/rex/thor/twin high, wanda medium, board/socrates xhigh).
+- **@rex concerns closed:** duplicate `effort:` keys deduped (concurrent-edit artifact);
+  loop-protocol receipts + thor provenance gate now state the honest wiring
+  (`.agent-state/*.jsonl` is a declared format with **no in-repo emitter yet** — phase-commit
+  evidence + kb audit lines are today's receipts); the ≤200-line rule carries its own scope
+  note (this file is bundled verbatim for ChatGPT/web → prune-before-add duty);
+  `test/test-autofmt.sh` added and wired into validate.sh (the silent-no-op class of bug now
+  has a regression gate).
+
 ## [v2.6.0] - 2026-07-07
 
 ### Changed
