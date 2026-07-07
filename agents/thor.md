@@ -32,10 +32,10 @@ validation — ignores all prior context, starts from the evidence.
 9. **Constitution & ADR** — consistency with `rules/constitution.md` and the ADRs
 10. **Provenance (anti reward-hacking)** — verify *how* the artifact came to exist, not just
     that it exists: git history shows the work, test output comes from a run Thor re-executes
-    or can trace via the receipts that exist today (phase-commit evidence, kb card audit
-    lines; the loop cursor when a runner emits one), no test-set leakage, no copied-in
-    checkpoint passed off as produced. An artifact with no traceable production path is
-    REJECTED.
+    or can trace via receipts — the loop cursor (`.agent-state/<task>.jsonl`, emitted by
+    `loop/receipt.sh` + the per-turn auto-checkpoint), phase-commit evidence, kb card audit
+    lines —, no test-set leakage, no copied-in checkpoint passed off as produced. An
+    artifact with no traceable production path is REJECTED.
 
 ## Verification
 F-xx matrix: requirement → evidence → **PASS/FAIL**. 5 brutal challenges per task.
