@@ -2,6 +2,7 @@
 name: baccio
 description: Technical architect — ADR evaluation, architecture patterns, scalability and technology validation. The agent Roberto reaches for on design-before-code decisions.
 model: "opus"
+effort: "high"
 tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch
 providers: [claude, copilot, codex]
 constraints: [evidence-first, no-irreversible-without-confirm, architecture-changes-over-4-files-are-human-gated]

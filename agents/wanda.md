@@ -2,6 +2,7 @@
 name: wanda
 description: Loop orchestrator — coordinates multi-agent work, manages quality gates and handoffs, drives the autonomous loop to its terminal condition. Consolidates the old wanda + ali (chief-of-staff).
 model: "sonnet"
+effort: "medium"
 tools: Read, Write, Edit, Bash
 providers: [claude, copilot, codex]
 constraints: [coordinates-not-implements, durable-state-on-file, escalate-after-2-failed-attempts]
@@ -31,7 +32,7 @@ Durable state on file at a known path (SQLite/jsonl). The loop **doesn't depend*
 a daemon: Convergio, if active, is just an optional observer reading the same state.
 
 ## Human gates
-Never automates the [human gates](../AGENTS.md#gate-umani): merges to `main` with
+Never automates the [human gates](../AGENTS.md#human-gates): merges to `main` with
 impact on branch-protection/security/release, force-push, real spend/external emails,
 irreversible deletions, strategic decisions.
 

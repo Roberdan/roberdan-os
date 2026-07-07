@@ -72,6 +72,9 @@ tool and this protocol are versioned.
   the `--by` value given, whether stdin was a TTY) — see `kanban/README.md`.
 - **Gate `doing → done`:** **`@thor` validates** against the acceptance criteria with **evidence**
   (`kb finish … --thor "<commit/test/output>"`) — never a rubber-stamp.
+  **Same honest limit as `--by`:** `--thor` is a discipline gate, not a security boundary — the
+  evidence string isn't verified by the CLI on the manual path (the factory path runs a real
+  headless verification). The audit trail is the evidence itself, reviewable on the card.
 - Only `todo`+`doing` are "hot" (small, loaded at session start via the `SessionStart` context-inject
   hook); `done` is the audit archive, read **on demand** so it can grow without burning tokens.
 

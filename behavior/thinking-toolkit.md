@@ -97,8 +97,9 @@ Fable run. Source: [Anthropic — Prompting Claude Fable 5](https://platform.cla
 - **Effort is the primary control on Fable** (intelligence ↔ latency/cost). Doctrine: **`high`
   by default; `xhigh` for the hardest capability-sensitive calls** (a `board` red-team, a
   `socrates` deconstruction of an ambiguous high-stakes problem); `low`/`medium` for routine.
-  This is a run-time knob (API/SDK), not an agent frontmatter field — set it when you invoke
-  Fable, don't write it into an agent file.
+  Run-time knob (API/SDK) **and, since mid-2026, a Claude Code agent frontmatter field**
+  (`effort:` next to `model:` — other providers ignore it, like `model:`). The doctrine is
+  unchanged: `high` default, `xhigh` only where capability is the binding constraint.
 - **Act sooner, survey less.** Fable rewards *"you have enough to act, so act — a recommendation,
   not an exhaustive survey"*. This is already the mother rule; on Fable at high effort it matters
   more, because the failure mode is over-deliberation, not under-thinking.

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Stop / SubagentStop hook — anti-drift for the 3 systems (vault + Convergio + repo).
-# Mechanizes the end-of-task sync: regenerates the per-platform wrappers from the canon
+# Stop / SubagentStop hook — regenerate per-platform wrappers + privacy leak-check.
+# (It does NOT sync the vault or Convergio — that's the /sync skill's job.)
+# Mechanizes the end-of-task refresh: regenerates the per-platform wrappers from the canon
 # on disk so the local ~/.claude/etc. stay fresh. Never blocks (exit 0). Never pushes.
 #
 # platforms/ is gitignored and never committed (see .gitignore, bin/sync.sh) — this hook

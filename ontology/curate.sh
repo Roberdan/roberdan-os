@@ -42,14 +42,17 @@ for c in "$quar"/*.md; do
   note="$dest/$slug.md"
   printf -- '---\n_organized: true\ntype: agent-learning\nclass: %s\nworkspace: agent-learnings\ncaptured: %s\n---\n\n# %s\n\n%s\n' \
     "$cls" "$(date +%Y-%m-%d)" "$slug" "$body" > "$note"
-  promoted=$((promoted+1))
-  mv "$c" "$c.promoted" 2>/dev/null || true
+  # Atomic per-candidate: commit the note first; consume the quarantine source ONLY on
+  # a verified commit. A failed/killed commit leaves the candidate in quarantine for retry
+  # (before: one cumulative commit after the loop could orphan already-consumed sources).
+  if git_safe add "agent-learnings/$slug.md" 2>/dev/null && git_safe commit -q -m "chore(memory): promote agent-learning $slug" 2>/dev/null; then
+    mv "$c" "$c.promoted" 2>/dev/null || true
+    promoted=$((promoted+1))
+  else
+    rm -f "$note"
+    echo "curate: vault commit failed for $c — left in quarantine for retry" >&2
+  fi
 done
-
-if [ "$promoted" -gt 0 ]; then
-  git_safe add "agent-learnings" 2>/dev/null || true
-  git_safe commit -m "chore(memory): promote $promoted agent-learning from quarantine" 2>/dev/null || true
-fi
 
 # robust counts: find doesn't fail on an empty dir (unlike ls glob + set -e)
 total="$(find "$dest" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"

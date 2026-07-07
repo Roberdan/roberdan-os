@@ -23,12 +23,21 @@ if [ -z "$vfile" ]; then
     [ -f "$c" ] && { vfile="$c"; break; }
   done
 fi
+# Top-level manifest version only — the first bare regex hit could match a dependency.
+_manifest_version() {
+  case "$1" in
+    package.json)   grep -m1 '"version"' "$1" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 ;;
+    Cargo.toml)     awk '/^\[package\]/{f=1;next} /^\[/{f=0} f && /^version[[:space:]]*=/{print;exit}' "$1" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 ;;
+    pyproject.toml) awk '/^\[(project|tool.poetry)\]/{f=1;next} /^\[/{f=0} f && /^version[[:space:]]*=/{print;exit}' "$1" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 ;;
+    *)              grep -oE '[0-9]+\.[0-9]+\.[0-9]+' "$1" 2>/dev/null | head -1 ;;
+  esac
+}
 if [ -n "$vfile" ] && [ -f "$vfile" ]; then
-  V1=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' "$vfile" 2>/dev/null | head -1)
+  V1=$(_manifest_version "$vfile")
   for m in package.json Cargo.toml pyproject.toml; do
     [ "$m" = "$vfile" ] && continue
     [ -f "$m" ] || continue
-    V2=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' "$m" 2>/dev/null | head -1)
+    V2=$(_manifest_version "$m")
     if [ -n "$V1" ] && [ -n "$V2" ] && [ "$V1" != "$V2" ]; then
       WARN+="• version drift: $vfile ($V1) != $m ($V2)\n"
     fi

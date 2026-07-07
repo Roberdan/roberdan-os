@@ -50,9 +50,9 @@ Don't say "I'm working on it." Show:
 Done is not "should work." Done has **3 mandatory conditions:**
 1. **Evidence** — concrete artifacts attached (commit SHA, PR link, file path, test output)
 2. **Empirically verified** — actually tested, not estimated ("are you sure? I don't see any modified file")
-3. **Systems synced** — the 3 systems must always stay aligned:
+3. **Systems synced** — the 3 systems stay aligned (sync what is present):
    - Desktop masterplan (Obsidian vault)
-   - Convergio twin plans (`cvg` in the daemon)
+   - Convergio twin plans (`cvg`) — **optional observer**: sync when it's running, never a done-gate
    - In-repo documentation
 
 **Key phrase:** *"Claims without evidence are rejected."*
@@ -139,9 +139,9 @@ Roberto has formalized these principles as a contract for all his agents:
 4. **Feedback Loops Everywhere** — every interaction is evaluable; low score → refinement
 5. **Ethical Guardrails** — bias scan, privacy budget, audit log enforced by the policy engine
 6. **Hybrid Workforce Orchestration** — humans and agents treated as first-class citizens
-7. **Data Gravity Flows to Insight** — the vault is the source, Convergio is the witness
+7. **Data Gravity Flows to Insight** — the vault is the source, Convergio an optional observer
 
-**Implicit principle #8:** *"This document is the contract. The daemon is the witness. If they disagree, the daemon is the bug."*
+**Implicit principle #8:** *"This document is the contract. Convergio, when present, is an observer — if they disagree the observer is stale; it is never a single point of failure."* (Aligned with AGENTS.md and loop-protocol: optional observer.)
 
 ---
 
