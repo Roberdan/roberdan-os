@@ -21,11 +21,18 @@ git_safe() {
   git -C "$vault" "$@"
 }
 
+# Emit ONLY the YAML frontmatter block (between the first two `---` fences). The
+# approval + class gates MUST read from here, not from a whole-file grep: a captured
+# signal whose ## Signal body happens to begin "approved: true …" would otherwise
+# self-promote past Roberto's human gate (rex HIGH, 2026-07-07). bash-3.2/BSD-safe.
+_frontmatter() { awk 'NR==1 && /^---$/{f=1;next} f && /^---$/{exit} f{print}' "$1"; }
+
 promoted=0
 for c in "$quar"/*.md; do
   [ -e "$c" ] || continue
-  grep -qE '^approved:[[:space:]]*true' "$c" || continue
-  cls="$(grep -E '^class:' "$c" | head -1 | sed -E 's/^class:[[:space:]]*//;s/[[:space:]]*#.*//')"
+  fm="$(_frontmatter "$c")"
+  printf '%s\n' "$fm" | grep -qE '^approved:[[:space:]]*true' || continue
+  cls="$(printf '%s\n' "$fm" | grep -E '^class:' | head -1 | sed -E 's/^class:[[:space:]]*//;s/[[:space:]]*#.*//')"
   [ -n "$cls" ] && [ "$cls" != "TODO" ] || continue
   body="$(awk '/^## Signal/{f=1;next} /^## /{f=0} f && NF' "$c")"
   [ -n "$body" ] || continue
@@ -59,7 +66,7 @@ total="$(find "$dest" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
 pending=0
 for q in "$quar"/*.md; do
   [ -e "$q" ] || continue
-  grep -qE '^approved:[[:space:]]*true' "$q" || pending=$((pending+1))
+  _frontmatter "$q" | grep -qE '^approved:[[:space:]]*true' || pending=$((pending+1))
 done
 printf -- '# memory hygiene — %s\n\n- promoted this run: %s\n- total agent-learning notes: %s\n- unapproved quarantine candidates: %s\n\n## Proposals (gated, human decides)\n- semantic near-dup dedup once the embedding provider is active\n- tombstone retire: RESOLVED/pre-v3 notes → agent-learnings/_archive/\n' \
   "$(date +%Y-%m-%d)" "$promoted" "$total" "$pending" > "$report"
