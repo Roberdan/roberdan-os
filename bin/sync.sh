@@ -119,15 +119,23 @@ This is a thin pointer. The canonical source of behavior is
 EOF
 
   # Thin SKILL.md per canonical skill → points to skills/<name>/skill.md.
-  local s name desc
+  # disable-model-invocation passthrough: side-effect skills (e.g. ship) opt out of
+  # model auto-invocation in their canon frontmatter; the wrapper must carry it or the
+  # gate silently vanishes on install (2026 skill-authoring best practice).
+  local s name desc dmi_line
   for s in $(list "$ROOT/skills" "skill.md" 3); do
     name="$(fm "$s" name)"; desc="$(fm "$s" description)"
+    dmi_line=""
+    if [ "$(fm "$s" disable-model-invocation)" = "true" ]; then
+      dmi_line="disable-model-invocation: true
+"
+    fi
     mkdir -p "$d/skills/$name"
     cat > "$d/skills/$name/SKILL.md" <<EOF
 ---
 name: $name
 description: $(yaml_dq "$desc")
----
+${dmi_line}---
 
 # $name (wrapper)
 
@@ -160,23 +168,23 @@ EOF
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/context-inject.sh 2>/dev/null || true" }] }
+      { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/context-inject.sh 2>/dev/null || true", "timeout": 15 }] }
     ],
     "PreToolUse": [
-      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/main-guard.sh" }] },
-      { "matcher": "Bash",        "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/bash-guard.sh" }] }
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/main-guard.sh", "timeout": 10 }] },
+      { "matcher": "Bash",        "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/bash-guard.sh", "timeout": 10 }] }
     ],
     "PostToolUse": [
-      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/autofmt.sh" }] }
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/autofmt.sh", "timeout": 30 }] }
     ],
     "PreCompact": [
-      { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/auto-checkpoint.sh" }] }
+      { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/auto-checkpoint.sh", "timeout": 30 }] }
     ],
     "Stop": [
       { "hooks": [
-          { "type": "command", "command": "$RDA_OS/hooks/verify-done.sh" },
-          { "type": "command", "command": "$RDA_OS/hooks/post-task-sync.sh" },
-          { "type": "command", "command": "bash $RDA_OS/hooks/auto-checkpoint.sh" }
+          { "type": "command", "command": "$RDA_OS/hooks/verify-done.sh", "timeout": 15 },
+          { "type": "command", "command": "$RDA_OS/hooks/post-task-sync.sh", "timeout": 60 },
+          { "type": "command", "command": "bash $RDA_OS/hooks/auto-checkpoint.sh", "timeout": 30 }
       ] }
     ]
   }

@@ -2,6 +2,7 @@
 name: ship
 description: Platform-agnostic ship workflow — local CI gate, commit per phase, push, PR with Summary + Test plan, watch CI, merge-commit only. Honors human gates on main.
 providers: [claude, copilot, codex]
+disable-model-invocation: true
 ---
 
 # ship — get the work into production (git + gh)
