@@ -19,8 +19,9 @@ kb finish <id> --thor "<ev>"         # GATE: doing->done (@thor validates with e
 kb pause "<next step>"               # lean per-repo checkpoint handoff/resume.md (overwritten;
                                      #   a Stop hook runs `kb pause --auto` after every turn)
 kb resume [--done]                   # show checkpoint + live backlog | clear when resumed
-kb pending [--count]                 # approval inbox: everything waiting on Roberto (todo +
-                                     #   unapproved learning + open PRs); --count = fast total
+kb pending [--count]                 # approval inbox: todo + unapproved learning + non-bot PRs
+                                     #   across all registered repos. --count = fast LOCAL total
+                                     #   (todo+learning only, no gh) for the SessionStart badge
 ```
 
 ## The two gates (no rubber-stamping)
