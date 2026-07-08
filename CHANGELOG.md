@@ -3,6 +3,29 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.12.0] - 2026-07-08
+
+### Changed
+- **gbrain: dropped the local fork — now runs the official upstream.** The "fork"
+  (`Roberdan/gbrain`, commit `f7376b11`) was just a 2-line patch adding `bge-m3` to the ollama
+  recipe. It's no longer needed: `~/.gbrain/config.json` declares `embedding_dimensions: 1024`
+  explicitly and the official `garrytan/gbrain` respects it, so `ollama:bge-m3` embeds fine with
+  **zero code changes**. Verified end-to-end on the real DB (11.769 pages, untouched): search
+  returns identical-score results and embed writes 1024-dim chunks. The `~/gbrain` clone now
+  tracks only the official remote (fork remote removed), pinned to the `official` branch @
+  v0.42.53. **Honest caveat:** upgrading to the latest official (v0.42.57) is blocked by a failing
+  DB migration (v0.32.2) on this DB — a separate, unresolved gbrain issue, not forced.
+- **`bin/check-embedder.sh` rewritten** for the fork-free world: instead of looking for a code
+  patch (there is none), it now verifies the three things that actually keep local-first recall
+  working — config declares `bge-m3` + `1024` dims, ollama serves `bge-m3` at 1024 via its
+  OpenAI-compatible endpoint, and the clone has no fork remote. Shellcheck-clean, green.
+
+### Note (machine ops, not repo code)
+- **`trading-os` integrated into both memory systems**: registered + indexed in gbrain (93 pages,
+  auto-scoped via `.gbrain-source` pin) and federated into the kanban (`kb init` — board
+  scaffolded, card columns excluded via `.git/info/exclude`, leak-check pre-commit hook). It was
+  absent simply because both systems are explicit opt-in and it had never been registered.
+
 ## [v2.11.0] - 2026-07-08
 
 ### Added
