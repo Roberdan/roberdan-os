@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- pending digest — the proactive half of the approval inbox. Twice daily (09:00 + 18:00):
+     if something is waiting on Roberto (todo cards, learning to approve, open PRs) it pushes a
+     macOS notification + refreshes ~/.roberdan-os/pending-digest.txt. Turns the system from
+     "mute until you look" into "it tells you." See bin/pending-digest.sh + kb pending.
+     Install: cp in ~/Library/LaunchAgents/ + launchctl load. Catch-up at boot/wake like the
+     other rda-* jobs (StartCalendarInterval, not cron). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.roberdan.rda-pending-digest</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>"$HOME/GitHub/roberdan-os/bin/pending-digest.sh"</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>StandardOutPath</key><string>/tmp/rda-pending-digest.log</string>
+  <key>StandardErrorPath</key><string>/tmp/rda-pending-digest.log</string>
+  <key>RunAtLoad</key><false/>
+</dict>
+</plist>

@@ -602,10 +602,97 @@ HOOK
   return 0
 }
 
+# kb pending — the "approval inbox": ONE place aggregating everything waiting on Roberto,
+# so nothing (a learning to approve, an open PR, a gated card) sits unseen. Read-only; the
+# same aggregation the proactive digest (bin/pending-digest.sh) and the SessionStart count use.
+# Prints a trailing "PENDING: N" line as the machine-readable total (grepped by the hook/digest).
+_pending() {
+  local total=0 n f cls body bd quar
+  local -a boards=()
+  while IFS= read -r bd; do [ -n "$bd" ] && [ -d "$bd/kanban" ] && boards+=("$bd/kanban"); done < <(_board_roots)
+  # Include the resolved board ($KB, which respects RDA_KANBAN) if _board_roots didn't already —
+  # matters for a non-registered cwd and for isolated tests that point RDA_KANBAN at a temp board.
+  local _in=0 _b; for _b in "${boards[@]}"; do [ "$_b" = "$KB" ] && _in=1; done
+  [ "$_in" -eq 0 ] && boards+=("$KB")
+  quar="${RDA_QUARANTINE:-$RDA_HOME/learnings/quarantine}"
+
+  # --count: fast LOCAL total (todo + unapproved learning, no gh) — for the SessionStart hook,
+  # which must stay quick. Prints only the number.
+  if [ "${1:-}" = "--count" ]; then
+    n=0
+    for bd in "${boards[@]}"; do for f in "$bd/todo"/*.md; do [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue ;; esac; n=$((n+1)); done; done
+    if [ -d "$quar" ]; then for f in "$quar"/*.md; do [ -e "$f" ] || continue
+      awk 'NR==1&&/^---$/{fm=1;next} fm&&/^---$/{exit} fm' "$f" | grep -qE '^approved:[[:space:]]*true' && continue; n=$((n+1)); done; fi
+    echo "$n"; return 0
+  fi
+
+  echo "## Pending — cosa aspetta te (Roberto)"
+
+  # 1) Kanban todo cards across every registered board — gate: todo->doing is your approval.
+  echo
+  echo "### Kanban todo — approvazione todo→doing"
+  n=0
+  for bd in "${boards[@]}"; do
+    for f in "$bd/todo"/*.md; do
+      [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue ;; esac
+      printf '  • %s (%s) — %s\n' "$(basename "$f" .md)" "$(_repo_tag "$f")" "$(_field "$f" title)"
+      n=$((n+1))
+    done
+  done
+  [ "$n" -eq 0 ] && echo "  (nessuna)"
+  total=$((total+n))
+
+  # 2) Learning candidates awaiting your approval (approved: false in quarantine) — flip
+  #    approved: true on the ones worth keeping, then `bash ontology/curate.sh` promotes them.
+  echo
+  echo "### Learning da approvare — flip approved:true + \`bash ontology/curate.sh\`"
+  n=0
+  if [ -d "$quar" ]; then
+    for f in "$quar"/*.md; do
+      [ -e "$f" ] || continue
+      awk 'NR==1&&/^---$/{fm=1;next} fm&&/^---$/{exit} fm' "$f" | grep -qE '^approved:[[:space:]]*true' && continue
+      cls="$(awk 'NR==1&&/^---$/{fm=1;next} fm&&/^---$/{exit} fm&&/^class:/{sub(/^class:[[:space:]]*/,"");sub(/[[:space:]]*#.*/,"");print}' "$f")"
+      body="$(awk '/^## Signal/{s=1;next} /^## /{s=0} s&&NF' "$f" | head -1)"
+      printf '  • [%s] %s — %s\n' "${cls:-?}" "$(basename "$f" .md)" "$(printf '%s' "$body" | cut -c1-72)"
+      n=$((n+1))
+    done
+  fi
+  [ "$n" -eq 0 ] && echo "  (nessuno)"
+  total=$((total+n))
+
+  # 3) Open PRs on the current repo (best-effort; needs gh + a remote). Scoped to cwd's repo
+  #    to avoid N slow API calls; the digest can widen across the registry.
+  echo
+  echo "### PR aperte (repo corrente)"
+  n=0
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "  (gh non installato)"
+  elif ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "  (non in un repo git)"
+  else
+    while IFS=$'\t' read -r num title; do
+      [ -n "$num" ] || continue
+      printf '  • #%s — %s\n' "$num" "$title"; n=$((n+1))
+    done < <(gh pr list --state open --json number,title --jq '.[]|"\(.number)\t\(.title)"' 2>/dev/null)
+    [ "$n" -eq 0 ] && echo "  (nessuna)"
+  fi
+  total=$((total+n))
+
+  # Discursive human-gate threads live in handoff/latest.md (open threads / gates) — pointer,
+  # not parsed: they're prose, and a false count is worse than a pointer.
+  echo
+  echo "### Gate discorsivi / thread aperti"
+  echo "  vedi $ROOT/handoff/latest.md (§ open threads / human gates)"
+
+  echo
+  echo "PENDING: $total"
+}
+
 case "$cmd" in
   view|board|"")                   # visual kanban (default); aggregate if cwd
     if [ "$KB_MATCHED" -eq 0 ]; then _board --all; else _board; fi
     ;;
+  pending|inbox) _pending "$@" ;;  # the approval inbox: everything waiting on Roberto (--count = fast total)
   init) _kb_init "${1:-$ROOT}" ;;  # scaffold + privatize a repo's board (idempotent)
   lint) RDA_KANBAN="$KB" bash "$ROOT/kanban/lint-cards.sh" ;;  # runner/human_gates schema lint
   dispatch) bash "$ROOT/factory/dispatch-runner.sh" "$@" ;;   # restricted external-CLI dispatcher (DORMANT — always refuses)

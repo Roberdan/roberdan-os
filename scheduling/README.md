@@ -7,6 +7,7 @@ OS-level scheduler (fires even with Claude closed). Cron-swappable. See [`docs/a
 | `com.roberdan.rda-evolve` | weekly (Sat 02:00, launchd catch-up if the Mac is off) | `evolve/watch.sh` → kanban cards |
 | `com.roberdan.rda-learn` | daily (02:30) | `learn/distill.sh` + `ontology/curate.sh` |
 | `com.roberdan.rda-factory` | nightly (01:00) — plist lives in [`factory/`](../factory/) | `factory/run.sh` (queued headless tasks) |
+| `com.roberdan.rda-pending-digest` | twice daily (09:00 + 18:00) | `bin/pending-digest.sh` → macOS notification + `~/.roberdan-os/pending-digest.txt` when something waits on Roberto (see `kb pending`) |
 
 ## Install
 

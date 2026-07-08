@@ -19,6 +19,8 @@ kb finish <id> --thor "<ev>"         # GATE: doing->done (@thor validates with e
 kb pause "<next step>"               # lean per-repo checkpoint handoff/resume.md (overwritten;
                                      #   a Stop hook runs `kb pause --auto` after every turn)
 kb resume [--done]                   # show checkpoint + live backlog | clear when resumed
+kb pending [--count]                 # approval inbox: everything waiting on Roberto (todo +
+                                     #   unapproved learning + open PRs); --count = fast total
 ```
 
 ## The two gates (no rubber-stamping)
