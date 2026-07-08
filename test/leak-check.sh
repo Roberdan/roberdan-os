@@ -28,13 +28,21 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DENYLIST="${RDA_DENYLIST_SRC:-$ROOT/private/.denylist}"
 HASHFILE="${RDA_DENYLIST_HASHFILE:-$ROOT/test/denylist.sha256}"
 
-# Targets: every tracked file (excludes private/, .git, binaries) + any extras (e.g. bundle).
-# Portable to bash 3.2 (macOS): no mapfile. Shared by tiers (a) and (b).
+# --only <files…>: scan ONLY the given files, NOT the default tree. The kb-init pre-commit
+# hook uses it so it checks the STAGED files of the CURRENT repo (fast + correct), instead of
+# re-scanning all of roberdan-os on every commit of another repo — the 2026-07-08 hang.
+only=0
+if [[ "${1:-}" == "--only" ]]; then only=1; shift; fi
+
+# Targets: default = every tracked file here (excludes private/, .git, binaries); with --only,
+# only the CLI files. Portable to bash 3.2 (macOS): no mapfile. Shared by tiers (a) and (b).
 targets=()
-while IFS= read -r f; do
-  [[ -n "$f" ]] && targets+=("$f")
-done < <(cd "$ROOT" && git ls-files --cached --others --exclude-standard -- . ':!:private/**' 2>/dev/null)
-# Adds extra files passed on the CLI (absolute paths or relative to cwd).
+if [[ "$only" -eq 0 ]]; then
+  while IFS= read -r f; do
+    [[ -n "$f" ]] && targets+=("$f")
+  done < <(cd "$ROOT" && git ls-files --cached --others --exclude-standard -- . ':!:private/**' 2>/dev/null)
+fi
+# Extra files passed on the CLI (absolute paths or relative to cwd).
 for f in "$@"; do targets+=("$f"); done
 
 # --- Tier (a): private/.denylist present — authoritative, local-only -------------------
