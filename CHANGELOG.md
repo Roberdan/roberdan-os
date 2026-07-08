@@ -3,6 +3,41 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.11.0] - 2026-07-08
+
+### Added
+- **Approval inbox — the system now tells Roberto when he's needed (push, not just pull).**
+  Answers the standing question "how do I know when something waits on me?". Three parts:
+  - **`kb pending [--count]`** — one place aggregating, across every registered repo: gated todo
+    cards + unapproved learning candidates + open PRs awaiting review/merge (**bot PRs excluded** —
+    Dependabot/renovate/actions are noise, not decisions; an agent-authored PR like copilot-swe-agent
+    is *kept*, it needs a merge decision). `--count` is a fast LOCAL total (todo+learning, no `gh`).
+  - **`bin/pending-digest.sh`** + launchd `com.roberdan.rda-pending-digest` (twice daily, 09:00 +
+    18:00) — pushes a macOS notification + refreshes `~/.roberdan-os/pending-digest.txt` with the
+    full picture (PRs included) when something waits. Runs from no cwd, iterates the registry.
+  - **SessionStart badge** — `📥 N in attesa` at the top of every fresh session (fast local count).
+  - `test/test-pending.sh` (validate §8e): count correctness, approved-learning excluded, digest
+    writes+exits-0, PR bot-filter predicate. @thor-gated (twice — see below).
+- **First real meta-loop promotion.** With the v2.10.0 loop live, the 2 genuine learnings that
+  surfaced (the leak-check "a safety check you must remember to run is not a control" scar + the
+  "recurring gap is DISTRIBUTION not architecture" lesson) were human-approved and promoted to the
+  vault — the loop's first end-to-end cycle in production. The 619-item boilerplate backlog was
+  archived (not promoted).
+
+### Fixed
+- **@thor caught two real defects the green tests didn't** (the qualitative done-gate earning its
+  keep): (1) an eval-limitation framing that was quantitatively fine but interpretively one-sided
+  (immunized the canon from its null result) → made symmetric; (2) the approval inbox's PR leg was
+  dead on the *push* path (digest runs from no repo, so a cwd-scoped `gh` check always failed) and
+  the docs over-claimed PR coverage → PRs now aggregate registry-wide, bot-filtered, and the docs
+  match what the code delivers.
+
+### Known follow-ups (honest, non-blocking — from @thor's PASS)
+- `test/test-pending.sh` §5 pins a *copy* of the bot-filter jq predicate rather than asserting
+  against `kanban/kb.sh` directly; extract it to a shared var so a future filter edit can't drift.
+- `kb pending` PR discovery iterates repos that have a `kanban/` dir, not raw registry membership;
+  a registered repo without a board would have its PRs silently skipped (no miss today).
+
 ## [v2.10.0] - 2026-07-07
 
 Two parallel worktree+PR streams (the new norm — see below), each @rex-reviewed and @thor
