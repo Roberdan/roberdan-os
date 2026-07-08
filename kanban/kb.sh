@@ -660,22 +660,27 @@ _pending() {
   [ "$n" -eq 0 ] && echo "  (nessuno)"
   total=$((total+n))
 
-  # 3) Open PRs on the current repo (best-effort; needs gh + a remote). Scoped to cwd's repo
-  #    to avoid N slow API calls; the digest can widen across the registry.
+  # 3) Open PRs awaiting review/merge, aggregated across EVERY registered repo (not just cwd —
+  #    the digest runs from no repo, so a cwd-scoped check was dead on the push path, rex/thor
+  #    2026-07-08). Bot PRs (Dependabot/renovate/actions) are excluded: they're not what "needs
+  #    Roberto" means — a raw dump of dozens of dep-bumps would be noise, the opposite failure.
+  #    Best-effort: per-repo gh call, skipped silently where gh/remote is absent.
   echo
-  echo "### PR aperte (repo corrente)"
+  echo "### PR aperte (review/merge — bot esclusi, tutti i repo)"
   n=0
-  if ! command -v gh >/dev/null 2>&1; then
-    echo "  (gh non installato)"
-  elif ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    echo "  (non in un repo git)"
-  else
-    while IFS=$'\t' read -r num title; do
-      [ -n "$num" ] || continue
-      printf '  • #%s — %s\n' "$num" "$title"; n=$((n+1))
-    done < <(gh pr list --state open --json number,title --jq '.[]|"\(.number)\t\(.title)"' 2>/dev/null)
-    [ "$n" -eq 0 ] && echo "  (nessuna)"
+  if command -v gh >/dev/null 2>&1; then
+    local repo_root
+    for bd in "${boards[@]}"; do
+      repo_root="$(dirname "$bd")"                     # bd is <root>/kanban
+      [ -d "$repo_root/.git" ] || continue
+      while IFS=$'\t' read -r num title; do
+        [ -n "$num" ] || continue
+        printf '  • %s#%s — %s\n' "$(basename "$repo_root")" "$num" "$title"; n=$((n+1))
+      done < <(cd "$repo_root" 2>/dev/null && gh pr list --state open --json number,title,author \
+        --jq '.[]|select((.author.login // "")|test("dependabot|renovate|github-actions|\\[bot\\]|-bot$")|not)|"\(.number)\t\(.title)"' 2>/dev/null)
+    done
   fi
+  [ "$n" -eq 0 ] && echo "  (nessuna non-bot / gh non disponibile)"
   total=$((total+n))
 
   # Discursive human-gate threads live in handoff/latest.md (open threads / gates) — pointer,

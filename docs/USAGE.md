@@ -20,11 +20,14 @@ kb pending                          # the APPROVAL INBOX: everything waiting on 
                                     #   learning to approve, open PRs) in one place; --count = fast total
 ```
 
-The **approval inbox** answers "what needs me?" without you going to look: `kb pending` aggregates
-gated todo cards + unapproved learning candidates + open PRs. The proactive half —
-`bin/pending-digest.sh` (launchd `com.roberdan.rda-pending-digest`, twice daily) — pushes a macOS
-notification + refreshes `~/.roberdan-os/pending-digest.txt` when something waits on you; and the
-SessionStart hook shows a `📥 N in attesa` badge at the top of every fresh session.
+The **approval inbox** answers "what needs me?" without you going to look. `kb pending` aggregates,
+across **every registered repo**: gated todo cards + unapproved learning candidates + open PRs
+awaiting review/merge (**bot PRs — Dependabot/renovate — excluded**, they're noise not decisions).
+The proactive half — `bin/pending-digest.sh` (launchd `com.roberdan.rda-pending-digest`, twice
+daily) — pushes a macOS notification + refreshes `~/.roberdan-os/pending-digest.txt` with the
+**full** picture (PRs included) when something waits on you. The SessionStart `📥 N in attesa`
+badge is a deliberately **fast local count** (todo + learning only — no per-repo `gh` calls to keep
+session start instant); open `kb pending` (or read the digest) for the PRs.
 
 **Pause & resume (the "devo andare / continua" flow — AGENTS.md § Pause & Resume):**
 

@@ -48,4 +48,11 @@ bash "$DIGEST" --always >/dev/null 2>&1 || fail "digest must exit 0"
 [ -s "$RDA_HOME/pending-digest.txt" ] || fail "digest did not write its file"
 grep -qE '^PENDING: 0$' "$RDA_HOME/pending-digest.txt" || fail "digest file missing PENDING total"
 
-echo "PASS: approval inbox (kb pending, --count, approved-excluded, digest writes + exits 0)"
+# 5) PR bot-filter: the exact jq expression _pending uses must drop bot authors, keep humans.
+#    (Full gh integration is best-effort/network — this locks the filter logic that decides
+#     "which PRs need Roberto", the part thor flagged as the judgment call.)
+pr_json='[{"number":99,"title":"human PR","author":{"login":"Roberdan"}},{"number":100,"title":"bump","author":{"login":"dependabot[bot]"}},{"number":101,"title":"bump2","author":{"login":"renovate[bot]"}},{"number":102,"title":"ci","author":{"login":"github-actions[bot]"}}]'
+kept="$(printf '%s' "$pr_json" | jq -r '.[]|select((.author.login // "")|test("dependabot|renovate|github-actions|\\[bot\\]|-bot$")|not)|.number' | tr '\n' ' ' | sed 's/ $//')"
+[ "$kept" = "99" ] || fail "PR bot-filter wrong: expected only human #99, got '$kept'"
+
+echo "PASS: approval inbox (kb pending, --count, approved-excluded, digest writes + exits 0, PR bot-filter)"
