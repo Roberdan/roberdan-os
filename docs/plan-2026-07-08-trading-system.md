@@ -245,17 +245,43 @@ i movimenti successivi) → per i segnali LLM **conta solo il forward-test**.
 
 ---
 
-## 7. Decisioni aperte (tue — gate umano; la fase 0 può partire anche senza, ma queste cambiano dimensionamento e priorità)
+## 7bis. Decisioni prese (Roberto, 2026-07-08) — Iterazione 1 approvata
 
-1. **Capitale dedicato** (e quota "sopravvivenza" mai a rischio): dimensiona tutto — costi
-   sostenibili, size minime, aspettative oneste.
-2. **Asset class di partenza:** proposta = ETF/equities USA (liquidi, dati ottimi) + crypto come
-   palestra 24/7 per L4 con size simboliche. Opzioni/futures solo dopo la fase 3.
-3. **Broker:** proposta = Interactive Brokers (paper nativo, API matura, disponibile in Italia).
-4. **Perimetro di autonomia iniziale di L4:** proposta = piena autonomia in paper, live solo
-   con promozione esplicita per strategia e per size.
-5. **Accetti la riformulazione dell'obiettivo (§0)?** North Star €10M, obiettivo operativo
-   = massimo compounding con rovina <1% e milestone trimestrali.
+- **Capitale: €10.000.** Approccio a gate: un mese, poi si misura, si aggiusta, si itera.
+- **Universo: solo azioni pure su NYSE e Nasdaq** (dove Roberto già opera). Niente ETF
+  (aggira anche PRIIPs), niente opzioni/futures/crypto in questa iterazione.
+- **Obiettivo riformulato accettato nei fatti:** si giudica l'iterazione, non il glidepath €10M.
+
+**Parametri operativi derivati (da firmare nel risk-config):**
+- Rischio max per trade: 0,5–1% = **€50–100**; max 5–8 posizioni; **no leva, no day-trading**
+  (regola PDT sotto $25k: max 3 day-trade/5gg — irrilevante all'orizzonte giorni/settimane, ma scritta).
+- Circuit breaker: drawdown totale **−10% (−€1.000) → halt + review**; −5% → size dimezzate.
+- Costi fissi ≤ €25/mese (0,25%): stack minimo (IBKR data $14,50 + free tier), mese 1 senza VPS.
+- Frequenza bassa (segnali a chiusura barra, orizzonte giorni/settimane): a €10k le commissioni
+  (~0,1–0,2% a giro su posizioni da €500–1.000) uccidono qualsiasi strategia ad alta rotazione.
+
+**Gate del mese 1 — misura il processo, non il P&L** (con 5–15 segnali il P&L è rumore;
+servono ~30+ trade per distinguere skill da fortuna). Scorecard thor-verificabile:
+1. Ingest attivo ≥21 giorni senza gap >5min (query sul DB).
+2. Digest 2×/giorno su Telegram, ≥15 giorni consecutivi.
+3. ≥1 strategia sopravvissuta a backtest onesto (costi inclusi, esperimento pre-registrato).
+4. ≥10 segnali advisor tracciati nel journal (paper o mini-size reale, a scelta di Roberto),
+   ognuno con entry/stop/size/rationale ed esito riconciliato.
+5. **0 violazioni del risk-config.**
+P&L riportato onestamente ma *non* è criterio di promozione fino al mese 2–3.
+
+## 7. Decisioni ancora aperte (le restanti — cambiano dimensionamento e priorità)
+
+1. **Quale broker usa oggi Roberto** per NYSE/Nasdaq — se IBKR: attivare paper + API; se altro
+   senza API: IBKR affiancato per il sistema, esecuzione manuale dove già opera, journal riconciliato.
+2. **Repo `trading-os`:** crearlo su GitHub e aggiungerlo alla sessione (o partire in una
+   cartella di roberdan-os e migrare poi).
+3. **Chiavi/account:** Finnhub (free), Anthropic API con budget cap (~$20/mese), bot Telegram
+   (@BotFather) + chat ID di Roberto.
+4. **Firma del risk-config** con i parametri di §7bis — è il contratto che né agente né umano
+   "in caccia del recupero" possono superare.
+5. **Perimetro di autonomia iniziale di L4** (quando ci si arriva): proposta = piena autonomia
+   in paper, live solo con promozione esplicita per strategia e per size.
 
 ---
 
