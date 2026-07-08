@@ -3,6 +3,30 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.12.1] - 2026-07-08
+
+### Fixed
+- **`kb init` pre-commit hook hung and scanned the wrong repo.** The generated hook called
+  `leak-check.sh` with no args, and leak-check's *default* target is roberdan-os's own tree
+  (`git ls-files` in its own ROOT) — so on every commit of *another* federated repo it
+  re-scanned all ~200 roberdan-os files (slow, hung past 2 min on repos with large blobs) AND
+  never actually checked the committing repo's files. Two-part fix:
+  - `test/leak-check.sh` gains an **`--only <files…>`** flag: scan exactly the given files, not
+    the default tree. Backward-compatible — validate.sh and `make-bundle.sh` (no flag) are
+    unchanged.
+  - the `kb init` hook template now passes the repo's **staged files** (`git diff --cached`,
+    absolute paths) to `leak-check.sh --only`, so it checks the right files, fast (0.2s vs a
+    2-minute hang), and skips cleanly when nothing is staged.
+  - Regenerated the already-installed hook in every kb-init'd repo (Fabrica, the-standing-egg,
+    MirrorBuddy, trading-os). Verified: a commit's pre-commit now runs in ~0.24s.
+
+### Note (machine ops)
+- **AGENTS.md/CLAUDE.md pointers added to the personal federated repos** (Fabrica,
+  ConvergioEdu2030, the-standing-egg, trading-os): thin pointers to the canon that tell any agent
+  working there to operate in roberto-mode and **track the plan on the `kb` board**. The shared
+  team repos (convergio, MirrorBuddy) were left untouched — they have their own project canon and
+  imposing a personal workflow on a team repo isn't appropriate.
+
 ## [v2.12.0] - 2026-07-08
 
 ### Changed

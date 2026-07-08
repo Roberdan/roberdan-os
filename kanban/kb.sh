@@ -574,16 +574,23 @@ EOF_SCAN
   else
     cat > "$hook" <<HOOK
 #!/usr/bin/env bash
-# installed by roberdan-os \`kb init\` — runs roberdan-os leak-check on the staged
-# tree before every commit (interactive safety; bypassable with --no-verify, so
-# it is NOT the runner's gate — that lives in the dispatcher, design §2e#5).
+# installed by roberdan-os \`kb init\` — runs roberdan-os leak-check on the STAGED files of
+# THIS repo before every commit (interactive safety; bypassable with --no-verify, so it is
+# NOT the runner's gate — that lives in the dispatcher, design §2e#5).
+# Scans only the staged files (--only), NOT the whole tree: leak-check's default target is
+# roberdan-os's own tree, so a bare call from another repo scanned the WRONG files and hung
+# on large blobs (2026-07-08 scar). Zero staged files → nothing to check.
 set -euo pipefail
 RDA_LEAKCHECK="$ROOT/test/leak-check.sh"
-if [ -x "\$RDA_LEAKCHECK" ]; then
-  if ! bash "\$RDA_LEAKCHECK"; then
-    echo "pre-commit: BLOCKED — confidential term(s) detected (see above)." >&2
-    exit 1
-  fi
+[ -x "\$RDA_LEAKCHECK" ] || exit 0
+_root="\$(git rev-parse --show-toplevel 2>/dev/null)"
+staged=()
+while IFS= read -r f; do [ -n "\$f" ] && staged+=("\$_root/\$f"); done \\
+  < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+[ \${#staged[@]} -eq 0 ] && exit 0
+if ! bash "\$RDA_LEAKCHECK" --only "\${staged[@]}"; then
+  echo "pre-commit: BLOCKED — confidential term(s) detected (see above)." >&2
+  exit 1
 fi
 HOOK
     chmod +x "$hook"
