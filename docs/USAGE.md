@@ -16,7 +16,15 @@ kb add "<title>" --repo <r> [dod] [acc]  # new card in todo/ (repo required; fil
 kb start <id> --by roberto          # GATE: todo -> doing, needs Roberto's approval
 kb finish <id> --thor "<ev>"        # GATE: doing -> done, needs @thor + evidence (never a rubber-stamp)
 kb block <id> "<reason>"            # mark a card blocked, move it back to todo/
+kb pending                          # the APPROVAL INBOX: everything waiting on you (todo cards,
+                                    #   learning to approve, open PRs) in one place; --count = fast total
 ```
+
+The **approval inbox** answers "what needs me?" without you going to look: `kb pending` aggregates
+gated todo cards + unapproved learning candidates + open PRs. The proactive half —
+`bin/pending-digest.sh` (launchd `com.roberdan.rda-pending-digest`, twice daily) — pushes a macOS
+notification + refreshes `~/.roberdan-os/pending-digest.txt` when something waits on you; and the
+SessionStart hook shows a `📥 N in attesa` badge at the top of every fresh session.
 
 **Pause & resume (the "devo andare / continua" flow — AGENTS.md § Pause & Resume):**
 

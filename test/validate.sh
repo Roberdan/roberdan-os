@@ -183,6 +183,10 @@ if bash test/test-receipts.sh >/dev/null 2>&1; then ok "receipt emitter green (s
 section "install-hooks — settings.json merge contract"
 if bash test/test-install-hooks.sh >/dev/null 2>&1; then ok "install-hooks merge green (see bash test/test-install-hooks.sh)"; else err "test-install-hooks — see bash test/test-install-hooks.sh"; fi
 
+# --- 8e) approval inbox: kb pending aggregates + counts, digest writes without failing ---
+section "approval inbox — kb pending + digest contract"
+if bash test/test-pending.sh >/dev/null 2>&1; then ok "approval inbox green (see bash test/test-pending.sh)"; else err "test-pending — see bash test/test-pending.sh"; fi
+
 # --- 8e) meta-loop wired end-to-end (capture -> distill[real class] -> curate promotes) ---
 # The self-improving loop must actually PROMOTE an approved learning, not stall at
 # `class: TODO`. Proves capture->distill(real class)->human-approve->curate-promotes,

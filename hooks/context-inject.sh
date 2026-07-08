@@ -7,6 +7,15 @@
 
 ROOT="$HOME/GitHub/roberdan-os"
 echo "## roberdan-os — session context (auto-injected)"
+# Approval inbox at the very top — a fresh session must SEE what's waiting on Roberto
+# without being asked. Fast local count only (todo + unapproved learning, no gh). See kb pending.
+if [ -x "$HOME/.local/bin/kb" ]; then
+  _pend="$(RDA_KANBAN="$ROOT/kanban" "$HOME/.local/bin/kb" pending --count 2>/dev/null || echo 0)"
+  case "$_pend" in ''|0) : ;; *[!0-9]*) : ;; *)
+    echo
+    echo "### 📥 $_pend in attesa della tua approvazione — \`kb pending\` per il dettaglio."
+  ;; esac
+fi
 # A pending pause/resume checkpoint takes top billing — a fresh session (e.g. after a reboot)
 # must notice it immediately. See kb pause/resume + AGENTS.md § Pause & Resume.
 if [ -f "$ROOT/handoff/resume.md" ]; then
