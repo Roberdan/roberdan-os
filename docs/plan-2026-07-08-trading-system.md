@@ -285,5 +285,32 @@ P&L riportato onestamente ma *non* è criterio di promozione fino al mese 2–3.
 
 ---
 
+---
+
+## 8. Stato di esecuzione (2026-07-08, fine sessione remota)
+
+Il piano è stato **eseguito** nel repo dedicato [`Roberdan/trading-os`](https://github.com/Roberdan/trading-os)
+(8 commit su `main`, `33a735c`→`88d6e20`, 44/44 test verdi). Costruito e verificato:
+
+- **v0 — advisor completo** (fasi 0–3 pronte da attivare): ingest Stooq/Finnhub/EDGAR/RSS,
+  triage news LLM con fallback euristico, segnali con sizing dal risk-config firmabile
+  (non firmato = DRY-RUN), backtest onesto con costi Fineco, journal + import Fineco +
+  post-mortem automatico, circuit breaker deterministico, Telegram (/halt), demo e2e.
+- **v1 — dual-mode**: autopilot paper/live-gated (broker abstraction, promozioni firmate,
+  anti-leva, HALT a metà passata), PWA verificata con screenshot, app SwiftUI nativa
+  macOS/iOS con icona (da compilare su Xcode), API come servizio launchd per Tailscale.
+- **v2 — oracle**: simulatore del passato (episodi unicorn/blackswan, features
+  point-in-time anti look-ahead, walk-forward lift-vs-base-rate, evidence pack
+  anonimizzati anti-contaminazione), scanner giornaliero nel digest, layer LLM
+  cloud/Ollama/MLX. Ricerca modelli/dataset distillata in `trading-os/docs/research-models.md`.
+
+Prossimo passo: **sul Mac di Roberto**, runbook ordinato in
+[`trading-os/docs/HANDOFF-mac.md`](https://github.com/Roberdan/trading-os/blob/main/docs/HANDOFF-mac.md)
+(collaudo → dati veri → chiavi → firma → launchd → app → fase O1 oracle → scorecard mese 1).
+Gate aperti: apertura conto IBKR (KYC lento, serve per autopilot paper), compilazione
+Xcode dell'app, firma del risk-config.
+
+---
+
 *Piano prodotto in roberto-mode: evidence-first, premortem incluso, gate umani preservati.
 Nessun euro va a mercato senza il tuo sì esplicito — per costituzione, non per prudenza retorica.*
