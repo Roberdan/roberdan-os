@@ -53,13 +53,32 @@ is a form of honesty. *"If you can't explain it simply, you don't understand it.
 | **One-way vs two-way doors** | speed: reversible decisions are made fast, irreversible ones with care (ties to the human gates) |
 | **Pre-mortem** | before committing: "it's 6 months from now and it failed — why?" |
 
-### Unmasking the trap (bias check)
+### Unmasking the trap (bias check) — Kahneman's System 1 / System 2
+Most bias is **System 1** (fast, intuitive, effortless) confidently answering a question that
+**System 2** (slow, deliberate, effortful) should. The move isn't to *not* have intuitions — it's
+to *notice* the fast read and choose whether to slow down and check it. (Daniel Kahneman,
+*Thinking, Fast and Slow* — Nobel laureate; the bias catalogue below is empirically grounded.)
 | Tool | Use when |
 |---|---|
 | **Survivorship bias** | you're only learning from visible successes — where are the failures you don't see? |
 | **Confirmation bias / sunk cost / anchoring** | you're defending a thesis, throwing good money after bad, or anchored to the first number |
+| **Availability / recency** | you're over-weighting what's vivid or just happened, not what's actually frequent |
+| **Loss aversion / framing** | the same choice framed as a loss vs a gain flips your call — restate it both ways and see if you still agree |
+| **Overconfidence / planning fallacy** | your estimate has no error bars — ask the base rate and run a pre-mortem before trusting it |
 | **Goodhart's law** | "when a measure becomes a target, it ceases to be a good measure" |
 | **Map ≠ territory** | the model/dashboard isn't reality — verify on the ground |
+
+### Coaching & reframing (help someone think — the `@coach` toolkit)
+Techniques for *drawing out* good thinking, not delivering it. Some have NLP roots; they're kept
+for what they demonstrably **do** (and rest on cognitive restructuring / goal-setting), not for
+NLP's theoretical claims, which don't hold up — evidence over pseudoscience.
+| Tool | Use when |
+|---|---|
+| **GROW** | walking a decision with someone: Goal → Reality → Options → Will (end on the smallest next step) |
+| **Well-formed outcome** | a fuzzy goal: restate it in the positive, concrete, and within their control |
+| **Meta-model (language discipline)** | challenge absolutes/distortions: "*everyone / never / I have to / impossible*" → who exactly? never once? what if you don't? hard, not impossible? |
+| **Reframing** | stuck in one frame — offer another ("threat, or test?") to unstick, not to spin; this is cognitive restructuring (CBT) |
+| **One good question at a time** | resist advice-giving; a question the person answers themselves lands deeper than an answer you hand them |
 
 ### Strategy & business
 | Tool | Use when |
