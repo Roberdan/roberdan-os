@@ -22,12 +22,27 @@ kb resume [--done]                   # show checkpoint + live backlog | clear wh
 kb pending [--count]                 # approval inbox: todo + unapproved learning + non-bot PRs
                                      #   across all registered repos. --count = fast LOCAL total
                                      #   (todo+learning only, no gh) for the SessionStart badge
+kb repo <name>                       # per-repo dashboard ON TOP of the board: git state (branch,
+                                     #   dirty, last commit, ahead/behind), open non-bot PRs, and
+                                     #   that repo's cards grouped doing / todo / done
 ```
 
 ## The two gates (no rubber-stamping)
 - **`todo → doing`** is a **human gate** — only Roberto approves what becomes active.
 - **`doing → done`** needs **`@thor`** (the done-gate agent) to validate against the card's
   **acceptance criteria**, with **evidence** (commit/test/output). No rubber-stamps.
+
+## `start` when you BEGIN, not retrospectively (so `doing` means something)
+**`kb start` goes at the *start* of the work, not at the end.** The point of `doing` is to show
+what is *in progress right now* — for Roberto and for other agents. If an agent does the whole
+task and only then creates + starts + finishes the card in one batch, `doing` is empty the whole
+time and carries zero information (the observed 2026-07-09 pattern: cards start-and-finish in the
+same second, `doing` always 0). The correct rhythm on a non-trivial task:
+1. **Open + `start` the card first** (`kb add … && kb start <id> --by roberto`) → it appears in
+   `doing`, so anyone glancing at the board sees what's being worked on.
+2. Do the work, committing per phase (update the card with evidence as you go).
+3. **`kb finish <id> --thor "<evidence>"`** only when @thor's acceptance is met.
+A card should *live* in `doing` for the duration of the work, not flicker through it.
 
 ## Every card has (mandatory)
 `title:` — states the **objective** (what outcome this card produces, not just a label) ·

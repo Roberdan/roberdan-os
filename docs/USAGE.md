@@ -18,6 +18,7 @@ kb finish <id> --thor "<ev>"        # GATE: doing -> done, needs @thor + evidenc
 kb block <id> "<reason>"            # mark a card blocked, move it back to todo/
 kb pending                          # the APPROVAL INBOX: everything waiting on you (todo cards,
                                     #   learning to approve, open PRs) in one place; --count = fast total
+kb repo <name>                      # per-repo dashboard: git state + open PRs + cards (doing/todo/done)
 ```
 
 The **approval inbox** answers "what needs me?" without you going to look. `kb pending` aggregates,
