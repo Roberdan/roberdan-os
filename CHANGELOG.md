@@ -3,6 +3,17 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.13.0] - 2026-07-09
+
+### Added
+- **`kb` board now shows what each card is, not just its ID.** The 3-column box stays compact
+  (ID + repo, for the at-a-glance layout), and a **legend below it** lists every *active* card
+  (todo + doing) as `<id> (<repo>) — <title>`. The legend lives outside the box on purpose:
+  titles are long and may be non-ASCII (accents), which would desync the box's fixed-width
+  column separators if placed inside a cell. Done cards are omitted (many, and finished). So
+  the aggregated board is now readable — you can tell `260708-120132` is "Decidere: OS-isolation
+  floor (ADR-0002)" without opening the card.
+
 ## [v2.12.1] - 2026-07-08
 
 ### Fixed
