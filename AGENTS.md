@@ -76,6 +76,10 @@ tool and this protocol are versioned.
   `--by roberto`; there's no blocking check (it would break the "do all the todos" autonomous
   flow). `kb start` appends an audit line to the card on every call, refused or not (timestamp,
   the `--by` value given, whether stdin was a TTY) — see `kanban/README.md`.
+- **`start` at the BEGINNING of the work, not retrospectively.** A card must *live* in `doing`
+  for the duration of the task so `doing` shows what's actually in progress. Open + `start` first,
+  then work, then `finish` — don't batch add+start+finish at the end (that leaves `doing` empty
+  and uninformative). See `kanban/README.md § start when you BEGIN`.
 - **Gate `doing → done`:** **`@thor` validates** against the acceptance criteria with **evidence**
   (`kb finish … --thor "<commit/test/output>"`) — never a rubber-stamp.
   **Same honest limit as `--by`:** `--thor` is a discipline gate, not a security boundary — the

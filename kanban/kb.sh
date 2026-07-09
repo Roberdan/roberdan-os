@@ -713,10 +713,82 @@ _pending() {
   echo "PENDING: $total"
 }
 
+# resolve a repo name to its path: a registry entry basenamed <name>, else ~/GitHub/<name>.
+_repo_path() {
+  local name="$1" r
+  if [ -f "$REGISTRY" ]; then
+    while IFS= read -r r; do [ -n "$r" ] && [ "$(basename "$r")" = "$name" ] && { printf '%s' "$r"; return 0; }; done < "$REGISTRY"
+  fi
+  [ -d "$HOME/GitHub/$name" ] && printf '%s' "$HOME/GitHub/$name"
+}
+# kb repo <name> — a per-repo dashboard ON TOP of the kanban: git state, open (non-bot) PRs,
+# and this repo's cards grouped doing / todo / done. Read-only. Complements `kb`/`kb all`.
+_repo_view() {
+  local name="$1" p b dirty last ln rc c kbd f n
+  p="$(_repo_path "$name")"
+  [ -n "$p" ] && [ -d "$p" ] || { echo "kb repo: '$name' not found (not in the registry, no ~/GitHub/$name)" >&2; return 1; }
+  echo "## $name — $p"
+
+  # git state
+  if git -C "$p" rev-parse --git-dir >/dev/null 2>&1; then
+    b="$(git -C "$p" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
+    dirty="$(git -C "$p" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+    last="$(git -C "$p" log -1 --format='%h %s' 2>/dev/null || echo '(no commits)')"
+    # ahead/behind only when the branch actually has an upstream on origin (local-only repos
+    # like Fabrica have none — computing it would fail and, under set -e, abort the whole view).
+    ln=""
+    if git -C "$p" rev-parse --verify -q "origin/$b" >/dev/null 2>&1; then
+      ln="$(git -C "$p" rev-list --left-right --count "origin/$b...$b" 2>/dev/null | awk '{printf "behind %s, ahead %s", $1, $2}')"
+    fi
+    printf '### git\n  %s · %s uncommitted · last: %s%s\n' "$b" "$dirty" "$last" "${ln:+ · $ln}"
+  else
+    printf '### git\n  (not a git repo)\n'
+  fi
+
+  # open PRs (non-bot), best-effort
+  printf '### open PRs (review/merge — bot excluded)\n'
+  n=0
+  if command -v gh >/dev/null 2>&1 && git -C "$p" rev-parse --git-dir >/dev/null 2>&1; then
+    while IFS=$'\t' read -r pn pt; do [ -n "$pn" ] && { printf '  #%s — %s\n' "$pn" "$pt"; n=$((n+1)); }; done \
+      < <(cd "$p" 2>/dev/null && gh pr list --state open --json number,title,author \
+          --jq '.[]|select((.author.login // "")|test("dependabot|renovate|github-actions|\\[bot\\]|-bot$")|not)|"\(.number)\t\(.title)"' 2>/dev/null)
+  fi
+  [ "$n" -eq 0 ] && echo "  (none / gh unavailable)"
+
+  # cards, grouped: doing (in essere) · todo (da fare) · done (fatte, newest 5)
+  kbd="$p/kanban"
+  if [ -d "$kbd" ]; then
+    for c in doing todo; do
+      printf '### %s\n' "$([ "$c" = doing ] && echo 'DOING (in essere)' || echo 'TODO (da fare)')"
+      rc=0
+      for f in "$kbd/$c"/*.md; do
+        [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue ;; esac
+        printf '  %s — %s\n' "$(basename "$f" .md)" "$(_field "$f" title)"; rc=1
+      done
+      [ "$rc" -eq 0 ] && echo "  (none)"
+    done
+    printf '### DONE (fatte — newest 5)\n'
+    rc=0
+    local _dtmp=""
+    for f in "$kbd/done"/*.md; do
+      [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue ;; esac
+      _dtmp="$_dtmp$(_mtime "$f")|$f"$'\n'
+    done
+    while IFS='|' read -r _ f; do
+      [ -n "${f:-}" ] || continue
+      printf '  %s — %s\n' "$(basename "$f" .md)" "$(_field "$f" title)"; rc=1
+    done < <(printf '%s' "$_dtmp" | sort -t'|' -k1,1 -rn | head -5)
+    [ "$rc" -eq 0 ] && echo "  (none)"
+  else
+    printf '### board\n  (repo not kb-init'"'"'d — no board; run `kb init` from inside it)\n'
+  fi
+}
+
 case "$cmd" in
   view|board|"")                   # visual kanban (default); aggregate if cwd
     if [ "$KB_MATCHED" -eq 0 ]; then _board --all; else _board; fi
     ;;
+  repo|status) _repo_view "${1:?repo name required (kb repo <name>)}" ;;  # per-repo dashboard: git + PRs + cards
   pending|inbox) _pending "$@" ;;  # the approval inbox: everything waiting on Roberto (--count = fast total)
   init) _kb_init "${1:-$ROOT}" ;;  # scaffold + privatize a repo's board (idempotent)
   lint) RDA_KANBAN="$KB" bash "$ROOT/kanban/lint-cards.sh" ;;  # runner/human_gates schema lint

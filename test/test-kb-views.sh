@@ -189,6 +189,27 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+section "kb repo <name>: per-repo dashboard (git + PRs + cards)"
+# Isolated repo with a board + one card per column; assert the view groups them.
+_rp="$TMP/repoview"; mkdir -p "$_rp/kanban"/{todo,doing,done}
+( cd "$_rp" && git init -q && git config user.email t@example.com && git config user.name t \
+  && git commit -q --allow-empty -m "init" )
+printf -- '---\ntitle: a todo thing\nrepo: repoview\nstatus: todo\n---\n' > "$_rp/kanban/todo/T-1.md"
+printf -- '---\ntitle: an in-progress thing\nrepo: repoview\nstatus: doing\n---\n' > "$_rp/kanban/doing/D-1.md"
+printf -- '---\ntitle: a finished thing\nrepo: repoview\nstatus: done\n---\n' > "$_rp/kanban/done/F-1.md"
+# _repo_path falls back to ~/GitHub/<name>; point HOME so ~/GitHub/repoview resolves to our fixture
+: > "$TMP/reg-empty"; mkdir -p "$TMP/GitHub" && ln -sf "$_rp" "$TMP/GitHub/repoview" 2>/dev/null
+_rv="$(HOME="$TMP" RDA_KANBAN_REGISTRY="$TMP/reg-empty" bash kanban/kb.sh repo repoview 2>&1 || true)"
+if printf '%s' "$_rv" | grep -q "an in-progress thing" \
+   && printf '%s' "$_rv" | grep -q "a todo thing" \
+   && printf '%s' "$_rv" | grep -q "a finished thing" \
+   && printf '%s' "$_rv" | grep -qi "git"; then
+  ok "kb repo groups git + doing/todo/done cards"
+else
+  err "kb repo view missing a section or card (got: $(printf '%s' "$_rv" | tr '\n' '¶'))"
+fi
+
+# ---------------------------------------------------------------------------
 if [ "$FAIL" -eq 0 ]; then
   echo; echo "test-kb-views: ✅ ALL GREEN"; exit 0
 else
