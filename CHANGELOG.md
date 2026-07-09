@@ -3,6 +3,40 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.14.0] - 2026-07-09
+
+### Added
+- **`@coach` — a maieutic thinking coach** (Roberto's /goal). Helps him reason, decide, and
+  challenge himself *by drawing the answer out* — a light GROW loop (Goal → Reality → Options →
+  Will), one good question at a time. Deliberately distinct from the reasoning agents it sits
+  beside: `@socrates` deconstructs (cold), `@board` red-teams (adversarial), `@coach` is the
+  warm inside voice that **guides, never decides** (the call stays Roberto's, gate #5) and never
+  red-teams. Registered in AGENTS.md + the global `~/.claude/CLAUDE.md` block, symlinked into
+  `~/.claude/agents` (invokable now). @thor-gated PASS.
+- **`thinking-toolkit` enriched with Kahneman + coaching tools.** The bias section is now framed
+  around **Kahneman's System 1 / System 2** (*Thinking, Fast and Slow* — Nobel, empirical) with
+  the catalogue extended (availability/recency, loss aversion/framing, overconfidence/planning
+  fallacy). New **Coaching & reframing** section: GROW, well-formed outcome, meta-model (language
+  discipline against "everyone/never/I have to/impossible"), reframing. Feynman first-principles
+  kept as before.
+  - **Honesty (evidence-first):** the reframing/meta-model techniques have NLP roots but are kept
+    for what they *demonstrably do* (grounded in CBT / goal-setting), **not** given NLP's
+    scientific authority, whose theoretical claims don't hold. Neither cargo-culted in nor
+    scrubbed out — the honest middle.
+- **`kb repo <name>` — a per-repo dashboard** on top of the kanban: git state (branch, dirty,
+  last commit, ahead/behind vs origin), open non-bot PRs, and that repo's cards grouped
+  doing/todo/done. Handles local-only repos (no origin) without aborting. Test-covered.
+
+### Changed
+- **Canon: `kb start` at the BEGINNING of the work, not retrospectively** (AGENTS.md +
+  kanban/README). A card should *live* in `doing` for the duration of the task so `doing` shows
+  what's actually in progress — instead of the observed pattern where agents batch add+start+finish
+  at the end and `doing` is always empty.
+
+### Known follow-up (non-blocking, from @thor)
+- `claude-ai-skill/roberto-mode/THINKING.md` (a hand-curated, intentionally non-sync'd web export)
+  is now stale vs the Kahneman/coaching toolkit — re-derive by hand on a future pass.
+
 ## [v2.13.0] - 2026-07-09
 
 ### Added
