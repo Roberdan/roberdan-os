@@ -3,6 +3,29 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.15.1] - 2026-07-09
+
+### Fixed
+- **`pre-completion-gate.sh` promoted from private `~/.claude` to canon** (`/doctor` run
+  found it: the Stop-event done-gate hook — checks open PRs, orphan worktrees, rogue
+  convergio runners, uncommitted changes before a completion claim — existed only in
+  Roberto's local `~/.claude/hooks/`, hardcoded to that path, invisible to a fresh
+  `roberdan-os` clone despite firing on every turn. Now lives in `hooks/`, wired into
+  `bin/sync.sh`'s generated Stop-hook chain (first hook, matching its live position).
+  `~/.claude/hooks/pre-completion-gate.sh` and `~/.claude/rules/best-practices.md` (a
+  second drifted private copy found the same way, stale since May) are now symlinks
+  into this repo — no more silent divergence between what Roberto's machine runs and
+  what the canon documents.
+- **`test-factory-kb.sh` flaky under system load — root cause fixed.** `validate.sh` failed
+  once, then passed clean standalone and on a full re-run: the test fixtures dispatch a
+  trivial mock `claude` binary (`exit 0`/`exit 5`) through the real `factory/run.sh`, which
+  wraps it in a hard wall-clock `timeout`/`gtimeout` — fixtures set `timeout: 5`, tight enough
+  that ordinary scheduler contention (many concurrent processes, as in this very session) can
+  occasionally exceed it even though the mock exits instantly. Bumped all 14 fixture
+  `timeout:` values from 5s to 30s (pure test-data slack, doesn't change what's asserted);
+  confirmed with 3 consecutive full `validate.sh` green runs, including one running
+  concurrently with other load.
+
 ## [v2.15.0] - 2026-07-09
 
 ### Added

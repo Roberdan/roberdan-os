@@ -175,7 +175,7 @@ env > "${CAPTURE_ENV:?}"
 exit 0
 EOF
 chmod +x "$FAC5/bin/claude"
-printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe\n' "$TMP" > "$FAC5/queue/billing.md"
+printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe\n' "$TMP" > "$FAC5/queue/billing.md"
 CAPENV="$TMP/billing-env.txt"
 env -i PATH="$FAC5/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FAC5" RDA_HANDOFF=/dev/null \
@@ -199,7 +199,7 @@ EOF
 chmod +x "$FAC6/bin/claude"
 PRIMER_FILE="$TMP/fake-primer.md"
 echo "SENTINEL-PRIMER-MARKER-98214" > "$PRIMER_FILE"
-printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe task body\n' "$TMP" > "$FAC6/queue/primer.md"
+printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task body\n' "$TMP" > "$FAC6/queue/primer.md"
 CAPPROMPT="$TMP/received-prompt.txt"
 env -i PATH="$FAC6/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FAC6" RDA_HANDOFF=/dev/null RDA_PRIMER="$PRIMER_FILE" \
@@ -221,7 +221,7 @@ cat > "$FAC/bin/claude" <<'EOF'
 exit 5
 EOF
 chmod +x "$FAC/bin/claude"
-printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe task\n' "$TMP" > "$FAC/queue/failer.md"
+printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task\n' "$TMP" > "$FAC/queue/failer.md"
 
 # minimal, launchd-like PATH: no alias, no interactive shell config
 env -i PATH="$FAC/bin:/usr/bin:/bin" HOME="$HOME" \
@@ -250,7 +250,7 @@ cat > "$FAC2/bin/claude" <<'EOF'
 exit 0
 EOF
 chmod +x "$FAC2/bin/claude"
-printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe task\n' "$TMP" > "$FAC2/queue/succeeder.md"
+printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task\n' "$TMP" > "$FAC2/queue/succeeder.md"
 env -i PATH="$FAC2/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FAC2" RDA_HANDOFF=/dev/null \
   bash factory/run.sh >/dev/null 2>&1
@@ -280,7 +280,7 @@ created: 2026-07-01
 ---
 body
 EOF
-printf -- '---\ndir: %s\ntimeout: 5\ncard: probe-sync\n---\nprobe task\n' "$TMP" > "$FAC4/queue/synced.md"
+printf -- '---\ndir: %s\ntimeout: 30\ncard: probe-sync\n---\nprobe task\n' "$TMP" > "$FAC4/queue/synced.md"
 env -i PATH="$FAC4/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FAC4" RDA_KANBAN="$KB4" RDA_HANDOFF=/dev/null \
   bash factory/run.sh >/dev/null 2>&1
@@ -321,7 +321,7 @@ created: 2026-07-01
 ---
 body
 EOF
-printf -- '---\ndir: %s\ntimeout: 5\ncard: verify-pass\n---\nprobe task\n' "$TMP" > "$FAC7/queue/verifypass.md"
+printf -- '---\ndir: %s\ntimeout: 30\ncard: verify-pass\n---\nprobe task\n' "$TMP" > "$FAC7/queue/verifypass.md"
 env -i PATH="$FAC7/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FAC7" RDA_KANBAN="$KB7" RDA_HANDOFF=/dev/null \
   bash factory/run.sh >/dev/null 2>&1
@@ -356,7 +356,7 @@ created: 2026-07-01
 ---
 body
 EOF
-printf -- '---\ndir: %s\ntimeout: 5\ncard: verify-fail\n---\nprobe task\n' "$TMP" > "$FAC8/queue/verifyfail.md"
+printf -- '---\ndir: %s\ntimeout: 30\ncard: verify-fail\n---\nprobe task\n' "$TMP" > "$FAC8/queue/verifyfail.md"
 # Two runs, same as the "failing task" regression test above: attempt 1 retries,
 # attempt 2 exhausts MAX_ATTEMPTS=2 into failed/.
 env -i PATH="$FAC8/bin:/usr/bin:/bin" HOME="$HOME" \
@@ -384,7 +384,7 @@ esac
 exit 0
 EOF
 chmod +x "$FAC9/bin/claude"
-printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe task, no card\n' "$TMP" > "$FAC9/queue/nocard.md"
+printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task, no card\n' "$TMP" > "$FAC9/queue/nocard.md"
 env -i PATH="$FAC9/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FAC9" RDA_HANDOFF=/dev/null \
   bash factory/run.sh >/dev/null 2>&1
@@ -403,7 +403,7 @@ cat > "$FAC3/home/.local/bin/claude" <<'EOF'
 exit 0
 EOF
 chmod +x "$FAC3/home/.local/bin/claude"
-printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe task\n' "$TMP" > "$FAC3/queue/resolveme.md"
+printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task\n' "$TMP" > "$FAC3/queue/resolveme.md"
 # PATH deliberately excludes the .local/bin dir; only HOME is set, exercising the fallback lookup
 env -i PATH="/usr/bin:/bin" HOME="$FAC3/home" \
   RDA_FACTORY="$FAC3" RDA_HANDOFF=/dev/null \
@@ -429,7 +429,7 @@ pwd > "${CAPTURE_CWD:?}"
 exit 0
 EOF
 chmod +x "$FAC7/bin/claude"
-printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe\n' "$FAC7/otherdir" > "$FAC7/queue/cwdcheck.md"
+printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe\n' "$FAC7/otherdir" > "$FAC7/queue/cwdcheck.md"
 CAPCWD="$TMP/observed-cwd.txt"
 # Launch run.sh from $TMP (NOT from $FAC7/otherdir) — the launch dir must NOT leak through.
 ( cd "$TMP" && env -i PATH="$FAC7/bin:/usr/bin:/bin" HOME="$HOME" \
@@ -457,7 +457,7 @@ printf '%s\n' "$@" > "${CAPTURE_ARGV:?}"
 exit 0
 EOF
 chmod +x "$FACM1/bin/claude"
-printf -- '---\ndir: %s\ntimeout: 5\n---\nprobe task\n' "$TMP" > "$FACM1/queue/nomodel.md"
+printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task\n' "$TMP" > "$FACM1/queue/nomodel.md"
 CAPARGV1="$TMP/argv-default.txt"
 env -i PATH="$FACM1/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM1" RDA_HANDOFF=/dev/null CAPTURE_ARGV="$CAPARGV1" \
@@ -476,7 +476,7 @@ printf '%s\n' "$@" > "${CAPTURE_ARGV:?}"
 exit 0
 EOF
 chmod +x "$FACM2/bin/claude"
-printf -- '---\ndir: %s\ntimeout: 5\nmodel: opus\n---\nprobe task\n' "$TMP" > "$FACM2/queue/opustask.md"
+printf -- '---\ndir: %s\ntimeout: 30\nmodel: opus\n---\nprobe task\n' "$TMP" > "$FACM2/queue/opustask.md"
 CAPARGV2="$TMP/argv-opus.txt"
 env -i PATH="$FACM2/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM2" RDA_HANDOFF=/dev/null CAPTURE_ARGV="$CAPARGV2" \
@@ -495,7 +495,7 @@ printf '%s\n' "$@" > "${CAPTURE_ARGV:?}"
 exit 0
 EOF
 chmod +x "$FACM3/bin/claude"
-printf -- '---\ndir: %s\ntimeout: 5\nmodel: fable\n---\nprobe task\n' "$TMP" > "$FACM3/queue/fabletask.md"
+printf -- '---\ndir: %s\ntimeout: 30\nmodel: fable\n---\nprobe task\n' "$TMP" > "$FACM3/queue/fabletask.md"
 CAPARGV3="$TMP/argv-fable.txt"
 RUNLOG3="$TMP/run-fable.log"
 env -i PATH="$FACM3/bin:/usr/bin:/bin" HOME="$HOME" \
@@ -533,7 +533,7 @@ created: 2026-07-01
 ---
 body
 EOF
-printf -- '---\ndir: %s\ntimeout: 5\ncard: model-verify\nmodel: opus\n---\nprobe task\n' "$TMP" > "$FACM4/queue/modelverify.md"
+printf -- '---\ndir: %s\ntimeout: 30\ncard: model-verify\nmodel: opus\n---\nprobe task\n' "$TMP" > "$FACM4/queue/modelverify.md"
 CAPVERIFYARGV="$TMP/argv-verify.txt"
 env -i PATH="$FACM4/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM4" RDA_KANBAN="$KBM4" RDA_HANDOFF=/dev/null CAPTURE_VERIFY_ARGV="$CAPVERIFYARGV" \
