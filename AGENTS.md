@@ -49,6 +49,7 @@ ethical block is **referenced** from `rules/constitution.md`, not copy-pasted.
 | [`thor`](agents/thor.md) | QA / verify-done guardian — sole gate for `done` | sonnet |
 | [`socrates`](agents/socrates.md) | First-principles: digs out one truth | opus |
 | [`board`](agents/board.md) | Sounding board + adversarial red-team on decisions | opus |
+| [`coach`](agents/coach.md) | Thinking coach — maieutic & empathetic: helps Roberto reason/decide/challenge himself (guides, never decides). Kahneman-bias-aware | opus |
 | [`wanda`](agents/wanda.md) | Loop orchestrator | sonnet |
 | [`twin`](agents/twin.md) | Digital twin: voice + cognitive engine (knows when to convene board/framework); persona in [`identity/`](identity/README.md) | opus |
 
