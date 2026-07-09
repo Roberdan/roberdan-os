@@ -3,6 +3,21 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.14.1] - 2026-07-09
+
+### Changed
+- **`@coach` now composes with the whole roberdan-os arsenal instead of being an island** (v1.1,
+  Roberto's point: "doesn't it make sense to put in the coach things we already have, used this
+  way?"). New "Compose — don't reinvent" section makes the coach a conductor that reaches, *in
+  coaching form (as questions)*, for what already exists:
+  - **Roberto's own decision-lens first** (`identity/voice.md`) — reflect *his* criteria back
+    (relationship-first, bias-to-action, purpose/impact, protect family, right-altitude) instead
+    of importing external ones. The best coaching question is often his own value made explicit.
+  - the **`thinking-toolkit` repertoire turned into questions** (one/two-way door, base rates,
+    regret-minimization, Cynefin, theory-of-constraints, Chesterton's fence);
+  - the **discovery/validation skills** when they fit (`premortem`, `problem-validation`,
+    `focus-group`); and the other **agents** called in (`@board`, `@socrates`) — not replaced.
+
 ## [v2.14.0] - 2026-07-09
 
 ### Added
