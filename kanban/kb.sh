@@ -180,6 +180,19 @@ _board() {
       $w $w "${T[$i]:-}" $w $w "${D[$i]:-}" $w $w "${N[$i]:-}"
   done
   printf '└%s┴%s┴%s┘\n' "$ln" "$ln" "$ln"
+
+  # Legend: what each ACTIVE card (todo + doing) is — so the IDs in the box aren't opaque.
+  # It lives BELOW the box because titles are long and may be non-ASCII, which would desync the
+  # box's │ column separators if placed inside a fixed-width cell. Done cards are omitted (many,
+  # and finished). Same board order as the columns above, so an ID is easy to look up.
+  local _lf _legend=0
+  for bd in "${boards[@]}"; do
+    for _lf in "$bd/todo"/*.md "$bd/doing"/*.md; do
+      [ -e "$_lf" ] || continue; case "$(basename "$_lf")" in _*) continue ;; esac
+      [ "$_legend" -eq 0 ] && { echo; echo "TO DO / DOING — cosa fa ogni card:"; _legend=1; }
+      printf '  %s (%s) — %s\n' "$(basename "$_lf" .md)" "$(_repo_tag "$_lf")" "$(_field "$_lf" title)"
+    done
+  done
   _archive_hint
 }
 
