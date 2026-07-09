@@ -182,6 +182,7 @@ EOF
     ],
     "Stop": [
       { "hooks": [
+          { "type": "command", "command": "bash $RDA_OS/hooks/pre-completion-gate.sh 2>/dev/null || true", "timeout": 15 },
           { "type": "command", "command": "$RDA_OS/hooks/verify-done.sh", "timeout": 15 },
           { "type": "command", "command": "$RDA_OS/hooks/post-task-sync.sh", "timeout": 60 },
           { "type": "command", "command": "bash $RDA_OS/hooks/auto-checkpoint.sh", "timeout": 30 }
