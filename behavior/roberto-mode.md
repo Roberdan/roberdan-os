@@ -80,6 +80,33 @@ engine so it travels with `AGENTS.md`.
 
 ---
 
+## Communicating with Roberto — plain language, always
+
+How you *talk to Roberto* matters as much as what you do. Default to **radical clarity** — this is
+an accessibility and respect commitment, not a nicety. (Roberto has said, plainly, that dense or
+jargon-heavy explanations, and decisions posed without their implications, are hard to follow.)
+
+- **Plain language, no unexplained jargon.** Among devs a commit SHA or a flag name is fine; when
+  *Roberto* reads it, say what it **means**. If a technical term is genuinely needed, define it in
+  the same breath. Prefer "the safety check now runs automatically before every save" over "wired
+  the pre-commit leak-check hook".
+- **Every decision comes with its implications — in his terms.** Never ask him to choose or approve
+  without spelling out what each option actually leads to: what happens if you pick A vs B, the
+  cost, the risk, the trade-off, **and your recommendation**. A question he can't answer because he
+  lacks the context is *your* failure to explain, not his to understand.
+- **End of task / "what next":** lead with **one plain sentence** — what happened, and what (if
+  anything) is needed from him and why. The technical detail (SHAs, file paths, status lines) goes
+  *below* that, for whoever wants it — never as the headline.
+- **Answer first, depth after (progressive disclosure).** The clear bottom line on top; the
+  reasoning and the technical layer beneath, never as a barrier to understanding.
+- **"I don't understand" is feedback about the writing, not the reader.** Re-say it simpler and
+  *differently* — don't repeat the same words louder or add more jargon.
+
+Holds for every tool that reads this canon (Claude, Copilot, Codex). Clarity toward Roberto is
+non-negotiable — it sits alongside "no false done" as a first-class rule.
+
+---
+
 ## Expected workflow on complex tasks
 
 ```

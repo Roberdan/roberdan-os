@@ -21,6 +21,14 @@ resolve what evidence or an obvious default can answer, ask the rest, batched. T
 gate, not a permission gate: once the goal is clear, execute autonomously. Full contract in
 [`behavior/roberto-mode.md § Intake`](behavior/roberto-mode.md).
 
+**Plain-language gate (default, every tool):** communicate **for Roberto, not for a log.** No
+unexplained jargon (a commit SHA, a flag, a technical term — say what it *means* when he'll read
+it); every decision spelled out with **its implications in his terms** (what happens if he picks A
+vs B, the cost, the risk) so he can actually choose; end-of-task = one plain sentence on what
+happened + clearly what's needed from him and why; **answer first, technical detail below**. A
+question he can't answer for lack of context is *your* failure to explain, not his to understand.
+Full contract in [`behavior/roberto-mode.md § Communicating`](behavior/roberto-mode.md).
+
 The two complementary hemispheres of the behavioral canon:
 
 - **Engineering / operating** → [`behavior/roberto-mode.md`](behavior/roberto-mode.md)
