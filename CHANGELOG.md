@@ -3,6 +3,20 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.14.2] - 2026-07-09
+
+### Changed
+- **A couple of the coaching methodologies now live in the default way of thinking** (Roberto's
+  question "does it make sense to add some of these to how roberdan-os itself thinks?"). Two were
+  worth it and are **integrated into the existing mother-rule steps**, not added as new rituals:
+  - step 2 (first principles) gains **distrust of absolutes** — "always / never / impossible / we
+    have to" is a System-1 shortcut, not a fact; test it;
+  - step 4 (prove yourself wrong) gains a **Kahneman bias-check** — a fast, confident answer is
+    exactly when to slow down and name the likely bias.
+  Deliberately *not* added to the default: GROW, reframing, one-question-at-a-time — those are
+  interpersonal *coaching* moves; making them default would turn every reasoning into a ceremony,
+  which is the "pretend to think" the mother-rule exists to prevent. Discipline is adding *little*.
+
 ## [v2.14.1] - 2026-07-09
 
 ### Changed

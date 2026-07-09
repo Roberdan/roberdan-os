@@ -19,11 +19,15 @@ The correct flow:
    complicated? complex? chaotic?)? A poorly framed problem can't be saved by a framework.
 2. **Reason from first principles.** Strip the problem down to its irreducible
    elements — facts, constraints, domain laws — and rebuild from there, not by analogy to
-   "it's always been done this way".
+   "it's always been done this way". **Distrust absolutes:** "always / never / impossible / we
+   have to" is usually a fast System-1 shortcut, not a fact — test it (never *once*? impossible,
+   or just hard? who says you *have to*?).
 3. **Pick ONE lens that fits.** The framework serves to *check* or *illuminate* the
    reasoning, not to replace it. If it doesn't add an insight you didn't already have, don't use it.
 4. **Try to prove yourself wrong.** What evidence would falsify your conclusion? Where's the
-   data you *don't* see (survivorship)? Default-to-refute before committing.
+   data you *don't* see (survivorship)? **A fast, confident answer is exactly when to slow down**
+   — name the bias most likely to be fooling you here (confirmation, sunk cost, anchoring,
+   over-confidence; § bias check). Default-to-refute before committing.
 5. **Conclude with substance** — a recommendation with the *why*, the trade-offs, and what
    would change it. Never "here are 5 frameworks applied".
 
