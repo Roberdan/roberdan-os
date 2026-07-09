@@ -3,6 +3,24 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.15.0] - 2026-07-09
+
+### Added
+- **Plain-language gate — agents must communicate FOR Roberto, not for a log** (Roberto's
+  observation: explanations, updates, and the decisions he's asked to make are often too dense or
+  jargon-heavy to follow, with implications left unstated). A first-class behavioral rule, on par
+  with "No False Done", in `AGENTS.md § Behavior` + `behavior/roberto-mode.md § Communicating`,
+  so it travels to every tool (Claude, Copilot, Codex):
+  - **no unexplained jargon** — when Roberto will read it, say what a SHA / flag / term *means*;
+  - **every decision carries its implications in his terms** — what A vs B leads to, cost, risk,
+    and a recommendation; a question he can't answer for lack of context is the agent's failure to
+    explain, not his to understand;
+  - **end-of-task = one plain sentence** (what happened + what's needed from him and why), technical
+    detail below, never as the headline;
+  - **answer first, depth after** (progressive disclosure);
+  - **"I don't understand" is feedback about the writing** — re-say it simpler, not louder.
+  Framed as an accessibility and respect commitment.
+
 ## [v2.14.2] - 2026-07-09
 
 ### Changed
