@@ -171,6 +171,10 @@ if bash test/test-fork-merge.sh >/dev/null 2>&1; then ok "merge-clean proof gree
 section "sync.sh --install — skills symlink step (isolated via RDA_CLAUDE_SKILLS_DIR)"
 if bash test/test-sync-install.sh >/dev/null 2>&1; then ok "install symlink/skip logic verified (see bash test/test-sync-install.sh)"; else err "test-sync-install — see bash test/test-sync-install.sh"; fi
 
+# --- 8a) Copilot native adapter (agents + extension emission/install/load/guards) ---
+section "copilot native adapter — emission, collision-safe install, extension load + guard mapping"
+if bash test/test-copilot-adapter.sh >/dev/null 2>&1; then ok "copilot adapter verified (see bash test/test-copilot-adapter.sh)"; else err "test-copilot-adapter — see bash test/test-copilot-adapter.sh"; fi
+
 # --- 8b) hooks/autofmt.sh input contract (stdin JSON; the old env-var API was a silent no-op) ---
 section "autofmt hook — stdin JSON input contract"
 if bash test/test-autofmt.sh >/dev/null 2>&1; then ok "autofmt receives files via stdin JSON (see bash test/test-autofmt.sh)"; else err "test-autofmt — see bash test/test-autofmt.sh"; fi
@@ -249,6 +253,29 @@ if [ -d "$HOME/.copilot" ]; then
     fi
   else
     printf "  skip: ~/.copilot/mcp-config.json not present yet (Copilot never run)\n"
+  fi
+  # copilot native agents: each roberdan-os agent symlinked into ~/.copilot/agents.
+  # Match the symlink target structurally (…/platforms/copilot/agents/…) rather than by a
+  # hardcoded repo-dir name, so a worktree/fork install (dir not literally "roberdan-os") is
+  # still recognized as genuinely wired.
+  for ag in baccio board coach luca rex socrates thor twin wanda; do
+    _agl="$HOME/.copilot/agents/$ag.md"
+    if [ -L "$_agl" ] && readlink "$_agl" 2>/dev/null | grep -qE "/platforms/copilot/agents/"; then
+      ok "copilot agent '$ag' wired (symlink resolves into a roberdan-os platforms/ checkout)"
+    elif [ -e "$_agl" ]; then
+      err "copilot agent '$ag' exists but is NOT a roberdan-os symlink (foreign same-name agent?) — $REMEDIATE"
+    else
+      err "copilot agent '$ag' missing at $_agl — $REMEDIATE"
+    fi
+  done
+  # copilot native extension: symlinked into ~/.copilot/extensions/roberdan-os.
+  _extl="$HOME/.copilot/extensions/roberdan-os/extension.mjs"
+  if [ -L "$_extl" ] && readlink "$_extl" 2>/dev/null | grep -qE "/platforms/copilot/extension/"; then
+    ok "copilot extension wired (symlink resolves into a roberdan-os platforms/ checkout)"
+  elif [ -e "$_extl" ]; then
+    err "copilot extension exists but is NOT a roberdan-os symlink — $REMEDIATE"
+  else
+    err "copilot extension missing at $_extl — $REMEDIATE"
   fi
 else
   printf "  skip: copilot not installed (no ~/.copilot)\n"
