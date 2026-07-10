@@ -51,6 +51,23 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   guards (which *can* deny/ask before execution), context injection, custom agents, and the native
   tools are full-fidelity; the completion gate is advisory only.
 
+### Reviewed
+- **@luca (security):** no high-confidence vulnerabilities — command-injection (argv-only spawn,
+  no shell string, no exec proxy), secret exposure (`mcp-config.json` probed only for the `gbrain`
+  token, never read out), install safety (collision-safe, no-op when `~/.copilot` absent), human-gate
+  preservation, and path/symlink handling all refuted.
+- **@rex (ecosystem/code):** two findings, both resolved before commit — (Medium) `onPreToolUse`
+  did not forward the session `workingDirectory`, so `main-guard.sh` could fail *open* on a relative
+  path when the extension cwd ≠ the session repo → fixed by threading `cwd` into `applyGuard`, with a
+  relative-path-on-`main` regression test; (Low) the `validate.sh` tool-coverage asserts hardcoded the
+  substring `roberdan-os/platforms/`, false-failing worktree/fork installs → fixed to a structural
+  `…/platforms/copilot/{agents,extension}/…` match.
+- **@thor (done-gate, fresh context):** round 1 REJECTED on empty/broad catches + a silently-dropped
+  autofmt failure in the extension (criterion 3 "no hidden failures"). Resolved: every catch now binds
+  the error and routes it to a single stderr `diag()` sink (stdout stays JSON-RPC-only), autofmt
+  non-zero exits are reported (not swallowed), and `test-copilot-adapter.sh` gained a guard against any
+  bare empty catch / silent no-op handler regressing.
+
 ## [v2.15.1] - 2026-07-09
 
 ### Fixed
