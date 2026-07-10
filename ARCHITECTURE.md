@@ -49,6 +49,10 @@ Operator (or a schedule)
    Exception by design: Claude Code reads the canon **natively** in-repo via the root
    `CLAUDE.md → AGENTS.md` symlink (v2.7.0) — no wrapper on that path. Agent frontmatter
    carries `model:` **and `effort:`** (2026) so cost/quality tiering travels with the canon.
+   Copilot gets a **native adapter** (v2.16.0): generated custom agents + a user-scoped
+   extension (`hooks/copilot/extension.template.mjs`) that binds the provider-neutral `hooks/`
+   to Copilot lifecycle APIs — operational near-parity, with the completion gate advisory
+   (Copilot can't block an already-produced final response). See `bin/sync.sh`, CHANGELOG.
 2. **Engine/identity split.** Forkers edit `identity/` only; engine files never embed identity.
    See [`docs/plan-2026-07-05-engine-identity-split.md`](docs/plan-2026-07-05-engine-identity-split.md).
 3. **Human gates are not advisory.** The seven gates in `AGENTS.md` are enforced by hooks and
