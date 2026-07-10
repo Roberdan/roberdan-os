@@ -61,6 +61,27 @@ if [ -f "$EXT" ]; then
   node --check "$EXT" 2>/dev/null && ok "extension.mjs is valid ES module syntax" || err "extension.mjs failed node --check"
   grep -qF "process.env.RDA_OS || \"$ROOT\"" "$EXT" && ok "extension bakes the repo ROOT (env RDA_OS still overrides)" || err "extension ROOT not baked/expanded"
   grep -qE '__RDA_OS_DEFAULT__' "$EXT" && err "unexpanded __RDA_OS_DEFAULT__ placeholder left in extension" || ok "no unexpanded placeholder remains"
+  # No hidden failures: no bare empty catch and no silent no-op error handler (criterion 3 +
+  # @thor's zero-tolerance empty-catch rule). Every catch must bind the error and route it to
+  # the diag() sink (or carry an explanatory comment for a genuinely terminal case).
+  if grep -qE 'catch[[:space:]]*\{[[:space:]]*\}|catch[[:space:]]*\([a-zA-Z_]*\)[[:space:]]*\{[[:space:]]*\}' "$EXT"; then
+    err "extension contains a bare empty catch (silent failure) — route it to diag()"
+  else
+    ok "no bare empty catch in the extension (failures are observable)"
+  fi
+  # Every catch must BIND its error (catch (e)) so it can be routed to diag() — an unbound
+  # `catch {` discards the error even if the body returns a fail-safe (what @thor caught in round 2).
+  if grep -qE 'catch[[:space:]]*\{' "$EXT"; then
+    err "extension has an unbound 'catch {' (error discarded) — use 'catch (e)' + diag()"
+  else
+    ok "every catch binds its error (catch (e), routable to diag())"
+  fi
+  if grep -qE 'on\("error",[[:space:]]*\([a-zA-Z_]*\)[[:space:]]*=>[[:space:]]*\{[[:space:]]*\}\)' "$EXT"; then
+    err "extension has a silent no-op error handler — route it to diag()"
+  else
+    ok "no silent no-op error handler in the extension"
+  fi
+  grep -q 'function diag(' "$EXT" && ok "extension has a single stderr diag() sink (stdout stays JSON-RPC only)" || err "extension missing the diag() diagnostic sink"
 else
   err "expected extension.mjs to be generated at $EXT"
 fi

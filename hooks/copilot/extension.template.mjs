@@ -38,6 +38,18 @@ const HOOKS = join(RDA_OS, "hooks");
 const KB = join(RDA_OS, "kanban", "kb.sh");
 const HOME = process.env.HOME || process.env.USERPROFILE || "";
 
+// Single diagnostic sink. stdout is reserved for JSON-RPC, so ALL diagnostics go to stderr.
+// This exists so no failure is ever swallowed silently: every catch below routes here with a
+// site tag, turning "empty catch" into an observable (but non-fatal) event. Never throws.
+function diag(where, e) {
+    try {
+        const msg = e && e.stack ? e.stack : String(e);
+        process.stderr.write(`[roberdan-os] ${where}: ${msg}\n`);
+    } catch (_e) {
+        /* stderr itself is unavailable — there is nowhere left to report; do not crash the CLI */
+    }
+}
+
 // Tool-name classification (Copilot tool names, lowercased). File-writing tools feed the
 // main-guard (branch discipline) + autofmt; shell tools feed the bash-guard.
 const WRITE_TOOLS = new Set(["edit", "create", "write", "str_replace", "str_replace_editor", "multiedit", "notebookedit"]);
@@ -72,7 +84,7 @@ function runScript(scriptPath, stdinStr, cwd) {
         child.on("error", (e) => resolve({ code: 127, stdout, stderr: stderr + String(e.message) }));
         child.on("close", (code) => resolve({ code: code == null ? 1 : code, stdout, stderr }));
         if (stdinStr != null) {
-            child.stdin.on("error", () => {});
+            child.stdin.on("error", (e) => diag("runScript:stdin", e)); // EPIPE if the child exits early — observable, non-fatal
             child.stdin.write(stdinStr);
         }
         child.stdin.end();
@@ -131,8 +143,10 @@ async function applyGuard(scriptRel, stdinObj, cwd) {
         const h = parsed.hookSpecificOutput || {};
         decision = h.permissionDecision;
         reason = h.permissionDecisionReason;
-    } catch {
+    } catch (e) {
         // Guard printed something non-JSON on exit 0: treat as advisory, don't silently allow.
+        // The parse error itself is routed to diag() (observable), not swallowed.
+        diag(`applyGuard:parse(${scriptRel})`, e);
         return {
             permissionDecision: "ask",
             permissionDecisionReason: `roberdan-os ${scriptRel} returned an unexpected result — pausing for your confirmation (fail-safe).`,
@@ -161,7 +175,9 @@ async function runStopChain(cwd) {
             if (msg) {
                 try {
                     await session.log(`[roberdan-os ${rel}]\n${msg}`, { level: "warning" });
-                } catch {}
+                } catch (e) {
+                    diag(`runStopChain:session.log(${rel})`, e);
+                }
             }
         }
         // Side effects: opt-in wrapper regen (self-gated by RDA_AUTOSYNC) + always-on checkpoint.
@@ -320,7 +336,9 @@ const tools = [
                     const { readdirSync } = await import("node:fs");
                     agentCount = readdirSync(agentsDir).filter((f) => f.endsWith(".md")).length;
                 }
-            } catch {}
+            } catch (e) {
+                diag("doctor:readdir(agents)", e);
+            }
             mark(agentCount > 0, `custom agents installed in ~/.copilot/agents (${agentCount} found)`);
             // extension installed
             const extFile = join(HOME, ".copilot", "extensions", "roberdan-os", "extension.mjs");
@@ -333,14 +351,18 @@ const tools = [
                     const { readdirSync } = await import("node:fs");
                     skillCount = readdirSync(skillsDir).length;
                 }
-            } catch {}
+            } catch (e) {
+                diag("doctor:readdir(skills)", e);
+            }
             mark(skillCount > 0, `skills present in ~/.copilot/skills (${skillCount} entries)`);
             // gbrain MCP (presence only — never read/echo the file's contents; it holds secrets)
             const mcp = join(HOME, ".copilot", "mcp-config.json");
             let gbrain = false;
             try {
                 if (existsSync(mcp)) gbrain = /"gbrain"/.test(readFileSync(mcp, "utf-8"));
-            } catch {}
+            } catch (e) {
+                diag("doctor:probe(mcp-config)", e);
+            }
             mark(gbrain, "gbrain configured in ~/.copilot/mcp-config.json (Copilot-owned; never modified here)");
             // context injection works
             const ci = join(HOOKS, "context-inject.sh");
@@ -396,9 +418,16 @@ const hooks = {
         const fp = args.path || args.file_path || args.filePath || "";
         const p = join(HOOKS, "autofmt.sh");
         if (!fp || !existsSync(p)) return undefined;
-        // Best-effort format (autofmt is silent-on-success, never-blocks by contract). We do not
-        // convert a failure into a success-shaped result; we simply add no model-visible context.
-        await runScript(p, JSON.stringify({ tool_input: { file_path: String(fp) } }), input && input.workingDirectory);
+        // Best-effort format (autofmt is silent-on-success, never-blocks by contract). A failure
+        // is NOT converted into a success-shaped result and NOT surfaced to the model (autofmt
+        // failures are environmental — missing formatter — and would be noise). But it is not
+        // hidden either: a non-zero exit is reported to stderr via diag() so it stays observable.
+        const { code, stderr } = await runScript(
+            p,
+            JSON.stringify({ tool_input: { file_path: String(fp) } }),
+            input && input.workingDirectory,
+        );
+        if (code !== 0) diag(`onPostToolUse:autofmt(exit ${code})`, stderr || `autofmt failed on ${fp}`);
         return undefined;
     },
 
@@ -410,7 +439,9 @@ const hooks = {
                 `[roberdan-os] tool '${input && input.toolName}' failed: ${String((input && input.error) || "").slice(0, 200)}`,
                 { level: "warning", ephemeral: true },
             );
-        } catch {}
+        } catch (e) {
+            diag("onPostToolUseFailure:session.log", e);
+        }
         return undefined;
     },
 
@@ -431,13 +462,15 @@ try {
     // and run side effects, but — per the documented limitation — it cannot block/rewrite the
     // final assistant message that has already been produced.
     session.on("session.idle", () => {
-        runStopChain(process.cwd()).catch(() => {});
+        runStopChain(process.cwd()).catch((e) => diag("session.idle:runStopChain", e));
     });
     try {
         await session.log("roberdan-os extension loaded (agents, guards, kanban tools, always-on checkpoint).", {
             ephemeral: true,
         });
-    } catch {}
+    } catch (e) {
+        diag("join:session.log(loaded)", e);
+    }
 } catch (e) {
     // stdout is reserved for JSON-RPC; diagnostics go to stderr and never crash the CLI.
     process.stderr.write(`roberdan-os extension failed to join session: ${e && e.stack ? e.stack : e}\n`);
