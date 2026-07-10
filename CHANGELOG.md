@@ -3,6 +3,54 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.16.0] - 2026-07-10
+
+### Added
+- **Native GitHub Copilot adapter — operational near-parity in stock Copilot CLI, no separate
+  SDK host.** roberdan-os now drives Copilot through its own first-class extension surface
+  instead of relying on skills + a global instructions pointer alone. Generated deterministically
+  from the canon by `bin/sync.sh`, installed collision-safely (never overwrites, always symlinks
+  so it tracks the canon):
+  - **Copilot custom agents** — one wrapper per `agents/*.md` that lists provider `copilot`,
+    in Copilot's authoritative frontmatter (description required; canonical tools mapped to
+    Copilot aliases `read/edit/execute/search/web`; coarse model tier mapped to a concrete id,
+    which degrades gracefully to the session model if unavailable). Symlinked into
+    `~/.copilot/agents/<name>.md`, skipping any pre-existing same-named file.
+  - **User-scoped extension** `~/.copilot/extensions/roberdan-os/extension.mjs` — the native
+    binding of the provider-neutral `hooks/`, sourced from `hooks/copilot/extension.template.mjs`
+    (repo root baked at emit time; a runtime `RDA_OS` env still overrides for forks):
+    - `onSessionStart` → `hooks/context-inject.sh` (fresh durable context injection).
+    - `onPreToolUse` → `hooks/main-guard.sh` + `hooks/bash-guard.sh`, mapped to Copilot
+      `allow/ask/deny`. A guard can only tighten, never loosen (safe actions defer to Copilot's
+      own permission flow). **A guard failure maps to `ask`, never a silent success-shaped allow.**
+    - `onPostToolUse` → `hooks/autofmt.sh` (best-effort format after edits, never blocks).
+    - `onPostToolUseFailure` → ephemeral observability log (no hidden model steering).
+    - `session.idle` / `onSessionEnd` → the Claude "Stop" chain (pre-completion-gate → verify-done
+      → post-task-sync → always-on auto-checkpoint), throttled + serialized to avoid duplicate/
+      reentrant runs.
+    - Safe, globally-unique namespaced tools: `roberdanos_kanban` (board reads + gated
+      add/start/finish/block — the todo→doing Roberto gate and doing→done @thor evidence gate are
+      enforced by `kb.sh` itself, never bypassed), `roberdanos_pause`, `roberdanos_resume`,
+      `roberdanos_verify_done`, `roberdanos_doctor` (wiring diagnostic; reports gbrain MCP presence
+      without ever reading/echoing the secret-bearing `mcp-config.json`). No arbitrary shell proxy.
+  - `bin/sync.sh --install` extends to `~/.copilot/agents` (`RDA_COPILOT_AGENTS_DIR`) and
+    `~/.copilot/extensions` (`RDA_COPILOT_EXT_DIR`), same no-silent-overwrite posture as the skills
+    install; a total no-op when `~/.copilot` is absent. `mcp-config.json` remains read-only (WARN if
+    gbrain missing) — Copilot owns that file and it holds secrets.
+  - `test/test-copilot-adapter.sh` (wired into `validate.sh` + the tool-coverage gate): deterministic
+    emission, frontmatter/tool/model mappings, collision-safe install, no-write-when-absent,
+    real ESM load against a stubbed SDK, PreToolUse guard mapping (deny/ask/allow + fail-safe),
+    idle dedup/throttle wiring, and the privacy check on `mcp-config.json`.
+
+### Known limitation (operational near-parity, stated honestly)
+- **No bit-for-bit Claude `Stop` parity.** Copilot exposes `session.idle`/`onSessionEnd` only
+  *after* a turn's final assistant message is produced, and there is no proven Copilot hook that
+  can block or rewrite that message. So `verify-done` / `pre-completion-gate` run as **advisory
+  warnings + side effects** in Copilot — they cannot hold back a premature "done" claim the way the
+  Claude Stop hook's blocking output can. The always-on pause/resume checkpoint, the PreToolUse
+  guards (which *can* deny/ask before execution), context injection, custom agents, and the native
+  tools are full-fidelity; the completion gate is advisory only.
+
 ## [v2.15.1] - 2026-07-09
 
 ### Fixed
