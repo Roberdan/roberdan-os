@@ -68,6 +68,15 @@ cat <<EOF
    @board for high-stakes decisions; @thor done-gate. Canon: $ROOT/AGENTS.md
 4) Copilot per-repo: copy the block from $ROOT/platforms/copilot/copilot-instructions.md
    into the .github/copilot-instructions.md of whichever repos you want.
+5) Copilot native adapter (agents + extension + skills): bash bin/sync.sh --install
+   symlinks the custom agents into ~/.copilot/agents and the extension into
+   ~/.copilot/extensions/roberdan-os/ (collision-safe, gated on ~/.copilot present).
+   In Copilot CLI, /agent lists the roberdan-os agents; the extension adds context
+   injection, the write/bash guards, an always-on checkpoint, and the roberdanos_*
+   tools. Verify with the roberdanos_doctor tool. gbrain MCP stays manual (Copilot
+   owns ~/.copilot/mcp-config.json; sync.sh never writes it).
+   Note: Copilot's completion/verify-done gate is ADVISORY (warns, cannot block the
+   final response) — see CHANGELOG "operational near-parity".
 
 Done. Open a new session to activate CLAUDE.md/hooks/agents.
 EOF
