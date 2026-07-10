@@ -37,6 +37,20 @@
 # Read-only check (never writes): if ~/.copilot/mcp-config.json exists but does not
 # contain "gbrain", prints a WARN — that file is owned by Copilot, never modified here.
 # Override RDA_COPILOT_MCP_CONFIG for isolated testing.
+# Copilot NATIVE custom agents + extension (--install only, GATED on ~/.copilot):
+#   - agents: from each agents/*.md that lists provider `copilot`, generates a Copilot
+#     custom-agent wrapper (platforms/copilot/agents/<name>.md) — description (required),
+#     tools mapped to Copilot aliases, canonical model mapped to a concrete id (falls back
+#     to the session model if unavailable) — and symlinks it into ~/.copilot/agents,
+#     collision-safe (never overwrites a same-named file). Override RDA_COPILOT_AGENTS_DIR.
+#   - extension: materializes hooks/copilot/extension.template.mjs (RDA_OS baked at emit
+#     time, env RDA_OS still overrides) and symlinks it to
+#     ~/.copilot/extensions/roberdan-os/extension.mjs — the native binding of the provider-
+#     neutral hooks/ (context-inject, main/bash guards, autofmt, always-on checkpoint) plus
+#     namespaced tools (kanban/pause/resume/verify-done/doctor). Override RDA_COPILOT_EXT_DIR.
+#   Honest limit: Copilot's session.idle/onSessionEnd fire AFTER the final assistant message
+#   is produced, so the emulated Stop chain WARNs + runs side effects but cannot BLOCK a
+#   premature "done" the way the Claude Stop hook can — operational near-parity, documented.
 # Global AGENTS.md pointer install (--install only): writes ~/.codex/AGENTS.md,
 # ~/.config/opencode/AGENTS.md and ~/GitHub/AGENTS.md for tools DETECTED as
 # installed, never overwriting an existing file. RDA_POINTER_HOME overrides
@@ -82,6 +96,55 @@ list() { find "$1" -maxdepth "${3:-1}" -name "$2" 2>/dev/null | LC_ALL=C sort; }
 # unquoted scalar (mapping-values error). Escape backslash then double-quote,
 # wrap in "" so the emitted frontmatter always parses.
 yaml_dq() { printf '"%s"' "$(printf '%s' "${1:-}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
+
+# --- Copilot custom-agent mappings (canon -> Copilot's authoritative format) ---
+# Copilot custom agents live in ~/.copilot/agents/<name>.md with YAML frontmatter.
+# Authoritative schema (docs.github.com/en/copilot/reference/custom-agents-configuration):
+#   description is REQUIRED; tools is a list of aliases or "*"; model falls back to the
+#   parent session model when the id is unavailable (graceful — see CustomAgentConfig).
+# Canon coarse model tiers -> a concrete Copilot model id. An unavailable id degrades to
+# the session model (documented safety net), so a future rename never hard-breaks an agent.
+copilot_model() {
+  case "$1" in
+    opus)   echo "claude-opus-4.5" ;;
+    sonnet) echo "claude-sonnet-4.5" ;;
+    haiku)  echo "claude-haiku-4.5" ;;
+    "")     echo "" ;;
+    *)      echo "$1" ;;   # already a concrete id (contains a version) -> pass through
+  esac
+}
+
+# Map ONE canon tool token to a Copilot primary tool alias (case-insensitive compatible
+# aliases per the reference table). Unknown tokens pass through: Copilot ignores unrecognized
+# tool names, so this never widens access, and a product-specific tool name survives untouched.
+copilot_tool_one() {
+  case "$1" in
+    Read|NotebookRead)                echo "read" ;;
+    Write|Edit|MultiEdit|NotebookEdit) echo "edit" ;;
+    Bash|shell|powershell)            echo "execute" ;;
+    Grep|Glob)                        echo "search" ;;
+    WebSearch|WebFetch)               echo "web" ;;
+    Task|custom-agent)                echo "agent" ;;
+    *)                                echo "$1" ;;
+  esac
+}
+
+# Turn a canon `tools:` CSV ("Read, Write, Bash") into a deterministic, de-duplicated
+# Copilot YAML flow array ("[read, edit, execute]"), preserving first-seen order. An empty
+# canon list yields "[]" (no tools) rather than "*", so we never silently grant everything.
+copilot_tools_array() {
+  local csv="$1" tok mapped seen="" out=""
+  local IFS=,
+  for tok in $csv; do
+    tok="$(printf '%s' "$tok" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    [ -z "$tok" ] && continue
+    mapped="$(copilot_tool_one "$tok")"
+    case " $seen " in *" $mapped "*) continue ;; esac
+    seen="$seen $mapped"
+    if [ -z "$out" ]; then out="$mapped"; else out="$out, $mapped"; fi
+  done
+  printf '[%s]' "$out"
+}
 
 emit_global_agents_pointer() {
   # Content of the thin AGENTS.md pointer installed OUTSIDE this repo (parent
@@ -231,6 +294,56 @@ $desc
 Canonical logic: \`skills/$name/skill.md\` in roberdan-os.
 EOF
   done
+
+  # --- Native Copilot custom agents (from agents/*.md that list `copilot`) -----
+  # One thin, drift-free wrapper per canon persona, in Copilot's authoritative
+  # frontmatter (description REQUIRED, tools as aliases, mapped model). The body is
+  # a pointer to the full canon persona at its ABSOLUTE path (baked at emit time,
+  # like settings-hooks.json) so the agent can read it from any cwd. Only agents
+  # whose `providers:` includes `copilot` are emitted.
+  mkdir -p "$d/agents"
+  local a aname adesc aprov amodel_raw atools_raw amodel atools
+  for a in $(list "$ROOT/agents" "*.md"); do
+    aprov="$(fm "$a" providers)"
+    case "$aprov" in *copilot*) : ;; *) continue ;; esac
+    aname="$(fm "$a" name)"; adesc="$(fm "$a" description)"
+    amodel_raw="$(fm "$a" model)"; atools_raw="$(fm "$a" tools)"
+    amodel="$(copilot_model "$amodel_raw")"
+    atools="$(copilot_tools_array "$atools_raw")"
+    {
+      echo '---'
+      echo "name: $aname"
+      echo "description: $(yaml_dq "$adesc")"
+      [ -n "$atools" ] && echo "tools: $atools"
+      [ -n "$amodel" ] && echo "model: $amodel"
+      # Pass through invocation controls only when the canon declares them (future-proof;
+      # Copilot defaults infer=true / user-invocable=true otherwise).
+      [ -n "$(fm "$a" disable-model-invocation)" ] && echo "disable-model-invocation: $(fm "$a" disable-model-invocation)"
+      [ -n "$(fm "$a" user-invocable)" ] && echo "user-invocable: $(fm "$a" user-invocable)"
+      echo "metadata:"
+      echo "  source: roberdan-os"
+      echo '---'
+      echo ""
+      echo "# $aname (roberdan-os canon agent)"
+      echo ""
+      echo "$adesc"
+      echo ""
+      echo "Canonical persona — full instructions, guardrails and constraints — lives in"
+      echo "\`$ROOT/agents/$aname.md\`. **Read that file first**, then act under it and under"
+      echo "\`$ROOT/AGENTS.md\` (canon + human gates). This is a generated wrapper — do not hand-edit."
+    } > "$d/agents/$aname.md"
+  done
+
+  # --- User-scoped native extension (hooks -> Copilot lifecycle + native tools) --
+  # Materialized from the canonical template hooks/copilot/extension.template.mjs with the
+  # repo root baked in as the RDA_OS default (deterministic; a runtime RDA_OS env still wins,
+  # keeping forks portable). The installed symlink points here, so the extension tracks the
+  # canon automatically — no hand-copied JS to drift.
+  mkdir -p "$d/extension/roberdan-os"
+  if [ -f "$ROOT/hooks/copilot/extension.template.mjs" ]; then
+    sed "s|__RDA_OS_DEFAULT__|$ROOT|g" "$ROOT/hooks/copilot/extension.template.mjs" \
+      > "$d/extension/roberdan-os/extension.mjs"
+  fi
 }
 
 emit_codex() {
@@ -389,6 +502,49 @@ if [ "$MODE" = "install" ]; then
   else
     echo "--- skills install (copilot) ---"
     echo "SKIP copilot: $COPILOT_ROOT non trovato (Copilot non installato)"
+  fi
+
+  # Copilot native custom AGENTS → collision-safe per-file symlink into ~/.copilot/agents.
+  # Same posture as skills: symlink each generated wrapper (tracks the canon), NEVER overwrite
+  # a same-named file already there (could be another system's agent), NEVER delete. Gated on
+  # ~/.copilot present. RDA_COPILOT_AGENTS_DIR overrides the target for isolated testing.
+  COPILOT_AGENTS_DIR="${RDA_COPILOT_AGENTS_DIR:-$COPILOT_ROOT/agents}"
+  echo ""
+  echo "--- copilot agents install (symlink, into $COPILOT_AGENTS_DIR) ---"
+  if [ -d "$COPILOT_ROOT" ]; then
+    mkdir -p "$COPILOT_AGENTS_DIR"
+    for w in $(list "$P/copilot/agents" "*.md"); do
+      aname="$(basename "$w" .md)"
+      target="$COPILOT_AGENTS_DIR/$aname.md"
+      if [ -e "$target" ] || [ -L "$target" ]; then
+        echo "SKIP agent $aname: già presente in $target (mai overwrite — verifica se collide con un altro sistema)"
+        continue
+      fi
+      ln -s "$w" "$target"
+      echo "INSTALL agent $aname: symlink $target -> $w"
+    done
+  else
+    echo "SKIP copilot agents: $COPILOT_ROOT non trovato (Copilot non installato)"
+  fi
+
+  # Copilot native EXTENSION → collision-safe symlink into ~/.copilot/extensions/roberdan-os/.
+  # If the roberdan-os extension dir already exists, SKIP the whole thing (never overwrite a
+  # possibly hand-edited install). Otherwise create the dir and symlink extension.mjs to the
+  # generated file, so it tracks the canon. RDA_COPILOT_EXT_DIR overrides for isolated testing.
+  COPILOT_EXT_DIR="${RDA_COPILOT_EXT_DIR:-$COPILOT_ROOT/extensions}"
+  EXT_SRC="$P/copilot/extension/roberdan-os/extension.mjs"
+  echo ""
+  echo "--- copilot extension install (symlink, into $COPILOT_EXT_DIR/roberdan-os) ---"
+  if [ ! -d "$COPILOT_ROOT" ]; then
+    echo "SKIP copilot extension: $COPILOT_ROOT non trovato (Copilot non installato)"
+  elif [ ! -f "$EXT_SRC" ]; then
+    echo "SKIP copilot extension: sorgente generata assente ($EXT_SRC) — esegui bin/sync.sh --emit-only"
+  elif [ -e "$COPILOT_EXT_DIR/roberdan-os" ] || [ -L "$COPILOT_EXT_DIR/roberdan-os" ]; then
+    echo "SKIP copilot extension: $COPILOT_EXT_DIR/roberdan-os già presente (mai overwrite)"
+  else
+    mkdir -p "$COPILOT_EXT_DIR/roberdan-os"
+    ln -s "$EXT_SRC" "$COPILOT_EXT_DIR/roberdan-os/extension.mjs"
+    echo "INSTALL copilot extension: symlink $COPILOT_EXT_DIR/roberdan-os/extension.mjs -> $EXT_SRC"
   fi
 
   # Read-only check: Copilot's own mcp-config.json is never modified by this
