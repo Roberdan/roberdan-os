@@ -3,6 +3,79 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.17.0] - 2026-07-11
+
+### Added
+- **Session-lifecycle contract (session-cost efficiency pilot, 2-week measurement window).**
+  Following measured Copilot session-cost signal (247.4:1 input:output token ratio, top-session
+  concentration, 18/47 sessions growing ≥1.5x across quartiles; Baccio/Board convergence:
+  phase-as-session is the key lever), `loop/loop-protocol.md` § "Session-as-phase-container" is
+  now the **single canonical home** for the lifecycle contract: `/compact` continues the same
+  phase; `/new` at natural phase boundaries, before a heavy skill/attachment-bearing step, or
+  before changing model/effort; cutting a session changes the *container*, not the task (a small
+  durable handoff packet — see `handoff/handoff-protocol.md` — carries the task across the cut).
+  `rules/best-practices.md` now carries a one-line pointer instead of restating the contract,
+  removing the duplication an independent @rex review flagged.
+- **Owned always-loaded context footprint reduced.** The prior commit (6763bb3) touching this
+  contract landed net *larger* than its parent (296+28=324 lines across the two files
+  `bin/make-bundle.sh` and Copilot actually load unconditionally: `rules/best-practices.md` +
+  `.github/copilot-instructions.md`) despite the stated goal being context slimming. This release
+  corrects that: the same two files now total 319 lines — tied with the pre-session-lifecycle
+  parent (96c1cf5) and down 5 lines from 6763bb3, while the full contract detail still lives in
+  full in `loop/loop-protocol.md` (JIT-loaded only, not part of the always-on budget).
+  `rules/best-practices.md` remains above its own internal ≤200-line aspirational target
+  (291 lines) — that overage predates this change and 6763bb3; a full prune is out of scope here.
+- **`test/validate.sh`: mechanical invariant for the shortened `.github/copilot-instructions.md`
+  pointer.** That pointer now reads "full 7-item list is AGENTS.md § Human gates" instead of
+  restating all seven gates inline (safer — the old inline copy had silently drifted and omitted
+  gate #7). A new deterministic assertion proves root `AGENTS.md` exists and its `## Human gates`
+  section still lists exactly seven sequentially-numbered gates, so the pointer can never again
+  silently point at a stale or incomplete list.
+
+### Fixed
+- **`hooks/copilot/extension.template.mjs`: corrected an inaccurate SDK comment.** The prior
+  comment claimed Copilot hooks "expose only workingDirectory, toolName, toolArgs and error" —
+  contradicted by `@github/copilot-sdk@1.0.6`'s own types (`onSessionStart` carries
+  `sessionId`/`timestamp`/`source`/`initialPrompt`; `onSessionEnd` carries
+  `reason`/`finalMessage`/`error`; `onPostToolUse` carries a `toolResult` with
+  `textResultForLlm`/`resultType`/optional `sessionLog`/`toolTelemetry`). The comment now states
+  only the defensible fact: none of that is a *validated* token/usage field — tool-result bytes
+  and `toolTelemetry` are proxies at best, not a verified correlation to context size — so this
+  release still ships **no** telemetry, threshold, or warning built on top of them (deferred, as
+  originally scoped; not a walk-back).
+- **`test/test-pending.sh`: deterministic SIGPIPE false failure.** Under `set -o pipefail`,
+  `printf ... | grep -q ...` can legitimately exit 141 (grep exits at first match, killing
+  `printf` mid-write via SIGPIPE) — not a flake, a guaranteed race between two specific
+  constructs. Rewritten as here-strings (`grep -q ... <<<"..."`), which never pipe. Verified
+  deterministic pass across repeated runs.
+- **`test/test-federated-kb.sh`: credential-vacuum probe read contaminated ambient env.** The
+  CI/sandbox environment can inject its own `GIT_CONFIG_PARAMETERS`/`GIT_CONFIG_*` (e.g. a
+  `gh`-auth git-credential trampoline); the test's "outside" canary leg didn't strip these before
+  asserting no vacuum, so it could pass or fail on unrelated ambient config rather than the
+  `factory/runner-sandbox.sh` isolation actually under test. Both probe legs now strip ambient
+  `GIT_CONFIG_*` first. `factory/runner-sandbox.sh`'s real isolation logic was unchanged and
+  independently confirmed sound — this was a test-harness hygiene bug, not a security defect.
+  Both of the above were previously, incorrectly, called "flaky"/reported as the sole failure in
+  kanban evidence; they are deterministic and both are now fixed. Corrected record: full
+  `bash test/validate.sh` is genuinely green, confirmed across repeated consecutive runs.
+
+### Note (accurate version citation)
+- The parent commit's message referenced "Copilot CLI v2.16" — that conflated roberdan-os's own
+  version (2.16.0) with the installed GitHub Copilot CLI binary (1.0.70 at the time). Corrected
+  here rather than by amending the already-pushed/reviewed commit: roberdan-os and the Copilot CLI
+  binary version independently; the AGENTS.md-native-loading behavior itself was accurately
+  documented and is unaffected.
+
+### Reviewed
+- **@rex:** original APPROVE-WITH-FINDINGS (context-budget self-violation + duplicate policy
+  HIGH; inaccurate SDK comment MEDIUM; version citation LOW; missing mechanical invariant for the
+  shortened human-gates pointer LOW/high-value; validation-truth and kanban-evidence findings).
+  All findings addressed in this release; see items above.
+
+### Pilot caveat
+- This is a **2-week measurement pilot** for the session-lifecycle contract. No token or dollar
+  savings are claimed yet — that requires the pilot's own before/after session data.
+
 ## [v2.16.0] - 2026-07-10
 
 ### Added

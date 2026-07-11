@@ -25,6 +25,16 @@
 // response. So the "Stop" chain here can WARN (via session.log) and run side effects
 // (checkpoint, sync), but it CANNOT hold back a premature "done" claim the way the Claude
 // Stop hook's blocking output can. verify-done / pre-completion-gate remain advisory here.
+//
+// CONTEXT-PRESSURE TELEMETRY — deliberately NOT built (verified 2026-07-12 against
+// @github/copilot-sdk@1.0.6 types): the hooks wired here DO carry more than working-dir/tool
+// name/args/error (e.g. onSessionStart's sessionId/initialPrompt, onPostToolUse's toolResult),
+// but none of that is a *validated* token/usage field. `toolResult.toolTelemetry` is an
+// untyped bag — a proxy at best, not a verified correlation to context size — so there is no
+// stable signal to build a "context getting heavy" warning on. No threshold is implemented.
+// Revisit only if a future SDK version adds a real, typed usage field, AND any such signal
+// must stay measurement-only / zero-context-output (never injected into model context, never
+// auto-triggers /new, never blocks a user) per rules/best-practices.md.
 
 import { joinSession } from "@github/copilot-sdk/extension";
 import { spawn } from "node:child_process";

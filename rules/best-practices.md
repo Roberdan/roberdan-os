@@ -113,6 +113,7 @@ Code best practices, current 2026.)
 - **Cache discipline.** Static content first and byte-stable (no timestamps/volatile state in
   always-loaded files); pick model + effort once, early — mid-session switches invalidate the
   prompt cache and recompute everything.
+- **A loop phase is the session container, not the whole task** — canonical contract lives in `loop/loop-protocol.md` § Session-as-phase-container; don't restate it here.
 - **Durable state on disk beats in-conversation state — for cost too.** A kanban card / checkpoint
   file is read once per resume; conversation state is re-paid every turn. Prefer CLIs (`gh`, `kb`)
   over verbose API dumps — the most context-efficient interface to external services.

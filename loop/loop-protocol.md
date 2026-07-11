@@ -11,6 +11,7 @@
 
 ```
 state:              <structured state.db> + .agent-state/<task>.jsonl (cursor)
+session:            a loop phase is the session unit — /compact continues it, /new starts the next
 terminal-condition: <job-specific empirical check — e.g. "cargo test green + CI #N pass">
 checkpoint:         1 commit per phase, evidence-first message (SHA/PR/CI in every update)
 escalation:         2 failed attempts on the same problem → opus, log the reason
@@ -59,6 +60,21 @@ stuck: STOP, report what's wedged (oversized row, missing key, lock), don't loop
 Every checkpoint is an **evidence-first** update:
 `[phase 3/7 ✓] commit a1b2c3d · CI #4821 green · next: apply migration`
 Never "still working." Roberto trusts artifacts, not words.
+
+### 6. Session-as-phase-container (canonical home)
+A loop phase is the session **container**, not the task itself — this is the single canonical
+statement of the contract (referenced, not duplicated, from `rules/best-practices.md` and any
+other canon file). `/compact` and `/new` are literal Copilot CLI slash commands, not conceptual
+placeholders:
+- **`/compact`** continues the *same* phase — routine continuation, same task, same container.
+- **`/new`** (or a fresh project session / headless run) starts the *next* phase — reach for it
+  at natural phase boundaries, before heavy skill/attachment work, or before changing
+  model/effort (a switch mid-phase invalidates the prompt cache anyway — see Component 1's
+  cache-discipline note). Never mid-phase.
+- **Cutting the session changes the container, not the task.** Durable state — `kb` cards,
+  `handoff/latest.md`, receipts (Component 1) — carries the plan across the cut: a small
+  handoff packet (task id, last-done step, next concrete action) is enough for a fresh
+  container to resume without re-deriving context. Format: `handoff/handoff-protocol.md`.
 
 ---
 
