@@ -11,6 +11,7 @@
 
 ```
 state:              <structured state.db> + .agent-state/<task>.jsonl (cursor)
+session:            a loop phase is the session unit — /compact continues it, /new starts the next
 terminal-condition: <job-specific empirical check — e.g. "cargo test green + CI #N pass">
 checkpoint:         1 commit per phase, evidence-first message (SHA/PR/CI in every update)
 escalation:         2 failed attempts on the same problem → opus, log the reason
