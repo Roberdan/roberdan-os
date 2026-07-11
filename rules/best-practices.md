@@ -113,12 +113,7 @@ Code best practices, current 2026.)
 - **Cache discipline.** Static content first and byte-stable (no timestamps/volatile state in
   always-loaded files); pick model + effort once, early — mid-session switches invalidate the
   prompt cache and recompute everything.
-- **A loop phase is the session container, not the whole task.** `/compact` and `/new` are literal
-  Copilot CLI slash commands (not conceptual placeholders). `/compact` continues the *same*
-  phase; reach for `/new` (or a fresh project session/headless run) at phase boundaries, before
-  heavy skill/attachment work, or before changing model/effort — never mid-phase. Cutting the
-  session changes the container, not the task: durable state (`kb`, `handoff/latest.md`, receipts)
-  carries the plan across the cut (see `loop/loop-protocol.md`, `handoff/handoff-protocol.md`).
+- **A loop phase is the session container, not the whole task** — canonical contract lives in `loop/loop-protocol.md` § Session-as-phase-container; don't restate it here.
 - **Durable state on disk beats in-conversation state — for cost too.** A kanban card / checkpoint
   file is read once per resume; conversation state is re-paid every turn. Prefer CLIs (`gh`, `kb`)
   over verbose API dumps — the most context-efficient interface to external services.

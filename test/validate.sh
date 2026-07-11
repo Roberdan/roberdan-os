@@ -59,6 +59,25 @@ done
 section "frontmatter — federated card schema (runner:, human_gates:↔human-only)"
 if bash kanban/lint-cards.sh kanban >/dev/null 2>&1; then ok "runner/human_gates schema clean"; else err "runner/human_gates lint — see bash kanban/lint-cards.sh kanban"; fi
 
+# --- 1e) canon structure — AGENTS.md § Human gates (mechanical invariant, @rex #4) -------
+section "canon structure — root AGENTS.md exists and § Human gates lists the 7 numbered gates"
+# .github/copilot-instructions.md was shortened to a pointer ("full 7-item list is AGENTS.md
+# § Human gates") — that's only safe if the section it points at actually still carries all 7.
+# This proves the invariant mechanically instead of trusting the pointer to stay in sync.
+# Non-brittle: counts + sequential numbering only, not exact gate wording.
+if [ -s AGENTS.md ]; then
+  gates_body="$(awk '/^## Human gates/{f=1;next} /^## /{if(f)exit} f' AGENTS.md)"
+  gates_count=$(printf '%s\n' "$gates_body" | grep -cE '^[0-9]+\. ')
+  gates_seq=$(printf '%s\n' "$gates_body" | grep -oE '^[0-9]+' | paste -sd, -)
+  if [ "$gates_count" -eq 7 ] && [ "$gates_seq" = "1,2,3,4,5,6,7" ]; then
+    ok "AGENTS.md § Human gates has exactly 7 sequentially-numbered gates"
+  else
+    err "AGENTS.md § Human gates has $gates_count gate(s) (sequence: ${gates_seq:-none}), expected 7 (1..7) — the copilot-instructions.md pointer promises the full list lives here"
+  fi
+else
+  err "root AGENTS.md missing or empty — every pointer (.github/copilot-instructions.md, CLAUDE.md, ~/.codex/AGENTS.md) depends on it"
+fi
+
 # --- 2) Link check (relative markdown; exempts [[wikilink]] and http) --------
 section "link check (relative markdown; [[wikilink]] exempted)"
 broken=0
