@@ -39,11 +39,16 @@ count="$(bash "$KB" pending --count)"
 [ "$count" = "$((base + 3))" ] || fail "expected base+3 ($((base + 3))), got '$count'"
 
 # 2) full report lists the test cards + learning, excludes the approved one, ends with PENDING: base+3.
+#    NOTE: use here-strings (<<<), not `printf | grep -q`. Under `set -o pipefail`, grep -q exits
+#    the instant it matches, SIGPIPE-killing the producer — the pipeline's exit status becomes the
+#    producer's 141 (broken pipe), not grep's 0, so a real match still triggers `|| fail`. This is
+#    deterministic (reproduces every run on this harness), not flaky. A here-string has no pipe, so
+#    no SIGPIPE race is possible.
 report="$(bash "$KB" pending)"
-printf '%s\n' "$report" | grep -q "first pending thing" || fail "todo card missing from report"
-printf '%s\n' "$report" | grep -q "a real learning awaiting approval" || fail "unapproved learning missing"
-printf '%s\n' "$report" | grep -q "already approved, not pending" && fail "approved learning must NOT appear"
-printf '%s\n' "$report" | grep -qE "^PENDING: $((base + 3))\$" || fail "report must end with PENDING: $((base + 3))"
+grep -q "first pending thing" <<<"$report" || fail "todo card missing from report"
+grep -q "a real learning awaiting approval" <<<"$report" || fail "unapproved learning missing"
+grep -q "already approved, not pending" <<<"$report" && fail "approved learning must NOT appear"
+grep -qE "^PENDING: $((base + 3))\$" <<<"$report" || fail "report must end with PENDING: $((base + 3))"
 
 # 3) removing the test cards returns the count to baseline.
 rm -f "$RDA_KANBAN/todo/"*.md "$RDA_QUARANTINE/"*.md

@@ -427,15 +427,25 @@ section "phase6: credential vacuum — hostile repo-local .git/config helper fir
 VR="$TMP/vacuumRepo"; mk_gitrepo "$VR"
 MARK="$TMP/cred-marker"
 git -C "$VR" config credential.helper "!touch $MARK"   # canary standing in for a hostile osxkeychain
+# The CALLING shell may itself inject a git credential helper via env (e.g. a host CLI's own
+# GIT_CONFIG_PARAMETERS-based auth trampoline). That helper would answer `credential fill` before
+# the repo-local canary ever runs, making BOTH legs read 0 for a reason that has nothing to do
+# with roberdan-os's own protection (exactly the false-pass the guard below exists to catch —
+# outside=0 already fails it, it doesn't silently report success). Strip any such ambient
+# git-config env-injection so this test isolates the ONE real variable: sandbox_git's own
+# `-c credential.helper=` reset.
+_gcv=()
+while IFS= read -r _v; do [ -n "$_v" ] && _gcv+=(-u "$_v"); done \
+  < <(env | cut -d= -f1 | grep -E '^GIT_CONFIG_(PARAMETERS|COUNT|KEY_[0-9]+|VALUE_[0-9]+)$')
 # (i) OUTSIDE the vacuum (global/system config excluded so ONLY the canary is reachable — and no
 #     real credential helper is ever consulted, so a real token can never be produced): canary fires.
 /bin/rm -f "$MARK" 2>/dev/null || rm -f "$MARK"
-printf 'protocol=https\nhost=github.com\n\n' | GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git -C "$VR" credential fill >/dev/null 2>&1 || true
+printf 'protocol=https\nhost=github.com\n\n' | env "${_gcv[@]+"${_gcv[@]}"}" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git -C "$VR" credential fill >/dev/null 2>&1 || true
 outside=0; [ -f "$MARK" ] && outside=1
 # (ii) INSIDE sandbox_git (adds forced -c credential.helper= — the ONLY difference from leg i):
 #      the helper list is reset, the canary never runs.
 /bin/rm -f "$MARK" 2>/dev/null || rm -f "$MARK"
-printf 'protocol=https\nhost=github.com\n\n' | bash -c 'source "$0"; sandbox_git "$1" credential fill' "$SANDBOX" "$VR" >/dev/null 2>&1 || true
+printf 'protocol=https\nhost=github.com\n\n' | env "${_gcv[@]+"${_gcv[@]}"}" bash -c 'source "$0"; sandbox_git "$1" credential fill' "$SANDBOX" "$VR" >/dev/null 2>&1 || true
 inside=0; [ -f "$MARK" ] && inside=1
 # (iii) env -i allowlist drops a planted GH_TOKEN
 envout="$(GH_TOKEN=planted-fake-not-real bash -c 'source "$0"; sandbox_env_run "'"$ROOT"'/factory/runner-shims" "'"$TMP"'/sbhome" "'"$TMP"'/sbtmp" -- env' "$SANDBOX" 2>/dev/null)"

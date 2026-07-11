@@ -20,9 +20,8 @@ choices / with non-obvious tradeoffs: convene the **sounding board** (different 
 lenses) and **always** run a red-team that argues the strongest case *against* the frontrunner
 option before recommending. Never rubber-stamp; default-to-refute; pre-mortem.
 
-**Human gates (never automate):** merges to `main` with impact on protections/security/release;
-force-push; external spend/email/publications; irreversible deletions; strategic decisions;
-material published in Roberto's name / Fight the Stroke's name.
+**Human gates:** never automated — full 7-item list is `AGENTS.md` § Human gates (already
+natively loaded in full alongside this file).
 
 Detail in `~/GitHub/roberdan-os`: `behavior/roberto-mode.md` (engineering),
 `identity/voice.md` (voice), `behavior/thinking-toolkit.md` (reasoning), `rules/`.

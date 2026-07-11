@@ -13,9 +13,11 @@ session — local or cloud, Claude or Copilot — resumes from ground truth:
 
 ## To hand off (end of a long session)
 
-Write/refresh `handoff/latest.md` with: the goal, key decisions + rationale, current state (what's
-built/running), open threads, and the single next action. Commit + push (private remote) so it's
-reachable from anywhere, including a cloud/web session or the iPhone Claude app.
+Write/refresh `handoff/latest.md` with a **small, durable packet**: kanban card id, the goal,
+completed phase + evidence (commit/PR/test output), branch/commit, decisions/constraints still
+active, and the single next action / terminal condition. Keep it a pointer, not a transcript — no
+raw exploration, no full skill bodies, no copied tool output. Commit + push (private remote) so
+it's reachable from anywhere, including a cloud/web session or the iPhone Claude app.
 
 ## To resume (fresh agent)
 
