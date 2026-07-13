@@ -40,11 +40,30 @@ KB=""
 # Assigns the globals KB + KB_MATCHED directly (NOT via command substitution —
 # a $(...) subshell would discard the KB_MATCHED assignment).
 _resolve_kb() {
-  if [ -n "${RDA_KANBAN:-}" ]; then KB_MATCHED=1; KB="$RDA_KANBAN"; return 0; fi
-  local root
+  # Compute the repo's OWN board first (registry-based), even when RDA_KANBAN is
+  # set, so an override that silently diverges from it can be flagged. This is
+  # the fix for the 2026-07-13 incident: a session exported RDA_KANBAN pointing
+  # at an unrelated directory, and every `kb` call for days afterward wrote real
+  # card content there instead of trading-os's own registered board — with zero
+  # warning, discovered only when the board looked stale days later.
+  local root natural=""
   root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
   if [ -n "$root" ] && { [ "$root" = "$ROOT" ] || _in_registry "$root"; }; then
-    KB_MATCHED=1; KB="$root/kanban"; return 0
+    natural="$root/kanban"
+  fi
+  if [ -n "${RDA_KANBAN:-}" ]; then
+    KB_MATCHED=1; KB="$RDA_KANBAN"
+    # A mismatch is only worth flagging when we're inside a repo that HAS its own
+    # resolvable board — outside any such repo there is nothing to diverge from
+    # (e.g. deliberate cross-repo aggregation use from a scratch directory).
+    if [ -n "$natural" ] && [ "$KB" != "$natural" ]; then
+      echo "kb: WARNING — RDA_KANBAN=$KB overrides this repo's own board ($natural)." >&2
+      echo "kb:   Writes will NOT land in the repo's board. Unset RDA_KANBAN to use it." >&2
+    fi
+    return 0
+  fi
+  if [ -n "$natural" ]; then
+    KB_MATCHED=1; KB="$natural"; return 0
   fi
   KB_MATCHED=0; KB="$ROOT/kanban"
 }
