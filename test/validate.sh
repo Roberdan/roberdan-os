@@ -157,6 +157,13 @@ if bash test/test-factory-kb.sh >/dev/null 2>&1; then ok "kb gates + factory gua
 section "kb views (history/archive/plans/plan/sched)"
 if bash test/test-kb-views.sh >/dev/null 2>&1; then ok "kb views green"; else err "test-kb-views — see bash test/test-kb-views.sh"; fi
 
+# --- 6b2) the done-gate must be mechanical, not honor-system -------------------
+# Pins both directions: forged evidence (rubber-stamps, fake SHAs) is refused, and
+# real evidence (resolvable SHA, test output, existing path) still passes. The gate
+# that only refuses is as useless as the one that only accepts.
+section "kb done-gate (mechanical evidence, no rubber-stamps)"
+if bash test/test-kb-done-gate.sh >/dev/null 2>&1; then ok "done-gate refuses forged evidence, accepts real"; else err "test-kb-done-gate — see bash test/test-kb-done-gate.sh"; fi
+
 # --- 6c) federated kanban + dormant dispatcher --------------------------------
 section "federated kanban (cwd-scoping, kb all/handoff, init, locks, dormant dispatcher)"
 # On failure, surface the test's own output (indented) instead of hiding it behind a "see …"

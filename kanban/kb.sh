@@ -66,6 +66,91 @@ _board_roots() {
 }
 
 _field() { grep -m1 "^$2:" "$1" 2>/dev/null | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"\$//"; }
+
+# --- The done-gate's mechanical half (2026-07-13) --------------------------------
+# Until now `kb finish --thor "<ev>"` accepted ANY non-empty string: `--thor ok`
+# closed a card and stamped `verified_by: thor`. That is an honor-system gate, and
+# best-practices.md § No False Done says the opposite ("prefer a mechanical gate
+# over your own assurance; move the evidence OUT of your words"). The trading-os
+# audit (2026-07-13) showed where that shape leads: its merge gate accepted
+# `evidence.ci == "pass"` as a self-declared string, 40 PRs merged with no CI, and
+# the product shipped 33 green cards while producing zero value.
+#
+# So the evidence must now RESOLVE to something that exists outside the sentence:
+#   - a commit SHA that git can actually find (in any registered repo), or
+#   - a PR/issue ref that gh can resolve, or
+#   - a file path that exists, or
+#   - real test/command output (a count of passed tests, a coverage number, OK/exit 0).
+# A cited SHA that resolves NOWHERE is a hard refusal: that is forged evidence.
+# This does not make @thor honest — it makes a *lie about an artifact* fail.
+_evidence_denylist='^(ok|okay|done|fatto|fine|finito|tutto ok|tutto a posto|a posto|works|funziona|it works|should work|dovrebbe funzionare|lgtm|verified|verificato|passed|green|verde|yes|si|sì|completed|completato)\.?$'
+
+_sha_resolves() {
+  local sha="$1" repo
+  git cat-file -e "${sha}^{commit}" 2>/dev/null && return 0
+  while IFS= read -r repo; do
+    [ -d "$repo/.git" ] || continue
+    git -C "$repo" cat-file -e "${sha}^{commit}" 2>/dev/null && return 0
+  done < <(_registry_repos)
+  return 1
+}
+
+_verify_evidence() {
+  local ev="$1" lower anchors=0 sha
+  lower="$(printf '%s' "$ev" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+
+  if printf '%s' "$lower" | grep -qE "$_evidence_denylist"; then
+    echo "REFUSED: '$ev' is a rubber-stamp, not evidence." >&2
+    echo "  Cite something that EXISTS: a commit SHA, a PR (#123), a file path, or real test output." >&2
+    return 1
+  fi
+  if [ "${#ev}" -lt 12 ]; then
+    echo "REFUSED: evidence too thin ('$ev'). Cite a commit SHA, a PR, a file path, or test output." >&2
+    return 1
+  fi
+
+  # A cited SHA that resolves nowhere = forged evidence. Hard fail.
+  for sha in $(printf '%s' "$ev" | grep -oE '\b[0-9a-f]{7,40}\b' || true); do
+    if _sha_resolves "$sha"; then
+      anchors=$((anchors + 1))
+    else
+      echo "REFUSED: commit '$sha' does not resolve in any registered repo — evidence cites a commit that does not exist." >&2
+      return 1
+    fi
+  done
+
+  # A PR/issue ref must resolve too (skipped when gh is unavailable/offline).
+  local pr
+  for pr in $(printf '%s' "$ev" | grep -oE '#[0-9]+' | tr -d '#' || true); do
+    if command -v gh >/dev/null 2>&1; then
+      if gh pr view "$pr" --json state >/dev/null 2>&1 || gh issue view "$pr" --json state >/dev/null 2>&1; then
+        anchors=$((anchors + 1))
+      else
+        echo "REFUSED: PR/issue #$pr does not resolve — evidence cites something that does not exist." >&2
+        return 1
+      fi
+    fi
+  done
+
+  # An existing file path is a valid anchor.
+  local tok
+  for tok in $ev; do
+    tok="${tok%,}"; tok="${tok%.}"
+    [ -e "$tok" ] && anchors=$((anchors + 1))
+  done
+
+  # Real command/test output: a count, a coverage %, an explicit pass/fail line.
+  printf '%s' "$lower" | grep -qE '([0-9]+[[:space:]]*(passed|passing|tests?|ok\b|assertions))|([0-9]+(\.[0-9]+)?%[[:space:]]*(coverage|cov))|(exit[[:space:]]*(code[[:space:]]*)?0)|(0[[:space:]]*(failed|failures|errors))|(receipt ok)|(checked=[0-9]+)' \
+    && anchors=$((anchors + 1))
+
+  if [ "$anchors" -eq 0 ]; then
+    echo "REFUSED: evidence names nothing verifiable." >&2
+    echo "  It must resolve to something outside the sentence: a commit SHA, a PR (#123)," >&2
+    echo "  an existing file path, or real output (e.g. '148 passed', 'coverage 100%', 'exit 0')." >&2
+    return 1
+  fi
+  return 0
+}
 # Portable in-place status edit: `sed -i ''` is BSD-only syntax (macOS) and breaks under
 # GNU sed (Linux) — it treats the empty string as the script and the real script as a
 # filename, dying with "No such file or directory". Redirect-to-temp-then-move works
@@ -880,6 +965,7 @@ case "$cmd" in
       echo "  Run @thor vs the acceptance criteria, then: kb finish $id --thor '<commit/test/output>'" >&2
       exit 1
     fi
+    if ! _verify_evidence "$ev"; then exit 1; fi
     _set_status "$f" done
     { echo 'verified_by: thor'; echo "verified_evidence: $ev"; echo "verified_at: $(date +%Y-%m-%d)"; } >> "$f"
     mv "$f" "$KB/done/"; echo "done/$id verified by @thor ($ev)"
