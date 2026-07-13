@@ -92,6 +92,50 @@ Concrete failure modes this rule exists to catch (all seen in this repo or its w
 (a coverage gate, a grep-for-caller test, a link check) rather than relying on a human to notice.
 An unwired feature that ships green is worse than one that fails loudly.
 
+## Carded End-to-End (requirements must become cards, not just prose)
+
+The twin of § Wired End-to-End, one level up. That rule says code with no live caller is dead code
+that looks done. This one says: **a requirement that lives in a plan but never becomes a card is
+not planned — it's a wish that looks planned.** Same failure shape, earlier in the chain, and far
+more expensive: unwired code wastes the work; an uncarded requirement means the work never happened
+and nobody noticed.
+
+**Every gate we have operates downstream of the card.** `kb` (todo→doing→done), `@thor` (done-gate),
+the merge-gate (`allowed_paths` from the card), CI (the card's tests) — all four verify *a card*.
+So a requirement that never became a card is invisible to all of them **simultaneously**. They are
+not broken; they are faithfully verifying an input that was already amputated. The translation
+**plan → cards is the only link in the chain with no gate**, and it is exactly where requirements
+die.
+
+**Rules:**
+- **A plan is not executable until every normative clause maps to ≥1 card**, or to an explicit,
+  written refusal ("out of scope because X"). Silence is not a decision — an unmapped clause is a
+  bug in the plan, not an omission you can discover later.
+- **A card may not weaken the clause it claims to satisfy.** If the plan says "the mandatory path is
+  X, Y and Z", a terminal condition of *"at least one of X/Y/Z"* is a **downgrade**, and it will
+  close green while silently deleting Y and Z from the product. Diff the card's terminal condition
+  against the clause's actual demand — quantifiers (`at least one`, `almeno una`, `one or more`) are
+  where requirements go to die.
+- **Verify by walking from the plan, never from the board.** The board can only show you the cards
+  that exist. Enumerate the plan's clauses and ask "which card covers this?" — the reverse direction
+  (reading the cards and feeling covered) cannot detect the absence of a card, which is the whole
+  failure mode.
+- **Prefer a mechanical proof** (same as § Wired End-to-End): a `plan-coverage` gate that maps every
+  numbered clause to a card ID and fails red on an unmapped one. Where the plan and its task DAG are
+  both committed (the normal case for a code repo), this belongs in CI. Where the board is local-only
+  (roberdan-os itself), `kb cover <plan>` is the operational equivalent — run it, don't trust memory.
+
+**Real failure this rule exists to prevent** (2026-07-13, trading-os): the signed plan §28 mandated
+"SEC EDGAR/RSS, official company IR and GDELT" as the required source path. **No card ever ingested a
+news item.** The one card that could have (F9-03) had the terminal condition *"At least one mandatory
+free live source is adopted"* — SEC EDGAR alone satisfied it, so the card closed **honestly green**
+and RSS + GDELT evaporated. Weeks later the system had built the news *graph*, the news *UI* and the
+news *realtime freshness handling* — **and nothing that fetches a news item**. The consumer without
+the producer. A full plan→DAG audit then found the same evaporation had happened to `novelty` (zero
+occurrences in every card and all code, though the plan makes it normative) and to the
+action-window comparators (the anti-multiple-testing guard). Three requirements, silently deleted in
+translation, all four gates green throughout.
+
 ## Context & Token Economy
 
 Context is a finite resource with diminishing returns ("context rot"): every always-loaded token
