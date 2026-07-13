@@ -145,6 +145,40 @@ mk_gitrepo() {  # $1=root
   git -C "$root" config commit.gpgsign false
 }
 
+section "phase1: RDA_KANBAN silently diverging from a repo's OWN board now WARNS (2026-07-13 incident)"
+# Reproduces the exact failure: a registered repo has its own board, but the
+# session's RDA_KANBAN points somewhere else — days of real writes silently
+# missed the repo's board with zero signal. This must now warn on stderr.
+DIVREPO="$TMP/divergeRepo"; mk_gitrepo "$DIVREPO"
+DIVREPO="$(cd "$DIVREPO" && pwd -P)"
+DIVREG="$TMP/reg-diverge"; printf '%s\n' "$DIVREPO" > "$DIVREG"
+ELSEWHERE="$TMP/elsewhere-board"; mkdir -p "$ELSEWHERE/todo" "$ELSEWHERE/doing" "$ELSEWHERE/done"
+err_out="$(cd "$DIVREPO" && RDA_KANBAN="$ELSEWHERE" RDA_KANBAN_REGISTRY="$DIVREG" bash "$ROOT/$KB" list 2>&1 1>/dev/null)"
+std_out="$(cd "$DIVREPO" && RDA_KANBAN="$ELSEWHERE" RDA_KANBAN_REGISTRY="$DIVREG" bash "$ROOT/$KB" list 2>/dev/null)"
+if echo "$err_out" | grep -q "overrides this repo's own board" && echo "$err_out" | grep -q "$DIVREPO/kanban"; then
+  ok "diverging RDA_KANBAN warns on stderr and names the repo's real board"
+else
+  err "no divergence warning printed — stderr was: $err_out"
+fi
+# The override still wins for reads/writes (unchanged behavior) — only the
+# WARNING is new, never a silent behavior change.
+if ! echo "$std_out" | grep -q "WARNING"; then
+  ok "the warning stays on stderr only — stdout (the actual kb output) is unpolluted"
+else
+  err "the warning leaked into stdout: $std_out"
+fi
+
+section "phase1: RDA_KANBAN matching a repo's own board prints no warning (no false positives)"
+MATCHREPO="$TMP/matchRepo"; mk_gitrepo "$MATCHREPO"
+MATCHREPO="$(cd "$MATCHREPO" && pwd -P)"
+MATCHREG="$TMP/reg-match"; printf '%s\n' "$MATCHREPO" > "$MATCHREG"
+err_out="$(cd "$MATCHREPO" && RDA_KANBAN="$MATCHREPO/kanban" RDA_KANBAN_REGISTRY="$MATCHREG" bash "$ROOT/$KB" list 2>&1 1>/dev/null)"
+if [ -z "$err_out" ]; then
+  ok "RDA_KANBAN matching the repo's natural board prints nothing (no false positive)"
+else
+  err "unexpected warning when RDA_KANBAN matches the natural board: $err_out"
+fi
+
 section "phase2: kb init scaffolds gitignore + pre-commit hook + registry entry"
 GR="$TMP/initRepo"; mk_gitrepo "$GR"
 GR="$(cd "$GR" && pwd -P)"   # canonicalize (git --show-toplevel resolves symlinks; registry stores the physical path)
