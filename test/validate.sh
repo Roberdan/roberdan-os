@@ -345,6 +345,27 @@ else
   printf "  skip: repo not under \$HOME/GitHub (different layout, pointer convention n/a)\n"
 fi
 
+# --- 11) plan coverage (every normative plan clause maps to a card) -----------
+# The plan→card step is the ONLY link in the chain with no gate — and it is exactly where
+# requirements die. Every other gate (kb, @thor, the merge-gate, CI) operates DOWNSTREAM of the
+# card, so a requirement that never BECOMES a card is invisible to all of them simultaneously.
+# (trading-os, 2026-07-13: the signed plan mandated SEC EDGAR/RSS + company IR + GDELT; the only
+# card that could have delivered it said "at least one mandatory free live source", closed honestly
+# green, and the news evaporated. An audit found 77 of 149 normative clauses never reached the
+# product.) `kb cover` walks FROM the plan: a board cannot show you the ABSENCE of a card.
+section "plan coverage (every normative clause of docs/plan.md has a card or a written decision)"
+if [ -f "$ROOT/docs/plan.md" ]; then
+  if RDA_KANBAN="$ROOT/kanban" bash "$ROOT/kanban/kb.sh" cover "$ROOT/docs/plan.md" > /tmp/kbcover.$$ 2>&1; then
+    ok "$(tail -2 /tmp/kbcover.$$ | head -1 | sed 's/^ *//')"
+  else
+    err "a plan clause has no card and no written decision — run: kb cover docs/plan.md"
+    sed 's/^/    /' /tmp/kbcover.$$
+  fi
+  rm -f /tmp/kbcover.$$
+else
+  skip "no docs/plan.md"
+fi
+
 # --- Result --------------------------------------------------------------
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "validate: ✅ ALL GREEN"; exit 0; else echo "validate: ❌ FAIL (see above)"; exit 1; fi
