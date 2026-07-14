@@ -74,32 +74,9 @@ uncommitted, so `main` was broken. "Released" had been claimed on "I pushed", no
 green CI run. The fix that should have been the habit: wait for the CI conclusion, read it, THEN
 say released.
 
-## Code Style
-
-| Lang | Standard |
-|---|---|
-| Rust | `cargo fmt`, `cargo clippy -- -D warnings`, edition workspace, `?` over `unwrap`, `Result` over panics |
-| TS/JS | ESLint + Prettier, semicolons, single quotes, 100 chars, `const` > `let`, async/await, `interface` > `type`, `.test.ts` AAA |
-| Python | Black 88, Google docstrings, type hints, pytest + fixtures |
-| Bash | `set -euo pipefail`, quote vars, `local`, `trap cleanup EXIT` |
-| CSS | Modules / BEM, `rem` / `px` borders, mobile-first, max 3 nesting levels |
-| Config | 2-space indent |
-
 ## Surgical Edits
 
 Every changed line in a diff should trace directly to the user's request. Don't "improve" adjacent code, comments, or formatting you happen to pass through. Match existing style even if you'd do it differently. If you notice unrelated dead code, mention it — don't delete it.
-
-## Testing
-
-**Mock boundaries** — ALLOWED: external APIs, network, filesystem, time. **FORBIDDEN**: auth, DB (use a test DB), the module under test.
-
-**Integration**: new endpoint → real middleware. New consumer → realistic shape. Interface change → ALL consumers.
-
-**Test data**: real names / shapes. No `Studio A` / `Test Studio`. Domains: `example.com` / `example.org` only.
-
-**Schema change**: migration in the same PR. Field addition → update ALL fixtures.
-
-**Coverage**: 80% business logic / 100% critical paths. Parameterized SQL.
 
 ## Wired End-to-End (features must be reachable, not just present)
 
@@ -128,47 +105,28 @@ An unwired feature that ships green is worse than one that fails loudly.
 
 ## Carded End-to-End (requirements must become cards, not just prose)
 
-The twin of § Wired End-to-End, one level up. That rule says code with no live caller is dead code
-that looks done. This one says: **a requirement that lives in a plan but never becomes a card is
-not planned — it's a wish that looks planned.** Same failure shape, earlier in the chain, and far
-more expensive: unwired code wastes the work; an uncarded requirement means the work never happened
-and nobody noticed.
+The twin of § Wired End-to-End, one level up: **a requirement that lives in a plan but never becomes
+a card is not planned — it's a wish that looks planned.**
 
-**Every gate we have operates downstream of the card.** `kb` (todo→doing→done), `@thor` (done-gate),
-the merge-gate (`allowed_paths` from the card), CI (the card's tests) — all four verify *a card*.
-So a requirement that never became a card is invisible to all of them **simultaneously**. They are
-not broken; they are faithfully verifying an input that was already amputated. The translation
-**plan → cards is the only link in the chain with no gate**, and it is exactly where requirements
-die.
+Every gate we have — `kb`, `@thor`, the merge-gate, CI — operates **downstream of the card**. A
+requirement that never became one is invisible to all four *simultaneously*. They are not broken;
+they faithfully verify an input that was already amputated. The plan→card translation is the only
+link in the chain with **no gate**, and it is exactly where requirements die.
 
-**Rules:**
-- **A plan is not executable until every normative clause maps to ≥1 card**, or to an explicit,
-  written refusal ("out of scope because X"). Silence is not a decision — an unmapped clause is a
-  bug in the plan, not an omission you can discover later.
-- **A card may not weaken the clause it claims to satisfy.** If the plan says "the mandatory path is
-  X, Y and Z", a terminal condition of *"at least one of X/Y/Z"* is a **downgrade**, and it will
-  close green while silently deleting Y and Z from the product. Diff the card's terminal condition
-  against the clause's actual demand — quantifiers (`at least one`, `almeno una`, `one or more`) are
-  where requirements go to die.
-- **Verify by walking from the plan, never from the board.** The board can only show you the cards
-  that exist. Enumerate the plan's clauses and ask "which card covers this?" — the reverse direction
-  (reading the cards and feeling covered) cannot detect the absence of a card, which is the whole
-  failure mode.
-- **Prefer a mechanical proof** (same as § Wired End-to-End): a `plan-coverage` gate that maps every
-  numbered clause to a card ID and fails red on an unmapped one. Where the plan and its task DAG are
-  both committed (the normal case for a code repo), this belongs in CI. Where the board is local-only
-  (roberdan-os itself), `kb cover <plan>` is the operational equivalent — run it, don't trust memory.
+- **Walk from the plan, never from the board.** A board can only show you the cards that exist. It
+  cannot show you the **absence** of one — which is the entire failure mode.
+- **A card may not weaken the clause it claims to satisfy.** Plan says "X, Y **and** Z are
+  mandatory"; card says "at least one of X/Y/Z" — that closes green while deleting Y and Z from the
+  product. **Quantifiers are where requirements go to die.**
+- **The gate, not this paragraph, is the control:** `kb cover <plan.md>` fails red on any clause with
+  no card and no written decision (`<plan>.coverage`). It runs inside `test/validate.sh`. Prose did
+  not stop this from happening — a gate does.
 
-**Real failure this rule exists to prevent** (2026-07-13, trading-os): the signed plan §28 mandated
-"SEC EDGAR/RSS, official company IR and GDELT" as the required source path. **No card ever ingested a
-news item.** The one card that could have (F9-03) had the terminal condition *"At least one mandatory
-free live source is adopted"* — SEC EDGAR alone satisfied it, so the card closed **honestly green**
-and RSS + GDELT evaporated. Weeks later the system had built the news *graph*, the news *UI* and the
-news *realtime freshness handling* — **and nothing that fetches a news item**. The consumer without
-the producer. A full plan→DAG audit then found the same evaporation had happened to `novelty` (zero
-occurrences in every card and all code, though the plan makes it normative) and to the
-action-window comparators (the anti-multiple-testing guard). Three requirements, silently deleted in
-translation, all four gates green throughout.
+*(Scar: trading-os 2026-07-13. The signed plan mandated "SEC EDGAR/RSS, company IR and GDELT"; the
+one card that could have delivered it read "at least one mandatory free live source", closed honestly
+green, and the news evaporated. The system then built the news graph, the news UI and news realtime
+freshness — and nothing that fetches a news item. A full plan→DAG audit found **77 of 149 normative
+clauses never reached the product**. Full report: `trading-os/docs/execution/plan-coverage-audit.md`.)*
 
 ## Context & Token Economy
 
@@ -246,25 +204,6 @@ second active meta-card while an external-facing card is sitting in `todo/`, tha
 to either finish/park one of the meta-cards first, or make the case out loud for why this
 meta-card is the exception.
 
-## API Conventions
-
-Methods: GET / POST / PUT / PATCH / DELETE | Plural nouns `/api/users` | kebab-case | Max 3 levels.
-Status: 200 / 201 / 204 | 400 / 401 / 403 / 404 / 409 / 422 / 429 / 500 / 503.
-Error: `{error: {code, message, details?, requestId, timestamp}}`.
-Pagination: `?page=1&limit=20` (max 100). Rate limit: 429 + headers. Auth: OAuth 2.0 / JWT.
-
-## Local CI Before Push
-
-Before `git push` or PR creation, run the full local pipeline:
-
-1. Format: `cargo fmt --check` / `prettier --check` / `ruff format --check`
-2. Lint: `cargo clippy -- -D warnings` / `eslint` / `ruff check`
-3. Type-check: `cargo check` / `npx tsc --noEmit`
-4. Tests: `cargo test` / `npm test` / `pytest`
-5. Build: `cargo build` / `npm run build`
-
-If any step fails, fix and re-run ALL checks. Do NOT push with known failures.
-
 ## Parallel work — worktree + PR, never concurrent commits on one checkout
 
 **When work is parallelized inside a single repo, each parallel stream gets its own `git worktree`
@@ -301,44 +240,6 @@ other's files — duplicate frontmatter keys, interleaved commits, a near-collis
   there is more than one writer, isolation is mandatory.
 - After merge: `git worktree remove` the stream's worktree and delete its branch.
 
-## Merge Discipline
-
-You are autonomous on merges — but **only after careful evaluation**. Before merging:
-
-1. CI must be fully green (all required checks pass; never merge with anything pending or failing).
-2. PR must be `mergeable=MERGEABLE` and `mergeStateStatus=CLEAN`.
-3. Diff must match the PR description (no surprises).
-4. **Every review comment must be properly resolved** — see § Review Comments below. No unresolved comments, no `requested-changes` reviews, no "resolved a cazzo".
-5. Local pipeline (fmt / lint / type-check / tests / build) must have run clean before push.
-6. Merge type is **merge commit only** — never squash, never rebase (preserves history; parallel agents depend on it).
-7. If the PR touches `main` branch protection, security policy, license, or release infrastructure → STOP and ask first.
-8. Force-pushes to `main` are ALWAYS forbidden without explicit user confirmation.
-
-After merging: delete the source branch, fast-forward `main` locally, and report the merge commit SHA. If anything in the eight checks above is uncertain, ask before merging — uncertainty is a signal to pause.
-
-## Review Comments
-
-Every comment on a PR — human or bot — must be **analyzed, understood, and resolved well**, not dismissed.
-
-For each comment:
-
-1. **Read it fully.** Don't skim. Re-read if the intent is unclear.
-2. **Understand the underlying concern.** A nitpick on naming may be a deeper concern about the abstraction; a "did you consider X?" is asking for evidence, not approval.
-3. **Decide the right action**: fix the code, push back with reasoning, mark wontfix with explanation, or escalate to the user. Never silent-resolve.
-4. **Implement the fix correctly** — same rigor as fresh work: tests, types, conventional commit, no half-measures. Don't game the comment with a token edit.
-5. **Reply on the comment thread** explaining what you did and why, then mark it resolved. The reply is the audit trail; "fixed" alone is not enough.
-6. **Re-run the local pipeline** before pushing the fix — review fixes break things as often as fresh code.
-7. **If the reviewer is wrong**, say so respectfully with evidence (link to docs / code / tests). Conviction over agreeableness; the reviewer would rather be corrected than silently overruled.
-
-Never:
-
-- Resolve a comment without addressing its substance.
-- Push a "fix" that only touches the comment's quoted line while ignoring its actual point.
-- Batch-resolve comments at the end as a clean-up gesture.
-- Merge a PR with any unresolved comment, even one you believe is invalid — write the rebuttal first.
-
-If you cannot resolve a comment yourself (architectural disagreement, scope question, missing context), STOP and ask the user. Better to pause than to merge over the disagreement.
-
 ## Security & Privacy
 
 Input: validate client + server, allowlists, sanitize. XSS: escape, CSP, DOMPurify.
@@ -357,28 +258,17 @@ malicious MCP servers can inject via tool *descriptions* alone). Rules:
   privilege tools (read-mail ≠ send-mail), draft-not-send as a *security* boundary, secrets
   physically unreachable from where generated code runs.
 
-## Repository Setup
-
-| Setting | Value | Why |
-|---|---|---|
-| Squash merge | DISABLED | Loses history; parallel agents overwrite each other's work |
-| Rebase merge | DISABLED | Rewrites history, breaks parallel branch refs |
-| Merge commit | ENABLED (only) | Preserves full history, safe for parallel agents |
-| Branch protection | Require PR + CI pass | No direct push to `main` |
-
-Apply to a repo: `gh api repos/OWNER/REPO -X PATCH -f allow_squash_merge=false -f allow_rebase_merge=false -f allow_merge_commit=true`
-
-## Recommended Git Hooks
-
-Install per-repo when relevant:
-
-| Hook | Blocks |
-|---|---|
-| `pre-commit` MainGuard | commits on `main` in main checkout |
-| `pre-commit` FileSizeGuard | commits with files > 300 lines (.rs/.ts/.js/.sh) |
-| `pre-commit` SecretScan | commits containing API keys, tokens, passwords |
-| `commit-msg` CommitLint | non-conventional commit messages |
-
 ## Writing
 
 Tables > prose. Commands > descriptions. No preambles. Comments: WHY only, < 5%. Commits: conventional. PRs: Summary + Test plan.
+
+## Execution reference (skill, not canon)
+
+Code style per language · test & mock boundaries · API conventions · the local CI sequence before
+push · merge discipline · how to resolve review comments · repo settings & git hooks — all of it
+lives in the **`engineering-reference` skill**, loaded on demand.
+
+It was always-loaded until 2026-07-14 and paid tokens on every turn of every session, while none of
+it changes what you **decide** — it tells you **how** to do a thing you already chose to do. That is
+the canon's own test for what belongs in a skill.
+

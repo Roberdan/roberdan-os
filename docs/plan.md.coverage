@@ -1,0 +1,19 @@
+# Decisions on docs/plan.md clauses (kb cover). A clause with no card AND no line here fails.
+# Written, not remembered: this file is committed, the board is not.
+Human#1  not_normative  # a human gate — a standing rule, not a deliverable
+Human#2  not_normative  # a human gate — a standing rule, not a deliverable
+Human#3  not_normative  # a human gate — a standing rule, not a deliverable
+Human#4  not_normative  # a human gate — a standing rule, not a deliverable
+Human#5  not_normative  # a human gate — a standing rule, not a deliverable
+Human#6  not_normative  # a human gate — a standing rule, not a deliverable
+Human#7  not_normative  # a human gate — a standing rule, not a deliverable
+Human#8  not_normative  # a human gate — a standing rule, not a deliverable
+End-to-end#1  not_normative  # a verification checklist step, not a work item
+End-to-end#2  not_normative  # a verification checklist step, not a work item
+End-to-end#3  not_normative  # a verification checklist step, not a work item
+End-to-end#4  not_normative  # a verification checklist step, not a work item
+End-to-end#5  not_normative  # a verification checklist step, not a work item
+End-to-end#6  not_normative  # a verification checklist step, not a work item
+End-to-end#7  not_normative  # a verification checklist step, not a work item
+End-to-end#8  not_normative  # a verification checklist step, not a work item
+End-to-end#9  not_normative  # a verification checklist step, not a work item
