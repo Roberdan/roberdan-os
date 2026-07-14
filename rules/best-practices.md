@@ -15,6 +15,40 @@ observed the evidence for THAT claim, end-to-end, yourself.** This is the top ru
 confident-but-wrong "all good" is the single most damaging thing an agent can do — it makes the
 whole system untrustworthy. It outranks speed, tidiness, and looking competent.
 
+### The gate you wrote is a promise, not a proof — and you don't get to pick which ones get checked
+
+The three failure modes below all shipped a false "done" **while every claim made was individually
+true**. Honesty is not enough; these are structural.
+
+1. **Check EVERY gate the plan declares, not the ones you remember.** If the plan lists gates
+   G1…G11, "done" requires **all eleven measured**, each one printed. A gate you defined and then
+   forgot is still a gate: silence on it is a false done, not an omission. *(Real failure,
+   2026-07-14: a plan declared "all views on the design system"; six phases shipped, all "green",
+   and that one gate was never measured. It was at 72/98, with 54 raw colours still in the app.
+   The user found it by asking.)*
+
+2. **The one who declares done must NOT be the one who chooses what gets verified.** If you write
+   the plan, then brief the verifier on which gates to check, you will hand them the gates you
+   already passed. `@thor` must **read the plan itself** and verify every gate it declares — never
+   only the list the orchestrator pasted into the prompt. A verifier fed its own checklist by the
+   party under audit is theatre.
+
+3. **A gate that can be satisfied without doing the work is worse than no gate.** Before trusting a
+   counter, ask: *what would make this number look good while the work is undone?* Count what the
+   user would see, not what is convenient to grep. *(Same failure: the gate counted "files that
+   mention the design system", so a file with one token and thirty raw colours counted as done, and
+   26 views that colour nothing at all were counted as debt. The metric was wrong in both
+   directions.)*
+
+4. **A green suite proves you didn't break what the tests already watched — nothing more.**
+   Before claiming an invariant is protected, **put the bug back and watch the test go red**. An
+   invariant asserted in a comment but not enforced by code — or "covered" by a test that never
+   exercises it — is *worse* than an absent one: it manufactures unearned confidence. *(Real
+   failure, same campaign: the most important fix of the whole effort — a clock that froze while
+   the phone slept, making a monitor claim "updated a moment ago" over a child unwatched for six
+   hours — was pinned by NOTHING. The done-gate reintroduced the bug and all 620 tests stayed
+   green. The test's own comment claimed it would catch exactly that.)*
+
 - **A claim needs evidence for the claim itself, not for a neighbour.** "Released" ⇒ the CI run
   on the release commit is confirmed green (not "I pushed"). "Tests pass" ⇒ you ran them and read
   the output (not "they should"). "It works" ⇒ you drove the real path and saw it. "Done" ⇒ every
@@ -237,6 +271,21 @@ If any step fails, fix and re-run ALL checks. Do NOT push with known failures.
 + branch + PR. Never run two agents/sessions committing to the same working checkout.** This is a
 hard rule, born from a real scar (2026-07-07: two sessions on the same checkout re-edited each
 other's files — duplicate frontmatter keys, interleaved commits, a near-collision on the release).
+
+- **`git add -A` is a loaded gun whenever anything else can write to the checkout. Stage by
+  explicit path.** A blanket `git add` does not stage *your* work — it stages *whatever is in the
+  tree right now*, including another process's in-flight edits. **A `docs(...)` commit must never
+  contain source.** *(Real scar, 2026-07-14, and the worst of the campaign: `@thor` was running a
+  mutation test — deliberately reintroducing a clock bug to prove the test caught it — in the same
+  checkout where the orchestrator ran `git add -A && git commit` to update a plan. The mutation was
+  swept into a commit titled `docs(p3): ...` and **pushed to `Development`**. A clinical-safety
+  regression shipped inside a documentation commit, and every gate stayed green because no test
+  covered that line. Thor spotted it and restored it. Two rules, both cheap: **stage docs by path**,
+  and **mutation testing only ever in a throwaway worktree**.)*
+- **Before removing a worktree, prove the agent is dead — `0 modified files` is not proof.** An
+  agent between edits looks identical to a corpse. *(Same session: a live F4 agent was declared dead
+  and had its worktree pulled from under it; it recreated it, and in doing so reset a second agent's
+  worktree, destroying that one's work. The orchestrator caused both.)*
 
 - **One worktree per stream:** `git worktree add ../<repo>-<feature> -b <type>/<feature>` off the
   base branch. Each worktree has its own index and HEAD, so parallel writers can't fight

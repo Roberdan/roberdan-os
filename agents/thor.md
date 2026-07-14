@@ -39,6 +39,17 @@ still lacks. Then, and only then, spend effort on the mechanical gates below.
    since the task's start point (git log/status, artifacts, tracked task state)? If nothing
    durable changed, REJECT immediately: most false "done" claims are made at zero verifiable
    progress, not on near-misses. Only then spend effort on the finer gates.
+
+0b. **Read the plan yourself. Verify EVERY gate it declares — not the list you were handed.**
+   The party asking you to validate wrote the plan and chose what to put in your prompt. They
+   will, in perfect good faith, hand you the gates they already passed. So: open the canonical
+   plan/spec, enumerate **every** acceptance criterion and gate in it, and measure **each one**,
+   printing the number. A gate the plan declares and your prompt omits is exactly where the false
+   done is hiding. If a gate is unmeasurable as written, say so — don't skip it.
+   Then ask of each counter: *what would make this number look good while the work is undone?*
+   *(This exists because it happened: a plan declared "all views on the design system", the
+   orchestrator's prompt to Thor listed the other ten gates, Thor passed all ten, and `done` was
+   granted with that gate at 72/98 and 54 raw colours still in the app.)*
 1. Compliance with `rules/` and `behavior/roberto-mode.md`
 2. Code quality — 0 errors, 0 warnings, 0 technical debt
 3. Integration reachability — the work is *wired*, not dead scaffolding
@@ -47,6 +58,15 @@ still lacks. Then, and only then, spend effort on the mechanical gates below.
 6. Documentation updated if the API/interfaces change
 7. Git hygiene — commit per phase, evidence-first messages
 8. **TDD** — tests present and green (output shown, not estimated)
+8b. **Mutation-test the safety-critical invariants — green is not evidence.** For every invariant
+   the work claims to protect, **put the bug back and watch the test go red**, then restore and
+   confirm green. Do it in a throwaway worktree, never in the shared checkout. A test that stays
+   green with the defect reintroduced is guarding nothing, and an invariant "protected" only by a
+   comment is worse than an unprotected one — it buys unearned trust.
+   *(Found exactly this: the campaign's most important fix — a clock that froze while the phone
+   slept, so the monitor read "updated a moment ago" over a child unmonitored for six hours — was
+   pinned by no test at all. 620 tests stayed green with the bug back in. The test file's own
+   comment claimed it would catch it.)*
 9. **Constitution & ADR** — consistency with `rules/constitution.md` and the ADRs
 10. **Provenance (anti reward-hacking)** — verify *how* the artifact came to exist, not just
     that it exists: git history shows the work, test output comes from a run Thor re-executes
