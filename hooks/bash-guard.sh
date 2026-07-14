@@ -24,4 +24,20 @@ if printf '%s' "$norm" | grep -qE 'git[[:space:]]+(reset[[:space:]]+--hard|clean
   ask "git reset --hard / clean -f destroys uncommitted changes. Explicit confirmation required before proceeding."
 fi
 
+# 4) A `docs(...)` commit must never carry source. `git add -A` does not stage YOUR work —
+#    it stages whatever is in the tree, including another process's in-flight edits.
+#    Real scar (2026-07-14): @thor was mutation-testing (deliberately reintroducing a clock bug
+#    to prove the test caught it) in the same checkout where the orchestrator ran
+#    `git add -A && git commit -m "docs(...)"`. The mutation was swept in and PUSHED: a
+#    clinical-safety regression shipped inside a documentation commit, every gate green.
+#    Staging docs by explicit path costs nothing and makes that impossible.
+#    Match on the COMMAND ONLY: strip quoted strings first, so a commit message that *mentions*
+#    `git add -A` (e.g. this very rule's changelog) is not itself blocked. That false positive is
+#    not hypothetical — it fired on the commit introducing this guard.
+cmd_nostr="$(printf '%s' "$cmd" | sed "s/'[^']*'//g; s/\"[^\"]*\"//g")"
+if printf '%s' "$cmd_nostr" | grep -qE 'git[[:space:]]+add[[:space:]]+(-A|--all|\.)([[:space:]]|$)' \
+   && printf '%s' "$cmd" | grep -qiE '\-m[[:space:]]*["'"'"']?(docs|chore\(docs)'; then
+  deny "A docs commit must not be staged with 'git add -A': a blanket add stages whatever is in the tree right now — including another agent's in-flight edits (e.g. a mutation test). Stage by explicit path: git add path/to/doc.md"
+fi
+
 exit 0
