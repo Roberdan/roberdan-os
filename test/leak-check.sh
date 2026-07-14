@@ -54,12 +54,35 @@ if [[ -f "$DENYLIST" ]]; then
   hits=0
   while IFS= read -r pat; do
     [[ -z "$pat" ]] && continue
+
+    # A PLAIN-WORD pattern is anchored to word boundaries; a pattern that already carries regex
+    # metacharacters is an INTENTIONAL regex and is used verbatim.
+    #
+    # Why: patterns were matched raw, so a private term matched as a SUBSTRING of unrelated public
+    # text. Real case (2026-07-14): the SEC's official ticker->CIK map — 10,408 public companies —
+    # could not be committed, because a private term appears inside the legal name of a real,
+    # publicly listed issuer. The alert was true about the bytes and false about the meaning.
+    #
+    # This makes the check MORE PRECISE, never more permissive: an actual confidential term still
+    # matches wherever it appears as a word. It stops matching inside longer words, which is not a
+    # leak and never was. A check that cries wolf is one you learn to bypass — and a bypassed
+    # privacy gate is worse than a strict one.
+    match="$pat"
+    if [[ ! "$pat" =~ [\\^$.|?*+()\[\]{}] ]]; then
+      match="\\b${pat}\\b"
+    fi
+
     for f in "${targets[@]}"; do
       full="$f"; [[ -f "$ROOT/$f" ]] && full="$ROOT/$f"
       [[ -f "$full" ]] || continue
-      if grep -niE "$pat" "$full" 2>/dev/null | grep -qv '^[0-9]*:.*denylist'; then
-        echo "LEAK: pattern /$pat/ found in $f" >&2
-        grep -niE "$pat" "$full" 2>/dev/null | head -3 | sed 's/^/   /' >&2
+      # BINARY files are skipped. A denylist term is a term in TEXT; a byte sequence that happens to
+      # spell it inside a PNG's deflate stream is not a disclosure — nobody can read it. Screenshots
+      # tripped this on every regeneration, and the only ways out were bypassing the hook or
+      # re-compressing the image until the collision vanished. Both are worse than the check.
+      if grep -qI . "$full" 2>/dev/null; then :; else continue; fi
+      if grep -niE "$match" "$full" 2>/dev/null | grep -qv '^[0-9]*:.*denylist'; then
+        echo "LEAK: pattern /$match/ found in $f" >&2
+        grep -niE "$match" "$full" 2>/dev/null | head -3 | sed 's/^/   /' >&2
         hits=$((hits + 1))
       fi
     done
