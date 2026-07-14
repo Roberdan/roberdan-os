@@ -888,6 +888,101 @@ _repo_view() {
   fi
 }
 
+# --- kb cover — the plan→card gate (rules/best-practices.md § Carded End-to-End) -------------
+# Every gate in this system operates DOWNSTREAM of the card: kb, @thor, the merge-gate and CI all
+# verify a card. A requirement that never BECOMES a card is invisible to all four simultaneously.
+# The plan→card translation is the only link in the chain with no gate — and it is exactly where
+# requirements die (trading-os, 2026-07-13: the signed plan mandated "SEC EDGAR/RSS, company IR and
+# GDELT"; the one card that could have delivered it said "at least one mandatory free live source",
+# closed honestly green, and the news evaporated. An audit then found 77 of 149 normative clauses
+# never reached the product).
+#
+# The canon named this command before it existed — a rule against unwired requirements that itself
+# cited an unwired command. This is that command.
+#
+# It walks FROM THE PLAN, never from the board: a board can only show you the cards that exist, and
+# cannot show you the ABSENCE of one, which is the entire failure mode.
+_cover() {
+  local plan="${1:-}"
+  [ -n "$plan" ] || { echo "usage: kb cover <plan.md>   (try: kb plans)" >&2; return 2; }
+  [ -f "$plan" ] || plan="$ROOT/$plan"
+  [ -f "$plan" ] || { echo "no such plan: ${1}" >&2; return 2; }
+
+  # Normative clauses: numbered list items, continued on indented lines. Same extractor shape as
+  # trading-os's plan_coverage gate, which was validated against a 2946-line signed plan.
+  # The committed decision sidecar: `<plan>.coverage`, one line per clause:
+  #   2#28  not_normative   # why: a human gate, not a deliverable
+  # It is COMMITTED (unlike the board, which is local-only), so the decision survives the session
+  # and is reviewable. A clause with no card AND no written exemption fails the gate.
+  local sidecar="${plan}.coverage"
+  local clauses total=0 uncovered=0 weakened=0 exempt=0
+  # The clause's section is captured WHEN THE CLAUSE STARTS (csect), not when it is flushed. Using
+  # the live heading at flush time meant a clause buffered at EOF took the name of whatever section
+  # was appended next — so every exemption key would silently rebind on the next edit of the plan.
+  # A fragile key is worse than no key: it rots quietly, which is the exact failure this gate exists
+  # to catch. (Found by running it, not by reading it.)
+  clauses="$(awk '
+    /^#/                 { sect = $0; sub(/^#+[ ]*/, "", sect) }
+    /^[0-9]+\.[ ]+/      { if (buf != "") print id "\t" csect "\t" buf
+                           id = $1; sub(/\./, "", id); csect = sect
+                           buf = substr($0, index($0, " ") + 1); next }
+    /^[ ]{3,}[^ ]/       { if (buf != "") { sub(/^[ ]+/, "", $0); buf = buf " " $0 } ; next }
+    /^[ ]*$/             { next }
+                         { if (buf != "") { print id "\t" csect "\t" buf; buf = "" } }
+    END                  { if (buf != "") print id "\t" csect "\t" buf }
+  ' "$plan" | awk -F'\t' 'length($3) > 40')"
+
+  # Weakening quantifiers: a plan that says "X, Y AND Z are mandatory" and a card that says
+  # "at least one" is a DOWNGRADE that closes green while deleting Y and Z from the product.
+  local weaken_re='at least one|almeno una|almeno uno|any one of|one or more|not_applicable'
+  local mandatory_re='obbligator|mandator|required|deve|must'
+
+  echo "plan-coverage: $(basename "$plan")"
+  while IFS=$'\t' read -r num sect text; do
+    [ -n "$num" ] || continue
+    total=$((total + 1))
+    local key="${sect%% *}#${num}"
+    # An explicit, COMMITTED decision may exempt a clause. Every clause must be decided — a gate
+    # that fires on prose it was never meant to police is one you learn to ignore, and an ignored
+    # gate is the same as no gate. The sidecar forces the decision to be WRITTEN, not remembered.
+    if [ -f "$sidecar" ] && grep -qE "^${key}[[:space:]]+(not_normative|exempt)\b" "$sidecar" 2>/dev/null; then
+      exempt=$((exempt + 1))
+      continue
+    fi
+    # A card claims a clause with `satisfies: <key>[,<key>]` in its frontmatter.
+    local hits
+    hits="$(grep -ils "^satisfies:.*${key}" "$KB"/todo/*.md "$KB"/doing/*.md "$KB"/done/*.md 2>/dev/null || true)"
+    if [ -z "$hits" ]; then
+      uncovered=$((uncovered + 1))
+      printf '  UNCOVERED  %-14s %s\n' "$key" "$(echo "$text" | cut -c1-72)"
+      continue
+    fi
+    # Covered — but does the card WEAKEN what the clause demands?
+    if echo "$text" | grep -qiE "$mandatory_re"; then
+      local card
+      while IFS= read -r card; do
+        [ -n "$card" ] || continue
+        if grep -qiE "$weaken_re" "$card"; then
+          weakened=$((weakened + 1))
+          printf '  WEAKENED   %-14s card %s reads as a weakening escape\n' \
+            "$key" "$(basename "$card" .md)"
+        fi
+      done <<< "$hits"
+    fi
+  done <<< "$clauses"
+
+  echo "  --"
+  echo "  $total clause(s) · $((total - uncovered - exempt)) carded · $uncovered uncovered · $weakened weakened · $exempt exempt"
+  if [ "$uncovered" -gt 0 ] || [ "$weakened" -gt 0 ]; then
+    echo "  A requirement that never becomes a card is not planned — it is a wish that looks planned." >&2
+    echo "  Card it:   kb add \"<title>\" --repo <r> --satisfies \"<clause-id>\" \"<dod>\" \"<acc>\"" >&2
+    echo "  Or decide: echo '<clause-id>  not_normative  # why' >> ${sidecar}" >&2
+    return 1
+  fi
+  echo "  every normative clause maps to a card"
+  return 0
+}
+
 case "$cmd" in
   view|board|"")                   # visual kanban (default); aggregate if cwd
     if [ "$KB_MATCHED" -eq 0 ]; then _board --all; else _board; fi
@@ -917,10 +1012,13 @@ case "$cmd" in
   add)
     # --repo can appear anywhere among the args; everything else stays positional
     # (title, then optional dod, then optional acceptance), same as before.
-    repo=""; args=()
+    repo=""; satisfies=""; args=()
     while [ $# -gt 0 ]; do
       case "$1" in
         --repo) repo="${2:-}"; shift 2 ;;
+        # The plan clause(s) this card delivers (e.g. --satisfies "2#28"). This is the link `kb
+        # cover` walks: without it a plan requirement has no card, and no gate can see the absence.
+        --satisfies) satisfies="${2:-}"; shift 2 ;;
         *) args+=("$1"); shift ;;
       esac
     done
@@ -932,7 +1030,9 @@ case "$cmd" in
       exit 1
     fi
     id="$(date +%y%m%d-%H%M%S)"
-    { echo '---'; echo "title: $title"; echo "repo: $repo"; echo "dod: \"$dod\""; echo "acceptance: \"$acc\""; echo 'status: todo'; echo "created: $(date +%Y-%m-%d)"; echo '---'; } > "$KB/todo/$id.md"
+    { echo '---'; echo "title: $title"; echo "repo: $repo"; echo "dod: \"$dod\""; echo "acceptance: \"$acc\"";
+      [ -n "$satisfies" ] && echo "satisfies: $satisfies"
+      echo 'status: todo'; echo "created: $(date +%Y-%m-%d)"; echo '---'; } > "$KB/todo/$id.md"
     echo "added todo/$id (repo: $repo)"
     ;;
 
@@ -1001,6 +1101,7 @@ case "$cmd" in
   archive) _archive_cmd "${1:-}" ;;
   plans)   _plans_list ;;
   plan)    _plan_show "${1:-}" ;;
+  cover)   _cover "${1:-}" ;;
   sched)   _sched ;;
 
   *) usage ;;
