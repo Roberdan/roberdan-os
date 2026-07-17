@@ -452,10 +452,22 @@ if [ "$MODE" = "install" ]; then
   CL="$HOME/.claude"
   if [ -f "$CL/CLAUDE.md" ]; then
     echo "REFUSE: $CL/CLAUDE.md already exists (curated config). NOT overwriting it."
-    echo "Add this pointer block by hand at the top of your CLAUDE.md:"
+    echo "Add this thin pointer block by hand at the top of your CLAUDE.md"
+    echo "(keep the markers — this is the canonical slim block; do NOT paste a full copy of AGENTS.md):"
     echo "---8<---"
-    echo "## roberdan-os (canon)"
-    echo "Canonical behavior in ~/GitHub/roberdan-os/AGENTS.md — read that."
+    cat <<'EOF'
+<!-- roberdan-os:begin -->
+## roberdan-os — canonical behavior (default, every session)
+
+Thin pointer. Full canon: `~/GitHub/roberdan-os/AGENTS.md` — read it for any non-trivial
+work (under `~/GitHub` the parent `~/GitHub/AGENTS.md` pointer carries it too).
+
+- Default = **loop + roberto-mode**: autonomy, evidence-first, commit per phase, verified done — code *and* business.
+- **twin** auto-activates when the output is communication or a decision "as Roberto" (draft-not-send for anything external).
+- `@board` on high-stakes/irreversible decisions · `@thor` = sole done-gate · `@rex`/`@luca`/`@baccio`/`@socrates`/`@coach`/`@wanda` at the right moment.
+- Human gates (`AGENTS.md` § Human gates) are never automated.
+<!-- roberdan-os:end -->
+EOF
     echo "--->8---"
   fi
 

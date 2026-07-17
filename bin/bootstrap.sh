@@ -63,9 +63,11 @@ cat <<EOF
    (dry-run without --apply; regenerate the snippet with bash bin/sync.sh --emit-only)
 2) Skills: bash bin/sync.sh --install  (symlinks the skill wrappers; validate's
    tool-coverage gate expects them once ~/.claude exists)
-3) Add the pointer block to ~/.claude/CLAUDE.md (curated personal config — by hand):
-   ## roberdan-os — default = loop+roberto-mode; twin auto on communication/decisions;
-   @board for high-stakes decisions; @thor done-gate. Canon: $ROOT/AGENTS.md
+3) Add the thin pointer block to ~/.claude/CLAUDE.md (curated personal config — by hand).
+   Get the canonical slim block (with markers) from: bash bin/sync.sh --install
+   — it prints the exact block to paste. Keep it THIN: never paste a full copy of
+   AGENTS.md there (that duplicate costs ~1k tokens every session; the parent
+   ~/GitHub/AGENTS.md pointer already carries the canon under ~/GitHub).
 4) Copilot per-repo: copy the block from $ROOT/platforms/copilot/copilot-instructions.md
    into the .github/copilot-instructions.md of whichever repos you want.
 5) Copilot native adapter (agents + extension + skills): bash bin/sync.sh --install
