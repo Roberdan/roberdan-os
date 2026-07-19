@@ -85,6 +85,9 @@ _board_roots() {
 }
 
 _field() { grep -m1 "^$2:" "$1" 2>/dev/null | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"\$//"; }
+# Shared regex for "bot authors" in PR views. Both kb.sh and tests consume this exact value.
+_PR_BOT_FILTER_RE='dependabot|renovate|github-actions|\[bot\]|-bot$'
+_pr_bot_filter_regex() { printf '%s\n' "$_PR_BOT_FILTER_RE"; }
 
 # --- The done-gate's mechanical half (2026-07-13) --------------------------------
 # Until now `kb finish --thor "<ev>"` accepted ANY non-empty string: `--thor ok`
@@ -178,6 +181,15 @@ _set_status() {
   local f="$1" v="$2" tmp
   tmp="$(mktemp "${TMPDIR:-/tmp}/rda-kb.XXXXXX")"
   sed "s/^status:.*/status: $v/" "$f" > "$tmp" && mv "$tmp" "$f"
+}
+_new_card_id() {
+  local base="${1:?base id required}" id n=1
+  id="$base"
+  while [ -e "$KB/todo/$id.md" ] || [ -e "$KB/doing/$id.md" ] || [ -e "$KB/done/$id.md" ]; do
+    id="${base}-${n}"
+    n=$((n+1))
+  done
+  printf '%s' "$id"
 }
 _repo_tag() {
   # ASCII "-" (not an em-dash) for a missing repo: box cells are padded with printf %-*s,
@@ -731,13 +743,21 @@ HOOK
 # same aggregation the proactive digest (bin/pending-digest.sh) and the SessionStart count use.
 # Prints a trailing "PENDING: N" line as the machine-readable total (grepped by the hook/digest).
 _pending() {
-  local total=0 n f cls body bd quar
-  local -a boards=()
-  while IFS= read -r bd; do [ -n "$bd" ] && [ -d "$bd/kanban" ] && boards+=("$bd/kanban"); done < <(_board_roots)
+  local total=0 n f cls body bd quar repo_root
+  local -a boards=() repo_roots=()
+  while IFS= read -r bd; do
+    [ -n "$bd" ] || continue
+    repo_roots+=("$bd")
+    [ -d "$bd/kanban" ] && boards+=("$bd/kanban")
+  done < <(_board_roots)
   # Include the resolved board ($KB, which respects RDA_KANBAN) if _board_roots didn't already —
   # matters for a non-registered cwd and for isolated tests that point RDA_KANBAN at a temp board.
-  local _in=0 _b; for _b in "${boards[@]}"; do [ "$_b" = "$KB" ] && _in=1; done
+  local _in=0 _b kb_repo_root
+  for _b in "${boards[@]}"; do [ "$_b" = "$KB" ] && _in=1; done
   [ "$_in" -eq 0 ] && boards+=("$KB")
+  kb_repo_root="$(dirname "$KB")"
+  _in=0; for _b in "${repo_roots[@]}"; do [ "$_b" = "$kb_repo_root" ] && _in=1; done
+  [ "$_in" -eq 0 ] && repo_roots+=("$kb_repo_root")
   quar="${RDA_QUARANTINE:-$RDA_HOME/learnings/quarantine}"
 
   # --count: fast LOCAL total (todo + unapproved learning, no gh) — for the SessionStart hook,
@@ -793,15 +813,13 @@ _pending() {
   echo "### PR aperte (review/merge — bot esclusi, tutti i repo)"
   n=0
   if command -v gh >/dev/null 2>&1; then
-    local repo_root
-    for bd in "${boards[@]}"; do
-      repo_root="$(dirname "$bd")"                     # bd is <root>/kanban
+    for repo_root in "${repo_roots[@]}"; do
       [ -d "$repo_root/.git" ] || continue
       while IFS=$'\t' read -r num title; do
         [ -n "$num" ] || continue
         printf '  • %s#%s — %s\n' "$(basename "$repo_root")" "$num" "$title"; n=$((n+1))
       done < <(cd "$repo_root" 2>/dev/null && gh pr list --state open --json number,title,author \
-        --jq '.[]|select((.author.login // "")|test("dependabot|renovate|github-actions|\\[bot\\]|-bot$")|not)|"\(.number)\t\(.title)"' 2>/dev/null)
+        --jq ".[]|select((.author.login // \"\")|test(\"$_PR_BOT_FILTER_RE\")|not)|\"\\(.number)\\t\\(.title)\"" 2>/dev/null)
     done
   fi
   [ "$n" -eq 0 ] && echo "  (nessuna non-bot / gh non disponibile)"
@@ -855,7 +873,7 @@ _repo_view() {
   if command -v gh >/dev/null 2>&1 && git -C "$p" rev-parse --git-dir >/dev/null 2>&1; then
     while IFS=$'\t' read -r pn pt; do [ -n "$pn" ] && { printf '  #%s — %s\n' "$pn" "$pt"; n=$((n+1)); }; done \
       < <(cd "$p" 2>/dev/null && gh pr list --state open --json number,title,author \
-          --jq '.[]|select((.author.login // "")|test("dependabot|renovate|github-actions|\\[bot\\]|-bot$")|not)|"\(.number)\t\(.title)"' 2>/dev/null)
+          --jq ".[]|select((.author.login // \"\")|test(\"$_PR_BOT_FILTER_RE\")|not)|\"\\(.number)\\t\\(.title)\"" 2>/dev/null)
   fi
   [ "$n" -eq 0 ] && echo "  (none / gh unavailable)"
 
@@ -989,6 +1007,7 @@ case "$cmd" in
     ;;
   repo|status) _repo_view "${1:?repo name required (kb repo <name>)}" ;;  # per-repo dashboard: git + PRs + cards
   pending|inbox) _pending "$@" ;;  # the approval inbox: everything waiting on Roberto (--count = fast total)
+  bot-filter-regex) _pr_bot_filter_regex ;;
   init) _kb_init "${1:-$ROOT}" ;;  # scaffold + privatize a repo's board (idempotent)
   lint) RDA_KANBAN="$KB" bash "$ROOT/kanban/lint-cards.sh" ;;  # runner/human_gates schema lint
   dispatch) bash "$ROOT/factory/dispatch-runner.sh" "$@" ;;   # restricted external-CLI dispatcher (DORMANT — always refuses)
@@ -1029,11 +1048,16 @@ case "$cmd" in
       echo "  (use the ~/GitHub dir-name for a code repo, or 'personal' for non-repo work)" >&2
       exit 1
     fi
-    id="$(date +%y%m%d-%H%M%S)"
+    base_id="${RDA_KB_ID_BASE:-$(date +%y%m%d-%H%M%S)}"
+    id="$(_new_card_id "$base_id")"
     { echo '---'; echo "title: $title"; echo "repo: $repo"; echo "dod: \"$dod\""; echo "acceptance: \"$acc\"";
       [ -n "$satisfies" ] && echo "satisfies: $satisfies"
       echo 'status: todo'; echo "created: $(date +%Y-%m-%d)"; echo '---'; } > "$KB/todo/$id.md"
-    echo "added todo/$id (repo: $repo)"
+    if [ "$id" = "$base_id" ]; then
+      echo "added todo/$id (repo: $repo)"
+    else
+      echo "added todo/$id (repo: $repo, collision on $base_id resolved with suffix)"
+    fi
     ;;
 
   start)
