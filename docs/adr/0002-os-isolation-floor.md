@@ -1,6 +1,6 @@
 # ADR-0002 — the OS-isolation floor for the external-CLI runner dispatcher
 
-**Status:** Proposed (2026-07-08) · advisory · **Decide:** Roberto (human gate **#5** strategic + **#7** architecture/security)
+**Status:** Deferred (2026-07-19) · advisory decision recorded · **Decide:** Roberto (human gate **#5** strategic + **#7** architecture/security)
 **Security lens:** luca-mode (zero-trust, OWASP-style) applied to an autonomous external-CLI runner
 **Relates to:** [`../plan-2026-07-05-federated-kanban-multi-cli.md`](../plan-2026-07-05-federated-kanban-multi-cli.md) (§Node 3, phase 7) · [`../../factory/dispatch-runner.sh`](../../factory/dispatch-runner.sh) (preflight #5) · [`../../factory/runner-sandbox.sh`](../../factory/runner-sandbox.sh) · [`../../factory/factory-protocol.md`](../../factory/factory-protocol.md) · [`./adr-always-on-security.md`](./adr-always-on-security.md) · [`./0001-self-improving.md`](./0001-self-improving.md)
 
@@ -409,6 +409,20 @@ compromised broker, or against a future unreviewed code change — and it carrie
 - **Reject** — decide external runners are not worth the standing security surface for this personal
   setup; remove the dormant dispatcher path entirely (a simplification, not a loss of any live
   capability).
+
+### Decision record (2026-07-19)
+
+**Decision:** **Defer**.
+
+**Why now:** there is no concrete external-runner use-case that Claude-native cannot already cover, so
+building the OS floor now would open a standing maintenance surface (broker/proxy/probes/account) with
+no immediate operational payoff.
+
+**What this means operationally:**
+
+1. `dispatch-runner.sh` stays dormant (`OS_FLOOR_PRESENT=0`, preflight #5 keeps refusing).
+2. No phase-7 implementation branch is opened now.
+3. Re-open this ADR only when a concrete, recurring use-case requires external runners.
 
 > **Recommendation (advisory):** **Defer** until a concrete external-runner use-case exists. The
 > design is sound and worth *having on the shelf* (this ADR), but building the floor before a use-case
