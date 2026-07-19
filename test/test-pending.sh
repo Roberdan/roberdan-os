@@ -59,11 +59,31 @@ bash "$DIGEST" --always >/dev/null 2>&1 || fail "digest must exit 0"
 [ -s "$RDA_HOME/pending-digest.txt" ] || fail "digest did not write its file"
 grep -qE '^PENDING: [0-9]+$' "$RDA_HOME/pending-digest.txt" || fail "digest file missing PENDING total"
 
-# 5) PR bot-filter: the exact jq expression _pending uses must drop bot authors, keep humans.
+# 5) PR bot-filter: the exact regex _pending uses must drop bot authors, keep humans.
 #    (Full gh integration is best-effort/network — this locks the filter logic that decides
 #     "which PRs need Roberto", the part thor flagged as the judgment call.)
 pr_json='[{"number":99,"title":"human PR","author":{"login":"Roberdan"}},{"number":100,"title":"bump","author":{"login":"dependabot[bot]"}},{"number":101,"title":"bump2","author":{"login":"renovate[bot]"}},{"number":102,"title":"ci","author":{"login":"github-actions[bot]"}}]'
-kept="$(printf '%s' "$pr_json" | jq -r '.[]|select((.author.login // "")|test("dependabot|renovate|github-actions|\\[bot\\]|-bot$")|not)|.number' | tr '\n' ' ' | sed 's/ $//')"
+bot_re="$(bash "$KB" bot-filter-regex)"
+kept="$(printf '%s' "$pr_json" | jq -r --arg re "$bot_re" '.[]|select((.author.login // "")|test($re)|not)|.number' | tr '\n' ' ' | sed 's/ $//')"
 [ "$kept" = "99" ] || fail "PR bot-filter wrong: expected only human #99, got '$kept'"
 
-echo "PASS: approval inbox (kb pending, --count, approved-excluded, digest writes + exits 0, PR bot-filter)"
+# 6) Pending PR scan must include registry repos even when they have no kanban/ directory.
+ext_repo="$TMP/external-no-board"
+mkdir -p "$ext_repo"
+git -C "$ext_repo" init -q
+printf '%s\n' "$ext_repo" >> "$RDA_KANBAN_REGISTRY"
+mkdir -p "$TMP/bin"
+cat > "$TMP/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "pr" ] && [ "${2:-}" = "list" ]; then
+  [ "$(basename "$PWD")" = "external-no-board" ] && printf '777\tregistry-only repo PR\n'
+  exit 0
+fi
+exit 1
+EOF
+chmod +x "$TMP/bin/gh"
+report_with_registry_pr="$(PATH="$TMP/bin:$PATH" bash "$KB" pending)"
+grep -q "external-no-board#777 — registry-only repo PR" <<<"$report_with_registry_pr" \
+  || fail "pending did not include PRs from registry repo without kanban/"
+
+echo "PASS: approval inbox (kb pending, --count, approved-excluded, digest writes + exits 0, PR bot-filter + registry-only PR scan)"

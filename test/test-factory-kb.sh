@@ -110,6 +110,31 @@ else
   err "kb add --repo did not persist the repo field as expected (out: $addout)"
 fi
 
+section "kb add: ID collision-safe (same-second ids never overwrite silently)"
+fixed_id="700101-010101"
+cat > "$KB/todo/$fixed_id.md" <<'EOF'
+---
+title: collision seed
+repo: roberdan-os
+dod: "seed dod"
+acceptance: "seed acceptance"
+status: todo
+created: 2070-01-01
+---
+seed body
+EOF
+out1="$(RDA_KANBAN="$KB" RDA_KB_ID_BASE="$fixed_id" bash kanban/kb.sh add "collision first" --repo roberdan-os 2>&1)"
+out2="$(RDA_KANBAN="$KB" RDA_KB_ID_BASE="$fixed_id" bash kanban/kb.sh add "collision second" --repo roberdan-os 2>&1)"
+id1="$(printf '%s' "$out1" | grep -oE 'todo/[^ ]+' | head -1 | cut -d/ -f2)"
+id2="$(printf '%s' "$out2" | grep -oE 'todo/[^ ]+' | head -1 | cut -d/ -f2)"
+if [ "$id1" = "${fixed_id}-1" ] && [ "$id2" = "${fixed_id}-2" ] \
+  && [ -e "$KB/todo/$fixed_id.md" ] && [ -e "$KB/todo/$id1.md" ] && [ -e "$KB/todo/$id2.md" ] \
+  && grep -q '^title: collision seed' "$KB/todo/$fixed_id.md"; then
+  ok "kb add resolves same-second collisions with suffixes (-1, -2), preserving all cards"
+else
+  err "kb add collision handling failed (id1=$id1 id2=$id2 out1=$out1 out2=$out2)"
+fi
+
 section "kb gate: doing->done needs @thor + evidence"
 RDA_KANBAN="$KB" bash kanban/kb.sh start probe --by roberto >/dev/null 2>&1
 [ -e "$KB/doing/probe.md" ] || err "setup: probe card did not reach doing/ via a valid start"
