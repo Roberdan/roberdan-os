@@ -39,14 +39,25 @@
 import { joinSession } from "@github/copilot-sdk/extension";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 
 // Repo root: a runtime RDA_OS env wins (portable across forks / relocations); otherwise the
 // path baked at emit time. Never throws if it's wrong — every hook degrades to a no-op.
 const RDA_OS = process.env.RDA_OS || "__RDA_OS_DEFAULT__";
 const HOOKS = join(RDA_OS, "hooks");
 const KB = join(RDA_OS, "kanban", "kb.sh");
-const HOME = process.env.HOME || process.env.USERPROFILE || "";
+const KB_CMD = process.env.RDA_KB_CMD || "kb";
+const HOME =
+    process.env.HOME ||
+    process.env.USERPROFILE ||
+    homedir() ||
+    // Last-resort fallback for odd extension launch envs without HOME/USERPROFILE.
+    // __RDA_OS_DEFAULT__ resolves to <home>/GitHub/roberdan-os in normal installs.
+    dirname(dirname(dirname(RDA_OS))) ||
+    "";
+const RDA_HOME = process.env.RDA_HOME || (HOME ? join(HOME, ".roberdan-os") : "");
+const RDA_KANBAN_REGISTRY = process.env.RDA_KANBAN_REGISTRY || (RDA_HOME ? join(RDA_HOME, "kanban-registry") : "");
 
 // Single diagnostic sink. stdout is reserved for JSON-RPC, so ALL diagnostics go to stderr.
 // This exists so no failure is ever swallowed silently: every catch below routes here with a
@@ -101,27 +112,51 @@ function runScript(scriptPath, stdinStr, cwd) {
     });
 }
 
-// Run kb.sh with a FIXED argv (never a raw shell string — not an arbitrary exec proxy).
+// Run kb with a FIXED argv (never a raw shell string — not an arbitrary exec proxy).
+// Prefer the installed `kb` command for parity with interactive CLI behavior; if unavailable,
+// fall back to the repo-local kb.sh shipped with roberdan-os.
 function runKb(argv, cwd) {
     return new Promise((resolve) => {
-        if (!existsSync(KB)) {
-            resolve({ code: 127, stdout: "", stderr: `kb.sh not found at ${KB}` });
-            return;
-        }
-        let child;
-        try {
-            child = spawn("bash", [KB, ...argv], { cwd: cwd || process.cwd(), env: process.env });
-        } catch (e) {
-            resolve({ code: 127, stdout: "", stderr: String(e && e.message ? e.message : e) });
-            return;
-        }
-        let stdout = "";
-        let stderr = "";
-        child.stdout.on("data", (b) => (stdout += b.toString()));
-        child.stderr.on("data", (b) => (stderr += b.toString()));
-        child.on("error", (e) => resolve({ code: 127, stdout, stderr: stderr + String(e.message) }));
-        child.on("close", (code) => resolve({ code: code == null ? 1 : code, stdout, stderr }));
-        child.stdin.end();
+        const launch = (cmd, args) => {
+            let child;
+            try {
+                child = spawn(cmd, args, {
+                    cwd: cwd || process.cwd(),
+                    env: {
+                        ...process.env,
+                        ...(HOME ? { HOME } : {}),
+                        ...(process.env.USERPROFILE ? {} : HOME ? { USERPROFILE: HOME } : {}),
+                        ...(process.env.RDA_HOME ? {} : RDA_HOME ? { RDA_HOME } : {}),
+                        ...(process.env.RDA_KANBAN_REGISTRY ? {} : RDA_KANBAN_REGISTRY ? { RDA_KANBAN_REGISTRY } : {}),
+                    },
+                });
+            } catch (e) {
+                resolve({ code: 127, stdout: "", stderr: String(e && e.message ? e.message : e) });
+                return;
+            }
+            let stdout = "";
+            let stderr = "";
+            let errored = false;
+            child.stdout.on("data", (b) => (stdout += b.toString()));
+            child.stderr.on("data", (b) => (stderr += b.toString()));
+            child.on("error", (e) => {
+                const msg = String(e && e.message ? e.message : e);
+                // If `kb` command is not present, fall back to the repo-local kb.sh.
+                if (!errored && cmd === KB_CMD && existsSync(KB)) {
+                    errored = true;
+                    launch("bash", [KB, ...argv]);
+                    return;
+                }
+                resolve({ code: 127, stdout, stderr: stderr + msg });
+            });
+            child.on("close", (code) => {
+                if (errored) return;
+                resolve({ code: code == null ? 1 : code, stdout, stderr });
+            });
+            child.stdin.end();
+        };
+
+        launch(KB_CMD, argv);
     });
 }
 
