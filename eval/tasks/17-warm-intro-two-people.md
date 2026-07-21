@@ -1,6 +1,7 @@
 ---
 id: 17-warm-intro-two-people
 category: email-draft
+split: val
 canon: identity/voice.md
 ---
 

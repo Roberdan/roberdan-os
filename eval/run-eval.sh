@@ -54,6 +54,41 @@ RESULTS="${RDA_EVAL_RESULTS:-$ROOT/eval/results}"
 TIMEOUT_S="${RDA_EVAL_TIMEOUT:-600}"
 mkdir -p "$RESULTS"
 
+# --- split preflight: the fixtures a rule was written from cannot be the ones that judge it ---
+# Every fixture declares `split: train|val`. `train` may be read while writing or revising canon;
+# `val` is held out — never opened during a canon edit, only used for the final measure. Without
+# this, re-measuring after a canon change on the same fixtures is overfitting dressed as evidence.
+# A missing/invalid split is a HARD refusal: an unlabelled fixture silently defaults to nothing,
+# and a gate that runs anyway is a gate that can be satisfied without doing the work.
+# RDA_EVAL_MIN_VAL mirrors SkillOpt's own D_sel<5 refusal (arXiv 2605.23904): a validation set
+# too small to separate signal from judge noise is worse than an honest "not measured".
+MIN_VAL="${RDA_EVAL_MIN_VAL:-5}"
+split_train=0; split_val=0; split_bad=0
+shopt -s nullglob
+for tf in "${RDA_EVAL_TASKS:-$ROOT/eval/tasks}"/*.md; do
+  sp="$(field "$tf" split)"
+  case "$sp" in
+    train) split_train=$((split_train+1)) ;;
+    val)   split_val=$((split_val+1)) ;;
+    *)     echo "[eval] FATAL: $tf declares split='${sp:-<missing>}' (expected train|val)" >&2
+           split_bad=$((split_bad+1)) ;;
+  esac
+done
+if [ "$split_bad" -gt 0 ]; then
+  echo "[eval] refusing to run: $split_bad fixture(s) without a valid split. See eval/README.md § Train/val split." >&2
+  exit 2
+fi
+if [ "$((split_train + split_val))" -eq 0 ]; then
+  echo "[eval] FATAL: no task fixtures found in ${RDA_EVAL_TASKS:-$ROOT/eval/tasks}" >&2
+  exit 2
+fi
+if [ "$split_val" -lt "$MIN_VAL" ]; then
+  echo "[eval] refusing to run: val split has $split_val fixture(s), minimum $MIN_VAL." >&2
+  echo "       A validation set this small cannot separate signal from judge noise." >&2
+  exit 2
+fi
+echo "[eval] split preflight: $split_train train / $split_val val (min val: $MIN_VAL)" >&2
+
 eval_unset_billing_env
 
 # CLAUDE stays unresolved when RDA_EVAL_AGENT_CMD overrides the agent — see eval_invoke_agent

@@ -95,6 +95,10 @@ rows = []           # per-task summary rows (core, i.e. non-skill-type canon)
 skill_rows = []      # per-task summary rows for skill-type canon tasks (qualitative only)
 canon_stats = {}     # canon file -> {"n":..,"gap_sum":..,"b_wins":..,"a_wins":..,"ties":..} (core only)
 holistic_counts = {"output_b": 0, "output_a": 0, "tie": 0, "unparsed": 0}  # core only
+# Split-aware counters. A canon that wins on `train` (the fixtures it was revised against) but
+# loses on `val` (never opened during a canon edit) is overfit, and an aggregate that mixes the
+# two hides exactly that. Reported separately so the gap is visible, never averaged away.
+split_counts = {s: {"output_b": 0, "output_a": 0, "tie": 0, "unparsed": 0} for s in ("train", "val", "?")}
 had_stub_marker = False
 
 task_files = sorted(glob.glob(os.path.join(tasks_dir, "*.md")))
@@ -102,6 +106,9 @@ for tf in task_files:
     fm = read_frontmatter(tf)
     tid = fm.get("id", os.path.splitext(os.path.basename(tf))[0])
     category = fm.get("category", "?")
+    split = fm.get("split", "?")
+    if split not in ("train", "val"):
+        split = "?"
     canon = fm.get("canon", "")
     canon_files = [c.strip() for c in canon.split(",") if c.strip()]
     skill_type = is_skill_canon(canon_files)
@@ -113,6 +120,7 @@ for tf in task_files:
 
     if not os.path.exists(verdict_path):
         target_rows.append({"id": tid, "category": category, "canon": canon,
+                            "split": split,
                             "score_a": "-", "score_b": "-", "winner": "no verdict"})
         continue
 
@@ -125,9 +133,11 @@ for tf in task_files:
     obj = extract_json_block(vtext)
     if not obj or not order1:
         target_rows.append({"id": tid, "category": category, "canon": canon,
+                            "split": split,
                             "score_a": "-", "score_b": "-", "winner": "unparseable"})
         if not skill_type:
             holistic_counts["unparsed"] += 1
+            split_counts[split]["unparsed"] += 1
         continue
 
     props = obj.get("properties", [])
@@ -147,20 +157,25 @@ for tf in task_files:
         winner = "B (with canon)"
         if not skill_type:
             holistic_counts["output_b"] += 1
+            split_counts[split]["output_b"] += 1
     elif winner_cond == "a":
         winner = "A (no canon)"
         if not skill_type:
             holistic_counts["output_a"] += 1
+            split_counts[split]["output_a"] += 1
     elif hv == "tie":
         winner = "tie"
         if not skill_type:
             holistic_counts["tie"] += 1
+            split_counts[split]["tie"] += 1
     else:
         winner = "unparsed"
         if not skill_type:
             holistic_counts["unparsed"] += 1
+            split_counts[split]["unparsed"] += 1
 
     target_rows.append({"id": tid, "category": category, "canon": canon,
+                        "split": split,
                         "score_a": f"{score_a}/{max_possible}", "score_b": f"{score_b}/{max_possible}",
                         "winner": winner})
 
@@ -188,10 +203,10 @@ if stub or had_stub_marker:
 lines.append("")
 lines.append("## Per-task results (core — behavior/rules canon, aggregated below)")
 lines.append("")
-lines.append("| Task | Category | Canon file(s) | Score A (no canon) | Score B (with canon) | Holistic winner |")
-lines.append("|---|---|---|---|---|---|")
+lines.append("| Task | Split | Category | Canon file(s) | Score A (no canon) | Score B (with canon) | Holistic winner |")
+lines.append("|---|---|---|---|---|---|---|")
 for r in rows:
-    lines.append(f"| {r['id']} | {r['category']} | {r['canon']} | {r['score_a']} | {r['score_b']} | {r['winner']} |")
+    lines.append(f"| {r['id']} | {r.get('split','?')} | {r['category']} | {r['canon']} | {r['score_a']} | {r['score_b']} | {r['winner']} |")
 
 judged = holistic_counts["output_a"] + holistic_counts["output_b"] + holistic_counts["tie"]
 core_n = len(rows)
@@ -207,6 +222,42 @@ if holistic_counts["unparsed"]:
 if skill_rows:
     lines.append(f"- Plus **{len(skill_rows)}** skill-type canon task(s), judged but excluded from this")
     lines.append("  summary and from the per-canon-file ranking below — see \"Skill-type canon tasks\" section.")
+lines.append("")
+lines.append("### Train vs val — the overfitting check")
+lines.append("")
+lines.append("`train` fixtures may be read while writing or revising canon; `val` fixtures are held")
+lines.append("out and only used for the final measure. **A canon that wins on train and loses on val")
+lines.append("is overfit to its own fixtures** — the single number above would hide that, so it is")
+lines.append("broken out here. Read the val row, not the aggregate, when deciding whether a canon")
+lines.append("change actually worked.")
+lines.append("")
+lines.append("| Split | Judged | B (with canon) | A (no canon) | Tie |")
+lines.append("|---|---|---|---|---|")
+for sname in ("train", "val", "?"):
+    sc = split_counts[sname]
+    sjudged = sc["output_a"] + sc["output_b"] + sc["tie"]
+    if sjudged == 0 and sc["unparsed"] == 0:
+        continue
+    label = sname if sname != "?" else "unlabelled"
+    lines.append(f"| {label} | {sjudged} | {sc['output_b']} | {sc['output_a']} | {sc['tie']} |")
+_vj = split_counts["val"]["output_a"] + split_counts["val"]["output_b"] + split_counts["val"]["tie"]
+_tj = split_counts["train"]["output_a"] + split_counts["train"]["output_b"] + split_counts["train"]["tie"]
+lines.append("")
+if _vj == 0:
+    lines.append("> **The val split has no judged result yet — there is no overfitting check in this")
+    lines.append("> report.** Any conclusion here rests entirely on fixtures the canon may have been")
+    lines.append("> revised against. Run the val fixtures before treating a number above as evidence.")
+elif _tj > 0:
+    _tr = split_counts["train"]["output_b"] / _tj
+    _vr = split_counts["val"]["output_b"] / _vj
+    if _tr - _vr >= 0.25:
+        lines.append(f"> **Overfitting signal:** B wins {_tr:.0%} of train but only {_vr:.0%} of val.")
+        lines.append("> Treat the aggregate above as optimistic; the val row is the honest number.")
+if split_counts["?"]["output_a"] + split_counts["?"]["output_b"] + split_counts["?"]["tie"] + split_counts["?"]["unparsed"]:
+    lines.append("")
+    lines.append("> **Unlabelled fixtures present.** `eval/run-eval.sh` refuses to generate outputs for")
+    lines.append("> a fixture without a valid `split:`, so these rows come from results generated")
+    lines.append("> before the split gate existed. Re-run them or label the fixtures.")
 lines.append("")
 lines.append("### Which canon file mattered most (avg score gap, B minus A)")
 lines.append("")

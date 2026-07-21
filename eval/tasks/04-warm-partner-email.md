@@ -1,6 +1,7 @@
 ---
 id: 04-warm-partner-email
 category: email-draft
+split: train
 canon: identity/voice.md
 ---
 

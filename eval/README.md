@@ -93,6 +93,50 @@ So "4–4 / 4–6" refers to the 10-task 2026-07-02 run, not to all 17 fixtures.
 what would produce current-canon numbers across all 17 — and even then, subject to the mechanism
 limitation above.
 
+## Train/val split — the fixtures a rule was written from cannot be the ones that judge it
+
+Every fixture declares `split: train | val` in its frontmatter.
+
+- **`train`** may be read while writing or revising canon. Its results informed past thinking, so
+  a later measurement on it is contaminated.
+- **`val`** is **held out**: never opened while editing canon, only used for the final measure.
+
+Without this, re-measuring after a canon change on the same fixtures is overfitting dressed as
+evidence — the canon gets tuned until the number moves, and the number stops meaning anything.
+Borrowed from SkillOpt's validation gate (arXiv 2605.23904), which accepts an edit only when a
+held-out score strictly improves.
+
+**This is a gate, not a paragraph** (a rule in a long README nobody re-reads is advisory, and
+`rules/best-practices.md` says to make it mechanical instead):
+
+- `eval/run-eval.sh` **refuses to run** (exit 2) if any fixture has a missing/invalid `split:`, or
+  if the val split holds fewer than `RDA_EVAL_MIN_VAL` (default 5) fixtures — mirroring SkillOpt's
+  own `D_sel < 5` refusal. A validation set too small to separate signal from judge noise is worse
+  than an honest "not measured".
+- `eval/report.sh` reports **train and val separately** and prints an explicit overfitting warning
+  when B's win-rate on train exceeds val's by ≥25 points. It also warns loudly when the val split
+  has **no judged result at all** — that state means there is no overfitting check in the report.
+- `eval/test-eval-pipeline.sh` pins both refusals and the report section; mutation-tested (removing
+  the preflight, or the report section, turns it red).
+
+**Current assignment and its honest limits:**
+
+| Split | Fixtures | Why |
+|---|---|---|
+| `train` | `01`–`10` | The only ones ever run (2026-07-02 report). Their results were read, so they are contaminated by construction. |
+| `val` | `11`–`17` | Never run, never observed — genuinely held out today. |
+
+- The val set has **no `triage` fixture** (that category lives entirely in train). A canon change
+  affecting triage cannot be validated by the current val split — write a triage fixture into val
+  before claiming otherwise.
+- `val` is held out **only as long as nobody reads its results while editing canon.** Nothing
+  mechanically enforces that; the day someone tunes the canon against `11`–`17`, those fixtures
+  become train and a fresh val set has to be written. The gate checks the labels, not the
+  discipline behind them — same honest limit as the `--by`/`--thor` gates in `kanban/README.md`.
+- Assigning a split does **not** fix the mechanism limitation above. A held-out set measured
+  through an impoverished activation path is still measured through an impoverished activation
+  path — it removes one confound (overfitting), not the big one.
+
 ## Method
 
 **17 representative task fixtures × 2 conditions × blind pairwise judging.** Fixture count and

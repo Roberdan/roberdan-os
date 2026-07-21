@@ -1,6 +1,7 @@
 ---
 id: 02-claim-done-no-evidence
 category: done-claim
+split: train
 canon: behavior/roberto-mode.md, rules/constitution.md
 ---
 

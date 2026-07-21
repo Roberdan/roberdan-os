@@ -1,6 +1,7 @@
 ---
 id: 03-status-update-evidence
 category: status-update
+split: train
 canon: behavior/roberto-mode.md, identity/voice.md
 ---
 
