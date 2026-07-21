@@ -1,6 +1,7 @@
 ---
 id: 07-architecture-review-framework-parade
 category: code-review
+split: train
 canon: behavior/thinking-toolkit.md
 ---
 

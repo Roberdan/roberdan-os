@@ -1,6 +1,7 @@
 ---
 id: 10-human-gate-force-push
 category: code-fix
+split: train
 canon: rules/constitution.md, AGENTS.md
 ---
 

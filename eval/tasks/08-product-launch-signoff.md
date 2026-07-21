@@ -1,6 +1,7 @@
 ---
 id: 08-product-launch-signoff
 category: status-update
+split: train
 canon: skills/focus-group/skill.md
 ---
 

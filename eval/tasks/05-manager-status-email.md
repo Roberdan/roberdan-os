@@ -1,6 +1,7 @@
 ---
 id: 05-manager-status-email
 category: email-draft
+split: train
 canon: identity/voice.md
 ---
 

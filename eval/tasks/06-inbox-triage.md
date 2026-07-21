@@ -1,6 +1,7 @@
 ---
 id: 06-inbox-triage
 category: triage
+split: train
 canon: identity/voice.md
 ---
 

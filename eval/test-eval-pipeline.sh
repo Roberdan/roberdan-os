@@ -15,7 +15,7 @@ ok()      { printf "  ok: %s\n" "$1"; }
 err()     { printf "  FAIL: %s\n" "$1"; FAIL=1; }
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap '[ -n "${RDA_EVAL_KEEP_TMP:-}" ] || rm -rf "$TMP"' EXIT
 
 TASKS="$TMP/tasks"
 RESULTS="$TMP/results"
@@ -28,6 +28,7 @@ cat > "$TASKS/t1-evidence.md" <<'EOF'
 ---
 id: t1-evidence
 category: code-fix
+split: train
 canon: behavior/roberto-mode.md
 ---
 
@@ -47,6 +48,7 @@ cat > "$TASKS/t2-voice.md" <<'EOF'
 ---
 id: t2-voice
 category: email-draft
+split: val
 canon: identity/voice.md
 ---
 
@@ -70,6 +72,7 @@ cat > "$TASKS/t3-skill.md" <<'EOF'
 ---
 id: t3-skill
 category: triage
+split: train
 canon: skills/premortem/skill.md
 ---
 
@@ -138,7 +141,7 @@ JUDGE_CAPTURE="$TMP/judge-prompts.log"
 
 run_env() {
   env -i PATH="$BIN:/usr/local/bin:/usr/bin:/bin" HOME="$HOME" \
-    RDA_EVAL_TASKS="$TASKS" RDA_EVAL_RESULTS="$RESULTS" RDA_EVAL_TIMEOUT=15 \
+    RDA_EVAL_TASKS="$TASKS" RDA_EVAL_RESULTS="$RESULTS" RDA_EVAL_TIMEOUT=15 RDA_EVAL_MIN_VAL=1 \
     EVAL_STUB_COUNTER="$COUNTER" EVAL_STUB_CAPTURE_JUDGE_PROMPT="$JUDGE_CAPTURE" \
     "$@"
 }
@@ -309,6 +312,7 @@ cat > "$TASKS_ALT/t-alt.md" <<'EOF'
 ---
 id: t-alt
 category: code-fix
+split: val
 canon: behavior/roberto-mode.md
 ---
 
@@ -346,7 +350,7 @@ ALT_STDIN="$TMP/alt-stdin.log"
 CLAUDE_COUNTER_BEFORE="$(wc -l < "$COUNTER" | tr -d ' ')"
 
 env -i PATH="$BIN:/usr/local/bin:/usr/bin:/bin" HOME="$HOME" \
-  RDA_EVAL_TASKS="$TASKS_ALT" RDA_EVAL_RESULTS="$RESULTS_ALT" RDA_EVAL_TIMEOUT=15 \
+  RDA_EVAL_TASKS="$TASKS_ALT" RDA_EVAL_RESULTS="$RESULTS_ALT" RDA_EVAL_TIMEOUT=15 RDA_EVAL_MIN_VAL=1 \
   RDA_EVAL_AGENT_CMD="$BIN/alt-agent --fake-flag" \
   EVAL_STUB_COUNTER="$COUNTER" \
   ALT_AGENT_COUNTER="$ALT_COUNTER" ALT_AGENT_ARGV_CAPTURE="$ALT_ARGV" ALT_AGENT_STDIN_CAPTURE="$ALT_STDIN" \
@@ -384,6 +388,49 @@ if grep -q "Fix the bug and tell me it's done" "$ALT_STDIN"; then
   ok "alt-agent received the task prompt via stdin, per the documented convention"
 else
   err "alt-agent did not receive the expected prompt content on stdin"
+fi
+
+# ---------------------------------------------------------------------------
+section "split gate: run-eval refuses unlabelled fixtures and an undersized val set"
+# The fixtures a rule was written from must not be the ones that judge it. This gate is the
+# mechanism; without these assertions it is just a paragraph in a README nobody re-reads.
+SPLIT_T="$TMP/tasks-split"
+mkdir -p "$SPLIT_T"
+cp "$TASKS/t1-evidence.md" "$SPLIT_T/"          # split: train
+cp "$TASKS/t2-voice.md" "$SPLIT_T/"             # split: val
+
+# (a) a fixture with no split at all -> hard refusal, exit 2
+cp "$TASKS/t1-evidence.md" "$SPLIT_T/t3-nosplit.md"
+sed -i.bak 's/^id: t1-evidence/id: t3-nosplit/; /^split:/d' "$SPLIT_T/t3-nosplit.md" && rm -f "$SPLIT_T/t3-nosplit.md.bak"
+set +e
+PATH="$BIN:$PATH" RDA_EVAL_TASKS="$SPLIT_T" RDA_EVAL_RESULTS="$TMP/results-split" \
+  RDA_EVAL_MIN_VAL=1 bash "$ROOT/eval/run-eval.sh" --stub >"$TMP/split-a.log" 2>&1
+rc_a=$?
+set -e
+if [ "$rc_a" -eq 2 ] && grep -q "without a valid split" "$TMP/split-a.log"; then
+  ok "unlabelled fixture -> run-eval refuses (exit 2)"
+else
+  err "unlabelled fixture did NOT trigger the refusal (rc=$rc_a) — see $TMP/split-a.log"
+fi
+
+# (b) a labelled set whose val split is below the floor -> hard refusal, exit 2
+rm -f "$SPLIT_T/t3-nosplit.md"
+set +e
+PATH="$BIN:$PATH" RDA_EVAL_TASKS="$SPLIT_T" RDA_EVAL_RESULTS="$TMP/results-split" \
+  RDA_EVAL_MIN_VAL=5 bash "$ROOT/eval/run-eval.sh" --stub >"$TMP/split-b.log" 2>&1
+rc_b=$?
+set -e
+if [ "$rc_b" -eq 2 ] && grep -q "val split has 1 fixture" "$TMP/split-b.log"; then
+  ok "val split below the floor -> run-eval refuses (exit 2)"
+else
+  err "undersized val split did NOT trigger the refusal (rc=$rc_b) — see $TMP/split-b.log"
+fi
+
+# (c) the report must break train and val out separately, not average them away
+if grep -q "Train vs val" "$RESULTS/report.md" 2>/dev/null; then
+  ok "report.md carries the train/val overfitting section"
+else
+  err "report.md has no train/val section — the overfitting check is invisible"
 fi
 
 # ---------------------------------------------------------------------------

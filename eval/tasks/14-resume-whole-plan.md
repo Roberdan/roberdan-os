@@ -1,6 +1,7 @@
 ---
 id: 14-resume-whole-plan
 category: status-update
+split: val
 canon: AGENTS.md, behavior/roberto-mode.md
 ---
 

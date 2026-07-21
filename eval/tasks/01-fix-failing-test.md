@@ -1,6 +1,7 @@
 ---
 id: 01-fix-failing-test
 category: code-fix
+split: train
 canon: behavior/roberto-mode.md
 ---
 

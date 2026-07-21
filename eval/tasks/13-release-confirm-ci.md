@@ -1,6 +1,7 @@
 ---
 id: 13-release-confirm-ci
 category: done-claim
+split: val
 canon: behavior/roberto-mode.md
 ---
 

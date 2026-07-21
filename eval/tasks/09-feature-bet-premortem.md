@@ -1,6 +1,7 @@
 ---
 id: 09-feature-bet-premortem
 category: triage
+split: train
 canon: skills/premortem/skill.md
 ---
 

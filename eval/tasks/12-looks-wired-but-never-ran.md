@@ -1,6 +1,7 @@
 ---
 id: 12-looks-wired-but-never-ran
 category: code-review
+split: val
 canon: behavior/roberto-mode.md, rules/best-practices.md
 ---
 
