@@ -224,6 +224,12 @@ if bash test/test-pending.sh >/dev/null 2>&1; then ok "approval inbox green (see
 section "meta-loop — capture -> distill -> curate promotion (test/test-metaloop.sh)"
 if bash test/test-metaloop.sh >/dev/null 2>&1; then ok "meta-loop promotes end-to-end (see bash test/test-metaloop.sh)"; else err "test-metaloop — see bash test/test-metaloop.sh"; fi
 
+# --- 8b) evolve rejected-proposal buffer --------------------------------------
+# Pins that a reworded repeat is recognized, a genuine novelty is NOT suppressed, and the
+# buffer actually reaches the agent through the card watch.sh writes (wired, not just present).
+section "evolve rejected-proposal buffer (test/test-evolve-declined.sh)"
+if bash test/test-evolve-declined.sh >/dev/null 2>&1; then ok "declined buffer matches rewordings, spares novelties, reaches the card"; else err "test-evolve-declined — see bash test/test-evolve-declined.sh"; fi
+
 # --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
 # eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The
 # actual with/without-canon comparison needs a real `claude` binary and Roberto's own machine —
