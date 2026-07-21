@@ -28,6 +28,25 @@ run (Mac off/asleep) fires at the next boot/wake — not skipped like cron.
    `roberdan-os/proposals/<YYYY-MM-DD>-<slug>.md` with **source citation (URL + version + date)**.
    No citation → no proposal. Then `@thor` + `kb finish` per the normal gate.
 
+## Rejected-proposal buffer
+
+The watcher fingerprints a **whole changelog page**, so any page change drops a card — but the
+novelties an agent then extracts are often ones already assessed and declined. Measured
+2026-07-21: `proposals/2026-07-{11,18,19}-claude-code.md` each re-raised the same two items,
+each reworded, each concluding *"no additional patch required now"*. Three weeks, one question.
+
+`evolve/declined.sh` records what was assessed-and-declined, per source, and step 2 of the flow
+injects it into every card body. Step 5 of the card asks the agent to record its own declines,
+so the loop closes instead of resetting every Saturday.
+
+- Matching is **fuzzy on purpose** (token overlap coefficient ≥ 0.5 with ≥3 shared tokens), because
+  the real repeats were reworded every week and exact hashing missed all of them.
+- It **informs, it never blocks.** A fuzzy matcher that could silently drop a genuine novelty
+  would be worse than the repetition it fixes: the card shows the declined list and asks the
+  agent to say explicitly that it skipped them.
+- Gate: `test/test-evolve-declined.sh` (in `test/validate.sh`) pins all three properties —
+  reworded repeats match, unrelated novelties don't, and the block actually reaches the card.
+
 ## Invariants (hard)
 
 - **Never** auto-commit to `behavior/ rules/ agents/ AGENTS.md` — draft only in

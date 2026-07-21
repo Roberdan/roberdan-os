@@ -61,11 +61,23 @@ for i in "${!sources_names[@]}"; do
     echo
     echo "Source: $url"
     echo
+    # Rejected-proposal buffer: what was already assessed and declined for THIS source, so the
+    # agent doesn't re-derive it a fourth week running (see evolve/declined.sh for the measured
+    # case this exists for). Informational — it never suppresses a genuine novelty.
+    if declined_block="$("$(dirname "$0")/declined.sh" render "$name" 2>/dev/null)" && [ -n "$declined_block" ]; then
+      echo "**Already assessed and DECLINED for \`$name\`** — do not re-propose these unless the"
+      echo "source shows something materially new about them; say explicitly that you skipped them:"
+      echo
+      printf '%s\n' "$declined_block"
+      echo
+    fi
     echo "Task for whichever agent picks this card up (any CLI — Claude, Copilot):"
     echo "1. Open the source; identify the concrete novelties since the last known version (with version + date)."
     echo "2. For each, assess whether it touches something roberdan-os uses (hook, skill, agent, scheduling, MCP, memory, factory, loop)."
     echo "3. Write the proposal to \`proposals/${now}-${name}.md\`: what changes, why, the suggested patch — **with source citation (URL + version + date)**. No citation → no proposal."
     echo "4. Do NOT apply to the canon: draft-only, human gate (see evolve/evolve-protocol.md)."
+    echo "5. For every novelty you assess and decide needs NO patch, record it so next week's card"
+    echo "   carries it forward: \`evolve/declined.sh add $name \"<one-line summary>\"\`."
   } > "$card"
   echo "watch: NEW card → $card" >&2
 
