@@ -1038,10 +1038,25 @@ case "$cmd" in
         # The plan clause(s) this card delivers (e.g. --satisfies "2#28"). This is the link `kb
         # cover` walks: without it a plan requirement has no card, and no gate can see the absence.
         --satisfies) satisfies="${2:-}"; shift 2 ;;
+        # An UNKNOWN --flag must never be swallowed as positional text. It used to be, and the
+        # result was silent data loss: `kb add "t" --repo r --dod "<real dod>" --acc "<real acc>"`
+        # produced dod="--dod", acceptance="<real dod>", and dropped the acceptance criteria
+        # entirely — while still passing the "a card can't start without all three filled" rule,
+        # because the literal string "--dod" is filled. A gate satisfiable without doing the work.
+        # Caught by @thor on card 260721-135440, 2026-07-21.
+        --*) echo "REFUSED: unknown flag '$1' for kb add." >&2
+             echo "  dod and acceptance are POSITIONAL, not flags:" >&2
+             echo "    kb add \"<title>\" --repo <repo> \"<dod>\" \"<acceptance>\"" >&2
+             exit 1 ;;
         *) args+=("$1"); shift ;;
       esac
     done
     title="${args[0]:?title required}"; dod="${args[1]:-FILL: definition of done}"; acc="${args[2]:-FILL: acceptance criteria (how @thor verifies)}"
+    if [ "${#args[@]}" -gt 3 ]; then
+      echo "REFUSED: kb add takes at most 3 positional args (title, dod, acceptance); got ${#args[@]}." >&2
+      echo "  Extra args would be silently dropped. Quote each field as a single argument." >&2
+      exit 1
+    fi
     if [ -z "$repo" ]; then
       echo "REFUSED: --repo required — which repo/scope is this card about? e.g.:" >&2
       echo "  kb add \"$title\" --repo roberdan-os [dod] [acc]" >&2
