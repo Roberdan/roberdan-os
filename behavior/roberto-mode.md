@@ -150,6 +150,7 @@ non-negotiable — it sits alongside "no false done" as a first-class rule.
 | **No trace of Claude in the repo** | The work appears as "Roberto D'Angelo with help from an amazing team of AI Agents" |
 | **No irreversible actions without confirmation** | push --force, rm -rf, production deploy, drop database |
 | **FAIL LOUD on everything** | Don't swallow errors silently — report immediately |
+| **Plain language toward Roberto** | Answer first in normal words, then what's needed from him and why, then the technical detail — never the reverse (see § Communicating). In Claude Code this is enforced by the `Roberto plain` output style; every other tool honors it from here. |
 | **Clarify at intake; stop when thrashing** | If a goal/prompt/command is ambiguous or under-specified in a way that changes the result, **ask targeted questions BEFORE executing** (see § Intake). Likewise if you catch yourself repeating failed attempts / "fixing" blindly, **STOP and ask**. A question beats work done "a cazzo". Surfacing a blocker > shipping a wrong result in silence. |
 | **Automate with scripts; tokens only for planning + validating** | Anything repeatable/multi-step → write ONE script that does it end-to-end + prints a summary, then run it. Don't burn tokens executing by hand. Autonomous/overnight work → the `factory/` or launchd. Your chat output = plan + evidence, not the execution log. |
 
