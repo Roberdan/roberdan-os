@@ -3,6 +3,46 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.18.0] - 2026-07-22
+
+### Added
+- **Plain language toward Roberto is now a NON-NEGOTIABLE rule, enforced at the system-prompt
+  level.** The § Communicating contract existed since v2.x but was advisory prose buried in a
+  222-line JIT-loaded file, and Roberto reported — plainly — that he still struggled to follow
+  what agents told him and asked of him. The rule is now a row in `behavior/roberto-mode.md`
+  § NON-NEGOTIABLE (answer first in plain words → what's needed from him and why → technical
+  detail below), backed in Claude Code by a new output style (`~/.claude/output-styles/
+  roberto-plain.md`, activated via `outputStyle`), which edits the system prompt every turn
+  instead of hoping a prose rule survives context-rot. Honest limit: the output style is
+  Claude-Code-only; Copilot/Codex/web carry the rule through the canon alone.
+- **`kb cover` — the plan→card gate the canon promised.** Fails red on any normative clause in a
+  plan with no card and no written decision, wired into `test/validate.sh`. Companion to the new
+  `rules/best-practices.md` § Carded End-to-End (a requirement that never becomes a card is
+  invisible to `kb`, `@thor`, the merge-gate and CI simultaneously) and § the three structural
+  holes that let a false done through.
+- **Train/val split gate in `eval/`** so a canon change can't be judged by the fixtures it was
+  written against.
+- **Rejected-proposal buffer in `evolve/`** — the changelog watcher stops re-proposing what was
+  already declined.
+- **`bin/copilot-local`** — opt-in Copilot CLI against a local Ollama model (BYOK).
+
+### Fixed
+- **`kb` done-gate is mechanical, not rhetorical**: `--thor` evidence must actually resolve
+  (commit/file/test output), not merely be non-empty.
+- `kb add` refuses unknown flags instead of silently swallowing them into the card title.
+- `kb pending` hardened; card-ID collisions handled.
+- `kb` warns when `RDA_KANBAN` silently points at a board other than the repo's own.
+- `leak-check`: plain-word terms are anchored and binaries skipped — fewer false positives
+  without loosening the gate.
+- Copilot's kanban tool now reads the same board source as the `kb` CLI.
+
+### Changed
+- The `CLAUDE.md` pointer block is now the canonical slim source, killing drift between the
+  global pointer and the repo canon.
+
+_Release hygiene note: `v2.16.0` and `v2.17.0` were written to the changelog but never tagged.
+This release tags `v2.18.0` at HEAD; the two intermediate versions remain changelog-only._
+
 ## [v2.17.0] - 2026-07-11
 
 ### Added
