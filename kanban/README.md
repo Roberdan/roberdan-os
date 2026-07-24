@@ -134,8 +134,22 @@ is the audit archive → the board never bloats the context.
 
 ## Meta-card budget
 
-Self-improvement cards (about roberdan-os itself) can crowd out external-facing ones if left
-unbounded — see the **Meta-Card Budget** rule in [`rules/best-practices.md`](../rules/best-practices.md)
-for the discipline norm (not a `kb.sh`-enforced gate). `repo:` makes "how many active cards are
-`roberdan-os` vs. something external" a one-glance `kb list` read instead of a re-read of every
-card's body — still a discipline norm, not a mechanized gate.
+The self-referential-runaway risk that applies to docs applies to the board too. In
+`roberdan-os`, every card closed so far (`kanban/done/`) has been the system building, auditing,
+or improving *itself* — none has produced value in Roberto's actual external work. Left
+unbounded, self-improvement work crowds out external use, because it's always easier to find
+one more thing to polish about the system than to go do the harder, less legible work outside it.
+
+**Rule:** whenever at least one external-facing card (a card whose DoD produces a verifiable
+artifact outside roberdan-os — e.g. in Convergio, Fight the Stroke, or Microsoft work) sits in
+`kanban/todo/`, keep **at most 1** active meta/self-improvement card (a card about roberdan-os
+itself — its infra, docs, tests, or agents) across `kanban/todo/` + `kanban/doing/` combined.
+
+This is a **discipline norm for whoever proposes new cards** (Roberto or an agent) — not a
+mechanically enforced gate. `kb.sh` does not check or block on this; nothing stops a second
+meta-card from being added. Treat it the same way as the `--by`/`approved_by` honor-system
+gates above: reviewable, not cryptographically bound. If you're about to add a second active
+meta-card while an external-facing card is sitting in `todo/`, that's the signal to either
+finish/park one of the meta-cards first, or make the case out loud for why this meta-card is
+the exception. `repo:` makes "how many active cards are `roberdan-os` vs. something external"
+a one-glance `kb list` read instead of a re-read of every card's body.

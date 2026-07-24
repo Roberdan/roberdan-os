@@ -96,6 +96,8 @@ tool and this protocol are versioned.
   headless verification). The audit trail is the evidence itself, reviewable on the card.
 - Only `todo`+`doing` are "hot" (small, loaded at session start via the `SessionStart` context-inject
   hook); `done` is the audit archive, read **on demand** so it can grow without burning tokens.
+- **Meta-card budget** (at most 1 active self-improvement card while an external-facing card waits
+  in `todo/`) → `kanban/README.md § Meta-card budget`. Discipline norm, not a `kb.sh` gate.
 
 Trust durable file state, not the conversation — this is what prevents losing goals across a long
 session. Session context is auto-injected at start ([`hooks/context-inject.sh`](hooks/context-inject.sh)):
