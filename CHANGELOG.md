@@ -3,6 +3,18 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.19.3] - 2026-07-24
+
+### Fixed
+- **`bin/sync.sh --install` printed a pointer block that no longer matched reality.** The
+  installed `~/.claude/CLAUDE.md` block was trimmed from 10 lines to 3 during the v2.19.2
+  `/doctor` pass (that file is resident context in *every* project, and under `~/GitHub` the
+  committed `~/GitHub/CLAUDE.md` already carries the detail) — but the generator still emitted
+  the long version as "the canonical slim block". No functional risk: `--install` **refuses** to
+  overwrite an existing `~/.claude/CLAUDE.md`, so nothing was ever restored behind anyone's back.
+  It was a copy-paste trap for the next fresh install. Generator and installed block are now
+  byte-identical (verified with `diff`), and the printed note says *why* it stays this short.
+
 ## [v2.19.2] - 2026-07-24
 
 ### Changed
