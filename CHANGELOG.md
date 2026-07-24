@@ -3,6 +3,39 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.19.2] - 2026-07-24
+
+### Changed
+- **The Meta-Card Budget norm moved out of the always-loaded rules file.**
+  `rules/best-practices.md` is symlinked into `~/.claude/rules/`, so every word of it is
+  resident context in **every** project and every tool — but the Meta-Card Budget governs only
+  the roberdan-os kanban. The full rule now lives in `kanban/README.md § Meta-card budget`
+  (which until now only pointed back at `best-practices.md`, so the norm had two homes and one
+  of them was empty), with a one-line pointer from `AGENTS.md` § Loop Protocol so it stays
+  reachable from the always-loaded canon — same wired-end-to-end bar as everything else.
+  Cost: ~364 est. tokens of resident context saved per session, in every project.
+  **Honest tradeoff:** `kanban/README.md` is not in `bin/make-bundle.sh`'s `SECTIONS`, so the
+  norm no longer reaches the ChatGPT/web bundle — where `kb` is never run anyway. Nothing else
+  in the canon points at the old location (grepped).
+
+### Notes
+- **Where this came from — a `/doctor` pass on the Claude Code setup, not a planned change.**
+  Findings worth recording, all measured rather than estimated from memory:
+  - Install is healthy (native 2.1.218, latest on channel; no npm leftovers; every settings file
+    parses; all 9 agents have valid, non-colliding frontmatter).
+  - **49 of 74 user skills have never been invoked once in 565 startups** (~1.8k est. tokens of
+    listing in every session). Roberto chose to disable only 3 of them — `ship-pr` (a duplicate
+    of the repo's own `ship`), `dev-cleanup` and `roberto-mode` (both had **no frontmatter
+    description at all**, so the skill router could never match them: present but unreachable).
+    The ~46 gstack/Orca skills stay enabled by his call. Disabling is via `skillOverrides` in
+    `~/.claude/settings.json` — the skill files are untouched on disk.
+  - **`test/leak-check.sh` takes 3m33s**, and it runs as a blocking `pre-commit` hook — a commit
+    in this repo cannot complete inside a 2-minute timeout. Recorded here because it is not
+    documented anywhere and it looks like a hung commit the first time you meet it.
+  - Two findings left as warnings, no change made: the shell alias `claude` carries
+    `--dangerously-skip-permissions`, which makes the configured `auto` permission mode moot; and
+    one `PreToolUse` hook on Bash hit its 10s timeout during the scanned window.
+
 ## [v2.19.1] - 2026-07-24
 
 ### Fixed
