@@ -3,6 +3,27 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.19.0] - 2026-07-24
+
+### Added
+- **`NOTICE` — the identity is not part of the MIT grant.** The repo has been public since
+  v1.2.0 under MIT, with `identity/voice.md`, `identity/operator.md` and
+  `identity/twin-persona.md` committed. Nothing stated that MIT — a *copyright* licence —
+  never conveyed the right to use a living person's name, persona or voice, nor to present a
+  fork or its output as Roberto or as his digital twin. `README.md` only *advised* replacing
+  the identity layer, and `bin/identity-init.sh` deliberately leaves the reference prose in
+  place, so a fork that stops halfway is still running Roberto's persona. `NOTICE` states the
+  reservation explicitly (declaratory, not an added restriction — the MIT grant on the code is
+  untouched), points forkers at `identity-init.sh`, and carries the AI-disclosure expectation
+  from `agents/twin.md`. Linked from `README.md` § License.
+- **`SECURITY.md` — private reporting channel with a real scope boundary.** Declares what is a
+  vulnerability here (privacy-boundary bypasses, code-execution paths in `hooks/ bin/ test/
+  factory/ kb.sh`, agent-supply-chain prompt injection, meta-loop guardrail bypass, secret
+  handling) and what is not (bad agent advice, third-party tools, the documented salted-denylist
+  tradeoff). GitHub private vulnerability reporting **enabled on the repository** so the
+  advisory link the file gives actually works — verified `{"enabled":true}` via the API, not
+  assumed. Also states plainly that installing this system executes its code on your machine.
+
 ## [v2.18.0] - 2026-07-22
 
 ### Added
