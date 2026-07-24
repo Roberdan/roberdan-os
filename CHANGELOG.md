@@ -3,6 +3,27 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.19.1] - 2026-07-24
+
+### Fixed
+- **CI: `actions/checkout@v4` → `@v5`.** GitHub now force-runs v4 on Node 24 and annotates every
+  run with a Node-20 deprecation warning. Green either way; the pin is corrected so the annotation
+  stops and the action is not left on a version GitHub is retiring.
+- **Paper § Reproducibility said "private remote".** Factually wrong since v1.2.0 (4 July): the
+  remote has been public under MIT for three weeks. Corrected, and the licence posture now stated
+  where a reader actually looks for it — public under MIT, with `NOTICE` recording what MIT does
+  not convey (name, persona, voice) and `SECURITY.md` the reporting channel. The v1.0.0 privacy
+  incident narrative still says "private remote" and is left alone: on 1 July the remote *was*
+  private, and that is accurate history. Paper bumped to v1.3 with an updated date, since its
+  content changed.
+
+### Notes
+- **Release tags are now complete; GitHub Release *pages* deliberately are not.** Every version in
+  this file has a git tag as of v2.19.0 (six were backfilled). Only 13 of 32 tags have ever had a
+  Release page — that was never the convention here, and backfilling 19 of them would notify
+  watchers about three-week-old commits for no benefit. Tags carry the numbering; Release pages
+  stay occasional.
+
 ## [v2.19.0] - 2026-07-24
 
 ### Added

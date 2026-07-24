@@ -1,7 +1,7 @@
 # roberdan-os: a personal, cross-platform agentic operating system with local-first memory and a self-improving meta-loop
 
 **Author:** Roberto D'Angelo (Fight the Stroke Foundation) · developed in a human–agent pair with Claude (Anthropic)
-**Date:** 3 July 2026 · **Version:** 1.2 (English) · **Status:** operating system, single-user, single-machine
+**Date:** 3 July 2026 (updated 24 July 2026) · **Version:** 1.3 (English) · **Status:** operating system, single-user, single-machine
 
 > **PDF:** not committed (build artifact — `docs/*.pdf` is gitignored). Regenerate locally with the
 > `make-pdf` skill: `~/.claude/skills/gstack/make-pdf/dist/pdf generate --cover --toc
@@ -657,8 +657,13 @@ judgement.
 
 ### Reproducibility and artefacts
 
-Code and canon: git repository `roberdan-os` (private remote `github.com/Roberdan/roberdan-os`,
-~88 commits as of 3 July 2026), entirely in English. Memory: Obsidian vault (local-first) + gbrain
+Code and canon: git repository `roberdan-os` (~88 commits as of 3 July 2026), entirely in English.
+The remote `github.com/Roberdan/roberdan-os` was private when this paper was first written and has
+been **public under the MIT licence since v1.2.0** (4 July 2026), after the kanban card content was
+gitignored and purged from history. `NOTICE` (v2.19.0) records what that licence does not convey:
+the author's name, persona and voice are not part of the grant, and a fork may not present itself or
+its output as him or as his digital twin — a *declaratory* reservation, leaving the MIT grant on the
+code untouched. `SECURITY.md` carries the private reporting channel and its scope. Memory: Obsidian vault (local-first) + gbrain
 (local Postgres/pgvector); embedding **local** `ollama:bge-m3`@1024 (via a patch to gbrain's Ollama
 recipe, commit `f7376b11`; durability verified by `bin/check-embedder.sh`). Scheduling: `launchd`.
 Governance: gated goal-ledger kanban (`kb`, §6.1) + an autonomous headless task factory with a
