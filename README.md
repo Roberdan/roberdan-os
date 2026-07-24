@@ -192,3 +192,14 @@ published under his own identity. If you fork it, run `bin/update-denylist-hashe
 [MIT](LICENSE). The canon, tooling and guardrails are generic and reusable; the identity is one
 directory you replace. Not a technical read? See [`docs/roberdan-os-paper-en.md`](docs/roberdan-os-paper-en.md)
 (versioned separately; some file paths it cites predate the v2.0.0 `identity/` split).
+
+**MIT covers the code and canon — not the person.** It grants no right to use Roberto D'Angelo's
+name, persona or voice, or to present a fork or its output as him or as his digital twin. That is
+not an added restriction: a copyright licence never granted it. See [`NOTICE`](NOTICE), and replace
+the identity layer (`bin/identity-init.sh`) before running the system in your own name.
+
+## Security
+
+Found a vulnerability? Report it privately — see [`SECURITY.md`](SECURITY.md). Note that this
+system installs hooks and scripts that execute on your machine: running a fork means running its
+code.

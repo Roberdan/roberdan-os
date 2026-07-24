@@ -1,0 +1,72 @@
+NOTICE — name, persona and voice are not part of the MIT grant
+==============================================================
+
+roberdan-os is released under the MIT License (see `LICENSE`), which grants broad
+rights in the **software and canon**: use, copy, modify, merge, publish, distribute,
+sublicense and sell.
+
+**This notice adds no restriction to the MIT License.** It states what that licence
+never granted in the first place: MIT is a *copyright* licence, and the items below
+are not copyright. They are protected separately — and independently of this
+repository's licence — as rights in a living person's name, likeness, voice and
+personal data.
+
+
+What the MIT License does NOT grant
+-----------------------------------
+
+- **Name and branding.** No right to use "Roberto D'Angelo", "Roberdan", or "Fight
+  the Stroke" to name, brand, endorse or promote a derivative work, a product, or a
+  service.
+
+- **Persona and voice.** `identity/operator.md`, `identity/voice.md` and
+  `identity/twin-persona.md` describe a specific living person's communication style,
+  decision patterns and personal details. They are published so that the *structure* —
+  how an identity layer is separated from an engine — can be studied, reused and
+  replaced. They are not a licence to write, speak, decide or act **as** that person.
+
+- **Impersonation.** No right to present a derivative work, an agent, or any of its
+  output as being Roberto D'Angelo, as authored by him, as his digital twin, or as
+  reviewed, approved or endorsed by him or by Fight the Stroke.
+
+- **Endorsement.** Publishing a fork implies no review, approval or support from the
+  original author.
+
+The confidential operator dossier is never published here (see `AGENTS.md` § Privacy):
+it lives outside this repository, and nothing in it is licensed by any means.
+
+
+What forkers must do
+--------------------
+
+Replace the identity layer with your own **before** you use the system in your name:
+
+    bin/identity-init.sh --slug <your-slug> --name "Your Name" --apply
+
+That scaffolds the forker-owned `identity/` surface. It deliberately keeps the
+reference prose in place so you can see what to write — which means that until you
+overwrite `identity/voice.md`, `identity/operator.md` and `identity/twin-persona.md`,
+**you are still running Roberto's persona, not yours.** Finish the rewrite.
+
+Keeping the MIT copyright notice in your fork is required by `LICENSE`. Using the
+author's name to *identify* your fork is not permitted by it.
+
+
+Disclosure when an agent faces someone else
+-------------------------------------------
+
+If you deploy an agent built on this system in a way that interacts with third
+parties, disclose that they are dealing with an automated system. The upstream canon
+holds itself to this rule (`agents/twin.md` § "Delegation, not impersonation", and
+the `draft-not-send` guardrail); a fork that removes the rule takes on whatever
+obligations apply to it.
+
+
+Warranty
+--------
+
+None. See the "AS IS" clauses in `LICENSE`. This is one person's personal operating
+system, published so others can learn from its structure. It is not a product, and it
+gives no medical, legal or financial advice.
+
+Copyright (c) 2026 Roberto D'Angelo
