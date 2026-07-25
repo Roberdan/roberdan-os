@@ -77,7 +77,7 @@ if [ -s AGENTS.md ]; then
 else
   err "root AGENTS.md missing or empty — every pointer (.github/copilot-instructions.md, CLAUDE.md, ~/.codex/AGENTS.md) depends on it"
 fi
-
+section "canon guardrails"; if bash test/test-canon-guardrails.sh; then ok "cross-tool guardrails present"; else err "test-canon-guardrails failed"; fi
 # --- 2) Link check (relative markdown; exempts [[wikilink]] and http) --------
 section "link check (relative markdown; [[wikilink]] exempted)"
 broken=0

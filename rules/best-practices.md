@@ -1,7 +1,7 @@
 ---
 name: best-practices
-version: "3.6.0"
-last_updated: "2026-07-07"
+version: "3.7.0"
+last_updated: "2026-07-25"
 ---
 
 # Best Practices
@@ -134,13 +134,14 @@ Context is a finite resource with diminishing returns ("context rot"): every alw
 competes with the tokens that matter. (Anthropic — effective context engineering 2025-09; Claude
 Code best practices, current 2026.)
 
-- **Always-loaded instruction files stay lean** — target ≤200 lines each. Per-line test: *would
-  removing this cause the agent to make mistakes? If not, cut it.* A rule the agent keeps
-  violating inside a long file means the file is too long: convert that rule into a **hook**
-  (deterministic), don't add more prose (advisory). *Scope note:* in Claude Code this file is
-  JIT-loaded, but the ChatGPT/web **bundle** (`bin/make-bundle.sh`) concatenates it verbatim
-  into an always-loaded context — this file is over the bar itself, so the standing duty here
-  is **prune before adding**, and trim on the next canon pass.
+- **Bounded hand-written files.** New hand-written source and test files target **≤300 lines**;
+  split by responsibility first. Existing oversized files may grow only with explicit,
+  task-relevant justification; never force unrelated refactors or micro-files.
+  Generated, vendored, lock, snapshot, data, and migration artifacts are exempt.
+- **Always-loaded instruction files stay lean** — target ≤200 lines each. Remove any line whose
+  absence would not cause mistakes; repeated violations need a deterministic hook, not more
+  advisory prose. Claude JIT-loads this file, but the ChatGPT/web bundle includes it verbatim.
+  This file is already over budget: prune before adding.
 - **Just-in-time retrieval over pre-loading.** Keep pointers (paths, queries, `[[wikilinks]]`) in
   context; pull content on demand (gbrain, grep). Knowledge that applies *sometimes* belongs in a
   skill (progressive disclosure: only name+description load at startup), never in the canon.
@@ -250,4 +251,3 @@ lives in the **`engineering-reference` skill**, loaded on demand.
 It was always-loaded until 2026-07-14 and paid tokens on every turn of every session, while none of
 it changes what you **decide** — it tells you **how** to do a thing you already chose to do. That is
 the canon's own test for what belongs in a skill.
-
