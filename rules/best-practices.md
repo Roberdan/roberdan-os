@@ -238,9 +238,8 @@ malicious MCP servers can inject via tool *descriptions* alone). Rules:
   privilege tools (read-mail ≠ send-mail), draft-not-send as a *security* boundary, secrets
   physically unreachable from where generated code runs.
 
-## Writing
-
-Tables > prose. Commands > descriptions. No preambles. Comments: WHY only, < 5%. Commits: conventional. PRs: Summary + Test plan.
+## Execution Defaults
+**Browser:** Playwright = Microsoft Edge (`msedge`) only; no Chrome/Chromium fallback. If Edge is unavailable, stop and report the blocker; override only for Roberto-requested cross-browser tests. **Writing:** Tables > prose; commands > descriptions; comments WHY-only; conventional commits; PR = summary + test plan.
 
 ## Execution reference (skill, not canon)
 

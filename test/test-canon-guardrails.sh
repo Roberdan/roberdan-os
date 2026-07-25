@@ -24,5 +24,13 @@ require 'Generated, vendored, lock, snapshot, data, and migration artifacts are 
   'missing technical-artifact exemptions'
 require 'never force unrelated refactors' \
   'missing the no-unrelated-refactor safeguard'
+require 'Playwright = Microsoft Edge (`msedge`) only' \
+  'missing the Edge-only Playwright policy'
+require 'no Chrome/Chromium fallback' \
+  'missing the Chrome/Chromium fallback prohibition'
+require 'If Edge is unavailable, stop and report the blocker' \
+  'missing the Edge-unavailable blocker behavior'
+require 'override only for Roberto-requested cross-browser tests' \
+  'missing the explicit cross-browser override'
 
 exit "$FAIL"
