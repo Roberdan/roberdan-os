@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
 RULES="rules/best-practices.md"
+REFERENCE="skills/engineering-reference/skill.md"
 FAIL=0
 
 require() {
@@ -32,5 +33,22 @@ require 'If Edge is unavailable, stop and report the blocker' \
   'missing the Edge-unavailable blocker behavior'
 require 'override only for Roberto-requested cross-browser tests' \
   'missing the explicit cross-browser override'
+
+if ! grep -qF 'new hand-written source/test files >300 lines' "$REFERENCE"; then
+  printf 'FAIL: engineering reference lacks the progressive new-file gate\n' >&2
+  FAIL=1
+fi
+if ! grep -qF 'unjustified growth in oversized legacy files' "$REFERENCE"; then
+  printf 'FAIL: engineering reference lacks the legacy-growth gate\n' >&2
+  FAIL=1
+fi
+if ! grep -qF 'technical artifacts exempt' "$REFERENCE"; then
+  printf 'FAIL: engineering reference lacks technical exemptions\n' >&2
+  FAIL=1
+fi
+if grep -qF 'commits with files > 300 lines' "$REFERENCE"; then
+  printf 'FAIL: engineering reference still contains the absolute file-size rule\n' >&2
+  FAIL=1
+fi
 
 exit "$FAIL"

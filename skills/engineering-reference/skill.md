@@ -114,6 +114,6 @@ Install per-repo when relevant:
 | Hook | Blocks |
 |---|---|
 | `pre-commit` MainGuard | commits on `main` in main checkout |
-| `pre-commit` FileSizeGuard | commits with files > 300 lines (.rs/.ts/.js/.sh) |
+| `pre-commit` FileSizeGuard | new hand-written source/test files >300 lines; unjustified growth in oversized legacy files (technical artifacts exempt) |
 | `pre-commit` SecretScan | commits containing API keys, tokens, passwords |
 | `commit-msg` CommitLint | non-conventional commit messages |
