@@ -3,6 +3,22 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.19.4] - 2026-07-25
+
+### Added
+- **All agents now resist creating new source and test monoliths.** New hand-written files target
+  at most 300 lines and split by responsibility first. Existing oversized files are not forced
+  through unrelated refactors, but may grow only with an explicit task-relevant reason.
+  Generated, vendored, lock, snapshot, data and migration artifacts stay exempt.
+
+### Changed
+- **Playwright automation now uses Microsoft Edge (`msedge`) only.** Agents no longer silently
+  fall back to Chrome or Chromium; an unavailable Edge installation is a visible blocker.
+  Cross-browser execution remains possible only when Roberto explicitly requests it.
+- **The on-demand engineering reference now matches the progressive policy.** Its recommended
+  `FileSizeGuard` distinguishes new files, justified legacy growth and technical exemptions
+  instead of contradicting the canon with an absolute all-files block.
+
 ## [v2.19.3] - 2026-07-24
 
 ### Fixed
