@@ -76,6 +76,33 @@ function diag(where, e) {
 const WRITE_TOOLS = new Set(["edit", "create", "write", "str_replace", "str_replace_editor", "multiedit", "notebookedit"]);
 const SHELL_TOOLS = new Set(["bash", "shell", "execute", "powershell"]);
 
+// Hook inputs carry `toolArgs` as `unknown`, and the session-event schema marks it
+// `x-opaque-json`: the host may deliver it as an already-parsed object OR as a JSON
+// *string*. Treating the string form as an object silently yields an empty file_path,
+// which makes main-guard fall back to the session cwd - over-blocking every write (even
+// outside any repo) whenever that cwd sits on main, and skipping the path carve-outs
+// entirely. Normalize once, here, so every hook sees a real object.
+function toolArgsOf(input) {
+    const raw = input && input.toolArgs;
+    if (!raw) return {};
+    if (typeof raw === "object") return raw;
+    if (typeof raw === "string") {
+        try {
+            const parsed = JSON.parse(raw);
+            return parsed && typeof parsed === "object" ? parsed : {};
+        } catch (e) {
+            diag("toolArgsOf:parse", e);
+            return {};
+        }
+    }
+    return {};
+}
+
+// Target path of a write tool, across the argument-naming variants.
+function writePathOf(args) {
+    return args.path || args.file_path || args.filePath || args.notebook_path || "";
+}
+
 // Stop-chain throttle/dedup: session.idle fires after every turn; the chain does real work
 // (git, gh, kb), so we serialize it (chainRunning) and rate-limit it (THROTTLE_MS) to avoid
 // duplicate/reentrant runs — the explicit "avoid duplicate/reentrant runs" requirement.
@@ -440,13 +467,13 @@ const hooks = {
 
     onPreToolUse: async (input) => {
         const name = String((input && input.toolName) || "").toLowerCase();
-        const args = (input && input.toolArgs) || {};
+        const args = toolArgsOf(input);
         // Forward the session's working directory so the guards resolve the correct repo/branch
         // even when a relative path is supplied and the extension's own cwd differs (a relative
         // path with a cwd mismatch would otherwise let main-guard resolve no repo and fail OPEN).
         const cwd = (input && input.workingDirectory) || process.cwd();
         if (WRITE_TOOLS.has(name)) {
-            const fp = args.path || args.file_path || args.filePath || "";
+            const fp = writePathOf(args);
             return await applyGuard("main-guard.sh", { tool_input: { file_path: String(fp) } }, cwd);
         }
         if (SHELL_TOOLS.has(name)) {
@@ -459,8 +486,8 @@ const hooks = {
     onPostToolUse: async (input) => {
         const name = String((input && input.toolName) || "").toLowerCase();
         if (!WRITE_TOOLS.has(name)) return undefined;
-        const args = (input && input.toolArgs) || {};
-        const fp = args.path || args.file_path || args.filePath || "";
+        const args = toolArgsOf(input);
+        const fp = writePathOf(args);
         const p = join(HOOKS, "autofmt.sh");
         if (!fp || !existsSync(p)) return undefined;
         // Best-effort format (autofmt is silent-on-success, never-blocks by contract). A failure
