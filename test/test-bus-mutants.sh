@@ -32,10 +32,18 @@ done
 
 mutants_run=0
 
-# mutate <name> <property> <expected-check> <sed-or-python program>
+# mutate <name> <property> <expected-check> <program> [evidence-regex]
 # The program reads bus.sh on stdin and writes the mutant on stdout.
+#
+# `evidence` defaults to a FAIL line from the suite, which is what "the suite
+# noticed" looks like. A few mutants are caught by the BUS ITSELF instead - the
+# delivery audit refuses to advance the cursor and dies - and that fires on the
+# first read, long before the check written for it. That is a STRONGER outcome
+# than a red check (the defect cannot reach a user at all, not merely cannot
+# reach a release), but it is a different string, so those mutants say so
+# explicitly rather than being waved through by a looser default.
 mutate() {
-  local name="$1" property="$2" expect="$3" program="$4"
+  local name="$1" property="$2" expect="$3" program="$4" evidence="${5:-^FAIL}"
   local mut="$WORK/$name.sh" out
   python3 -c "$program" < "$BUS" > "$mut" || fail "$name: the mutation program itself failed"
   chmod +x "$mut"
@@ -47,8 +55,8 @@ mutate() {
   local rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "SURVIVED: $name — the suite passed a bus that $property. The check that should have caught it: $expect"
-  grep -q "^FAIL" <<<"$out" || fail "$name: the suite exited $rc without a FAIL line — it broke rather than detected: $(tail -3 <<<"$out")"
-  printf '  caught: %-22s (%s)\n       -> %s\n' "$name" "$property" "$(grep -m1 '^FAIL' <<<"$out")"
+  grep -qE "$evidence" <<<"$out" || fail "$name: the suite exited $rc without matching /$evidence/ — it broke rather than detected: $(tail -3 <<<"$out")"
+  printf '  caught: %-22s (%s)\n       -> %s\n' "$name" "$property" "$(grep -m1 -E "$evidence" <<<"$out")"
   mutants_run=$((mutants_run + 1))
 }
 
@@ -386,5 +394,65 @@ s = s[:i] + s[j:]
 sys.stdout.write(s)
 '
 
-[ "$mutants_run" = "24" ] || fail "expected 24 mutants, ran $mutants_run"
-echo "PASS: test-bus-mutants.sh — 24/24 mutants caught"
+# ===========================================================================
+# 25-28. The @rex round-4 findings. Two are the SEAM between the two halves of
+#        the boundary; two are silent loss the delivery audit could not see.
+# ===========================================================================
+
+# 25. THE SEAM. The canary is run-wide but structurally blind to an ABSOLUTE
+#     path (a stub is only ever consulted through PATH); the xtrace allowlist
+#     sees absolute paths but used to be scoped to the argument table. Put the
+#     payload where both blind spots overlap - an absolute path, in a refusal
+#     branch the table cannot reach - and it passed the whole green suite while
+#     starting a live agent. Both halves are floors now, which is why this dies.
+mutate abs-in-refusal "spawns an agent BY ABSOLUTE PATH from a refusal branch" "check 45 (allowlist over the whole run)" '
+import sys
+s = sys.stdin.read()
+a = "    || die \"send: BLOCKED"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "    || { \"$RDA_BUS_STUBDIR/claude\" -p x >/dev/null 2>&1 || true; false; } \\\n" + a)
+sys.stdout.write(s)
+'
+
+# 26. The same seam for property 2. This one executes NOTHING - no command, no
+#     traced word, no stub - so only the fingerprint can see it, and the
+#     fingerprint used to be scoped to the table. A REFUSED send wrote a card.
+mutate kanban-in-refusal "writes a card from a refusal branch, executing nothing" "check 47 (kanban fingerprint over the whole run)" '
+import sys
+s = sys.stdin.read()
+a = "    || die \"send: BLOCKED"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "    || { printf \"laundered_by: %s\\\\n\" \"$from\" >> \"$KANBAN/doing/$card.md\" 2>/dev/null; false; } \\\n" + a)
+sys.stdout.write(s)
+'
+
+# 27. SILENT LOSS UPSTREAM OF THE AUDIT. The audit compared the renderer against
+#     the very file that fed it, so anything the FILTER dropped was missing from
+#     both sides: both numbers agreed and both were wrong. `want` is now counted
+#     from the snapshot instead, which spans the whole path.
+#     Caught by the bus, not by the suite: the audit dies on the FIRST read of
+#     the run, which is exactly the behaviour that makes this class survivable.
+mutate upstream-dedupe "drops deliverable records in the filter, before the audit can count them" "the delivery audit in read (check 43 pins the same property)" '
+import sys
+s = sys.stdin.read()
+a = "    | jq -c --arg me \"$as\" --arg all \"$BROADCAST\" \\\n        \x27select(.to == $me or (.to == $all and .from != $me))\x27 > \"$deliverable\""
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "    | jq -sc --arg me \"$as\" --arg all \"$BROADCAST\" \\\n        \x27map(select(.to == $me or (.to == $all and .from != $me))) | unique_by(.to) | .[]\x27 > \"$deliverable\"")
+sys.stdout.write(s)
+' "delivery is incomplete"
+
+# 28. The H1 regression, and the reason check 21 is no longer a race: this exact
+#     mutant was caught 1 run in 3 while genuinely losing a message 1 trial in
+#     10. A standing mutant with a 33% catch rate is a green suite that means
+#     nothing on the property it claims to hold.
+mutate upstream-totallog "advances the cursor past records it never snapshotted" "check 21 (cursor == the snapshot it emitted)" '
+import sys
+s = sys.stdin.read()
+a = "  total=\"$(wc -l < \"$snap\" | tr -d \x27 \x27)\""
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "  total=\"$(wc -l < \"$log\" | tr -d \x27 \x27)\"")
+sys.stdout.write(s)
+'
+
+[ "$mutants_run" = "28" ] || fail "expected 28 mutants, ran $mutants_run"
+echo "PASS: test-bus-mutants.sh — 28/28 mutants caught"

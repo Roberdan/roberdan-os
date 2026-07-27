@@ -240,7 +240,7 @@ if bash test/test-bus.sh >/dev/null 2>&1; then ok "bus delivers durably, attribu
 # first @rex review found one bus check that was dead code and several that a
 # malicious mutant walked past. ~100s, and it is the reason the green above means
 # anything.
-if bash test/test-bus-mutants.sh >/dev/null 2>&1; then ok "every load-bearing bus check has been seen to fail (24/24 mutants caught)"; else err "test-bus-mutants — a mutant SURVIVED, see bash test/test-bus-mutants.sh"; fi
+if bash test/test-bus-mutants.sh >/dev/null 2>&1; then ok "every load-bearing bus check has been seen to fail (28/28 mutants caught)"; else err "test-bus-mutants — a mutant SURVIVED, see bash test/test-bus-mutants.sh"; fi
 
 # --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
 # eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The

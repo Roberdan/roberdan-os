@@ -32,6 +32,41 @@ mkdir -p "$RDA_KANBAN/doing"
 : > "$RDA_KANBAN_REGISTRY"
 
 # ===========================================================================
+# PROPERTY 2 IS A FLOOR TOO: THE BUS NEVER WRITES KANBAN STATE.
+#
+# This used to be checked only inside the argument-table loop - the exact shape
+# of hole the canary hoist just removed for property 1, and an adversary walked
+# straight through it: `printf ... >> $RDA_KANBAN/doing/$card.md` in a refusal
+# branch the table cannot reach wrote a card during a REFUSED send, and the
+# suite stayed green. Note it executes nothing at all: no external command, no
+# traced word, no stub. Measuring "never runs kb" is not the same sentence as
+# "never writes kanban state".
+#
+# So the fingerprint spans the whole run. The suite legitimately writes its own
+# kanban fixtures, so each of those calls kb_rebaseline afterwards. That IS an
+# enumeration - but of OUR writes, not of the bus's branches, and the failure
+# direction is what makes it safe: forgetting a rebaseline turns the suite RED
+# and is diagnosed in seconds, whereas forgetting a table entry left it GREEN
+# while a mutant wrote a card, for five rounds running.
+# ===========================================================================
+kanban_fingerprint() {
+  { find "$RDA_KANBAN" "$RDA_KANBAN_REGISTRY" -type f 2>/dev/null | sort \
+      | while IFS= read -r f; do printf '%s ' "$f"; shasum "$f" | awk '{print $1}'; done; } | shasum | awk '{print $1}'
+}
+assert_kanban_untouched() {
+  [ "$(kanban_fingerprint)" = "$kb_baseline" ] \
+    || fail "the bus CHANGED kanban state without executing anything - card transitions are a human gate ($1)"
+}
+# ASSERT, THEN re-baseline. Re-baselining alone quietly ADOPTS whatever damage
+# happened since the last one: a mutant that wrote a card during check 11 was
+# absorbed by the next fixture's baseline and survived the whole suite. So every
+# fixture write is bracketed - the assert closes the window that ends where the
+# write begins, and the run-wide assert at the end closes the last one.
+kb_fixture() { assert_kanban_untouched "$1"; }
+kb_rebaseline() { kb_baseline="$(kanban_fingerprint)"; }
+kb_rebaseline
+
+# ===========================================================================
 # THE CANARY IS NOT A CHECK, IT IS THE FLOOR OF THE WHOLE RUN.
 #
 # It used to be scoped to one loop over a table of argument paths, and the table
@@ -62,17 +97,66 @@ STUBEOF
   chmod +x "$STUB/$danger"
 done
 export PATH="$STUB:$PATH"
+# Note: with the stub dir global, python3/node/curl/perl are shadowed for the
+# WHOLE run. Nothing here needs them today; a future check that legitimately
+# does will see an opaque exit 127 — remove that name from the list above
+# deliberately rather than wondering.
 assert_never_executed() {
   [ -s "$CANARY" ] && fail "the bus EXECUTED $(tr '\n' ';' < "$CANARY") - it must never start an agent, a scheduler or kb ($1)"
   return 0
 }
 
+# ===========================================================================
+# ...AND THE SAME INVERSION FOR THE OTHER HALF OF THE BOUNDARY.
+#
+# The canary above is blind to absolute paths by construction (a stub is only
+# consulted through PATH), and the xtrace allowlist that DOES see absolute paths
+# used to be scoped to one loop over the argument table. Two halves, two
+# different blind spots, and their intersection is a real hole one mutant wide:
+# `"/tmp/x/claude" -p ...` planted in a refusal branch the table cannot reach
+# passed the entire green suite while starting a live agent.
+#
+# So both halves are now the floor. EVERY invocation of the bus in this file
+# goes through busrun, which runs it under `bash -x`, keeps the trace, and
+# forwards the bus's own stderr unchanged so error-message assertions still work.
+# The allowlist runs at the end over the accumulated trace of the whole suite.
+# Check 45 asserts no direct `bash "$BUS"` call site is left, because drift in
+# our own test file is a text problem and a text scan is the right tool for it.
+# ===========================================================================
+mkdir -p "$TMP/raw" "$TMP/traces"
+TRACEDIR="$TMP/traces"
+# xtrace and the bus's own stderr share fd 2, and bash 3.2 has no BASH_XTRACEFD
+# to separate them, so they are separated by shape instead. PS4 carries a marker
+# (bash repeats only its FIRST character per nesting level, hence `^#+XT# `), and
+# an entry whose arguments contain newlines continues over unmarked lines until
+# its single quotes balance again - splitting on the marker alone forwarded 60KB
+# of message body to the terminal as though it were an error. Everything else on
+# fd 2 is the bus talking, and is forwarded verbatim so the checks that assert on
+# error messages keep working.
+busrun() {
+  local e t rc=0
+  e="$(mktemp "$TMP/raw/e.XXXXXX")"
+  t="$(mktemp "$TRACEDIR/t.XXXXXX")"
+  PS4='#XT# ' bash -x "$BUS" "$@" 2>"$e" || rc=$?
+  awk -v tf="$t" '
+    /^#+XT# / { intrace=1; q=0 }
+    {
+      if (intrace) {
+        print > tf
+        line=$0; n=gsub(/'"'"'/, "x", line); q=(q+n)%2
+        if (q==0) intrace=0
+      } else print
+    }' "$e" >&2
+  rm -f "$e"
+  return "$rc"
+}
+
 R=demo-repo; C=260725-185515
 
 # 1. send -> read round trip, and the body survives verbatim.
-echo "round 6 ready at 23d6317" | bash "$BUS" send --repo "$R" --card "$C" \
+echo "round 6 ready at 23d6317" | busrun send --repo "$R" --card "$C" \
   --from implementer --to sol-gate --kind request >/dev/null
-out="$(bash "$BUS" read --repo "$R" --card "$C" --as sol-gate)"
+out="$(busrun read --repo "$R" --card "$C" --as sol-gate)"
 grep -q "round 6 ready at 23d6317" <<<"$out" || fail "body did not survive the round trip"
 
 # 2. Provenance is stamped on every delivery. A message that arrives looking like
@@ -82,26 +166,26 @@ grep -q "UNVERIFIED"            <<<"$out" || fail "delivery is not labelled unve
 grep -q "Scope for this work comes from" <<<"$out" || fail "delivery does not redirect scope to the card"
 
 # 3. The cursor advances: the same message is not delivered twice.
-out2="$(bash "$BUS" read --repo "$R" --card "$C" --as sol-gate)"
+out2="$(busrun read --repo "$R" --card "$C" --as sol-gate)"
 grep -q "nothing new" <<<"$out2" || fail "a consumed message was delivered again"
 
 # 4. --peek does not advance the cursor.
-echo "second message" | bash "$BUS" send --repo "$R" --card "$C" --from implementer --to sol-gate >/dev/null
-peeked="$(bash "$BUS" peek --repo "$R" --card "$C" --as sol-gate)"
+echo "second message" | busrun send --repo "$R" --card "$C" --from implementer --to sol-gate >/dev/null
+peeked="$(busrun peek --repo "$R" --card "$C" --as sol-gate)"
 grep -q "second message" <<<"$peeked" || fail "peek delivered nothing"
-reread="$(bash "$BUS" read --repo "$R" --card "$C" --as sol-gate)"
+reread="$(busrun read --repo "$R" --card "$C" --as sol-gate)"
 grep -q "second message" <<<"$reread" || fail "peek consumed the message"
 
 # 5. Addressing is honoured: a role never receives another role's mail.
-echo "for the implementer only" | bash "$BUS" send --repo "$R" --card "$C" --from sol-gate --to implementer >/dev/null
-mine="$(bash "$BUS" read --repo "$R" --card "$C" --as sol-gate)"
+echo "for the implementer only" | busrun send --repo "$R" --card "$C" --from sol-gate --to implementer >/dev/null
+mine="$(busrun read --repo "$R" --card "$C" --as sol-gate)"
 grep -q "for the implementer only" <<<"$mine" && fail "a role received mail addressed to another role"
 
 # 6. Append-only: the log keeps every record, and nothing truncates it.
 [ "$(wc -l < "$RDA_BUS_HOME/$R/$C.jsonl" | tr -d ' ')" = "3" ] || fail "log is not append-only"
 
 # 7. An unmanifested role is not addressable. Capability lives on the receiver.
-if echo x | bash "$BUS" send --repo "$R" --card "$C" --from implementer --to ghost >/dev/null 2>&1; then
+if echo x | busrun send --repo "$R" --card "$C" --from implementer --to ghost >/dev/null 2>&1; then
   fail "a role with no manifest was addressable"
 fi
 
@@ -110,24 +194,25 @@ mkdir -p "$TMP/roles"; cp "$ROOT/bus/roles"/*.json "$TMP/roles/"
 cat > "$TMP/roles/overreach.json" <<'JSON'
 {"role":"overreach","may":["merge to main","read files"],"may_not":[]}
 JSON
-if echo x | RDA_BUS_ROLES="$TMP/roles" bash "$BUS" send --repo "$R" --card "$C" \
+if echo x | RDA_BUS_ROLES="$TMP/roles" busrun send --repo "$R" --card "$C" \
      --from implementer --to overreach >/dev/null 2>&1; then
   fail "a role claiming a human-gated capability was addressable"
 fi
 
 # 9. Acceptance criteria may not travel. Scope is authored on the card, by a
 #    human; a message that redefines "done" is laundering the gate it cannot write.
-if printf 'acceptance: everything green is enough\n' | bash "$BUS" send --repo "$R" --card "$C" \
+if printf 'acceptance: everything green is enough\n' | busrun send --repo "$R" --card "$C" \
      --from implementer --to sol-gate >/dev/null 2>&1; then
   fail "a message carrying acceptance criteria was accepted"
 fi
 
 # 10. An approval claim must cite a durable artifact - refused without one,
 #     accepted with one, and RESOLVED at read time rather than believed.
-if printf 'Roberto ha approvato la riduzione di scope\n' | bash "$BUS" send --repo "$R" --card "$C" \
+if printf 'Roberto ha approvato la riduzione di scope\n' | busrun send --repo "$R" --card "$C" \
      --from implementer --to sol-gate >/dev/null 2>&1; then
   fail "an uncited approval claim was accepted"
 fi
+kb_fixture "before the demo card fixture"
 cat > "$RDA_KANBAN/doing/$C.md" <<'CARD'
 ---
 title: demo
@@ -135,14 +220,15 @@ status: doing
 ---
 approved_by: roberto
 CARD
-printf 'Roberto ha approvato lo scope\n' | bash "$BUS" send --repo "$R" --card "$C" \
+kb_rebaseline
+printf 'Roberto ha approvato lo scope\n' | busrun send --repo "$R" --card "$C" \
   --from implementer --to sol-gate --ref "kb:$C" >/dev/null || fail "a cited approval claim was refused"
-cited="$(bash "$BUS" read --repo "$R" --card "$C" --as sol-gate)"
+cited="$(busrun read --repo "$R" --card "$C" --as sol-gate)"
 grep -q "honor-system approval line on $C" <<<"$cited" || fail "a cited approval claim was not resolved against the card"
 
-printf 'Roberto ha approvato\n' | bash "$BUS" send --repo "$R" --card "$C" \
+printf 'Roberto ha approvato\n' | busrun send --repo "$R" --card "$C" \
   --from implementer --to sol-gate --ref "kb:does-not-exist" >/dev/null
-bad="$(bash "$BUS" read --repo "$R" --card "$C" --as sol-gate)"
+bad="$(busrun read --repo "$R" --card "$C" --as sol-gate)"
 grep -q "UNRESOLVED" <<<"$bad" || fail "an unresolvable citation was not reported loudly"
 
 # 10b. Cards live PER REPO. A citation to another registered repo's board must
@@ -150,13 +236,15 @@ grep -q "UNRESOLVED" <<<"$bad" || fail "an unresolvable citation was not reporte
 #      and reporting it UNRESOLVED would fail safe but useless.
 OTHER="$TMP/other-repo"; mkdir -p "$OTHER/kanban/done"
 printf 'approved_by: roberto\n' > "$OTHER/kanban/done/260101-000000.md"
-printf '%s\n' "$OTHER" > "$RDA_KANBAN_REGISTRY"
-echo "roberto ha approvato lo scope" | bash "$BUS" send --repo "$R" --card "$C" \
+kb_fixture "before the cross-repo registry fixture"
+printf '%s\n' "$OTHER" > "$RDA_KANBAN_REGISTRY"; kb_rebaseline
+echo "roberto ha approvato lo scope" | busrun send --repo "$R" --card "$C" \
   --from implementer --to sol-gate --ref kb:260101-000000 >/dev/null
-xrepo="$(bash "$BUS" read --repo "$R" --card "$C" --as sol-gate)"
+xrepo="$(busrun read --repo "$R" --card "$C" --as sol-gate)"
 grep -q "honor-system approval line on 260101-000000" <<<"$xrepo" \
   || fail "a citation to another registered repo's board was not resolved"
-: > "$RDA_KANBAN_REGISTRY"
+kb_fixture "before clearing the registry"
+: > "$RDA_KANBAN_REGISTRY"; kb_rebaseline
 
 # 10c. A git citation resolves against a REAL object, and a plausible-looking sha
 #      that exists nowhere is reported UNRESOLVED rather than believed.
@@ -164,29 +252,31 @@ GREPO="$TMP/git-repo"; mkdir -p "$GREPO"
 git -C "$GREPO" init -q 2>/dev/null
 git -C "$GREPO" -c user.email=t@t -c user.name=t commit -q --allow-empty -m seed
 GSHA="$(git -C "$GREPO" rev-parse HEAD)"
-printf '%s\n' "$GREPO" > "$RDA_KANBAN_REGISTRY"
-echo "roberto ha approvato: vedi il commit" | bash "$BUS" send --repo "$R" --card "$C" \
+kb_fixture "before the git-repo registry fixture"
+printf '%s\n' "$GREPO" > "$RDA_KANBAN_REGISTRY"; kb_rebaseline
+echo "roberto ha approvato: vedi il commit" | busrun send --repo "$R" --card "$C" \
   --from implementer --to sol-gate --ref "git:$GSHA" >/dev/null
-echo "roberto ha approvato: vedi il commit" | bash "$BUS" send --repo "$R" --card "$C" \
+echo "roberto ha approvato: vedi il commit" | busrun send --repo "$R" --card "$C" \
   --from implementer --to sol-gate --ref git:0000000000000000000000000000000000000000 >/dev/null
-gitout="$(cd "$TMP" && bash "$BUS" read --repo "$R" --card "$C" --as sol-gate)"
+gitout="$(cd "$TMP" && busrun read --repo "$R" --card "$C" --as sol-gate)"
 grep -q "EXISTS as commit $GSHA" <<<"$gitout" || fail "a real commit citation did not resolve"
 grep -q "UNRESOLVED (no commit 0000000" <<<"$gitout" || fail "a nonexistent commit was not reported UNRESOLVED"
 #      ...and with an EMPTY registry the cwd repo still resolves it, exactly as
 #      kb's _sha_resolves does. Same citation, same answer, both sides of a gate.
-: > "$RDA_KANBAN_REGISTRY"
-cwdout="$(cd "$GREPO" && bash "$BUS" log --repo "$R" --card "$C")"
+kb_fixture "before clearing the registry again"
+: > "$RDA_KANBAN_REGISTRY"; kb_rebaseline
+cwdout="$(cd "$GREPO" && busrun log --repo "$R" --card "$C")"
 grep -q "EXISTS as commit $GSHA" <<<"$cwdout" || fail "the cwd repo did not resolve its own commit"
 
 # 11. Bodies pass the same privacy tier as kanban cards.
 printf '#!/bin/sh\nexit 1\n' > "$TMP/leak-stub.sh"; chmod +x "$TMP/leak-stub.sh"
-if echo "anything" | RDA_LEAKCHECK="$TMP/leak-stub.sh" bash "$BUS" send --repo "$R" --card "$C" \
+if echo "anything" | RDA_LEAKCHECK="$TMP/leak-stub.sh" busrun send --repo "$R" --card "$C" \
      --from implementer --to sol-gate >/dev/null 2>&1; then
   fail "leak-check refusal did not block the send"
 fi
 
 # 12. Liveness is OBSERVED, not declared: no lease to register, refresh or expire.
-alive="$(bash "$BUS" who --repo "$R")"
+alive="$(busrun who --repo "$R")"
 grep -q "implementer" <<<"$alive" || fail "who did not report a role that has appended"
 [ -e "$RDA_BUS_HOME/$R/subscribers" ] && fail "a lease/subscriber registry appeared - liveness must stay an observation"
 
@@ -214,8 +304,11 @@ chmod +x "$TMP/lc2-leak-check.sh"
 # A stub for the ABSOLUTE-PATH case. @rex walked through the PATH stubs twice by
 # spelling the binary /tmp/.../claude: an absolute path never consults PATH, so
 # no amount of names in the list above can see it. That evasion is caught by the
-# allowlist in 13b instead - which is why 13b must normalise before matching, and
-# why these two checks are one boundary in two halves rather than belt and braces.
+# allowlist (check 45) instead - which is why it must normalise before matching,
+# and why these two checks are one boundary in two halves rather than belt and
+# braces. Both halves are now run-wide: hoisting only one left a seam exactly one
+# mutant wide, and an absolute path inside an untabled refusal branch walked
+# through it while the suite printed PASS.
 
 # EVERY path through the bus, not every subcommand NAME. The broadcast branch,
 # the ref resolvers, the stdin body and the failing sends were all unreached, and
@@ -283,28 +376,15 @@ teardown_degraded() {
   rm -f "$RDA_BUS_HOME/$R/dmg$1.jsonl" "$RDA_BUS_HOME/$R/empty$1.jsonl" "$RDA_BUS_HOME/$R/locked$1.jsonl"
 }
 
-canary_run() {
-  RDA_LEAKCHECK="$TMP/lc/leak-check.sh" PATH="$STUB:$PATH" bash "$BUS" "$@" >/dev/null 2>&1 || true
-}
+canary_run() ( RDA_LEAKCHECK="$TMP/lc/leak-check.sh" busrun "$@" >/dev/null 2>&1 || true )
 echo "a plain note" > "$TMP/body.txt"
 # A real sha and a real card so the ref-resolution branches are actually entered
 # rather than bailing out early.
 REAL_SHA="$(git -C "$ROOT" rev-parse HEAD)"
 KBCARD=260725-185515
+kb_fixture "before the gate-loop card fixture"
 printf -- '---\ntitle: fixture\nstatus: doing\n---\napproved_by: roberto\n' > "$RDA_KANBAN/doing/$KBCARD.md"
-# Property 2 is "never writes kanban STATE", and the canary only ever measured
-# "never executes kb". Those are not the same sentence: `printf ... >> $RDA_KANBAN/doing/$card.md`
-# writes the state while executing nothing at all - no external command, no
-# traced word, no stub. So hash the whole isolated kanban tree and registry
-# around the gate and require them byte-identical afterwards. Found by an
-# adversarial pass that went looking for the gap between the property and its
-# proxy; it is the difference between measuring the effect and measuring one
-# known cause of it.
-kanban_fingerprint() {
-  { find "$RDA_KANBAN" "$RDA_KANBAN_REGISTRY" -type f 2>/dev/null | sort \
-      | while IFS= read -r f; do printf '%s ' "$f"; shasum "$f" | awk '{print $1}'; done; } | shasum | awk '{print $1}'
-}
-kb_before="$(kanban_fingerprint)"
+kb_rebaseline
 setup_degraded 1
 export RDA_BUS_LOCK_TRIES=3   # so the lock-timeout branch is reached in 0.3s, not 10s
 while IFS= read -r line; do
@@ -317,54 +397,8 @@ teardown_degraded 1
 # --body-file and was never exercised.
 echo "a piped note" | canary_run send --repo "$R" --card "$C" --from implementer --to sol-gate
 assert_never_executed "argument-path table"
-[ "$(kanban_fingerprint)" = "$kb_before" ] \
-  || fail "the bus CHANGED kanban state without executing anything - card transitions are a human gate"
-
-# 13b. Allowlist, not denylist - and derived from what the bus ACTUALLY EXECUTES,
-#      not from what its source looks like. A static scan of the text both misses
-#      indirection (a binary named in an env var) and hallucinates commands out
-#      of regex literals. So: run every subcommand under xtrace and collect the
-#      first word of every traced command that resolves to a real binary. A
-#      denylist loses to the first tool nobody thought of; this turns "the bus
-#      started calling something new" into a failure that has to be answered on
-#      purpose, which is the gate that has to hold in month 2. Extend
-#      deliberately, never idly.
-ALLOWED=" jq git date grep mkdir rmdir cp cat wc tail sort awk printf mktemp rm tr basename dirname sleep shasum iconv leak-check.sh "
-TRACE="$TMP/trace"; : > "$TRACE"
-# The trace run keeps the STUB PATH. It used to drop it, which meant the payload
-# had to actually RUN before the allowlist could notice it: a `touch` planted in
-# the bus really created its file, and only then was reported. A detector that
-# must execute what it is detecting is not a safe detector for this class.
-trace_run() {
-  RDA_LEAKCHECK="$TMP/lc/leak-check.sh" PATH="$STUB:$PATH" bash -x "$BUS" "$@" >/dev/null 2>>"$TRACE" || true
-}
-setup_degraded 2
-while IFS= read -r line; do
-  [ -n "$line" ] || continue
-  # shellcheck disable=SC2086
-  trace_run $line
-done < <(bus_paths 2)
-teardown_degraded 2
+assert_kanban_untouched "argument-path table"
 unset RDA_BUS_LOCK_TRIES
-echo "a piped note" | trace_run send --repo "$R" --card "$C" --from implementer --to sol-gate
-# NORMALISE BEFORE MATCHING. Two evasions were invisible to the old filter:
-#   /tmp/stubs/claude   - dropped entirely, because the word starts with '/'
-#   BUS_WAKE=1 claude   - the first word is the assignment, not the command
-# Strip leading VAR=value prefixes, then take the basename, so both collapse to
-# `claude` and fail the allowlist. An allowlist that silently discards the
-# spellings an attacker would choose is a denylist wearing a costume.
-executed="$(sed -E 's/^\++[[:space:]]*//' "$TRACE" \
-  | sed -E 's/^([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)+//' \
-  | awk '{print $1}' | sed -E 's#.*/##' \
-  | grep -E '^[a-zA-Z_][a-zA-Z0-9_.-]*$' | sort -u \
-  | while IFS= read -r w; do [ "$(type -t "$w" 2>/dev/null)" = "file" ] && echo "$w"; done)"
-[ -n "$executed" ] || fail "the trace captured no external command at all - the allowlist check is not actually running"
-while IFS= read -r cmd; do
-  case "$ALLOWED" in
-    *" $cmd "*) ;;
-    *) fail "the bus executed the external command '$cmd', which is not on the allowlist - add it here deliberately or remove the call";;
-  esac
-done <<<"$executed"
 
 # 13c. The dormant counterpart is still dormant. Test 13's whole premise is that
 #      dispatch is a reviewed, deliberately-disabled capability living elsewhere.
@@ -379,7 +413,7 @@ before="$(shasum "$RDA_BUS_HOME/$R/$C.jsonl" | awk '{print $1}')"
 for sub in "read --repo $R --card $C --as sol-gate" "peek --repo $R --card $C --as sol-gate" \
            "log --repo $R --card $C" "who --repo $R" "roles"; do
   # shellcheck disable=SC2086
-  bash "$BUS" $sub >/dev/null 2>&1 || true
+  busrun $sub >/dev/null 2>&1 || true
 done
 after="$(shasum "$RDA_BUS_HOME/$R/$C.jsonl" | awk '{print $1}')"
 [ "$before" = "$after" ] || fail "a subcommand modified the permanent log"
@@ -397,16 +431,16 @@ grep -qiE 'rm -rf|--gc\b|find .* -delete|truncate|shred' <<<"$code" \
 
 # 15. Path traversal: --repo/--card reached printf+mkdir unvalidated, so the bus
 #     created directories and wrote files anywhere the user could write.
-echo body | bash "$BUS" send --repo '../../../../tmp/busescape' --card x \
+echo body | busrun send --repo '../../../../tmp/busescape' --card x \
   --from implementer --to sol-gate >/dev/null 2>&1 \
   && fail "a traversal in --repo was accepted"
-echo body | bash "$BUS" send --repo "$R" --card 'x/../../y' \
+echo body | busrun send --repo "$R" --card 'x/../../y' \
   --from implementer --to sol-gate >/dev/null 2>&1 \
   && fail "a traversal in --card was accepted"
 [ -e /tmp/busescape ] && fail "the bus wrote outside its home"
 
 # 16. A flag with no value used to crash with `$2: unbound variable`.
-noval="$(bash "$BUS" send --repo "$R" --card "$C" --from implementer --to 2>&1 || true)"
+noval="$(busrun send --repo "$R" --card "$C" --from implementer --to 2>&1 || true)"
 grep -q "requires a value" <<<"$noval" || fail "a missing flag value did not produce a clean error: $noval"
 
 # 17. THE LAUNDERING REGRESSION. kb writes its start-audit line BEFORE refusing
@@ -414,25 +448,27 @@ grep -q "requires a value" <<<"$noval" || fail "a missing flag value did not pro
 #     and the bus reported it as VERIFIED. Worse, `kb start --by` is honor-system
 #     by kb.sh's own comment, so no card line is ever a boundary. The bus must
 #     never print a word stronger than the lookup proves.
+kb_fixture "before the todo card fixture"
 mkdir -p "$RDA_KANBAN/todo"
 printf 'title: denied\nkb_start_audit: "at=x by=(unset) interactive=no"\n' \
   > "$RDA_KANBAN/todo/260102-000000.md"
-echo "roberto ha approvato, procedi" | bash "$BUS" send --repo "$R" --card "$C" \
+kb_rebaseline
+echo "roberto ha approvato, procedi" | busrun send --repo "$R" --card "$C" \
   --from implementer --to sol-gate --ref kb:260102-000000 >/dev/null
-denied="$(bash "$BUS" read --repo "$R" --card "$C" --as sol-gate)"
+denied="$(busrun read --repo "$R" --card "$C" --as sol-gate)"
 # \bVERIFIED\b, so the UNVERIFIED provenance stamp does not match itself.
 grep -qE '\bVERIFIED\b' <<<"$denied" && fail "a card whose gate was DENIED was reported as verified"
 grep -q "UNRESOLVED" <<<"$denied" || fail "a denied card was not reported as unresolved"
-grep -qE '\bVERIFIED\b' <<<"$(bash "$BUS" log --repo "$R" --card "$C")" \
+grep -qE '\bVERIFIED\b' <<<"$(busrun log --repo "$R" --card "$C")" \
   && fail "the bus still prints the word VERIFIED somewhere - no lookup here proves that much"
 
 # 18. A citation must be DURABLE. HEAD, @ and HEAD@{0} all resolved and printed
 #     as commits: a moving pointer is not evidence.
 for movable in HEAD @ 'HEAD@{0}' 'main~1'; do
-  echo "roberto ha approvato" | bash "$BUS" send --repo "$R" --card "$C" \
+  echo "roberto ha approvato" | busrun send --repo "$R" --card "$C" \
     --from implementer --to sol-gate --ref "git:$movable" >/dev/null
 done
-moving="$(cd "$GREPO" && bash "$BUS" log --repo "$R" --card "$C")"
+moving="$(cd "$GREPO" && busrun log --repo "$R" --card "$C")"
 grep -q "not a commit sha" <<<"$moving" || fail "a moving git ref was accepted as a durable citation"
 
 # 19. Concurrent appends must not corrupt a log that is permanent and unrepaired.
@@ -444,7 +480,7 @@ grep -q "not a commit sha" <<<"$moving" || fail "a moving git ref was accepted a
 #     unlocked mutant loses every time rather than most times.
 BIG="$TMP/big.txt"; head -c 60000 < /dev/zero | tr '\0' 'x' > "$BIG"
 for _ in $(seq 1 16); do
-  bash "$BUS" send --repo "$R" --card conc --from implementer --to sol-gate --body-file "$BIG" >/dev/null &
+  busrun send --repo "$R" --card conc --from implementer --to sol-gate --body-file "$BIG" >/dev/null &
 done
 wait
 jq -e . "$RDA_BUS_HOME/$R/conc.jsonl" >/dev/null 2>&1 || fail "concurrent appends corrupted the log"
@@ -454,35 +490,52 @@ jq -e . "$RDA_BUS_HOME/$R/conc.jsonl" >/dev/null 2>&1 || fail "concurrent append
 #     parse error after printing part of the thread, so a reader who does not
 #     check the exit code believed they had seen everything.
 printf 'not json\n' >> "$RDA_BUS_HOME/$R/conc.jsonl"
-corrupt="$(bash "$BUS" log --repo "$R" --card conc 2>&1 || true)"
+corrupt="$(busrun log --repo "$R" --card conc 2>&1 || true)"
 grep -q "damaged" <<<"$corrupt" || fail "a corrupt log was not reported clearly"
 grep -q "CLAIM BY" <<<"$corrupt" && fail "a corrupt log still emitted a partial thread"
 
 # 21. Delivery must not be lost to a message arriving while a read is in flight.
 #     The cursor used to be recomputed AFTER emitting, so anything appended in
 #     between was marked read without ever being delivered.
+#
+#     THIS CHECK IS DETERMINISTIC ON PURPOSE. It used to race a reader against a
+#     writer and hope, and the mutant for this exact defect (the cursor taken
+#     from the live log instead of the snapshot) was caught 1 run in 3 - a
+#     standing mutant with a 33% catch rate is a green suite that means nothing
+#     on the property it claims. The bus exposes a test-only pause immediately
+#     after the snapshot, so the late arrival lands INSIDE the window every
+#     time, and the mutant loses every time. The consequence is not theoretical:
+#     swept by hand, the defect silently lost a message in 1 trial out of 10.
 for _ in 1 2 3 4 5 6 7 8 9 10; do
-  bash "$BUS" send --repo "$R" --card race --from implementer --to sol-gate --body-file "$BIG" >/dev/null
+  busrun send --repo "$R" --card race --from implementer --to sol-gate --body-file "$BIG" >/dev/null
 done
-( bash "$BUS" read --repo "$R" --card race --as sol-gate >/dev/null ) &
+( RDA_BUS_TEST_PAUSE=2 busrun read --repo "$R" --card race --as sol-gate >/dev/null ) &
 reader=$!
-echo "LATE-ARRIVAL" | bash "$BUS" send --repo "$R" --card race --from implementer --to sol-gate >/dev/null
+sleep 0.5   # the reader is now holding its snapshot and sleeping
+echo "LATE-ARRIVAL" | busrun send --repo "$R" --card race --from implementer --to sol-gate >/dev/null
 wait "$reader"
-late="$(bash "$BUS" read --repo "$R" --card race --as sol-gate)"
+#     The invariant behind it, stated directly: the cursor a read stores is the
+#     line count of the SNAPSHOT it emitted, never of the log as it stands
+#     afterwards. The reader snapshotted 10 records and the log now holds 11, so
+#     the two numbers differ and this pins the mechanism, not just the symptom.
+[ "$(wc -l < "$RDA_BUS_HOME/$R/race.jsonl" | tr -d ' ')" = "11" ] || fail "the race fixture is not the shape this check assumes"
+[ "$(tr -d '[:space:]' < "$RDA_BUS_HOME/$R/.cursor/race/sol-gate")" = "10" ] \
+  || fail "the cursor does not match the snapshot the reader emitted - it was recomputed from the live log"
+late="$(busrun read --repo "$R" --card race --as sol-gate)"
 grep -q "LATE-ARRIVAL" <<<"$late" || fail "a message that arrived during a read was silently marked as read"
 
 # 22. leak-check is FAIL-CLOSED: an unusable one refuses the send instead of
 #     silently dropping the privacy tier, and the real one is wired correctly.
-closed="$(echo hi | RDA_LEAKCHECK=/nonexistent bash "$BUS" send --repo "$R" --card "$C" \
+closed="$(echo hi | RDA_LEAKCHECK=/nonexistent busrun send --repo "$R" --card "$C" \
   --from implementer --to sol-gate 2>&1 || true)"
 grep -q "leak-check is not executable" <<<"$closed" || fail "an unusable leak-check did not refuse the send"
-real="$(echo "a harmless sentence" | RDA_LEAKCHECK="$ROOT/test/leak-check.sh" bash "$BUS" send \
+real="$(echo "a harmless sentence" | RDA_LEAKCHECK="$ROOT/test/leak-check.sh" busrun send \
   --repo "$R" --card "$C" --from implementer --to sol-gate 2>&1 || true)"
 grep -q "appended" <<<"$real" || fail "the REAL leak-check wiring rejects an innocuous body: $real"
 
 # 23. who exits 0 and sees a role that has only READ. A review agent that has
 #     been reading for three minutes used to show as dead.
-whoout="$(bash "$BUS" who --repo "$R")" || fail "who exited non-zero"
+whoout="$(busrun who --repo "$R")" || fail "who exited non-zero"
 grep -q "sol-gate" <<<"$whoout" || fail "who does not see a role that has only read"
 
 # ===========================================================================
@@ -499,7 +552,7 @@ cat > "$M3/auditor.json" <<'AUD'
   "may_not": ["write code", "move a card", "approve anything"]
 }
 AUD
-r3() { RDA_BUS_ROLES="$M3" bash "$BUS" "$@"; }
+r3() { RDA_BUS_ROLES="$M3" busrun "$@"; }
 C3=multi-agent-card
 
 # 24. Addressed delivery: a third role does not receive mail sent to someone else.
@@ -581,7 +634,7 @@ grep -q "the auditor's own" <<<"$after" \
 
 # 29. Liveness with three: `who` must attribute the right card to the right role
 #     and not merge two threads into one line.
-w3="$(RDA_BUS_ROLES="$M3" bash "$BUS" who --repo "$R" 2>/dev/null)"
+w3="$(RDA_BUS_ROLES="$M3" busrun who --repo "$R" 2>/dev/null)"
 grep -q "auditor" <<<"$w3" || fail "who does not see the third role"
 [ "$(grep -c "auditor" <<<"$w3")" = "1" ] || fail "who reports the same role on more than one line"
 
@@ -597,7 +650,7 @@ grep -q "auditor" <<<"$w3" || fail "who does not see the third role"
 #     An absolute path in --repo is the interesting one - it writes outside the
 #     bus home entirely.
 for badv in "a/b" "/tmp/rex-escape" "a b" "-rf" ".hidden"; do
-  out="$(echo body | bash "$BUS" send --repo "$badv" --card "$C" \
+  out="$(echo body | busrun send --repo "$badv" --card "$C" \
           --from implementer --to sol-gate 2>&1 || true)"
   # Each of these is refused for its own reason - a slash, a space, a leading
   # dash, a leading dot - so assert the refusal, not one particular sentence.
@@ -615,7 +668,7 @@ MDOT="$TMP/roles-dot"; mkdir -p "$MDOT"; cp "$ROOT/bus/roles/"*.json "$MDOT/"
 for rn in "sol.gate" "gate"; do
   jq -n --arg r "$rn" '{role:$r,may:["read a thread"],may_not:["approve anything"]}' > "$MDOT/$rn.json"
 done
-rd() { RDA_BUS_ROLES="$MDOT" bash "$BUS" "$@"; }
+rd() { RDA_BUS_ROLES="$MDOT" busrun "$@"; }
 echo "for sol.gate on 26.07"  | rd send --repo "$R" --card 26.07     --from sol.gate --to sol.gate >/dev/null
 rd read --repo "$R" --card 26.07 --as sol.gate >/dev/null
 echo "for gate on 26.07.sol"  | rd send --repo "$R" --card 26.07.sol --from gate --to gate >/dev/null
@@ -629,7 +682,7 @@ rd who --repo "$R" 2>/dev/null | grep -qE '^gate ' \
 #     created left zero bytes, and every later read raised the loudest message in
 #     the file about a thread that had simply never been written to.
 mkdir -p "$RDA_BUS_HOME/$R"; : > "$RDA_BUS_HOME/$R/empty-thread.jsonl"
-eout="$(bash "$BUS" read --repo "$R" --card empty-thread --as sol-gate 2>&1)" \
+eout="$(busrun read --repo "$R" --card empty-thread --as sol-gate 2>&1)" \
   || fail "reading an empty thread failed: $eout"
 grep -qi "damaged" <<<"$eout" && fail "an empty log was reported as damaged"
 
@@ -639,7 +692,7 @@ grep -qi "damaged" <<<"$eout" && fail "an empty log was reported as damaged"
 dmg="$RDA_BUS_HOME/$R/damaged-half.jsonl"
 jq -cn '{ts:"t",repo:"r",card:"damaged-half",from:"implementer",to:"sol-gate",kind:"note",ref:null,body:"FIRST RECORD"}' > "$dmg"
 printf '{"ts":"t","body":"unterminated\n' >> "$dmg"
-dout="$(bash "$BUS" read --repo "$R" --card damaged-half --as sol-gate 2>&1 || true)"
+dout="$(busrun read --repo "$R" --card damaged-half --as sol-gate 2>&1 || true)"
 grep -q "FIRST RECORD" <<<"$dout" && fail "a damaged log delivered a partial thread before failing"
 grep -qi "damaged" <<<"$dout" || fail "a damaged log did not fail loudly: $dout"
 
@@ -648,17 +701,17 @@ grep -qi "damaged" <<<"$dout" || fail "a damaged log did not fail loudly: $dout"
 #     whose whole purpose is carrying verdicts with diffs in them.
 big="$TMP/big-body.txt"; : > "$big"
 for _ in $(seq 1 60); do head -c 51200 /dev/zero | tr '\0' 'x' >> "$big"; echo >> "$big"; done
-bout="$(bash "$BUS" send --repo "$R" --card big-body --from implementer --to sol-gate --body-file "$big" 2>&1)" \
+bout="$(busrun send --repo "$R" --card big-body --from implementer --to sol-gate --body-file "$big" 2>&1)" \
   || fail "a 3MB body was refused with: $bout"
 grep -q "appended" <<<"$bout" || fail "a large send did not report success: $bout"
-bash "$BUS" read --repo "$R" --card big-body --as sol-gate >/dev/null \
+busrun read --repo "$R" --card big-body --as sol-gate >/dev/null \
   || fail "a large record cannot be read back"
 
 # 35. `roles/all.json` is refused ON SIGHT. With it present, `bus roles` used to
 #     advertise @all as an actor while every operation involving it failed.
 MALL="$TMP/roles-all"; mkdir -p "$MALL"; cp "$ROOT/bus/roles/"*.json "$MALL/"
 jq -n '{role:"all",may:["read a thread"],may_not:["approve anything"]}' > "$MALL/all.json"
-aout="$(RDA_BUS_ROLES="$MALL" bash "$BUS" roles 2>&1 || true)"
+aout="$(RDA_BUS_ROLES="$MALL" busrun roles 2>&1 || true)"
 grep -qi "shadows the reserved broadcast addressee" <<<"$aout" \
   || fail "bus roles advertised a manifest that shadows the broadcast addressee: $aout"
 
@@ -669,7 +722,7 @@ grep -qi "shadows the reserved broadcast addressee" <<<"$aout" \
 #     rather than write.
 held="$RDA_BUS_HOME/$R/locked-card.jsonl.lock"
 mkdir -p "$(dirname "$held")" "$held"
-lout="$(RDA_BUS_LOCK_TRIES=3 bash "$BUS" send --repo "$R" --card locked-card \
+lout="$(RDA_BUS_LOCK_TRIES=3 busrun send --repo "$R" --card locked-card \
          --from implementer --to sol-gate --body-file "$TMP/body.txt" 2>&1 || true)"
 grep -qi "could not acquire the log lock" <<<"$lout" || fail "a send ignored a held lock: $lout"
 grep -qi "held since" <<<"$lout" || fail "the stale-lock message does not say how old the lock is"
@@ -692,41 +745,41 @@ rmdir "$held"
 #        difference. An isolated repo makes the assertion mean what it says.
 CR=close-repo
 CC=closable
-echo "the work" | bash "$BUS" send --repo "$CR" --card "$CC" --from implementer --to sol-gate >/dev/null
+echo "the work" | busrun send --repo "$CR" --card "$CC" --from implementer --to sol-gate >/dev/null
 
 # 37. Reading twice costs only what is new. This is the actual answer to the
 #     token question, and it is worth asserting rather than asserting.
-first="$(bash "$BUS" read --repo "$CR" --card "$CC" --as sol-gate)"
+first="$(busrun read --repo "$CR" --card "$CC" --as sol-gate)"
 grep -q "the work" <<<"$first" || fail "the first read did not deliver"
-second="$(bash "$BUS" read --repo "$CR" --card "$CC" --as sol-gate)"
+second="$(busrun read --repo "$CR" --card "$CC" --as sol-gate)"
 grep -q "the work" <<<"$second" && fail "history was re-sent on a second read - every read would cost the whole thread"
 
 # 38. A closed thread delivers nothing, appears in no summary, and is still there.
-bash "$BUS" close --repo "$CR" --card "$CC" --by sol-gate >/dev/null || fail "close failed"
-cout="$(bash "$BUS" read --repo "$CR" --card "$CC" --as implementer)"
+busrun close --repo "$CR" --card "$CC" --by sol-gate >/dev/null || fail "close failed"
+cout="$(busrun read --repo "$CR" --card "$CC" --as implementer)"
 grep -q "CLAIM BY" <<<"$cout" && fail "a closed thread still delivered messages"
 grep -qi "is closed" <<<"$cout" || fail "a closed thread did not say so: $cout"
-bash "$BUS" who --repo "$CR" | grep -q "$CC" && fail "a closed thread still shows in who"
-bash "$BUS" log --repo "$CR" --card "$CC" > "$TMP/closed-log.txt" 2>&1 || true
+busrun who --repo "$CR" | grep -q "$CC" && fail "a closed thread still shows in who"
+busrun log --repo "$CR" --card "$CC" > "$TMP/closed-log.txt" 2>&1 || true
 grep -q "the work" "$TMP/closed-log.txt" \
   || fail "closing LOST the thread - it must keep every word. log said: $(head -3 "$TMP/closed-log.txt")"
 
 # 39. Closing is not a deletion and not a gate: a closed thread refuses new mail
 #     until someone reopens it on purpose, so nothing is appended to a
 #     conversation everyone has stopped reading.
-sout="$(echo late | bash "$BUS" send --repo "$CR" --card "$CC" --from implementer --to sol-gate 2>&1 || true)"
+sout="$(echo late | busrun send --repo "$CR" --card "$CC" --from implementer --to sol-gate 2>&1 || true)"
 grep -qi "is closed" <<<"$sout" || fail "a send to a closed thread was accepted: $sout"
-bash "$BUS" open --repo "$CR" --card "$CC" --by implementer >/dev/null || fail "open failed"
-echo late | bash "$BUS" send --repo "$CR" --card "$CC" --from implementer --to sol-gate >/dev/null \
+busrun open --repo "$CR" --card "$CC" --by implementer >/dev/null || fail "open failed"
+echo late | busrun send --repo "$CR" --card "$CC" --from implementer --to sol-gate >/dev/null \
   || fail "a reopened thread still refuses mail"
 
 # 40. The state is the LAST marker, so close/open/close is not ambiguous, and
 #     the markers are records in the log rather than a side file that could go
 #     missing while the thread it described stayed.
-bash "$BUS" close --repo "$CR" --card "$CC" --by sol-gate >/dev/null
+busrun close --repo "$CR" --card "$CC" --by sol-gate >/dev/null
 grep -q '"kind":"closed"' "$RDA_BUS_HOME/$CR/$CC.jsonl" || fail "the closure is not recorded in the log itself"
 [ "$(grep -c '"kind":"opened"' "$RDA_BUS_HOME/$CR/$CC.jsonl")" = "1" ] || fail "the reopen was not recorded"
-dbl="$(bash "$BUS" close --repo "$CR" --card "$CC" --by sol-gate 2>&1 || true)"
+dbl="$(busrun close --repo "$CR" --card "$CC" --by sol-gate 2>&1 || true)"
 grep -qi "already closed" <<<"$dbl" || fail "closing twice was not refused: $dbl"
 
 # 41. --peek must NEVER advance the cursor, for a DIRECT message, for a BROADCAST
@@ -735,17 +788,17 @@ grep -qi "already closed" <<<"$dbl" || fail "closing twice was not refused: $dbl
 #     worst failure this thing has: send succeeds, read returns nothing, and no
 #     error is printed anywhere. Silent loss is why the bus exists to begin with.
 PK=peekcard
-echo direct1  | bash "$BUS" send --repo "$R" --card "$PK" --from implementer --to sol-gate    >/dev/null
-echo bcast1   | bash "$BUS" send --repo "$R" --card "$PK" --from implementer --to all         >/dev/null
-echo direct2  | bash "$BUS" send --repo "$R" --card "$PK" --from implementer --to sol-gate    >/dev/null
+echo direct1  | busrun send --repo "$R" --card "$PK" --from implementer --to sol-gate    >/dev/null
+echo bcast1   | busrun send --repo "$R" --card "$PK" --from implementer --to all         >/dev/null
+echo direct2  | busrun send --repo "$R" --card "$PK" --from implementer --to sol-gate    >/dev/null
 for attempt in 1 2 3; do
-  pk="$(bash "$BUS" read --repo "$R" --card "$PK" --as sol-gate --peek)"
+  pk="$(busrun read --repo "$R" --card "$PK" --as sol-gate --peek)"
   for want in direct1 bcast1 direct2; do
     grep -q "$want" <<<"$pk" || fail "peek #$attempt did not show $want - a peek consumed it"
   done
 done
 [ -e "$RDA_BUS_HOME/$R/.cursor/$PK/sol-gate" ] && fail "peek WROTE a cursor - peeking is not reading"
-real="$(bash "$BUS" read --repo "$R" --card "$PK" --as sol-gate)"
+real="$(busrun read --repo "$R" --card "$PK" --as sol-gate)"
 for want in direct1 bcast1 direct2; do
   grep -q "$want" <<<"$real" || fail "$want was lost between peek and read"
 done
@@ -755,12 +808,6 @@ done
 #     ones nobody enumerated. Six refusal branches were caught by exactly this
 #     line after five hand-maintained tables had missed them.
 assert_never_executed "whole run"
-# The kanban fingerprint deliberately stays scoped to the gate loop rather than
-# being hoisted here too: the SUITE writes kanban fixtures of its own after that
-# point, so a run-wide comparison would fail on this file's writes rather than
-# the bus's. The canary has no such problem - nothing in this suite legitimately
-# invokes any of the stubbed names - which is exactly why it can be the floor
-# and the fingerprint cannot.
 
 # 43. DELIVERY IS COMPLETE AT A SIZE NOBODY EYEBALLED. Every other delivery
 #     assertion here uses batches of one to three, so a CAP - the single most
@@ -772,9 +819,9 @@ assert_never_executed "whole run"
 #     nothing measured it.
 BIGN=25
 for i in $(seq 1 $BIGN); do
-  echo "msg-$i" | bash "$BUS" send --repo "$R" --card bulk --from implementer --to sol-gate >/dev/null
+  echo "msg-$i" | busrun send --repo "$R" --card bulk --from implementer --to sol-gate >/dev/null
 done
-bulk="$(bash "$BUS" read --repo "$R" --card bulk --as sol-gate)" || fail "the bulk read failed outright"
+bulk="$(busrun read --repo "$R" --card bulk --as sol-gate)" || fail "the bulk read failed outright"
 got="$(grep -c '^CLAIM BY' <<<"$bulk")"
 [ "$got" = "$BIGN" ] || fail "delivery is INCOMPLETE and silent: $BIGN sent, $got delivered"
 for i in $(seq 1 $BIGN); do
@@ -789,13 +836,70 @@ grep -q "$BIGN deliverable" <<<"$bulk" || fail "the trailer disagrees with what 
 #     rewritten version is the only one anyone reads afterwards. Refuse loudly
 #     rather than repair quietly.
 printf 'diff line: caf\xe9 latin1\n' > "$TMP/latin1.txt"
-l1="$(bash "$BUS" send --repo "$R" --card enc --from implementer --to sol-gate --body-file "$TMP/latin1.txt" 2>&1 || true)"
+l1="$(busrun send --repo "$R" --card enc --from implementer --to sol-gate --body-file "$TMP/latin1.txt" 2>&1 || true)"
 grep -qi "not valid UTF-8" <<<"$l1" || fail "a non-UTF-8 body was accepted and silently mangled: $l1"
 [ -f "$RDA_BUS_HOME/$R/enc.jsonl" ] && fail "the refused body was written to the log anyway"
 printf 'caf\xc3\xa9 \xe2\x9c\x93 utf8\n' > "$TMP/utf8.txt"
-bash "$BUS" send --repo "$R" --card enc --from implementer --to sol-gate --body-file "$TMP/utf8.txt" >/dev/null \
+busrun send --repo "$R" --card enc --from implementer --to sol-gate --body-file "$TMP/utf8.txt" >/dev/null \
   || fail "a valid UTF-8 body with non-ASCII characters was refused"
-u8="$(bash "$BUS" read --repo "$R" --card enc --as sol-gate)"
+u8="$(busrun read --repo "$R" --card enc --as sol-gate)"
 grep -q 'café ✓ utf8' <<<"$u8" || fail "non-ASCII UTF-8 did not survive verbatim"
+
+# ===========================================================================
+# 45-47. THE THREE RUN-WIDE FLOORS, ASSERTED LAST SO THEY COVER EVERY LINE ABOVE.
+# ===========================================================================
+
+# 45. THE ALLOWLIST, NOW RUN-WIDE. It used to be scoped to the argument table,
+#     while the canary was already global - two halves of one boundary with two
+#     different blind spots, and their intersection was a real hole: the canary
+#     cannot see an ABSOLUTE path (a stub is only consulted through PATH), the
+#     table cannot reach a REFUSAL branch, so `"/tmp/x/claude" -p ...` in a
+#     refusal branch passed the entire green suite and started a live agent.
+#     Every bus invocation in this file now goes through busrun, so this runs
+#     over the trace of the WHOLE suite. Extend deliberately, never idly.
+ALLOWED=" jq git date grep mkdir rmdir cp cat wc tail sort awk printf mktemp rm tr basename dirname sleep shasum iconv leak-check.sh "
+# NORMALISE BEFORE MATCHING. Two evasions were invisible to the old filter:
+#   /tmp/stubs/claude   - dropped entirely, because the word starts with '/'
+#   BUS_WAKE=1 claude   - the first word is the assignment, not the command
+# Strip leading VAR=value prefixes, then take the basename, so both collapse to
+# `claude` and fail the allowlist. An allowlist that silently discards the
+# spellings an attacker would choose is a denylist wearing a costume.
+# Only MARKED lines name a command: an entry whose argument spans newlines
+# continues over unmarked lines, and treating those as commands turned 60KB of
+# message body into 60KB of imaginary command names.
+executed="$(cat "$TRACEDIR"/t.* 2>/dev/null \
+  | grep -E '^#+XT# ' \
+  | sed -E 's/^#+XT#[[:space:]]*//' \
+  | sed -E 's/^([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)+//' \
+  | awk '{print $1}' | sed -E 's#.*/##' \
+  | grep -E '^[a-zA-Z_][a-zA-Z0-9_.-]*$' | sort -u \
+  | while IFS= read -r w; do
+      # `[ ... ] && echo` leaves the loop - and, under set -e, the whole
+      # assignment - with the exit status of the LAST word tested, which aborted
+      # the suite silently whenever the last name was not a binary.
+      if [ "$(type -t "$w" 2>/dev/null)" = "file" ]; then echo "$w"; fi
+    done)"
+[ -n "$executed" ] || fail "the trace captured no external command at all - the allowlist check is not actually running"
+while IFS= read -r cmd; do
+  case "$ALLOWED" in
+    *" $cmd "*) ;;
+    *) fail "the bus executed the external command '$cmd', which is not on the allowlist - add it here deliberately or remove the call";;
+  esac
+done <<<"$executed"
+
+# 46. NO UNTRACED CALL SITE. Check 45 only covers what busrun ran, so a future
+#     `bash "$BUS" ...` written straight into this file would quietly opt that
+#     invocation out of the boundary - the same drift that kept reopening the
+#     enumerated version. Drift in our own test file is a text problem, and a
+#     text scan is the right tool for exactly that.
+direct="$(grep -vE '^[[:space:]]*#' "$0" \
+  | grep -nE 'bash( -x)? "\$BUS"' \
+  | grep -v "PS4='#XT# '" | grep -v 'grep -nE' || true)"
+[ -z "$direct" ] || fail "an untraced direct invocation of the bus exists, so check 45 does not cover it: $direct"
+
+# 47. Property 2, run-wide, for the same reason as 42: a payload that writes a
+#     card executes nothing, so the canary cannot see it, and the fingerprint was
+#     scoped to the table - a refused send that appended to a card walked through.
+assert_kanban_untouched "whole run"
 
 echo "PASS: test-bus.sh"
