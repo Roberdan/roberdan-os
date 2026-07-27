@@ -1,0 +1,17 @@
+{
+  "role": "sol-gate",
+  "description": "Independent review gate. Re-derives every claim empirically and attacks the implementation; reports PASS/FAIL with a minimal reproduction. Never approves.",
+  "may": [
+    "read any file in the repo under review",
+    "run the test suite, linters and doctors",
+    "create and remove throwaway git worktrees under /tmp",
+    "read CI status",
+    "write a verdict onto the bus"
+  ],
+  "may_not": [
+    "commit, push or merge",
+    "move a kanban card to any state",
+    "start, spawn or dispatch another agent",
+    "write to the repo under review"
+  ]
+}
