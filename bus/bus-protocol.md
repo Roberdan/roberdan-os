@@ -37,43 +37,53 @@ greps forbade and passed every one of them.
    — and it cannot see a branch the table never reaches. Both are real: @rex
    spawned 54 agents by absolute path and passed all 29 checks, then hid a
    payload in the broadcast branch, which the table did not yet exercise.
-   *Half two (check 13b)* closes the first gap: it takes an xtrace of what
+   *Half two (check 45)* closes the first gap: it takes an xtrace of what
    **actually ran**, **normalises each word** (strips `VAR=value` prefixes, takes
    the basename) and matches it against an **allowlist** — an allowlist, not a
    denylist, because a denylist always misses something. Normalisation is
    load-bearing: without it `/opt/claude` and `BUS_WAKE=1 claude` are simply
    different strings and match nothing.
-   The second gap has no clever fix: **coverage is a safety property here, not a
-   metric.** Checks 24-29 run with the *real* `PATH`, so an unexercised branch
-   carrying a payload does not merely go unnoticed — it starts live agent
-   sessions during the test run. Any new branch must be added to the path table
-   in the same commit.
+   The second gap has no clever fix at the level of the table: **coverage is a
+   safety property here, not a metric.** An unexercised branch carrying a payload
+   does not merely go unnoticed — parts of the suite run with the *real* `PATH`
+   available to an absolute path, so it starts live agent sessions during the
+   test run.
    That hole reopened **five times** — an unexercised branch (broadcast), two
    unexercised subcommands (`close`/`open`), two degraded paths, and finally six
    **refusal** branches that the table could not reach by construction, because
    it only ever supplies valid roles, valid slugs, a passing leak-check and an
    empty registry. Each time the answer had been to extend the table, and each
    time the next disguise was already written.
-   So the polarity is now **inverted, and this is the actual fix**: the recording
-   stubs are first on `PATH` for the *entire* `test-bus.sh` run, and the canary
-   must be empty at the end (check 42). "Gated" no longer means "somebody
-   remembered to add this branch to a table"; it means "anything the suite
-   exercises anywhere is measured". The table still decides what gets
-   *exercised* — so coverage still matters, and an error path is still a path —
-   but it no longer decides what gets *watched*.
-   One thing could not be hoisted with it, and the asymmetry is worth stating:
-   the kanban fingerprint stays scoped to the gate loop, because the suite writes
-   kanban fixtures of its own and a run-wide comparison would fail on the tests'
-   writes rather than the bus's. Nothing in the suite legitimately invokes a
-   stubbed binary, which is precisely why the canary can be the floor and the
-   fingerprint cannot.
+   So the polarity is **inverted, and this is the actual fix**: the recording
+   stubs are first on `PATH` for the *entire* `test-bus.sh` run and the canary
+   must be empty at the end (check 42), **and every invocation of the bus in the
+   suite goes through `busrun`**, which runs it under `bash -x`, so the allowlist
+   at the end (check 45) reads the trace of the *whole run* too. "Gated" no
+   longer means "somebody remembered to add this branch to a table"; it means
+   "anything the suite exercises anywhere is measured". The table still decides
+   what gets *exercised* — so coverage still matters, and an error path is still
+   a path — but it no longer decides what gets *watched*.
+   **Hoisting only one half was itself a hole**, and it lasted exactly one round:
+   the canary is blind to absolute paths by construction, the allowlist was
+   scoped to the table, so a payload in their intersection — `"/tmp/x/claude" -p
+   …` inside a refusal branch — passed the whole green suite and started a live
+   agent. Two halves of one boundary have to be floors together or the seam
+   between them is the hole. Check 46 keeps them together by refusing any direct
+   `bash "$BUS"` call site, which would silently opt an invocation out of 45.
    And the property is not the same sentence as its proxy. "Never writes kanban
    state" was checked as "never executes `kb`" — so `printf ... >> $card.md`
    satisfied the check while violating the property completely: no command, no
-   traced word, no canary. The gate now hashes the whole isolated kanban tree
-   around the run and requires it byte-identical, which measures the *effect*
-   rather than one known cause of it.
-   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 24
+   traced word, no canary. The gate hashes the whole isolated kanban tree and
+   requires it byte-identical (check 47), which measures the *effect* rather than
+   one known cause of it — and that hash spans the **whole run** as well, for the
+   same reason as the canary. The suite writes kanban fixtures of its own, so
+   each one is bracketed: assert untouched, write, re-baseline. That is an
+   enumeration of *our* writes rather than of the bus's branches, and the failure
+   direction is what makes it safe — a forgotten bracket turns the suite **red**,
+   whereas a forgotten table entry left it **green** while a mutant wrote a card.
+   Re-baselining without asserting first is not safe: it silently *adopts*
+   whatever happened since, and a mutant survived exactly that way for one round.
+   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 28
    deliberate violations and asserts that each is caught by a *named* check,
    including every evasion above. A check that has never been seen to fail is not
    evidence — and the three most recent mutants exist because an adversarial pass
@@ -87,7 +97,9 @@ greps forbade and passed every one of them.
    their gates. A bus that cannot write state cannot launder a human gate. The
    canary covers `kb` and `kb.sh` **as invoked names**, with the same two limits
    and the same two halves as property 1 — an absolute path is caught by the
-   normalised allowlist, not by the stubs.
+   normalised allowlist, not by the stubs — and the byte-identical fingerprint of
+   the kanban tree (check 47) covers what neither of them can see: a write that
+   executes nothing at all.
 3. **It should never carry acceptance criteria — DECLARED HEURISTIC, NOT ENFORCED.**
    Scope comes from the card (`dod:`/`acceptance:`, authored by a human) and from
    the diff. A message may direct **attention**; it must never define
@@ -254,14 +266,27 @@ success — and since the log is permanent, the rewritten version is the only on
 anyone reads afterwards. "The body survives verbatim" had only ever been
 asserted with ASCII.
 
-`read` **audits its own delivery**: it counts the records it hands to the
-renderer against the records the renderer produced, and refuses to advance the
-cursor if they differ. The cursor moves past the whole snapshot and the log is
+`read` **audits its own delivery**: it counts the records the *snapshot* says are
+deliverable against the records the renderer actually produced, and refuses to
+advance the cursor if they differ. Counting the file that feeds the renderer
+instead made the audit downstream-only — anything the **filter** dropped was
+missing from both sides, so both numbers agreed and both were wrong, and a
+one-word dedupe in the pipeline rendered 1 of 3 records while the trailer
+correctly printed 3. The cursor moves past the whole snapshot and the log is
 append-only, so a record that was deliverable but not rendered is unreachable
 forever with nothing printed to say so — `send` returned 0, `read` returned 0,
 and the trailer even reported the right count. A batch cap added to "save
 tokens" is the obvious way this breaks; check 43 sends 25 because every other
 delivery assertion here uses batches of one to three.
+
+The other way to lose a message is the **cursor**, and there both counts agree
+because the loss is upstream of counting: a cursor computed from the live log
+rather than from the snapshot marks anything that arrived mid-read as seen.
+`read` exposes `RDA_BUS_TEST_PAUSE` — a validated number, and only ever a
+`sleep` — purely so check 21 can put the late arrival inside that window every
+time. It used to race and hope, and the mutant for this exact defect was caught
+1 run in 3 while genuinely losing a message 1 trial in 10. A standing mutant with
+a 33% catch rate is a green suite that means nothing on the property it claims.
 
 Bodies pass the same `leak-check.sh` as cards — **fail-closed**: if it is missing
 or not executable the send is refused. It used to skip, and it could be switched

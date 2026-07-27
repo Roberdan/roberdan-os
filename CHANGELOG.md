@@ -22,8 +22,8 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   Coverage is a safety property rather than a metric here: the multi-agent checks run with
   the *real* `PATH`, so a branch missing from the table does not merely go unnoticed, it
   starts live sessions during the test run. `bus/*.sh` added to `SHELLCHECK_TARGETS`.
-- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 24 deliberate violations, each
-  naming the property it breaks and the check that must catch it; 24/24 caught. Written
+- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 28 deliberate violations, each
+  naming the property it breaks and the check that must catch it; 28/28 caught. Written
   because two reviews found their blockers by *executing* mutants while every reading of the
   same code passed it — a check that has never been seen to fail is not evidence. It found
   two bugs in its own assertions and one in `who`. A third, adversarial pass then found three
@@ -49,6 +49,17 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   `test-bus.sh` run and the canary must be empty at the end. "Gated" stops meaning "somebody
   remembered to list this branch" and starts meaning "anything the suite exercises anywhere is
   measured". All six died to that one assertion.
+  A sixth pass (@rex, fourth round) found the hole in the **seam between the two halves**:
+  the canary is blind to an absolute path by construction, and the *allowlist* — the half
+  that does see absolute paths — was still scoped to the table, so `"/tmp/x/claude"` inside
+  a refusal branch passed the entire green suite and started a live agent. Two halves of one
+  boundary have to be floors together, so every bus invocation in the suite now runs under
+  `busrun` (`bash -x`, marked `PS4`) and the allowlist reads the trace of the whole run; a
+  static check refuses any direct `bash "$BUS"` call site that would opt out of it. The same
+  round did the same to property 2: the kanban fingerprint was hoisted run-wide, with the
+  suite's own fixture writes bracketed *assert-then-write-then-rebaseline* — re-baselining
+  without asserting first silently **adopts** the damage, which is how a mutant that wrote a
+  card from a refused send survived a round. 28/28 mutants caught.
 - **`read` audits its own delivery, and non-UTF-8 bodies are refused rather than repaired.**
   Nothing measured delivery *completeness*: every assertion used batches of one to three, so a
   20-record cap passed the whole suite while five messages became unreachable forever — `send`
@@ -57,6 +68,13 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   what the renderer produced and refuses to advance on a mismatch. Separately, `jq --rawfile`
   substituted U+FFFD for undecodable bytes, so a latin-1 diff was silently rewritten while
   `send` reported success; "survives verbatim" had only ever been asserted with ASCII.
+  The audit's first form was **downstream-only** — it counted the same file that fed the
+  renderer, so anything the *filter* dropped was missing from both sides and both numbers
+  agreed while both were wrong. It now counts the snapshot independently. The other silent
+  loss is the cursor, where both counts agree by construction: `read` takes a validated
+  test-only pause so the "message arrived mid-read" check stops being a race it wins twice
+  out of three and becomes an invariant (the stored cursor is the snapshot's line count),
+  caught 10 times out of 10.
 - **Broadcast addressing (`--to all`) so the bus works with three or more agents.** Reaches
   every role except the sender; nothing is consumed, so a broadcast is delivered in full to
   each role rather than taken by whoever reads first — a bus, not a work queue. `all` is a

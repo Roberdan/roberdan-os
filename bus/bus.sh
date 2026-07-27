@@ -403,6 +403,14 @@ _cmd_read() {
   # during a 900KB append were invalid.
   snap="$(mktemp)"
   _with_lock "$log" cp "$log" "$snap"
+  # TEST-ONLY WINDOW. The regression this guards (the cursor computed from the
+  # live log instead of the snapshot) is a race, and a race-based test passes most
+  # of the time for reasons unrelated to the property: the mutant for it was
+  # caught 1 run in 3. This widens the window on demand so the check is
+  # deterministic. It can only ever sleep — it is validated as a number, it is
+  # unset in every real invocation, and it is watched by the same run-wide canary
+  # and allowlist as every other line here.
+  if [[ "${RDA_BUS_TEST_PAUSE:-}" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then sleep "$RDA_BUS_TEST_PAUSE"; fi
   # Validate THE BYTES WE WILL EMIT, not the file they came from. Validating the
   # file and streaming from a different read of it is the same TOCTOU one layer
   # down.
@@ -420,7 +428,14 @@ _cmd_read() {
     || { rm -f "$snap" "$deliverable"; die "the snapshot of $log could not be filtered — nothing was delivered, so nothing is half-read"; }
   local emitted_f emitted want
   emitted_f="$(mktemp)"
-  want="$(wc -l < "$deliverable" | tr -d ' ')"
+  # `want` is derived from THE SNAPSHOT, not from $deliverable. Counting the same
+  # file that feeds the renderer makes the audit downstream-only: anything the
+  # filter itself drops (a dedupe, a narrowed select, an off-by-one in the tail)
+  # is missing from both sides, both numbers agree, and both are wrong. Recomputed
+  # independently, the audit spans the whole path from snapshot to rendered line.
+  want="$(jq -s --arg me "$as" --arg all "$BROADCAST" --argjson skip "$seen" \
+      '.[$skip:] | map(select(.to == $me or (.to == $all and .from != $me))) | length' "$snap")" \
+    || { rm -f "$snap" "$deliverable" "$emitted_f"; die "the snapshot of $log could not be counted — nothing was delivered, so nothing is half-read"; }
   RDA_BUS_EMITTED="$emitted_f" _emit "$card" < "$deliverable"
   emitted="$(cat "$emitted_f" 2>/dev/null || echo 0)"; rm -f "$emitted_f"
   # THE DELIVERY AUDIT. The cursor advances past everything in the snapshot, and
