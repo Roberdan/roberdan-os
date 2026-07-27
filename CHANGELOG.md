@@ -22,8 +22,8 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   Coverage is a safety property rather than a metric here: the multi-agent checks run with
   the *real* `PATH`, so a branch missing from the table does not merely go unnoticed, it
   starts live sessions during the test run. `bus/*.sh` added to `SHELLCHECK_TARGETS`.
-- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 17 deliberate violations, each
-  naming the property it breaks and the check that must catch it; 17/17 caught. Written
+- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 19 deliberate violations, each
+  naming the property it breaks and the check that must catch it; 19/19 caught. Written
   because two reviews found their blockers by *executing* mutants while every reading of the
   same code passed it — a check that has never been seen to fail is not evidence. It found
   two bugs in its own assertions and one in `who`. A third, adversarial pass then found three
@@ -32,7 +32,15 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   property while satisfying its proxy, since no command is executed at all — and a `--peek`
   that consumed broadcasts, the one failure mode where a message is accepted, never
   delivered, and nothing prints an error. The gate now hashes the kanban tree around the run
-  instead of only watching for `kb`.
+  instead of only watching for `kb`. A fourth pass (@thor, refusing to mark the card done)
+  found the same coverage hole in its third disguise: payloads in the **degraded** branches —
+  the damaged-log warning in `who` and the lock-timeout refusal — passed the whole green suite
+  while the canary recorded live `claude -p` calls. Those branches run in an ordinary test
+  run, so the gate now sets up a damaged log, an empty log and a held lock and drives them on
+  purpose. An error path is still a path. It also made the close/open checks run in their own
+  repo: `who` deduplicates per role, so "a closed thread disappears from `who`" was true or
+  false depending on which timestamp sorted last, and caught its mutant by hand while missing
+  it in the harness.
 - **Broadcast addressing (`--to all`) so the bus works with three or more agents.** Reaches
   every role except the sender; nothing is consumed, so a broadcast is delivered in full to
   each role rather than taken by whoever reads first — a bus, not a work queue. `all` is a

@@ -228,7 +228,34 @@ close --repo $R --card gate$1 --by sol-gate
 open --repo $R --card gate$1 --by sol-gate
 open --repo $R --card gate$1 --by sol-gate
 close --repo $R --card nosuchthread --by sol-gate
+log --repo $R --card dmg$1
+read --repo $R --card dmg$1 --as sol-gate
+who --repo $R
+send --repo $R --card locked$1 --from implementer --to sol-gate --body-file $TMP/body.txt
+read --repo $R --card empty$1 --as sol-gate
+log --repo $R --card empty$1
 PATHS
+}
+
+# The DEGRADED branches, set up so the paths above actually reach them. @thor
+# walked through the gate twice here: a payload in the "damaged log" warning of
+# `who`, and one in the lock-timeout `die`, both passed the whole suite green
+# while the canary recorded live `claude -p` calls. Those branches DO run in a
+# normal test run (the damaged-log warning fires three times), just outside the
+# canary loop - so an ungated payload there would have started real sessions
+# during a run that printed PASS. An error path is still a path.
+setup_degraded() {
+  mkdir -p "$RDA_BUS_HOME/$R"
+  printf 'not json at all\n' > "$RDA_BUS_HOME/$R/dmg$1.jsonl"
+  : > "$RDA_BUS_HOME/$R/empty$1.jsonl"
+  : > "$RDA_BUS_HOME/$R/locked$1.jsonl"
+  mkdir -p "$RDA_BUS_HOME/$R/locked$1.jsonl.lock"
+  printf 'pid 1 at 2020-01-01T00:00:00Z\n' > "$RDA_BUS_HOME/$R/locked$1.jsonl.lock/owner"
+}
+teardown_degraded() {
+  rm -f "$RDA_BUS_HOME/$R/locked$1.jsonl.lock/owner"
+  rmdir "$RDA_BUS_HOME/$R/locked$1.jsonl.lock" 2>/dev/null || true
+  rm -f "$RDA_BUS_HOME/$R/dmg$1.jsonl" "$RDA_BUS_HOME/$R/empty$1.jsonl" "$RDA_BUS_HOME/$R/locked$1.jsonl"
 }
 
 canary_run() {
@@ -253,11 +280,14 @@ kanban_fingerprint() {
       | while IFS= read -r f; do printf '%s ' "$f"; shasum "$f" | awk '{print $1}'; done; } | shasum | awk '{print $1}'
 }
 kb_before="$(kanban_fingerprint)"
+setup_degraded 1
+export RDA_BUS_LOCK_TRIES=3   # so the lock-timeout branch is reached in 0.3s, not 10s
 while IFS= read -r line; do
   [ -n "$line" ] || continue
   # shellcheck disable=SC2086
   canary_run $line
 done < <(bus_paths 1)
+teardown_degraded 1
 # ...and the same paths with a body on stdin, which is a different code path from
 # --body-file and was never exercised.
 echo "a piped note" | canary_run send --repo "$R" --card "$C" --from implementer --to sol-gate
@@ -283,11 +313,14 @@ TRACE="$TMP/trace"; : > "$TRACE"
 trace_run() {
   RDA_LEAKCHECK="$TMP/lc/leak-check.sh" PATH="$STUB:$PATH" bash -x "$BUS" "$@" >/dev/null 2>>"$TRACE" || true
 }
+setup_degraded 2
 while IFS= read -r line; do
   [ -n "$line" ] || continue
   # shellcheck disable=SC2086
   trace_run $line
 done < <(bus_paths 2)
+teardown_degraded 2
+unset RDA_BUS_LOCK_TRIES
 echo "a piped note" | trace_run send --repo "$R" --card "$C" --from implementer --to sol-gate
 # NORMALISE BEFORE MATCHING. Two evasions were invisible to the old filter:
 #   /tmp/stubs/claude   - dropped entirely, because the word starts with '/'
@@ -625,42 +658,50 @@ rmdir "$held"
 #        loses the reasoning. Closing makes a finished thread free and silent
 #        while keeping every word.
 # ===========================================================================
+#        These run in their OWN repo. `who` deduplicates to the most recent
+#        activity per role, so in a repo full of other threads a closed card is
+#        visible only when it happens to sort last for someone - which made the
+#        "closed disappears from who" assertion pass or fail depending on
+#        timestamps. It caught its mutant when run by hand and missed it inside
+#        the mutation harness, which is the signature of a race, not of a
+#        difference. An isolated repo makes the assertion mean what it says.
+CR=close-repo
 CC=closable
-echo "the work" | bash "$BUS" send --repo "$R" --card "$CC" --from implementer --to sol-gate >/dev/null
+echo "the work" | bash "$BUS" send --repo "$CR" --card "$CC" --from implementer --to sol-gate >/dev/null
 
 # 37. Reading twice costs only what is new. This is the actual answer to the
 #     token question, and it is worth asserting rather than asserting.
-first="$(bash "$BUS" read --repo "$R" --card "$CC" --as sol-gate)"
+first="$(bash "$BUS" read --repo "$CR" --card "$CC" --as sol-gate)"
 grep -q "the work" <<<"$first" || fail "the first read did not deliver"
-second="$(bash "$BUS" read --repo "$R" --card "$CC" --as sol-gate)"
+second="$(bash "$BUS" read --repo "$CR" --card "$CC" --as sol-gate)"
 grep -q "the work" <<<"$second" && fail "history was re-sent on a second read - every read would cost the whole thread"
 
 # 38. A closed thread delivers nothing, appears in no summary, and is still there.
-bash "$BUS" close --repo "$R" --card "$CC" --by sol-gate >/dev/null || fail "close failed"
-cout="$(bash "$BUS" read --repo "$R" --card "$CC" --as implementer)"
+bash "$BUS" close --repo "$CR" --card "$CC" --by sol-gate >/dev/null || fail "close failed"
+cout="$(bash "$BUS" read --repo "$CR" --card "$CC" --as implementer)"
 grep -q "CLAIM BY" <<<"$cout" && fail "a closed thread still delivered messages"
 grep -qi "is closed" <<<"$cout" || fail "a closed thread did not say so: $cout"
-bash "$BUS" who --repo "$R" | grep -q "$CC" && fail "a closed thread still shows in who"
-bash "$BUS" log --repo "$R" --card "$CC" > "$TMP/closed-log.txt" 2>&1 || true
+bash "$BUS" who --repo "$CR" | grep -q "$CC" && fail "a closed thread still shows in who"
+bash "$BUS" log --repo "$CR" --card "$CC" > "$TMP/closed-log.txt" 2>&1 || true
 grep -q "the work" "$TMP/closed-log.txt" \
   || fail "closing LOST the thread - it must keep every word. log said: $(head -3 "$TMP/closed-log.txt")"
 
 # 39. Closing is not a deletion and not a gate: a closed thread refuses new mail
 #     until someone reopens it on purpose, so nothing is appended to a
 #     conversation everyone has stopped reading.
-sout="$(echo late | bash "$BUS" send --repo "$R" --card "$CC" --from implementer --to sol-gate 2>&1 || true)"
+sout="$(echo late | bash "$BUS" send --repo "$CR" --card "$CC" --from implementer --to sol-gate 2>&1 || true)"
 grep -qi "is closed" <<<"$sout" || fail "a send to a closed thread was accepted: $sout"
-bash "$BUS" open --repo "$R" --card "$CC" --by implementer >/dev/null || fail "open failed"
-echo late | bash "$BUS" send --repo "$R" --card "$CC" --from implementer --to sol-gate >/dev/null \
+bash "$BUS" open --repo "$CR" --card "$CC" --by implementer >/dev/null || fail "open failed"
+echo late | bash "$BUS" send --repo "$CR" --card "$CC" --from implementer --to sol-gate >/dev/null \
   || fail "a reopened thread still refuses mail"
 
 # 40. The state is the LAST marker, so close/open/close is not ambiguous, and
 #     the markers are records in the log rather than a side file that could go
 #     missing while the thread it described stayed.
-bash "$BUS" close --repo "$R" --card "$CC" --by sol-gate >/dev/null
-grep -q '"kind":"closed"' "$RDA_BUS_HOME/$R/$CC.jsonl" || fail "the closure is not recorded in the log itself"
-[ "$(grep -c '"kind":"opened"' "$RDA_BUS_HOME/$R/$CC.jsonl")" = "1" ] || fail "the reopen was not recorded"
-dbl="$(bash "$BUS" close --repo "$R" --card "$CC" --by sol-gate 2>&1 || true)"
+bash "$BUS" close --repo "$CR" --card "$CC" --by sol-gate >/dev/null
+grep -q '"kind":"closed"' "$RDA_BUS_HOME/$CR/$CC.jsonl" || fail "the closure is not recorded in the log itself"
+[ "$(grep -c '"kind":"opened"' "$RDA_BUS_HOME/$CR/$CC.jsonl")" = "1" ] || fail "the reopen was not recorded"
+dbl="$(bash "$BUS" close --repo "$CR" --card "$CC" --by sol-gate 2>&1 || true)"
 grep -qi "already closed" <<<"$dbl" || fail "closing twice was not refused: $dbl"
 
 # 41. --peek must NEVER advance the cursor, for a DIRECT message, for a BROADCAST

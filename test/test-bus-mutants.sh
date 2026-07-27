@@ -215,7 +215,7 @@ sys.stdout.write(s)
 # 13. Closing must never become deleting. The whole argument for keeping history
 #     is that the reasoning is the artifact; a close that quietly truncates the
 #     log would satisfy every other test in the suite.
-mutate close-deletes "deletes the thread when closing it" "check 38 (closing keeps every word)" '
+mutate close-deletes "deletes the thread when closing it" "check 37-40 (close/open lifecycle: closing keeps every word)" '
 import sys
 s = sys.stdin.read()
 anchor = "  local bf; bf=\"$(mktemp)\"\n"
@@ -229,7 +229,7 @@ sys.stdout.write(s)
 #     the writers and kept the readers. Which half won depended on which
 #     timestamp sorted last, so the check has to be run more than once to be
 #     believed - hence this mutant, which makes it deterministic.
-mutate who-half-closed "hides closed threads from who only on the write path" "check 39 (closed disappears from who)" '
+mutate who-half-closed "hides closed threads from who only on the write path" "check 37-40 (close/open lifecycle: closed disappears from who)" '
 import sys
 s = sys.stdin.read()
 anchor = "        [ \"$(_thread_state \"$clog\")\" != \"closed\" ] || continue"
@@ -286,5 +286,36 @@ s = s.replace(a, "  if [ \"$advance\" = \"1\" ] || grep -q \x27\"to\":\"all\"\x2
 sys.stdout.write(s)
 '
 
-[ "$mutants_run" = "17" ] || fail "expected 17 mutants, ran $mutants_run"
-echo "PASS: test-bus-mutants.sh — 17/17 mutants caught"
+# --- Found by @thor validating the card, by executing rather than reading. The
+#     same coverage class as mutants 12 and 15, in its third disguise: not an
+#     unexercised SUBCOMMAND this time, but an unexercised DEGRADED BRANCH. Both
+#     of these passed the entire green suite while the canary recorded live
+#     `claude -p` calls. What makes it load-bearing rather than tidy: those
+#     branches really do run in a normal test run, under the REAL PATH, so the
+#     regression would not have been missed - it would have started live agent
+#     sessions during a run that printed PASS.
+#     The standing lesson: AN ERROR PATH IS STILL A PATH.
+
+# 18. The damaged-log warning inside `who`.
+mutate damaged-branch "spawns an agent from the damaged-log branch of who" "check 13 (path table drives degraded logs)" '
+import sys
+s = sys.stdin.read()
+a = "        echo \"bus: WARNING"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "        claude -p \"who saw damage\" >/dev/null 2>&1 || true\n" + a)
+sys.stdout.write(s)
+'
+
+# 19. The lock-timeout refusal. Reached only when a lock is already held, which
+#     nothing in the gate used to do.
+mutate lock-timeout "spawns an agent when it cannot take the lock" "check 13 (path table holds a lock)" '
+import sys
+s = sys.stdin.read()
+a = "    [ \"$waited\" -lt \"$tries\" ] || die"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "    [ \"$waited\" -lt \"$tries\" ] || claude -p \"lock stuck\" >/dev/null 2>&1 || true\n" + a)
+sys.stdout.write(s)
+'
+
+[ "$mutants_run" = "19" ] || fail "expected 19 mutants, ran $mutants_run"
+echo "PASS: test-bus-mutants.sh — 19/19 mutants caught"

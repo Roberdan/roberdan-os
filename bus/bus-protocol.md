@@ -48,18 +48,28 @@ greps forbade and passed every one of them.
    carrying a payload does not merely go unnoticed — it starts live agent
    sessions during the test run. Any new branch must be added to the path table
    in the same commit.
+   That hole has now reopened three times, in three disguises: an unexercised
+   *branch* (broadcast), two unexercised *subcommands* (`close`/`open`, added
+   after the table and never added to it), and two unexercised **degraded
+   paths** — the damaged-log warning in `who` and the lock-timeout refusal. The
+   last pair is the sharpest illustration, because those branches really do run
+   in an ordinary test run: a payload there passed the entire green suite while
+   the canary recorded live `claude -p` calls. **An error path is still a path**,
+   so the table now sets up a damaged log, an empty log and a held lock, and
+   drives them deliberately.
    And the property is not the same sentence as its proxy. "Never writes kanban
    state" was checked as "never executes `kb`" — so `printf ... >> $card.md`
    satisfied the check while violating the property completely: no command, no
    traced word, no canary. The gate now hashes the whole isolated kanban tree
    around the run and requires it byte-identical, which measures the *effect*
    rather than one known cause of it.
-   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 17
+   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 19
    deliberate violations and asserts that each is caught by a *named* check,
    including every evasion above. A check that has never been seen to fail is not
    evidence — and the three most recent mutants exist because an adversarial pass
    proposed five evasions, called them "likely survives" without running them,
-   and three of the five really did.
+   and three of the five really did. The last two were found by @thor refusing to
+   mark the card done.
    *This is the most likely mutation:* at month 2, "if a message is pending,
    start the session" will look obviously right. It is not.
 2. **It never writes kanban state — BEHAVIOURALLY ENFORCED, same lever.**
