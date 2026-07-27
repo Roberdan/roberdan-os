@@ -133,11 +133,11 @@ fi
 rm -rf "$d1" "$d2"
 
 # --- 4) Shellcheck -----------------------------------------------------------
-section "shellcheck (hooks + bin + test + eval + factory + dispatcher shims + lint-cards)"
+section "shellcheck (hooks + bin + test + eval + factory + dispatcher shims + lint-cards + bus)"
 # factory/*.sh, the runner-shims and kanban/lint-cards.sh are security-sensitive (dispatcher
 # sandbox path) — kept in the gate, not just hand-checked (rex nit #1). kanban/kb.sh is
 # deliberately NOT globbed: it carries pre-existing SC1010/SC2010 warnings in untouched code.
-SHELLCHECK_TARGETS=(hooks/*.sh bin/*.sh test/*.sh eval/*.sh factory/*.sh factory/runner-shims/* kanban/lint-cards.sh learn/*.sh ontology/*.sh)
+SHELLCHECK_TARGETS=(hooks/*.sh bin/*.sh test/*.sh eval/*.sh factory/*.sh factory/runner-shims/* kanban/lint-cards.sh learn/*.sh ontology/*.sh bus/*.sh)
 if command -v shellcheck >/dev/null 2>&1; then
   if shellcheck -S warning "${SHELLCHECK_TARGETS[@]}"; then ok "shellcheck clean"; else err "shellcheck warning/error"; fi
 else
@@ -229,6 +229,18 @@ if bash test/test-metaloop.sh >/dev/null 2>&1; then ok "meta-loop promotes end-t
 # buffer actually reaches the agent through the card watch.sh writes (wired, not just present).
 section "evolve rejected-proposal buffer (test/test-evolve-declined.sh)"
 if bash test/test-evolve-declined.sh >/dev/null 2>&1; then ok "declined buffer matches rewordings, spares novelties, reaches the card"; else err "test-evolve-declined — see bash test/test-evolve-declined.sh"; fi
+
+# Messages between agents, never execution. The load-bearing checks are the negative
+# ones: the bus must not be able to start an agent (that is factory/dispatch-runner.sh,
+# dormant by a reviewed decision), write kanban state, or carry acceptance criteria.
+# An unwired test is an unverified claim, so it runs here — see bus/bus-protocol.md.
+section "agent bus — messages, never execution (test/test-bus.sh)"
+if bash test/test-bus.sh >/dev/null 2>&1; then ok "bus delivers durably, attributes, resolves citations to no more than they prove, and executes nothing"; else err "test-bus — see bash test/test-bus.sh"; fi
+# And the suite above is itself only worth what it has been seen to catch: the
+# first @rex review found one bus check that was dead code and several that a
+# malicious mutant walked past. ~100s, and it is the reason the green above means
+# anything.
+if bash test/test-bus-mutants.sh >/dev/null 2>&1; then ok "every load-bearing bus check has been seen to fail (17/17 mutants caught)"; else err "test-bus-mutants — a mutant SURVIVED, see bash test/test-bus-mutants.sh"; fi
 
 # --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
 # eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The

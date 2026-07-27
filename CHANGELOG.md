@@ -3,6 +3,55 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [Unreleased]
+
+### Added
+- **`bus/` — agent-to-agent messages, per repo and per card.** Generalises the improvised
+  `/tmp` file channel two sessions used across seven review rounds of VirtualBPM PR #46.
+  Append-only JSONL thread per (repo, card), per-role cursors, provenance stamped
+  `UNVERIFIED` on every delivery, roles addressable only through a manifest that claims no
+  human-gated action. Not wired into `AGENTS.md`, `hooks/` or `kb`: that is human gate #7.
+- **`test/test-bus.sh`, wired into `validate.sh`.** The two load-bearing properties — never
+  executes anything, never writes kanban state — are enforced **behaviourally**, in two
+  halves with different blind spots: a table of *argument paths* (not subcommand names) runs
+  against a `PATH` of stub binaries with a canary, and an allowlist of external commands is
+  derived from an xtrace of what actually ran, **each traced word normalised** (`VAR=` prefix
+  stripped, basename taken) before matching. The normalisation is the boundary, not the
+  stubs: a command invoked by **absolute path never consults `PATH`**, so the stub half
+  cannot see it at all — a @rex mutant spawned 54 agents that way and passed every check.
+  Coverage is a safety property rather than a metric here: the multi-agent checks run with
+  the *real* `PATH`, so a branch missing from the table does not merely go unnoticed, it
+  starts live sessions during the test run. `bus/*.sh` added to `SHELLCHECK_TARGETS`.
+- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 17 deliberate violations, each
+  naming the property it breaks and the check that must catch it; 17/17 caught. Written
+  because two reviews found their blockers by *executing* mutants while every reading of the
+  same code passed it — a check that has never been seen to fail is not evidence. It found
+  two bugs in its own assertions and one in `who`. A third, adversarial pass then found three
+  more real holes: a payload in `close`/`open` (subcommands added after the path table and
+  never added to it), kanban state written by **shell redirection** — which violated the
+  property while satisfying its proxy, since no command is executed at all — and a `--peek`
+  that consumed broadcasts, the one failure mode where a message is accepted, never
+  delivered, and nothing prints an error. The gate now hashes the kanban tree around the run
+  instead of only watching for `kb`.
+- **Broadcast addressing (`--to all`) so the bus works with three or more agents.** Reaches
+  every role except the sender; nothing is consumed, so a broadcast is delivered in full to
+  each role rather than taken by whoever reads first — a bus, not a work queue. `all` is a
+  reserved addressee: nothing may send *from* it or read *as* it, and an `all.json` manifest
+  is refused rather than disambiguated. Cursors now index raw records instead of the filtered
+  stream, so widening the delivery rule re-delivers (visible) rather than drops (silent).
+- **`bus close` / `bus open` — a finished thread stops delivering and keeps every word.**
+  Asked whether the bus should delete handled messages to save tokens; measured instead: the
+  cursor already means a read costs only what is new (2037 bytes, then 95 on the next read),
+  so deletion saves nothing at read time and costs the reasoning the kanban does not keep.
+  `close` gives the actual thing wanted — no delivery, gone from `who`, new mail refused —
+  as a **record appended to the log**, not a rename or a side file, so the state is in the
+  same auditable history as everything else.
+- Regression tests for everything the @rex review found by execution: path traversal through
+  `--repo`/`--card`, missing flag values, a laundered approval read off a **denied** card,
+  moving git refs cited as evidence, concurrent-append corruption, partial reads of a damaged
+  log, delivery lost to a message arriving mid-read, fail-open leak-check, and `who` missing a
+  role that had only read.
+
 ## [v2.19.4] - 2026-07-25
 
 ### Added
