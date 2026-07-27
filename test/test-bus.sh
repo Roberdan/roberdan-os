@@ -9,9 +9,29 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # that has never been seen to fail is an unverified claim.
 BUS="${RDA_BUS_BIN:-$ROOT/bus/bus.sh}"
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap '_rda_on_exit' EXIT
 
-fail() { echo "FAIL: $*" >&2; exit 1; }
+fail() { echo "FAIL: $*" >&2; : > "$TMP/.asserted"; exit 1; }
+# A `set -e` abort used to print NOTHING: exit 1, zero output, no line number -
+# which reads as "the suite broke" and is indistinguishable from "the suite
+# detected". It happened for real (a `[ ... ] && echo` at the end of a loop left
+# the whole assignment with a non-zero status) and it was found by luck. This
+# turns the whole class into a diagnosis.
+# The diagnosis is printed from the EXIT trap, not from ERR: with `set -E` the
+# ERR trap also fires for a non-zero command that `set -e` deliberately tolerates
+# (inside a subshell feeding a command substitution, for one), and a suite that
+# announces four aborts and then prints PASS teaches people to ignore the line.
+# ERR only RECORDS - to a file, because a subshell's variables die with it - and
+# EXIT decides whether anything actually broke.
+set -E
+trap 'echo "$LINENO" > "$TMP/.errline" 2>/dev/null || true' ERR
+_rda_on_exit() {
+  local rc=$?
+  if [ "$rc" -ne 0 ] && [ ! -e "$TMP/.asserted" ]; then
+    echo "test-bus: ABORTED at line $(cat "$TMP/.errline" 2>/dev/null || echo '?') (set -e) - no assertion failed, the suite itself broke" >&2
+  fi
+  rm -rf "$TMP"
+}
 
 export RDA_BUS_HOME="$TMP/bus"
 export RDA_BUS_ROLES="$ROOT/bus/roles"
@@ -49,8 +69,19 @@ mkdir -p "$RDA_KANBAN/doing"
 # and is diagnosed in seconds, whereas forgetting a table entry left it GREEN
 # while a mutant wrote a card, for five rounds running.
 # ===========================================================================
+# It hashes EVERY board the bus can reach, not just the local one. `_card_boards`
+# walks $KANBAN plus $root/kanban for every registry entry, and those trees used
+# to be outside the fingerprint entirely: a payload in the kb: resolver appended
+# `approved_by: roberto` to ANOTHER repo's card and then cited it as resolving -
+# a self-fulfilling citation, on exactly the axis property 2 exists to protect,
+# with the run-wide fingerprint green. The reachable set is the boundary; the
+# local board is just the nearest part of it.
 kanban_fingerprint() {
-  { find "$RDA_KANBAN" "$RDA_KANBAN_REGISTRY" -type f 2>/dev/null | sort \
+  local boards=("$RDA_KANBAN" "$RDA_KANBAN_REGISTRY") r
+  while IFS= read -r r; do
+    [ -n "$r" ] && [ -e "$r/kanban" ] && boards+=("$r/kanban")
+  done < "$RDA_KANBAN_REGISTRY"
+  { find "${boards[@]}" -type f 2>/dev/null | sort \
       | while IFS= read -r f; do printf '%s ' "$f"; shasum "$f" | awk '{print $1}'; done; } | shasum | awk '{print $1}'
 }
 assert_kanban_untouched() {
@@ -86,9 +117,16 @@ kb_rebaseline
 # and coverage as a boundary.
 # ===========================================================================
 STUB="$TMP/stub"; CANARY="$TMP/canary"; mkdir -p "$STUB"; : > "$CANARY"
+# What is stubbed here is what the bus can NEVER legitimately cause, directly or
+# transitively. Interpreters were on this list and had to come off: leak-check.sh
+# falls back to a python tier when `private/.denylist` is absent (it is
+# gitignored, so that is EVERY machine except this one), and the bus is required
+# to run leak-check. Stubbing python there does not measure a boundary, it breaks
+# the privacy tier and then accuses the bus of an interpreter it never called.
+# An interpreter invoked by the BUS is caught where it belongs: it appears in the
+# bus's own xtrace, and check 45's allowlist rejects it.
 for danger in claude copilot codex gemini aider osascript open launchctl at crontab \
-              nohup setsid ssh tmux screen disown curl wget kb kb.sh dispatch-runner.sh \
-              node python python3 ruby perl; do
+              nohup setsid ssh tmux screen disown curl wget kb kb.sh dispatch-runner.sh; do
   cat > "$STUB/$danger" <<STUBEOF
 #!/bin/sh
 echo "\$0 \$*" >> "$CANARY"
@@ -892,14 +930,49 @@ done <<<"$executed"
 #     invocation out of the boundary - the same drift that kept reopening the
 #     enumerated version. Drift in our own test file is a text problem, and a
 #     text scan is the right tool for exactly that.
-direct="$(grep -vE '^[[:space:]]*#' "$0" \
-  | grep -nE 'bash( -x)? "\$BUS"' \
+noncomment="$(grep -vE '^[[:space:]]*#' "$0")"
+direct="$(grep -nE 'bash( -x)? "\$BUS"' <<<"$noncomment" \
   | grep -v "PS4='#XT# '" | grep -v 'grep -nE' || true)"
+#     ...and an alias defeats a literal scan, so $BUS may not be copied either.
+alias_of_bus="$(grep -nE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="\$BUS"' <<<"$noncomment" || true)"
 [ -z "$direct" ] || fail "an untraced direct invocation of the bus exists, so check 45 does not cover it: $direct"
+[ -z "$alias_of_bus" ] || fail "\$BUS is aliased, which walks past the scan above: $alias_of_bus"
 
 # 47. Property 2, run-wide, for the same reason as 42: a payload that writes a
 #     card executes nothing, so the canary cannot see it, and the fingerprint was
 #     scoped to the table - a refused send that appended to a card walked through.
 assert_kanban_untouched "whole run"
+
+# 48. THE LID ON HALF TWO, NAMED AS ONE. In-process tracing is a drift detector,
+#     not a sandbox: PS4, `set +x`, `exec 2>` and BASH_XTRACEFD are all reachable
+#     from inside the traced process, so a payload that blanks PS4 around itself
+#     writes an unmarked line and check 45 never sees it - demonstrated twice,
+#     with a live agent started by absolute path and the suite printing PASS.
+#     There is no mechanical fix from inside; what there is, is a denylist that
+#     costs three lines and catches both, and an honest sentence in the protocol
+#     saying that an adversary who edits the tracing machinery is outside what
+#     half two covers. This scan is that denylist. It is named as one.
+tracecode="$(grep -vE '^[[:space:]]*#' "$BUS" || true)"
+grep -qE 'PS4=|set \+x|BASH_XTRACEFD|exec[[:space:]]+2>' <<<"$tracecode" \
+  && fail "bus.sh manipulates the tracing machinery (PS4/set +x/exec 2>/BASH_XTRACEFD) - that blinds check 45 from inside, which is exactly the boundary it cannot police itself"
+
+# 49. THE LAST UNAUDITED HOP. The delivery audit spans snapshot -> rendered, so a
+#     loss at log -> snapshot was invisible: every count downstream honestly
+#     agreed. `tail -n 500` on the snapshot - "bound the memory a read may use" -
+#     dropped 100 records of a 600-record thread with exit 0, a correct trailer
+#     and the cursor past all of them. The log is written directly here because
+#     600 sends is four minutes of test time to prove something about reading.
+BIGN2=600
+BIGLOG="$RDA_BUS_HOME/$R/big.jsonl"
+mkdir -p "$RDA_BUS_HOME/$R"; : > "$BIGLOG"
+for i in $(seq 1 $BIGN2); do
+  printf '{"ts":"2026-07-27T00:00:00Z","repo":"%s","card":"big","from":"implementer","to":"sol-gate","kind":"note","ref":null,"body":"m-%s"}\n' "$R" "$i" >> "$BIGLOG"
+done
+big="$(busrun read --repo "$R" --card big --as sol-gate)" || fail "the 600-record read failed outright"
+[ "$(grep -c '^CLAIM BY' <<<"$big")" = "$BIGN2" ] || fail "delivery is INCOMPLETE at 600: $(grep -c '^CLAIM BY' <<<"$big") of $BIGN2 rendered"
+grep -q "^m-1$" <<<"$big" || fail "the OLDEST record was dropped between the log and the snapshot"
+grep -q "^m-$BIGN2$" <<<"$big" || fail "the NEWEST record was dropped between the log and the snapshot"
+[ "$(tr -d '[:space:]' < "$RDA_BUS_HOME/$R/.cursor/big/sol-gate")" = "$BIGN2" ] \
+  || fail "the cursor does not cover the whole snapshot"
 
 echo "PASS: test-bus.sh"
