@@ -197,10 +197,32 @@ A(r && r.permissionDecision === "deny", "edit non-md on main -> deny");
 // allow: markdown carve-out on main
 r = await pre({ toolName: "edit", toolArgs: { path: "$MREPO/notes.md" } });
 A(r === undefined, "edit .md on main -> no override (carve-out)");
+// allow: a path outside any git repository is none of the guard's business
+r = await pre({ toolName: "edit", toolArgs: { path: "$TMP/outside-any-repo.txt" } });
+A(r === undefined, "edit a path outside any git repo -> no override");
 // deny: RELATIVE path on main, repo supplied via workingDirectory (regression guard for the
 // cwd-forwarding fix — the extension's own cwd here is \$STAGE, not the repo).
 r = await pre({ toolName: "edit", toolArgs: { path: "code.txt" }, workingDirectory: "$MREPO" });
 A(r && r.permissionDecision === "deny", "edit RELATIVE non-md on main (workingDirectory forwarded) -> deny");
+
+// --- toolArgs delivered as an OPAQUE JSON STRING -----------------------------
+// The hook input types toolArgs as \`unknown\` and the session-event schema marks it
+// x-opaque-json, so the host may hand it over already parsed OR as a JSON string. Every
+// case above uses the object form; these repeat the decisive ones in the string form.
+// Without normalization the args read back empty, main-guard loses the file path and
+// falls back to the session cwd: it then denies EVERY write (even outside any repo)
+// whenever that cwd is on main, and the .md/docs carve-outs never apply.
+r = await pre({ toolName: "edit", toolArgs: JSON.stringify({ path: "$MREPO/code.txt" }) });
+A(r && r.permissionDecision === "deny", "edit non-md on main (toolArgs as JSON string) -> deny");
+r = await pre({ toolName: "edit", toolArgs: JSON.stringify({ path: "$MREPO/notes.md" }) });
+A(r === undefined, "edit .md on main (toolArgs as JSON string) -> carve-out honoured");
+r = await pre({ toolName: "edit", toolArgs: JSON.stringify({ path: "$TMP/outside-any-repo.txt" }) });
+A(r === undefined, "edit a path outside any git repo (JSON string) -> no override (no over-block)");
+r = await pre({ toolName: "bash", toolArgs: JSON.stringify({ command: "git push --force origin main" }) });
+A(r && r.permissionDecision === "deny", "bash force-push (toolArgs as JSON string) -> deny");
+// Malformed JSON must not throw and must not be mistaken for real args.
+r = await pre({ toolName: "bash", toolArgs: "{not json" });
+A(r === undefined, "unparseable toolArgs -> no crash, no override");
 
 console.log(JSON.stringify(out));
 JS
