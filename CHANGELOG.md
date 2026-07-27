@@ -22,8 +22,8 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   Coverage is a safety property rather than a metric here: the multi-agent checks run with
   the *real* `PATH`, so a branch missing from the table does not merely go unnoticed, it
   starts live sessions during the test run. `bus/*.sh` added to `SHELLCHECK_TARGETS`.
-- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 19 deliberate violations, each
-  naming the property it breaks and the check that must catch it; 19/19 caught. Written
+- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 24 deliberate violations, each
+  naming the property it breaks and the check that must catch it; 24/24 caught. Written
   because two reviews found their blockers by *executing* mutants while every reading of the
   same code passed it — a check that has never been seen to fail is not evidence. It found
   two bugs in its own assertions and one in `who`. A third, adversarial pass then found three
@@ -41,6 +41,22 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   repo: `who` deduplicates per role, so "a closed thread disappears from `who`" was true or
   false depending on which timestamp sorted last, and caught its mutant by hand while missing
   it in the harness.
+  A fifth pass (@rex, third round) then found the same hole in its fifth disguise and with six
+  live instances on the shipping commit: the **refusal** branches, which the table could not
+  reach by construction — it only ever supplies valid roles, valid slugs, a passing leak-check
+  and an empty registry. Extending the table a sixth time would have been another enumeration,
+  so the polarity is **inverted**: the recording stubs are now first on `PATH` for the entire
+  `test-bus.sh` run and the canary must be empty at the end. "Gated" stops meaning "somebody
+  remembered to list this branch" and starts meaning "anything the suite exercises anywhere is
+  measured". All six died to that one assertion.
+- **`read` audits its own delivery, and non-UTF-8 bodies are refused rather than repaired.**
+  Nothing measured delivery *completeness*: every assertion used batches of one to three, so a
+  20-record cap passed the whole suite while five messages became unreachable forever — `send`
+  returned 0, `read` returned 0, the trailer reported the right count, and the cursor had moved
+  past all of them on an append-only log. `read` now compares what it handed the renderer with
+  what the renderer produced and refuses to advance on a mismatch. Separately, `jq --rawfile`
+  substituted U+FFFD for undecodable bytes, so a latin-1 diff was silently rewritten while
+  `send` reported success; "survives verbatim" had only ever been asserted with ASCII.
 - **Broadcast addressing (`--to all`) so the bus works with three or more agents.** Reaches
   every role except the sender; nothing is consumed, so a broadcast is delivered in full to
   each role rather than taken by whoever reads first — a bus, not a work queue. `all` is a

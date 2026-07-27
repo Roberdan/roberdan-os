@@ -48,22 +48,32 @@ greps forbade and passed every one of them.
    carrying a payload does not merely go unnoticed — it starts live agent
    sessions during the test run. Any new branch must be added to the path table
    in the same commit.
-   That hole has now reopened three times, in three disguises: an unexercised
-   *branch* (broadcast), two unexercised *subcommands* (`close`/`open`, added
-   after the table and never added to it), and two unexercised **degraded
-   paths** — the damaged-log warning in `who` and the lock-timeout refusal. The
-   last pair is the sharpest illustration, because those branches really do run
-   in an ordinary test run: a payload there passed the entire green suite while
-   the canary recorded live `claude -p` calls. **An error path is still a path**,
-   so the table now sets up a damaged log, an empty log and a held lock, and
-   drives them deliberately.
+   That hole reopened **five times** — an unexercised branch (broadcast), two
+   unexercised subcommands (`close`/`open`), two degraded paths, and finally six
+   **refusal** branches that the table could not reach by construction, because
+   it only ever supplies valid roles, valid slugs, a passing leak-check and an
+   empty registry. Each time the answer had been to extend the table, and each
+   time the next disguise was already written.
+   So the polarity is now **inverted, and this is the actual fix**: the recording
+   stubs are first on `PATH` for the *entire* `test-bus.sh` run, and the canary
+   must be empty at the end (check 42). "Gated" no longer means "somebody
+   remembered to add this branch to a table"; it means "anything the suite
+   exercises anywhere is measured". The table still decides what gets
+   *exercised* — so coverage still matters, and an error path is still a path —
+   but it no longer decides what gets *watched*.
+   One thing could not be hoisted with it, and the asymmetry is worth stating:
+   the kanban fingerprint stays scoped to the gate loop, because the suite writes
+   kanban fixtures of its own and a run-wide comparison would fail on the tests'
+   writes rather than the bus's. Nothing in the suite legitimately invokes a
+   stubbed binary, which is precisely why the canary can be the floor and the
+   fingerprint cannot.
    And the property is not the same sentence as its proxy. "Never writes kanban
    state" was checked as "never executes `kb`" — so `printf ... >> $card.md`
    satisfied the check while violating the property completely: no command, no
    traced word, no canary. The gate now hashes the whole isolated kanban tree
    around the run and requires it byte-identical, which measures the *effect*
    rather than one known cause of it.
-   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 19
+   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 24
    deliberate violations and asserts that each is caught by a *named* check,
    including every evasion above. A check that has never been seen to fail is not
    evidence — and the three most recent mutants exist because an adversarial pass
@@ -236,6 +246,22 @@ decoupled from the rule, so the worst a stale cursor can do is **re-deliver**,
 which is visible, instead of **drop**, which is not. Cursors written before
 broadcasts existed therefore re-show a message or two on the first read after this
 change; that is the intended, safe direction.
+
+Bodies must be **valid UTF-8**, and an invalid one is refused rather than
+repaired: `jq --rawfile` substitutes U+FFFD for undecodable bytes, so a verdict
+pasting a diff of a latin-1 file was silently rewritten while `send` reported
+success — and since the log is permanent, the rewritten version is the only one
+anyone reads afterwards. "The body survives verbatim" had only ever been
+asserted with ASCII.
+
+`read` **audits its own delivery**: it counts the records it hands to the
+renderer against the records the renderer produced, and refuses to advance the
+cursor if they differ. The cursor moves past the whole snapshot and the log is
+append-only, so a record that was deliverable but not rendered is unreachable
+forever with nothing printed to say so — `send` returned 0, `read` returned 0,
+and the trailer even reported the right count. A batch cap added to "save
+tokens" is the obvious way this breaks; check 43 sends 25 because every other
+delivery assertion here uses batches of one to three.
 
 Bodies pass the same `leak-check.sh` as cards — **fail-closed**: if it is missing
 or not executable the send is refused. It used to skip, and it could be switched

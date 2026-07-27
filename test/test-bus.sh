@@ -31,6 +31,42 @@ export RDA_KANBAN_REGISTRY="$TMP/registry"   # hermetic: never consult the real 
 mkdir -p "$RDA_KANBAN/doing"
 : > "$RDA_KANBAN_REGISTRY"
 
+# ===========================================================================
+# THE CANARY IS NOT A CHECK, IT IS THE FLOOR OF THE WHOLE RUN.
+#
+# It used to be scoped to one loop over a table of argument paths, and the table
+# was maintained by hand. That made "is this branch gated?" mean "did somebody
+# remember to add it to the table?" - an enumeration, not a boundary. The hole
+# reopened five times: the broadcast branch, the close/open subcommands, two
+# degraded paths, and then six REFUSAL branches that exist today and that the
+# table structurally could not reach, because the table only ever supplies valid
+# roles, valid slugs, a passing leak-check and an empty registry. All six passed
+# the entire green suite while recording live `claude -p` calls.
+#
+# So the polarity is inverted: the recording stubs are first on PATH for EVERY
+# line of this file, and the canary must be empty at the end. Anything the suite
+# exercises ANYWHERE is measured, whether or not anyone thought of it. The table
+# further down still matters - it decides what gets exercised - but it no longer
+# decides what gets watched. That is the difference between coverage as a metric
+# and coverage as a boundary.
+# ===========================================================================
+STUB="$TMP/stub"; CANARY="$TMP/canary"; mkdir -p "$STUB"; : > "$CANARY"
+for danger in claude copilot codex gemini aider osascript open launchctl at crontab \
+              nohup setsid ssh tmux screen disown curl wget kb kb.sh dispatch-runner.sh \
+              node python python3 ruby perl; do
+  cat > "$STUB/$danger" <<STUBEOF
+#!/bin/sh
+echo "\$0 \$*" >> "$CANARY"
+exit 127
+STUBEOF
+  chmod +x "$STUB/$danger"
+done
+export PATH="$STUB:$PATH"
+assert_never_executed() {
+  [ -s "$CANARY" ] && fail "the bus EXECUTED $(tr '\n' ';' < "$CANARY") - it must never start an agent, a scheduler or kb ($1)"
+  return 0
+}
+
 R=demo-repo; C=260725-185515
 
 # 1. send -> read round trip, and the body survives verbatim.
@@ -168,17 +204,6 @@ grep -q "implementer" <<<"$alive" || fail "who did not report a role that has ap
 #     subcommand with a PATH of stubs that record and refuse, and assert nothing
 #     was executed. This measures what happens, not how it is written.
 # ===========================================================================
-STUB="$TMP/stub"; CANARY="$TMP/canary"; mkdir -p "$STUB"; : > "$CANARY"
-for danger in claude copilot codex gemini aider osascript open launchctl at crontab \
-              nohup setsid ssh tmux screen disown curl wget kb kb.sh dispatch-runner.sh \
-              node python python3 ruby perl; do
-  cat > "$STUB/$danger" <<STUBEOF
-#!/bin/sh
-echo "\$0 \$*" >> "$CANARY"
-exit 127
-STUBEOF
-  chmod +x "$STUB/$danger"
-done
 # A real leak-check would need bash+grep; point at an executable stub so the
 # fail-closed path is satisfied without dragging the whole tree onto the stub PATH.
 cat > "$TMP/lc2-leak-check.sh" <<'LEAKEOF'
@@ -291,7 +316,7 @@ teardown_degraded 1
 # ...and the same paths with a body on stdin, which is a different code path from
 # --body-file and was never exercised.
 echo "a piped note" | canary_run send --repo "$R" --card "$C" --from implementer --to sol-gate
-[ -s "$CANARY" ] && fail "the bus EXECUTED $(tr '\n' ';' < "$CANARY") - it must never start an agent, a scheduler or kb"
+assert_never_executed "argument-path table"
 [ "$(kanban_fingerprint)" = "$kb_before" ] \
   || fail "the bus CHANGED kanban state without executing anything - card transitions are a human gate"
 
@@ -304,7 +329,7 @@ echo "a piped note" | canary_run send --repo "$R" --card "$C" --from implementer
 #      started calling something new" into a failure that has to be answered on
 #      purpose, which is the gate that has to hold in month 2. Extend
 #      deliberately, never idly.
-ALLOWED=" jq git date grep mkdir rmdir cp cat wc tail sort awk printf mktemp rm tr basename dirname sleep shasum leak-check.sh "
+ALLOWED=" jq git date grep mkdir rmdir cp cat wc tail sort awk printf mktemp rm tr basename dirname sleep shasum iconv leak-check.sh "
 TRACE="$TMP/trace"; : > "$TRACE"
 # The trace run keeps the STUB PATH. It used to drop it, which meant the payload
 # had to actually RUN before the allowlist could notice it: a `touch` planted in
@@ -724,5 +749,53 @@ real="$(bash "$BUS" read --repo "$R" --card "$PK" --as sol-gate)"
 for want in direct1 bcast1 direct2; do
   grep -q "$want" <<<"$real" || fail "$want was lost between peek and read"
 done
+
+# 42. THE FLOOR. Everything above ran with the recording stubs first on PATH, so
+#     this single assertion covers every branch the suite touched, including the
+#     ones nobody enumerated. Six refusal branches were caught by exactly this
+#     line after five hand-maintained tables had missed them.
+assert_never_executed "whole run"
+# The kanban fingerprint deliberately stays scoped to the gate loop rather than
+# being hoisted here too: the SUITE writes kanban fixtures of its own after that
+# point, so a run-wide comparison would fail on this file's writes rather than
+# the bus's. The canary has no such problem - nothing in this suite legitimately
+# invokes any of the stubbed names - which is exactly why it can be the floor
+# and the fingerprint cannot.
+
+# 43. DELIVERY IS COMPLETE AT A SIZE NOBODY EYEBALLED. Every other delivery
+#     assertion here uses batches of one to three, so a CAP - the single most
+#     likely "save tokens" change anyone will ever make to this file - passed the
+#     whole suite while dropping messages: send returned 0, read returned 0, the
+#     trailer reported the right count, and five records were unreachable
+#     forever, because the cursor advances past the snapshot and the log is
+#     append-only. That is the one failure durable delivery cannot survive, and
+#     nothing measured it.
+BIGN=25
+for i in $(seq 1 $BIGN); do
+  echo "msg-$i" | bash "$BUS" send --repo "$R" --card bulk --from implementer --to sol-gate >/dev/null
+done
+bulk="$(bash "$BUS" read --repo "$R" --card bulk --as sol-gate)" || fail "the bulk read failed outright"
+got="$(grep -c '^CLAIM BY' <<<"$bulk")"
+[ "$got" = "$BIGN" ] || fail "delivery is INCOMPLETE and silent: $BIGN sent, $got delivered"
+for i in $(seq 1 $BIGN); do
+  grep -q "^msg-$i$" <<<"$bulk" || fail "msg-$i was accepted by send and never delivered"
+done
+grep -q "$BIGN deliverable" <<<"$bulk" || fail "the trailer disagrees with what was delivered"
+
+# 44. "The body survives verbatim" was asserted with ASCII only, and it was FALSE
+#     for anything else: jq --rawfile substitutes U+FFFD for undecodable bytes,
+#     so a latin-1 diff - the normal case on a channel meant for pasting diffs -
+#     was rewritten while send reported success. The log is permanent, so the
+#     rewritten version is the only one anyone reads afterwards. Refuse loudly
+#     rather than repair quietly.
+printf 'diff line: caf\xe9 latin1\n' > "$TMP/latin1.txt"
+l1="$(bash "$BUS" send --repo "$R" --card enc --from implementer --to sol-gate --body-file "$TMP/latin1.txt" 2>&1 || true)"
+grep -qi "not valid UTF-8" <<<"$l1" || fail "a non-UTF-8 body was accepted and silently mangled: $l1"
+[ -f "$RDA_BUS_HOME/$R/enc.jsonl" ] && fail "the refused body was written to the log anyway"
+printf 'caf\xc3\xa9 \xe2\x9c\x93 utf8\n' > "$TMP/utf8.txt"
+bash "$BUS" send --repo "$R" --card enc --from implementer --to sol-gate --body-file "$TMP/utf8.txt" >/dev/null \
+  || fail "a valid UTF-8 body with non-ASCII characters was refused"
+u8="$(bash "$BUS" read --repo "$R" --card enc --as sol-gate)"
+grep -q 'café ✓ utf8' <<<"$u8" || fail "non-ASCII UTF-8 did not survive verbatim"
 
 echo "PASS: test-bus.sh"
