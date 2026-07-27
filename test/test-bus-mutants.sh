@@ -317,5 +317,74 @@ s = s.replace(a, "    [ \"$waited\" -lt \"$tries\" ] || claude -p \"lock stuck\"
 sys.stdout.write(s)
 '
 
-[ "$mutants_run" = "19" ] || fail "expected 19 mutants, ran $mutants_run"
-echo "PASS: test-bus-mutants.sh — 19/19 mutants caught"
+# --- Third @rex round. He found the coverage hole in its FIFTH disguise, and
+#     this time with six live instances on the shipping commit: the REFUSAL
+#     branches. The path table could not reach them by construction - it only
+#     ever supplies valid roles, valid slugs, a passing leak-check and an empty
+#     registry - so every refusal path was ungated while running under the real
+#     PATH elsewhere in the suite.
+#     The answer was not a sixth enumeration. The canary stubs are now first on
+#     PATH for the ENTIRE test-bus.sh run, and the canary must be empty at the
+#     end: anything the suite exercises anywhere is measured, whether or not
+#     anyone thought to list it. The four mutants below are kept as evidence of
+#     the class, not as the definition of it - they were all caught by the same
+#     single assertion, which is the whole point.
+
+mutate slug-branch "spawns an agent from the slug refusal" "check 42 (canary floor for the whole run)" '
+import sys
+s = sys.stdin.read()
+a = "    -*) die \"$what: \x27$value\x27 looks like a flag, not a value\";;"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "    -*) claude -p x >/dev/null 2>&1 || true; die \"$what: \x27$value\x27 looks like a flag, not a value\";;")
+sys.stdout.write(s)
+'
+
+mutate role-branch "spawns an agent from the human-gated-capability refusal" "check 42 (canary floor for the whole run)" '
+import sys
+s = sys.stdin.read()
+a = "  [ -z \"$offenders\" ] || die"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "  [ -z \"$offenders\" ] || claude -p x >/dev/null 2>&1 || true\n" + a)
+sys.stdout.write(s)
+'
+
+mutate leakblock-branch "spawns an agent when the leak-check BLOCKS a body" "check 42 (canary floor for the whole run)" '
+import sys
+s = sys.stdin.read()
+a = "    || die \"send: BLOCKED"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "    || { claude -p x >/dev/null 2>&1 || true; false; } \\\n" + a)
+sys.stdout.write(s)
+'
+
+# 23. THE SILENT DROP, and the only one of these that is not about execution.
+#     Nothing measured delivery COMPLETENESS: every other assertion used batches
+#     of one to three, so a batch cap - the most likely "save tokens" edit anyone
+#     will ever make here - passed the whole suite while five messages became
+#     unreachable forever. send returned 0, read returned 0, the trailer even
+#     reported the right count. The bus now audits itself (rendered vs
+#     deliverable) and refuses to advance the cursor on a mismatch.
+mutate emit-cap "caps the batch, losing messages with no error" "check 43 (delivery is complete at 25)" '
+import sys
+s = sys.stdin.read()
+a = "    n=$((n+1))"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, a + "\n    [ \"$n\" -le 20 ] || continue")
+sys.stdout.write(s)
+'
+
+# 24. Accepting a body that jq will silently rewrite. "Survives verbatim" was
+#     asserted with ASCII only and was false for everything else.
+mutate encoding-mangle "accepts a body jq will silently rewrite" "check 44 (non-UTF-8 is refused, not repaired)" '
+import sys
+s = sys.stdin.read()
+a = "  iconv -f UTF-8 -t UTF-8 < \"$body\""
+assert s.count(a) == 1, "anchor drift"
+i = s.index(a)
+j = s.index("\n", s.index("send again.", i)) + 1
+s = s[:i] + s[j:]
+sys.stdout.write(s)
+'
+
+[ "$mutants_run" = "24" ] || fail "expected 24 mutants, ran $mutants_run"
+echo "PASS: test-bus-mutants.sh — 24/24 mutants caught"

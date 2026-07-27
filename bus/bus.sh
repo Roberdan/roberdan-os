@@ -236,6 +236,16 @@ _cmd_send() {
   "$LEAKCHECK" --only "$body" >/dev/null 2>&1 \
     || die "send: BLOCKED — leak-check found a confidential term in the body"
 
+  # The body must be valid UTF-8, and this refuses rather than repairs. `jq
+  # --rawfile` silently substitutes U+FFFD for any byte it cannot decode, so a
+  # verdict pasting a diff of a latin-1 file was rewritten mid-flight while send
+  # reported success - and the thread is the permanent record, so the corruption
+  # is the only version anyone ever reads afterwards. "The body survives
+  # verbatim" is the promise; a promise that quietly degrades is worse than a
+  # refusal, because the refusal is visible.
+  iconv -f UTF-8 -t UTF-8 < "$body" > /dev/null 2>&1 \
+    || die "send: the body is not valid UTF-8. This channel stores text and promises it survives verbatim, and jq would silently replace the undecodable bytes — convert it (iconv -f latin1 -t utf8) and send again."
+
   local log; log="$(_log_path "$repo" "$card")"
   [ ! -f "$log" ] || [ "$(_thread_state "$log")" != "closed" ] \
     || die "send: $repo/$card is closed. Reopen it deliberately with: bus open --repo $repo --card $card --by <role>"
@@ -338,6 +348,9 @@ _emit() {
     echo
   done
   [ "$n" -gt 0 ] || echo "bus: nothing new."
+  # Report how many records were actually rendered, so the caller can check it
+  # against how many it handed over. See the delivery audit in _cmd_read.
+  printf '%s' "$n" > "${RDA_BUS_EMITTED:-/dev/null}"
 }
 
 _cmd_read() {
@@ -405,7 +418,23 @@ _cmd_read() {
     | jq -c --arg me "$as" --arg all "$BROADCAST" \
         'select(.to == $me or (.to == $all and .from != $me))' > "$deliverable" \
     || { rm -f "$snap" "$deliverable"; die "the snapshot of $log could not be filtered — nothing was delivered, so nothing is half-read"; }
-  _emit "$card" < "$deliverable"
+  local emitted_f emitted want
+  emitted_f="$(mktemp)"
+  want="$(wc -l < "$deliverable" | tr -d ' ')"
+  RDA_BUS_EMITTED="$emitted_f" _emit "$card" < "$deliverable"
+  emitted="$(cat "$emitted_f" 2>/dev/null || echo 0)"; rm -f "$emitted_f"
+  # THE DELIVERY AUDIT. The cursor advances past everything in the snapshot, and
+  # the log is append-only, so a record that was deliverable but not rendered is
+  # gone from `read` forever with nothing printed to say so. Nothing outside this
+  # function can notice that: `send` returned 0, `read` returned 0, the trailer
+  # even reports the right count. So the bus counts what it handed to the
+  # renderer and what the renderer produced, and refuses to move the cursor if
+  # they differ. A batch cap added to "save tokens" is the obvious way this
+  # breaks, and it is the one failure durable delivery cannot survive.
+  if [ "$emitted" != "$want" ]; then
+    rm -f "$snap" "$deliverable"
+    die "delivery is incomplete: $want record(s) were deliverable to @$as but $emitted were rendered. The cursor has NOT advanced, so nothing is lost — re-read after fixing the renderer."
+  fi
   if [ "$advance" = "1" ]; then
     mkdir -p "$(dirname "$cur")"
     printf '%s\n' "$total" > "$cur"   # only after a successful emit
