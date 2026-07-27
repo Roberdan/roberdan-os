@@ -83,7 +83,34 @@ greps forbade and passed every one of them.
    whereas a forgotten table entry left it **green** while a mutant wrote a card.
    Re-baselining without asserting first is not safe: it silently *adopts*
    whatever happened since, and a mutant survived exactly that way for one round.
-   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 28
+   **What half two cannot see, stated plainly.** The trace comes from the traced
+   process itself, and that process owns its own tracing: `PS4=''`, `set +x`,
+   `exec 2>` and `BASH_XTRACEFD` all blind check 45 from inside, and both of the
+   first two were demonstrated starting a live agent with the suite printing
+   PASS. There is no eighth mechanism that fixes this from in-process — only an
+   out-of-process boundary (a sandbox, a syscall monitor) or a human reading the
+   diff. So the honest description of half two is: it catches a call that was
+   *added*, by any spelling, and it does not catch a call that also *edits the
+   observer*. What stands in for the missing mechanism is check 48, a three-line
+   grep of `bus/bus.sh` for those four tokens. That is a **denylist**, named as
+   one, with exactly the property denylists have: it catches the spellings
+   someone thought of. `ps4-blind` and `setx-blind` are kept as standing mutants
+   for that reason — a mutant you can only catch by name is the most honest
+   documentation of where a boundary ends.
+   **And the boundary is the whole reachable set, not the nearest part of it.**
+   The kanban fingerprint hashed `$RDA_KANBAN` while `_card_boards` reaches
+   `$root/kanban` for **every** registered repo, so a plain `read` stamped an
+   approval line onto another repo's card and then cited that card as resolving —
+   the citation and the thing it cites both written by the bus, suite green. The
+   fingerprint now spans every board `_card_boards` can reach (mutant 29).
+   **Delivery is audited with no unaudited hop.** The chain is log → snapshot →
+   filter → renderer → cursor, and the count that polices it is taken under the
+   same lock as the snapshot. A `tail -n 500` "to bound the memory a read may
+   use" dropped 100 records of a 600-record thread with exit 0, a correct trailer
+   and the cursor parked past all of them, because every count downstream was
+   counting the truncated copy and honestly agreeing (mutants 27, 28, 30; check
+   49 sends 600 and demands 600).
+   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 32
    deliberate violations and asserts that each is caught by a *named* check,
    including every evasion above. A check that has never been seen to fail is not
    evidence — and the three most recent mutants exist because an adversarial pass

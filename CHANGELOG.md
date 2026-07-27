@@ -22,8 +22,8 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   Coverage is a safety property rather than a metric here: the multi-agent checks run with
   the *real* `PATH`, so a branch missing from the table does not merely go unnoticed, it
   starts live sessions during the test run. `bus/*.sh` added to `SHELLCHECK_TARGETS`.
-- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 28 deliberate violations, each
-  naming the property it breaks and the check that must catch it; 28/28 caught. Written
+- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 32 deliberate violations, each
+  naming the property it breaks and the check that must catch it; 32/32 caught. Written
   because two reviews found their blockers by *executing* mutants while every reading of the
   same code passed it — a check that has never been seen to fail is not evidence. It found
   two bugs in its own assertions and one in `who`. A third, adversarial pass then found three
@@ -59,7 +59,19 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   round did the same to property 2: the kanban fingerprint was hoisted run-wide, with the
   suite's own fixture writes bracketed *assert-then-write-then-rebaseline* — re-baselining
   without asserting first silently **adopts** the damage, which is how a mutant that wrote a
-  card from a refused send survived a round. 28/28 mutants caught.
+  card from a refused send survived a round. 32/32 mutants caught.
+- **Round 5 (@rex).** The fingerprint hashed one board while the resolver reached every
+  registered one, so a `read` could stamp an approval line onto another repo's card and
+  cite it (mutant 29 — the fingerprint now spans the whole reachable set). The last
+  unaudited hop, log -> snapshot, is now counted under the same lock as the copy: a
+  `tail -n 500` lost 100 of 600 records with exit 0 and every downstream count honestly
+  agreeing (mutant 30, check 49 sends 600 and demands 600). `set -E` + an `ERR` trap, so
+  a `set -e` abort can no longer exit 1 printing nothing at all. `python3` is no longer
+  stubbed by the canary: `leak-check.sh` falls back to it wherever `private/.denylist` is
+  absent, which is every machine but this one, so "ALL GREEN" was machine-local. And the
+  limit of in-process tracing is now DECLARED rather than implied — `PS4=`/`set +x`/
+  `exec 2>`/`BASH_XTRACEFD` blind check 45 from inside; check 48 is a three-line denylist
+  for them, named as one, with `ps4-blind`/`setx-blind` kept as standing mutants.
 - **`read` audits its own delivery, and non-UTF-8 bodies are refused rather than repaired.**
   Nothing measured delivery *completeness*: every assertion used batches of one to three, so a
   20-record cap passed the whole suite while five messages became unreachable forever — `send`

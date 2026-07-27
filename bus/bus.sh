@@ -154,6 +154,14 @@ _assert_readable_log() {
     || die "the log $1 is not valid JSONL — it is damaged. Nothing here deletes or rewrites it, so inspect it by hand rather than trusting a partial read."
 }
 
+# Copy AND count in one critical section. Two calls under two locks is the same
+# TOCTOU one layer up: the log can grow between them, and then the count that is
+# supposed to police the copy describes a different file.
+_snapshot_log() {
+  cp "$1" "$2"
+  wc -l < "$1" | tr -d ' ' > "$3"
+}
+
 _release_lock() {
   rm -f "$1/owner" 2>/dev/null || true
   rmdir "$1" 2>/dev/null || true
@@ -402,7 +410,15 @@ _cmd_read() {
   # perfectly valid a moment later. Observed in review: 9 of 12 snapshots taken
   # during a 900KB append were invalid.
   snap="$(mktemp)"
-  _with_lock "$log" cp "$log" "$snap"
+  local snapcount; snapcount="$(mktemp)"
+  # The count is taken UNDER THE SAME LOCK as the copy, and checked against the
+  # snapshot before anything reads it. That closes the last unaudited hop: the
+  # delivery audit below spans snapshot -> rendered, so a loss at log -> snapshot
+  # left every count downstream honestly agreeing. A `tail -n 500` added to bound
+  # the memory a read may use dropped 100 records of a 600-record thread, exit 0,
+  # trailer correct, cursor past all of them. The chain is now log -> snapshot ->
+  # filter -> renderer -> cursor with no gap in it.
+  _with_lock "$log" _snapshot_log "$log" "$snap" "$snapcount"
   # TEST-ONLY WINDOW. The regression this guards (the cursor computed from the
   # live log instead of the snapshot) is a race, and a race-based test passes most
   # of the time for reasons unrelated to the property: the mutant for it was
@@ -416,6 +432,11 @@ _cmd_read() {
   # down.
   _assert_readable_log "$snap"
   total="$(wc -l < "$snap" | tr -d ' ')"
+  local expected; expected="$(tr -d '[:space:]' < "$snapcount")"; rm -f "$snapcount"
+  if [ "$total" != "$expected" ]; then
+    rm -f "$snap"
+    die "the snapshot of $log is short: the log held $expected record(s) under the lock but the snapshot has $total. Nothing was delivered and the cursor has NOT advanced, so nothing is lost."
+  fi
   # `.to == all` reaches everyone EXCEPT the sender: an agent that had to skip its
   # own broadcast by hand would eventually forget to.
   local deliverable; deliverable="$(mktemp)"

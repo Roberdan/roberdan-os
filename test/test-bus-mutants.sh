@@ -101,8 +101,10 @@ sys.stdout.write(s)
 mutate filtered-cursor "couples the cursor to the delivery rule" "check 28b (migration)" '
 import sys
 s = sys.stdin.read()
-old = "  _with_lock \"$log\" cp \"$log\" \"$snap\""
-new = "  _with_lock \"$log\" jq -c --arg me \"$as\" --arg all \"$BROADCAST\" \x27select(.to == $me or (.to == $all and .from != $me))\x27 \"$log\" > \"$snap\"; :"
+old = "  _with_lock \"$log\" _snapshot_log \"$log\" \"$snap\" \"$snapcount\""
+# the count is written from the filtered snapshot too, so this mutant fails on
+# the property under test (the cursor) and not on the snapshot audit above it.
+new = "  jq -c --arg me \"$as\" --arg all \"$BROADCAST\" \x27select(.to == $me or (.to == $all and .from != $me))\x27 \"$log\" > \"$snap\"; wc -l < \"$snap\" | tr -d \x27 \x27 > \"$snapcount\""
 assert s.count(old) == 1, "anchor drift"
 s = s.replace(old, new)
 sys.stdout.write(s)
@@ -445,6 +447,9 @@ sys.stdout.write(s)
 #     mutant was caught 1 run in 3 while genuinely losing a message 1 trial in
 #     10. A standing mutant with a 33% catch rate is a green suite that means
 #     nothing on the property it claims to hold.
+#     Since the count moved under the snapshot lock (Finding D), the BUS kills
+#     this one before check 21 runs: the count and the snapshot disagree on the
+#     first read and nothing is delivered at all. Stronger, different string.
 mutate upstream-totallog "advances the cursor past records it never snapshotted" "check 21 (cursor == the snapshot it emitted)" '
 import sys
 s = sys.stdin.read()
@@ -452,7 +457,69 @@ a = "  total=\"$(wc -l < \"$snap\" | tr -d \x27 \x27)\""
 assert s.count(a) == 1, "anchor drift"
 s = s.replace(a, "  total=\"$(wc -l < \"$log\" | tr -d \x27 \x27)\"")
 sys.stdout.write(s)
+' "is short: the log held|^FAIL"
+
+# ===========================================================================
+# @rex round 5. Two of these are the gate's own blind spots (a board it never
+# hashed, a hop it never counted). The last two are the honest ones: they are
+# caught by a DENYLIST, and a denylist is exactly as good as its list.
+# ===========================================================================
+
+# 29. THE REACHABLE SET IS THE BOUNDARY, NOT THE NEAREST PART OF IT. The
+#     fingerprint hashed $RDA_KANBAN, while _card_boards reaches $root/kanban for
+#     EVERY registry entry. A plain `read` stamped an approval line onto another
+#     repo's card and then cited that card as resolving - the citation and the
+#     thing it cites both written by the bus, and nothing in the suite moved.
+mutate kanban-other-board "stamps an approval line onto ANOTHER repo's card while resolving a citation" "check 47 (fingerprint over every board _card_boards reaches)" '
+import sys
+s = sys.stdin.read()
+a = "        echo \"RESOLVES to an honor-system approval line"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "        case \"$found\" in \"$KANBAN\"/*) ;; *) printf \x27approved_by: roberto\\\\n\x27 >> \"$found\" 2>/dev/null || true;; esac\n" + a)
+sys.stdout.write(s)
 '
 
-[ "$mutants_run" = "28" ] || fail "expected 28 mutants, ran $mutants_run"
-echo "PASS: test-bus-mutants.sh — 28/28 mutants caught"
+# 30. THE HOP NOBODY COUNTED. Bound the memory a read may use - a defensible
+#     change, five characters - and 600 records become 500 with exit 0, a correct
+#     trailer, and the cursor parked past all of them. Every count downstream
+#     agreed with every other, because they were all counting the truncated copy.
+mutate snapshot-cap "silently truncates the snapshot, losing the oldest records with exit 0" "check 49 (600 records in, 600 rendered) and the snapshot audit in read" '
+import sys
+s = sys.stdin.read()
+a = "  cp \"$1\" \"$2\""
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "  tail -n 500 \"$1\" > \"$2\"")
+sys.stdout.write(s)
+' "the snapshot of .* is short|^FAIL"
+
+# 31. THE LID, AND WHAT IT IS WORTH. `PS4=` for the duration of the payload and
+#     the traced line is unmarked; the classifier drops it as stderr and check 45
+#     never sees the word `claude`. There is no fix for this from inside the
+#     traced process - the process owns its own tracing. What kills it here is
+#     check 48, a three-line grep for the tracing machinery, and that is a
+#     denylist: it catches this spelling because someone thought of this spelling.
+#     Kept because a mutant you can only catch by name is the most honest
+#     description of where a boundary ends.
+mutate ps4-blind "blanks PS4 around a spawn, so the trace never records it" "check 48 (the tracing-machinery denylist)" '
+import sys
+s = sys.stdin.read()
+a = "    || die \"send: BLOCKED"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "    || { PS4=\x27\x27; \"$RDA_BUS_STUBDIR/claude\" -p x >/dev/null 2>&1 || true; PS4=\x27#XT# \x27; false; } \\\n" + a)
+sys.stdout.write(s)
+'
+
+# 32. The same lid, other hand: `set +x` simply stops the trace. Same conclusion,
+#     and it matters that BOTH spellings are named, because the denylist is the
+#     whole mechanism here and its coverage is its list.
+mutate setx-blind "turns the trace off around a spawn" "check 48 (the tracing-machinery denylist)" '
+import sys
+s = sys.stdin.read()
+a = "    || die \"send: BLOCKED"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "    || { set +x; \"$RDA_BUS_STUBDIR/claude\" -p x >/dev/null 2>&1 || true; set -x; false; } \\\n" + a)
+sys.stdout.write(s)
+'
+
+[ "$mutants_run" = "32" ] || fail "expected 32 mutants, ran $mutants_run"
+echo "PASS: test-bus-mutants.sh — 32/32 mutants caught"
