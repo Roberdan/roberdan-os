@@ -75,7 +75,7 @@ _suite_out() { cat "$_PARDIR/$1.out" 2>/dev/null; }
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate \
           test-federated-kb test-leak-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
-          test-evolve-declined test-review-budget test-bus; do
+          test-evolve-declined test-review-budget test-bus test-bus-mcp; do
   _spawn "$_s"
 done
 unset _s
@@ -322,6 +322,9 @@ if _suite test-review-budget; then ok "a spent review budget exits 3 and demands
 
 section "agent bus — messages, never execution (test/test-bus.sh)"
 if _suite test-bus; then ok "bus delivers durably, attributes, resolves citations to no more than they prove, and executes nothing"; else err "test-bus — see bash test/test-bus.sh"; fi
+
+section "agent bus — the typed MCP surface (test/test-bus-mcp.sh)"
+if _suite test-bus-mcp; then ok "the MCP surface dispatches send/read/log only, refuses unknown tools, and stores shell metacharacters as inert data"; else _suite_out test-bus-mcp; err "test-bus-mcp — see bash test/test-bus-mcp.sh"; fi
 # THE MUTATION HARNESS IS NO LONGER A GATE. `bash test/test-bus-mutants.sh` is
 # still in the tree and still useful to run by hand when the bus changes shape,
 # but it does not decide whether this repo is releasable, for three reasons that
