@@ -619,3 +619,62 @@ checked, in process, by `test/test-bus.sh`.
 `test/test-bus-mutants.sh` stays in the tree. It is still the right tool to run
 by hand when the bus changes shape. It is no longer the thing that decides
 whether the repo is releasable.
+
+## 2026-07-28 — the MCP surface, and how an agent actually reaches it
+
+The section above ends on a promise: property 1 "moves to the shape of the
+core", exposed as typed MCP tools. `bus/bus-mcp.py` is that, and this section is
+the part that was missing — not what it is, but **how it gets loaded and by
+whom**, which is where a security boundary usually leaks.
+
+**It is not auto-loaded, and must not be.** Nothing in `bin/sync.sh --install`
+registers it. Which MCP servers an agent may load lives in the client's own
+config (`~/.claude.json`, `~/.copilot/mcp-config.json`, `~/.codex/config.toml`),
+and `sync.sh` has never written any of those — for `gbrain` it looks and warns,
+and that is all. Keep it that way. An install that could silently add a tool
+surface to every agent on the machine would be a worse hole than any the mutant
+suite was ever pointed at.
+
+Registration is therefore one deliberate command per client:
+
+```
+claude mcp add --scope user roberdan-bus -- <repo>/bus/bus-mcp.py
+claude mcp list      # roberdan-bus: ... ✔ Connected
+```
+
+`bin/doctor.sh` has a `bus-mcp` wiring row that greps the three known client
+configs and reports which of them, if any, reference it. "Installed but not
+connected" is the failure mode that otherwise happens in silence, and it is the
+one doctor exists for.
+
+**Scope is per-machine, not per-repo.** The store is `~/.rda/bus/<repo>/<card>.jsonl`
+and every tool takes repo and card as arguments, so one user-scope registration
+serves every checkout. Two sessions on the same card find each other regardless
+of the directory they started in — which is the point, since the collision the
+bus caught for real was two agents in one checkout.
+
+**The surface is four tools: `bus_send`, `bus_read`, `bus_peek`, `bus_log`.**
+Absent on purpose: `close`, `open`, `roles`. An agent does not close a thread and
+does not register itself; those stay on `bus/bus.sh` where a human runs them.
+
+**It narrows, it does not reimplement.** One `subprocess.run`, `shell=False`
+stated in the source, `BUS_SH` resolved from `__file__` rather than `PATH` (a
+PATH lookup would be the injection point), body as a temp file and never in
+`argv`, unlinked in a `finally`. `bus.sh` keeps validating all eight send-side
+invariants. A second store implementation would be a divergence machine with the
+privacy gate on the side nobody runs.
+
+That last point cost two mutants to learn. Of five mutations against
+`test/test-bus-mcp.sh`, three died at once (`shell=True`, an added `close` verb,
+a second `subprocess.run`) but two survived: deleting the Python `kind` enum and
+disabling `SLUG_RE` still passed, because `bus.sh` rejects the same input a
+layer later. The test claimed the surface "refuses before dispatch", which is a
+property of *this* layer, so the assertions now pin this layer's wording
+(`^repo: `, `^kind: must be one of `) against `bus.sh`'s (`--repo:`,
+`send: --kind must be`). Defence in depth reads exactly like an untested layer
+until you assert which layer answered.
+
+Source-reading checks use `ast.parse`, not grep. Two of them first failed on the
+file's own prose — the comment explaining there is no `shell=True`. A grep would
+equally let a real shell call hide behind a well-worded comment. The dispatch
+verbs are enumerated by an AST walk that flags any computed verb as `DYNAMIC`.
