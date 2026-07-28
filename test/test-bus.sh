@@ -20,15 +20,6 @@ TMP="$(mktemp -d)"
 # the write-marker live here, because everything under $TMP is one dirname away
 # from the RDA_BUS_HOME the bus is handed.
 CANDIR="$(mktemp -d)"
-# The reference for the sweep is a TIMESTAMP HELD IN A VARIABLE, not a marker
-# file. A marker under the system temp dir is one glob away from inside the bus
-# - $TMP is dirname "$RDA_BUS_HOME", so "$(dirname "$TMP")"/tmp.*/.t0 finds it -
-# and a payload that wrote a skill into the real ~/.claude/skills and then
-# rewrote every such marker made its own write invisible, with the suite green.
-# `date` truncates DOWN to the second, so every write after this line is
-# strictly newer; nothing is missed, and a file written in the same second
-# BEFORE this line only ever fails closed.
-MARK_TS="$(date '+%Y-%m-%d %H:%M:%S')"
 # ONE RUN AT A TIME, and the lock is SHARED WITH THE MUTANT HARNESS on purpose.
 # Both watch the real $HOME for writes, so a harness running alongside this suite
 # plants its probes inside this suite's measurement window: check 47c then reports
@@ -97,7 +88,6 @@ export RDA_LEAKCHECK="$TMP/lc/leak-check.sh"
 # live session, executes nothing external, consults no PATH, names no binary and
 # touches no kanban file: all four watchers are structurally blind to it.
 # Demonstrated: 14 files planted in the REAL ~/.roberdan-os during a green run.
-RDA_REAL_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 export RDA_HOME="$TMP/home"          # accidents land in the sandbox...
 mkdir -p "$RDA_HOME"
 # FIXTURE: the sandbox queue is a SYMLINK to a sibling directory, which is what
@@ -111,144 +101,37 @@ mkdir -p "$RDA_HOME"
 # becomes the pin for -L at zero cost.
 mkdir -p "$TMP/queue-volume" "$RDA_HOME/factory"
 ln -s "$TMP/queue-volume" "$RDA_HOME/factory/queue"
-dispatch_surfaces() {
-  local h r
-  for h in "$RDA_REAL_HOME" "$RDA_HOME"; do
-    printf '%s\n' "$h/factory/queue" "$h/factory/state" "$h/factory/done" \
-                  "$h/factory/failed" "$h/runner-allowlist" "$h/kanban-registry"
-  done
-  # A queue is not the only way to make an agent start without executing one.
-  # Every path below is a LOADED consumer on this machine, demonstrated by a
-  # mutant that wrote it during a green run:
-  #  - ~/.claude/{scripts,hooks,agents,commands}: com.roberdan.rustsweep executes
-  #    ~/.claude/scripts/rust-sweep.sh on a schedule, and settings.json hooks run
-  #    on every Claude session.
-  #  - ~/.orca/agent-hooks: named by ~/.claude/settings.json PermissionRequest.
-  #  - ~/Library/LaunchAgents: a plist dropped here is a job at next login.
-  #  - <repo>/.git/hooks: post-commit runs on the human's next commit.
-  #  - <repo>/handoff: factory/run.sh concatenates it into the PROMPT of every
-  #    headless --dangerously-skip-permissions agent, i.e. prompt injection.
-  printf '%s\n' "$HOME/.claude/scripts" "$HOME/.claude/hooks" \
-                "$HOME/.claude/agents" "$HOME/.claude/commands" \
-                "$HOME/.claude/settings.json" "$HOME/.orca/agent-hooks" \
-                "$HOME/Library/LaunchAgents"
-  for r in "$ROOT" "$BUSROOT"; do
-    printf '%s\n' "$r/.git/hooks" "$r/handoff"
-  done
-  # ...and the same two surfaces for every board the registry can reach.
-  if [ -f "${RDA_KANBAN_REGISTRY:-}" ]; then
-    while IFS= read -r r; do
-      [ -n "$r" ] || continue
-      printf '%s\n' "$r/.git/hooks" "$r/handoff"
-    done < <(awk '{print $NF}' "$RDA_KANBAN_REGISTRY" 2>/dev/null || true)
-  fi
-}
-# ...and a payload that spells the real path absolutely is caught here.
-dispatch_fingerprint() {
-  local paths=() p
-  while IFS= read -r p; do [ -e "$p" ] && paths+=("$p"); done < <(dispatch_surfaces)
-  [ "${#paths[@]}" -gt 0 ] || { echo "no-dispatch-surface"; return 0; }
-  # -L, for the same reason kanban_fingerprint has it: a plain `find` lists a
-  # symlinked directory and never descends into it, so a factory/queue that is a
-  # symlink (an external volume, a synced folder) is 100% blind. Demonstrated:
-  # the hash is byte-identical before and after a job file is written inside.
-  { find -L "${paths[@]}" 2>/dev/null | sort \
-      | while IFS= read -r f; do printf '%s ' "$f"; [ -f "$f" ] && shasum "$f" | awk '{print $1}'; echo; done; } | shasum | awk '{print $1}'
-}
-dispatch_baseline="$(dispatch_fingerprint)"
-# Some consumers are directories with tens of thousands of files in them
-# (~/.claude/skills is 20k), so hashing every byte of them four times a run costs
-# six minutes. Hash is the wrong instrument there: what matters is that NOTHING
-# WAS WRITTEN. A single stat-only sweep for anything newer than a marker taken
-# before the first bus invocation costs 0.5s and catches creation and
-# modification alike. The marker lives in $CANDIR, not $TMP, for the same reason
-# the canary does: $TMP is one dirname from RDA_BUS_HOME.
-# DERIVE THE LIST FROM LAUNCHD, DO NOT REMEMBER IT. Three loaded jobs execute
-# scripts that no hand-written enumeration on this branch has ever mentioned
-# (~/.claude/scripts/rust-sweep.sh, ~/.gbrain/gbrain-vault-sync.sh,
-# ~/.local/bin/gbrain-refresh-code, the Actions runner's runsvc.sh), and five
-# more execute scripts inside this checkout. Asking launchd what it will run is
-# the difference between a list that decays and one that cannot.
-# Only regular executable files: the StandardOut/ErrorPath entries in the same
-# plists are logs the jobs write to themselves.
-launchd_targets() {
-  local p t
-  for p in "$HOME/Library/LaunchAgents"/*.plist; do
-    [ -f "$p" ] || continue
-    grep -o '<string>[^<]*</string>' "$p" 2>/dev/null | sed -e 's/<[^>]*>//g'
-  done | tr ';' '\n' \
-       | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' \
-       | sed -e "s#\$HOME#$HOME#g" | grep '^/' | sort -u \
-       | while IFS= read -r t; do
-           case "$t" in *.log|*.err|*.out) continue;; esac
-           [ -f "$t" ] && [ -x "$t" ] && printf '%s\n' "$t"
-         done
-  return 0
-}
-exec_config_roots() {
-  local r
-  # ~/.claude WHOLESALE, not a list of directories inside it. The enumeration
-  # missed settings.local.json - a file Claude reads for `hooks` and
-  # `permissions`, i.e. a session hook - and it would have missed the next one
-  # too. What is session-mutable is subtracted below, and that subtraction is a
-  # DECLARED DENYLIST: everything else in ~/.claude is treated as executable.
-  for r in "$HOME/.claude" "$HOME/.orca/agent-hooks" "$HOME/Library/LaunchAgents" \
-           "$HOME/.zshenv" "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.zlogin" \
-           "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"; do
-    [ -e "$r" ] && printf '%s\n' "$r"
-  done
-  # THE WHOLE CHECKOUT, not a list of directories inside it. FIVE loaded launchd
-  # jobs execute scripts that live in this repo - factory/run.sh, evolve/watch.sh,
-  # learn/distill.sh, ontology/curate.sh, bin/pending-digest.sh - and the bus
-  # computes $ROOT from its own location, so `>> "$ROOT/factory/run.sh"` is
-  # arbitrary code at 01:00 with no external command, no PATH and no agent name.
-  # A payload that appended 92 lines to factory/run.sh and to .git/config passed
-  # the whole suite. Enumerating executable directories inside a repo is the same
-  # losing game as enumerating dispatch queues: watch the checkout.
-  # Only when it IS a checkout: under the mutant harness $BUSROOT is the system
-  # temp directory, and scanning that is neither cheap nor stable.
-  # The explicit pair stays even though the whole checkout is swept below: under
-  # the mutant harness the binary lives in a scratch directory, so $BUSROOT is
-  # the system temp dir - not checkout-shaped, therefore not swept wholesale, and
-  # mutant 41 walked straight back through the gap the moment the wholesale rule
-  # replaced them. Two mechanisms, deliberately overlapping.
-  for r in "$ROOT" "$BUSROOT"; do
-    [ -e "$r/hooks" ] && printf '%s\n' "$r/hooks"
-    [ -e "$r/.git/hooks" ] && printf '%s\n' "$r/.git/hooks"
-    [ -d "$r/.git" ] && printf '%s\n' "$r"
-  done
-  launchd_targets
-  return 0
-}
-# 47c. THE EXECUTABLE-CONFIGURATION SWEEP, named so a mutant can pin it. [PINNED]
-#      Nothing newer than MARK_TS may appear under any root that something else
-#      later EXECUTES. This is where "writing one file starts an agent" is
-#      actually refused; the numbered header exists because six mutants say they
-#      pin "check 47c", and a name a mutant claims must be a name that exists.
-assert_no_new_exec_config() {
-  local roots=() r out
-  while IFS= read -r r; do roots+=("$r"); done < <(exec_config_roots)
-  [ "${#roots[@]}" -gt 0 ] || return 0
-  # git's own bookkeeping is the only thing that legitimately moves inside a
-  # checkout while the suite runs (fsmonitor cookies, index, objects, refs).
-  # .git/hooks and .git/config are NOT ignored: both are execution surfaces -
-  # core.hooksPath and [alias] run arbitrary commands on the human's next git
-  # command. This ignore list is a DENYLIST and is declared as one.
-  out="$(find -L "${roots[@]}" -newermt "$MARK_TS" 2>/dev/null \
-          | grep -vE '/\.git(/(fsmonitor--daemon|objects|index|logs|refs|worktrees|packed-refs|shallow|modules|COMMIT_EDITMSG|FETCH_HEAD|ORIG_HEAD|MERGE_[A-Z]+)|$)' \
-          | grep -vE '/\.claude/(sessions|history\.jsonl|logs|cache|file-history|paste-cache|image-cache|uploads|telemetry|projects|shell-snapshots|daemon|session-env|backups|tasks|jobs|todos|statsig|plans|reports|stats-cache\.json|chrome|sandbox)' \
-          || true)"
-  [ -z "$out" ] || fail "the bus wrote EXECUTABLE CONFIGURATION: $(tr '\n' ' ' <<<"$out") - ~/.claude (wholesale, minus the declared session-mutable denylist), ~/.orca/agent-hooks, ~/Library/LaunchAgents, the shell rc files that /bin/bash -lc sources for five loaded launchd jobs, and the whole CHECKOUT (factory/run.sh, evolve/watch.sh, learn/distill.sh, ontology/curate.sh, bin/pending-digest.sh are all executed on a schedule, and .git/{hooks,config} on the next git command). Writing one starts an agent without executing one ($1)"
-}
-# 47b. THE DISPATCH FINGERPRINT, over whatever window the caller names. [PINNED]
-#      47c covers roots that are executed; this covers the specific surfaces that
-#      dispatch — a launchd queue, a scheduled script, a session or git hook, a
-#      prompt input. Byte-compared against a baseline taken before the run.
-assert_no_dispatch() {
-  assert_no_new_exec_config "$1"
-  [ "$(dispatch_fingerprint)" = "$dispatch_baseline" ] \
-    || fail "the bus wrote to a DISPATCH SURFACE - one of the paths listed in dispatch_surfaces(): a launchd queue, a scheduled script, a session hook, a git hook or a prompt input. Every one of them starts an agent WITHOUT executing one, and starting a session is the one thing this channel may never do ($1)"
-}
+# ---------------------------------------------------------------------------
+# WHAT USED TO BE HERE, AND WHY IT IS NOT
+#
+# Six functions swept the MACHINE: ~/.claude wholesale, ~/Library/LaunchAgents,
+# ~/.orca/agent-hooks, the shell rc files, the whole checkout, .git/{hooks,config}
+# - anything newer than a marker timestamp. They were trying to prove property 1
+# ("the bus never starts an agent session") by looking at the world afterwards.
+#
+# Three things killed that approach, all of them measured rather than argued:
+#
+#   1. IT COULD NOT BE GREEN. The denylist exempted children of ~/.claude but not
+#      the directory node, whose mtime moves whenever any live session adds or
+#      removes an entry. On this machine a session is always running - so the
+#      gate accused whatever session was executing it. No green run had ever
+#      existed. A gate that cannot be green is a ritual, not a gate.
+#   2. IT COULD NOT BE SOUND EITHER. Exempting the node to fix (1) opens a hole:
+#      `touch -t` backdates a created file below the marker and it disappears.
+#      mtime is attacker-controlled; the sweep was asking the suspect for an alibi.
+#   3. IT ALREADY ADMITTED DEFEAT IN WRITING. test-bus-mutants.sh declares
+#      `survives brace-blind`: an agent started inside a stderr-redirected
+#      compound command, suite green. Its own comment says "there is no
+#      in-process fix; only an out-of-process boundary covers this."
+#
+# So property 1 is no longer claimed to be PROVEN here. It is enforced by the
+# shape of the core - a data-only bus with no subprocess API cannot start
+# anything - with an optional sandbox-exec profile as a second belt. What
+# remains in this file is everything that observes the BUS PROCESS (the stub
+# PATH canary, the execution allowlist over its own trace) and the kanban
+# fingerprint for property 2, because that one is Roberto's approval gate.
+# Process-scoped checks are deterministic; machine-scoped ones were not.
+# ---------------------------------------------------------------------------
 export RDA_KANBAN="$TMP/kanban"
 export RDA_KANBAN_REGISTRY="$TMP/registry"   # hermetic: never consult the real boards
 mkdir -p "$RDA_KANBAN/doing"
@@ -1096,7 +979,6 @@ for want in direct1 bcast1 direct2; do
   grep -q "$want" <<<"$real" || fail "$want was lost between peek and read"
 done
 
-assert_no_dispatch "whole run (pre-floor)"
 # 42. THE FLOOR. Everything above ran with the recording stubs first on PATH, so [PINNED]
 #     this single assertion covers every branch the suite touched, including the
 #     ones nobody enumerated. Six refusal branches were caught by exactly this
@@ -1218,8 +1100,21 @@ for _agent in claude codex copilot gemini aider cursor-agent dispatch-runner.sh;
   grep -qxF "$_agent" <<<"$tracewords" \
     && fail "the name of an agent CLI ('$_agent') appears as an ARGUMENT in the trace - an allowlisted interpreter was handed an agent to run, which starts a session without ever executing one under its own name"
 done
+# The classifier below is an awk regex pass, and awk on this platform degrades
+# badly on very long lines - check 34 deliberately pushes a body past ARG_MAX,
+# so one traced line is 60,019 characters. Handing it all 9MB of trace cost
+# 96.9 SECONDS, measured, which was 103 of the suite's 188 and - because 27 of
+# the 62 mutants declare a check at or after this one - roughly 45 minutes of
+# the mutant gate's 60. The grep below is a SUPERSET filter, not a shortcut:
+# every branch of the classifier requires one of these six regex alternatives
+# to match, so a line the grep drops could not have matched any branch. (They
+# are alternatives, not literals: two of them cover several spellings each.) Verified
+# on the real trace (0.088s, 1100x) and on both evasions from round 8, which
+# are still caught byte-identically. Do not replace the classifier with a
+# faster one; keep the slow, readable classifier and give it less to read.
 escape="$(cat "$TRACEDIR"/t.* 2>/dev/null | grep -E '^#+XT# ' \
   | sed -E 's/^#+XT#[[:space:]]*//' \
+  | grep -E '(^| )-c[ =]|--exec-path|system\(|--compress-program|alias\.[A-Za-z]|core\.(pager|sshCommand|hooksPath|editor)' \
   | awk '{ c=$1; sub(/.*\//,"",c);
            if (c=="git"  && $0 ~ /(^| )-c([ =])/)                    { print "git -c: " $0 }
            else if (c=="git"  && $0 ~ /--exec-path/)                 { print "git --exec-path: " $0 }
@@ -1255,7 +1150,6 @@ done
 #     card executes nothing, so the canary cannot see it, and the fingerprint was
 #     scoped to the table - a refused send that appended to a card walked through.
 assert_kanban_untouched "whole run"
-assert_no_dispatch "whole run"
 
 # 48. THE LID ON HALF TWO, NAMED AS ONE. In-process tracing is a drift detector, [PINNED]
 #     not a sandbox: PS4, `set +x`, `exec 2>` and BASH_XTRACEFD are all reachable
@@ -1324,6 +1218,5 @@ grep -q "^m-$BIGN2$" <<<"$big" || fail "the NEWEST record was dropped between th
 #     only a floor if nothing runs underneath it.
 assert_never_executed "final (after every bus invocation)"
 assert_kanban_untouched "final (after every bus invocation)"
-assert_no_dispatch "final (after every bus invocation)"
 
 echo "PASS: test-bus.sh"

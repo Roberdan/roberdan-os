@@ -1005,7 +1005,7 @@ sys.stdout.write(s.replace(a, "    || true"))
 mutate broadcast-shadow "lets a manifest shadow the reserved broadcast addressee" "check 35 (roles/all.json is refused on sight)" '
 import sys
 s = sys.stdin.read()
-a = """  [ ! -f "$ROLES_DIR/$BROADCAST.json" ] \\\\
+a = """  [ ! -f "$ROLES_DIR/$BROADCAST.json" ] \\
     || die "$ROLES_DIR/$BROADCAST.json shadows the reserved broadcast addressee — rename that role\""""
 assert s.count(a) == 1, "anchor drift"
 sys.stdout.write(s.replace(a, "  return 0"))
