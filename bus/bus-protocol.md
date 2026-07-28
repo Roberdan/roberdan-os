@@ -568,3 +568,54 @@ on the channel. It is also where the real guarantee for non-goal 3 lives.
 
 Open question, more important than this code:
 *what would have to be true for `kb pending` to drop below 5?*
+
+---
+
+## 2026-07-28 — the proving apparatus left the gate
+
+The paragraph above about `brace-blind` said, four rounds early, that only an
+out-of-process boundary could enforce property 1. It was right, and the rest of
+the apparatus was built anyway. Today it came out of `test/validate.sh`.
+
+What forced it, all measured:
+
+- **The floors could never be green.** `assert_no_new_exec_config` swept
+  `~/.claude` wholesale; the denylist exempted children of that directory but
+  not the directory node, whose mtime moves whenever a live session adds or
+  removes an entry directly under it. On this machine an agent session is always
+  running, so the gate charged the bus with the writes of the session executing
+  it. Three runs (40, 40 and 66 minutes) died that way in one day. No green run
+  had ever existed.
+- **Fixing that could not be made sound.** Exempting the node removes the false
+  positive and opens a hole in the same gesture: `touch -t` backdates a created
+  file below the marker and it leaves the sweep. mtime is attacker-controlled.
+  `find -newerct` closes that one hole and leaves the approach standing, which
+  is the problem, not the fix.
+- **Cost was a defect, not a price.** 96.9 of the suite's 188 seconds were one
+  awk pass handed 9MB of accumulated xtrace including a 60,019-character line
+  (check 34 traces it on purpose, and awk degrades badly on long lines). 27 of
+  the 62 mutants reach that check, so ~45 of the gate's 60 minutes were that
+  single pipeline. The classifier is unchanged and now has a grep superset in
+  front of it: 0.088s, verified differentially over 1,596 command spellings.
+
+**The rule that came out of it, which is the reusable part: keep every check
+that observes the BUS PROCESS, drop every check that observes the MACHINE.**
+Process-scoped checks are deterministic. Machine-scoped ones never were — two
+agents working in the same checkout accuse each other, which is exactly how two
+runs were lost before anyone noticed the gate was also accusing itself.
+
+Property 1 (never starts an agent session) is therefore no longer claimed to be
+*proven* here. It moves to the shape of the core: a data-only bus with no
+subprocess API cannot start anything, exposed as typed MCP tools so the surface
+an agent can reach is enumerated rather than swept for afterwards. A
+`sandbox-exec` profile is available as a second belt and was checked by hand: a
+deny-default profile with a literal exec allowlist denies `claude`, `osascript`
+and the `git -c alias.z='!claude'` evasion that defeated eight rounds of textual
+checks, while `git` and `jq` keep working.
+
+Property 2 (never writes kanban state) is Roberto's approval gate and is still
+checked, in process, by `test/test-bus.sh`.
+
+`test/test-bus-mutants.sh` stays in the tree. It is still the right tool to run
+by hand when the bus changes shape. It is no longer the thing that decides
+whether the repo is releasable.
