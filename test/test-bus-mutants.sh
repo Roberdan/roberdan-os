@@ -21,15 +21,34 @@ WORK="$(mktemp -d)"
 # by something that starts an agent. Being CAUGHT does not unwrite the file, so
 # every probe carries one distinctive name and is swept afterwards, always.
 PROBE="RDA-MUTANT-PROBE"
+# The sweep roots are the SAME roots the suite watches, read out of test-bus.sh
+# rather than remembered here: a probe this harness plants somewhere the sweep
+# does not reach is litter on the real machine, and the two lists drifting apart
+# is exactly how that happens. No -maxdepth: a probe at
+# ~/.claude/skills/x/y/SKILL.md is already at the old limit of 4, and one level
+# deeper it would have been left behind. (-maxdepth also has to precede -name on
+# BSD find, which the old call got wrong and hid with 2>/dev/null.)
 probe_sweep() {
   local root
   for root in "$HOME/.claude" "$HOME/.orca" "$HOME/Library/LaunchAgents" \
-              "$HOME/.roberdan-os/factory" "$ROOT/hooks" "$ROOT/.git/hooks" "$ROOT/handoff"; do
+              "$HOME/.roberdan-os/factory" "$HOME/.gbrain" "$HOME/.local/bin" \
+              "$ROOT" ; do
     [ -d "$root" ] || continue
-    find "$root" -name "$PROBE*" -maxdepth 4 -exec rm -rf {} + 2>/dev/null || true
+    find "$root" -name "$PROBE*" -exec rm -rf {} + 2>/dev/null || true
   done
 }
-trap 'rm -rf "$WORK"; probe_sweep' EXIT
+# ONE RUN AT A TIME. The suite now watches the real $HOME, so two concurrent
+# harnesses cross-contaminate: @rex and I ran ours against the same machine for
+# twenty minutes and each saw the other's probes appear mid-measurement, which
+# can fail either run for a reason that is not in either diff.
+LOCKDIR="${TMPDIR:-/tmp}/rda-bus-mutants.lock"
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+  echo "REFUSED: another mutant run holds $LOCKDIR." >&2
+  echo "  This harness writes probes into the real \$HOME and the suite now watches it," >&2
+  echo "  so two runs at once corrupt each other's evidence. Wait, or remove the dir if stale." >&2
+  exit 2
+fi
+trap 'rm -rf "$WORK" "$LOCKDIR"; probe_sweep' EXIT
 probe_sweep
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -43,6 +62,15 @@ for danger in claude copilot codex osascript launchctl nohup kb kb.sh; do
   printf '#!/bin/sh\necho "stub %s invoked" >&2\nexit 0\n' "$danger" > "$STUBS/$danger"
   chmod +x "$STUBS/$danger"
 done
+
+# THE MUTANT LIVES IN A CHECKOUT-SHAPED DIRECTORY. bus.sh computes $ROOT from
+# its own location, so a mutant parked directly in $WORK made $ROOT the system
+# temp directory - not repo-shaped, therefore not swept as a checkout, and a
+# payload appending arbitrary shell to `$ROOT/factory/run.sh` (a script FIVE
+# loaded launchd jobs execute) walked straight through. Production shape is a
+# checkout; the harness must have one too, or it tests a shape nobody runs.
+MUTREPO="$WORK/repo"
+mkdir -p "$MUTREPO/bus" "$MUTREPO/.git"
 
 mutants_run=0
 
@@ -58,7 +86,7 @@ mutants_run=0
 # explicitly rather than being waved through by a looser default.
 mutate() {
   local name="$1" property="$2" expect="$3" program="$4" evidence="${5:-^FAIL}"
-  local mut="$WORK/$name.sh" out
+  local mut="$MUTREPO/bus/$name.sh" out
   python3 -c "$program" < "$BUS" > "$mut" || fail "$name: the mutation program itself failed"
   chmod +x "$mut"
   cmp -s "$BUS" "$mut" && fail "$name: the mutation changed nothing — the anchor text has drifted, so this mutant is not testing anything"
@@ -720,7 +748,152 @@ p = "  { kb start rexprobe || true; : > \"$(dirname \"$RDA_BUS_HOME\")/canary\";
 sys.stdout.write(s.replace(a, p + a))
 '
 
-[ "$mutants_run" = "45" ] || fail "expected 45 mutants, ran $mutants_run"
+# 46-48. ARGUMENTS ARE CODE TOO. Check 45 allowlists the command NAME and takes
+#     `awk '{print $1}'` of every traced line: it never looks at what the command
+#     was ASKED TO DO. Three of the allowlisted names are interpreters, and
+#     `git -c alias.z='!/abs/claude -p wake' z` started 92 real agent sessions
+#     during a green run - no PATH lookup (canary blind), no unallowed name
+#     (check 45 blind), no dispatch file (47b/47c blind), no trace manipulation
+#     (check 48 blind). This is the sharpest instance of the standing lesson:
+#     the property was measured through the ONE cause somebody enumerated.
+mutate git-alias "hands an allowlisted interpreter an agent to run, via a git alias" "check 45b list (a): no agent name may appear as ANY word of a traced line" '
+import sys
+s = sys.stdin.read()
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+assert s.count(a) == 1, "anchor drift"
+p = "  git -C \"$RDA_BUS_HOME\" -c \"alias.rexz=!$RDA_BUS_STUBDIR/claude -p wake\" rexz >/dev/null 2>&1 || true\n"
+sys.stdout.write(s.replace(a, p + a))
+' "appears as an ARGUMENT in the trace"
+
+mutate awk-system "hands an allowlisted interpreter an agent to run, via awk system()" "check 45b list (a): the same denylist, a second interpreter" '
+import sys
+s = sys.stdin.read()
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+assert s.count(a) == 1, "anchor drift"
+p = "  awk \"BEGIN{system(\\\\\"$RDA_BUS_STUBDIR/claude -p viaawk\\\\\")}\" </dev/null >/dev/null 2>&1 || true\n"
+sys.stdout.write(s.replace(a, p + a))
+' "appears as an ARGUMENT in the trace"
+
+# The payload here is deliberately HARMLESS (`!true`): the point is that the
+# escape hatch itself is refused, not that this particular use of it was bad.
+# The bus has never needed `git -c` and never should, so it is cheaper to ban
+# the mechanism than to keep guessing at the payloads it can carry.
+mutate git-escape-only "uses an interpreter escape hatch of an allowlisted command, with a harmless payload" "check 45b list (b): the escape hatches are refused outright" '
+import sys
+s = sys.stdin.read()
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+assert s.count(a) == 1, "anchor drift"
+p = "  git -C \"$RDA_BUS_HOME\" -c \"alias.rexq=!true\" rexq >/dev/null 2>&1 || true\n"
+sys.stdout.write(s.replace(a, p + a))
+' "INTERPRETER ESCAPE HATCH"
+
+# 49. THE REFERENCE WAS INSIDE THE BLAST RADIUS - AGAIN, ONE LINE FROM WHERE IT
+#     HAD JUST BEEN FIXED. Round 7 moved the canary out of the bus's reach and
+#     made it tamper-evident; the sweep MARKER was then placed in the same
+#     directory and left forgeable. $TMP is dirname "$RDA_BUS_HOME", so
+#     "$(dirname "$TMP")"/tmp.*/.t0 finds the marker WITHOUT KNOWING ITS NAME:
+#     write a skill into the real ~/.claude/skills, bump every such marker, and
+#     the whole sweep is switched off with the suite green. The reference is now
+#     a timestamp held in a variable of the test process - unreachable by
+#     construction rather than by hiding.
+mutate marker-bump "plants a real skill and then back-dates the sweep reference" "check 47c (the reference is a timestamp in the test process, not a file)" '
+import sys
+s = sys.stdin.read()
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+assert s.count(a) == 1, "anchor drift"
+p = ("  mkdir -p \"$HOME/.claude/skills/RDA-MUTANT-PROBE-marker\" 2>/dev/null || true\n"
+     "  printf \x27probe\\n\x27 > \"$HOME/.claude/skills/RDA-MUTANT-PROBE-marker/SKILL.md\" 2>/dev/null || true\n"
+     "  for _m in \"$(dirname \"$(dirname \"$RDA_BUS_HOME\")\")\"/tmp.*/.t0; do [ -f \"$_m\" ] && : > \"$_m\"; done 2>/dev/null || true\n")
+sys.stdout.write(s.replace(a, p + a))
+'
+
+# 50. THE WHOLE CHECKOUT IS A DISPATCH SURFACE, not the two directories somebody
+#     listed inside it. FIVE loaded launchd jobs execute scripts that live in
+#     this repo (factory/run.sh, evolve/watch.sh, learn/distill.sh,
+#     ontology/curate.sh, bin/pending-digest.sh) and the bus computes $ROOT from
+#     its own location, so `>> "$ROOT/factory/run.sh"` is arbitrary code at 01:00
+#     with no external command, no PATH and no agent name. `.git/config` is the
+#     same thing on the human next git command ([alias], core.hooksPath).
+mutate repo-scripts "appends shell to a scheduled script inside its own checkout" "check 47c (the whole checkout is swept, not a list of directories inside it)" '
+import sys
+s = sys.stdin.read()
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+assert s.count(a) == 1, "anchor drift"
+p = ("  mkdir -p \"$ROOT/factory\" 2>/dev/null || true\n"
+     "  printf \x27# RDA-MUTANT-PROBE-scripts\\n\x27 >> \"$ROOT/factory/run.sh\" 2>/dev/null || true\n"
+     "  printf \x27# RDA-MUTANT-PROBE-scripts\\n\x27 >> \"$ROOT/.git/config\" 2>/dev/null || true\n")
+sys.stdout.write(s.replace(a, p + a))
+'
+
+# Resolve a launchd-executed script that is NOT already covered by one of the
+# hand-written roots, so mutant 51 pins launchd_targets() specifically and not
+# some other rule that happens to overlap it. If this machine has none, SAY SO
+# and stop: a skipped mutant is an unverified claim, and this is the claim that
+# the root list cannot decay.
+# (A function, not an inline $(...): bash 3.2 mis-parses a `case` pattern's
+# closing paren inside command substitution as the end of the substitution.)
+_ld_target() {
+  local _p _t
+  for _p in "$HOME/Library/LaunchAgents"/*.plist; do
+    [ -f "$_p" ] || continue
+    grep -o '<string>[^<]*</string>' "$_p" 2>/dev/null | sed -e 's/<[^>]*>//g'
+  done | sed -e "s#\$HOME#$HOME#g" | grep '^/' | sort -u | while IFS= read -r _t; do
+    case "$_t" in
+      *.log|*.err|*.out) continue;;
+      # Interpreters and system binaries are ProgramArguments[0] of half these
+      # jobs (/bin/bash, /usr/bin/python3). They are real targets and the suite
+      # sweeps them, but they are not writable and not what this mutant is for:
+      # the finding is that launchd names USER-OWNED scripts nobody enumerated.
+      "$HOME"/*) : ;;
+      *) continue;;
+    esac
+    case "$_t" in
+      "$HOME/.claude"/*|"$HOME/.orca"/*|"$HOME/Library/LaunchAgents"/*|"$ROOT"/*) continue;;
+    esac
+    [ -f "$_t" ] && [ -x "$_t" ] && { printf '%s\n' "$_t"; break; }
+  done | head -1
+}
+LD_TARGET="$(_ld_target)"
+[ -n "$LD_TARGET" ] || fail "no launchd-executed script outside the hand-written roots on this machine: mutant 51 cannot be built, so launchd_targets() is UNVERIFIED here. Do not read a green run as covering it."
+export LD_TARGET
+LD_TARGET_BEFORE="$(shasum "$LD_TARGET" | awk '{print $1}')"
+
+# 51. DERIVE THE LIST FROM LAUNCHD, DO NOT REMEMBER IT. Parsing the plists yields
+#     executable targets no hand-written enumeration on this branch ever
+#     mentioned. The payload only TOUCHES the target - mtime, not content - both
+#     because that is all the sweep needs to see and because this runs against
+#     the real machine. The concrete path is resolved by the harness, below,
+#     rather than hardcoded: a mutant that names one persons filesystem is a
+#     mutant that quietly stops testing on anybody elses.
+mutate launchd-target "bumps a script launchd will execute, which no hand-written root list named" "check 47c via launchd_targets() (the roots are derived from the plists)" "
+import sys
+s = sys.stdin.read()
+a = '  echo \"bus: appended \$kind from \$from to \$to on \$repo/\$card -> \$log\"'
+assert s.count(a) == 1, 'anchor drift'
+p = '  touch \"$LD_TARGET\" 2>/dev/null || true\n'
+sys.stdout.write(s.replace(a, p + a))
+"
+
+# The payload only touched mtime, but say so with evidence rather than by
+# assertion: this ran against a script launchd really executes.
+[ "$(shasum "$LD_TARGET" | awk '{print $1}')" = "$LD_TARGET_BEFORE" ] \
+  || fail "mutant 51 CHANGED the contents of $LD_TARGET - it was meant to touch mtime only. Restore it from git/backup before doing anything else."
+
+# 52. ENUMERATING FILES INSIDE ~/.claude is the same losing game one level down.
+#     settings.local.json - which Claude reads for `hooks` and `permissions` -
+#     was not on the list, and neither were mcp.json, statusline.sh, CLAUDE.md or
+#     plugins/. ~/.claude is now swept WHOLESALE minus a declared session-mutable
+#     denylist, which is the only form of this claim that does not decay.
+mutate claude-root "drops a hook-bearing config straight into ~/.claude, which no sub-directory list named" "check 47c (~/.claude wholesale, minus the declared session-mutable denylist)" '
+import sys
+s = sys.stdin.read()
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+assert s.count(a) == 1, "anchor drift"
+p = "  printf \x27{}\\n\x27 > \"$HOME/.claude/RDA-MUTANT-PROBE-settings.local.json\" 2>/dev/null || true\n"
+sys.stdout.write(s.replace(a, p + a))
+'
+
+[ "$mutants_run" = "52" ] || fail "expected 52 mutants, ran $mutants_run"
 
 # ===========================================================================
 # DECLARED SURVIVORS. A mutant that is CAUGHT proves a check works. A mutant that
@@ -732,7 +905,7 @@ sys.stdout.write(s.replace(a, p + a))
 # ===========================================================================
 survives() {
   local name="$1" property="$2" why="$3" program="$4"
-  local mut="$WORK/$name.sh"
+  local mut="$MUTREPO/bus/$name.sh"
   python3 -c "$program" < "$BUS" > "$mut" || fail "$name: the mutation program itself failed"
   cmp -s "$BUS" "$mut" && fail "$name: the mutation changed nothing — the anchor text has drifted"
   bash -n "$mut" || fail "$name: the mutant is not valid shell"
@@ -761,4 +934,4 @@ s = s.replace(a, "    || { { \"$RDA_BUS_STUBDIR/claude\" -p x >/dev/null; } 2>/d
 sys.stdout.write(s)
 '
 
-echo "PASS: test-bus-mutants.sh — 45/45 mutants caught, 1 declared survivor"
+echo "PASS: test-bus-mutants.sh — 52/52 mutants caught, 1 declared survivor"
