@@ -62,6 +62,20 @@ last copy of that work). Two escapes, both written onto the card, never silent:
 `--no-worktree "<why>"` at start (a decision, an approval, anything that is not code) and
 `--keep-worktree "<why>"` at finish (e.g. a review still open).
 
+## Cards that already exist — nothing breaks, and two things can be recovered
+Every field above is **optional**: a card written before any of this simply shows `-` where a
+measurement is missing, and both gates behave exactly as they did. Two things, though, are already
+on disk and worth recovering:
+```
+kb migrate            # dry-run: what could be recovered, and which doing cards have no worktree
+kb migrate --apply    # backfills started_at/started_epoch from the kb_start_audit line
+kb wt attach <id> <path>   # records a worktree an agent already created by hand onto the card
+```
+`kb migrate` **never touches `done/`** (append-only audit archive) and **never invents a time**: a
+card with no audit line is reported, not backfilled with "now". `kb wt attach` refuses a path that
+is not a real git worktree — a card claiming one that isn't there would make `kb finish` refuse
+forever, on evidence that was never true.
+
 ## What the dashboard can and cannot tell you (`kb dash`)
 - **Times are local** and come from `started_epoch:` / `finished_epoch:`, stamped by `kb`.
   Cards closed before those stamps existed show their date and `-` for the duration — never a

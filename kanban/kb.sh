@@ -321,6 +321,62 @@ _board() {
   _archive_hint
 }
 
+# --- migrating the cards that already exist --------------------------------
+# Nothing has to be migrated for the board to keep working: every field added by the worktree /
+# dashboard work is optional, and a card without it degrades to "-" by design. But two things CAN
+# be recovered, and a dashboard is worth more when the cards already on the board answer too:
+#   1. the start TIME of every card in doing — `kb start` has been appending a UTC audit line
+#      since long before started_epoch existed, so the number is already on disk, unparsed;
+#   2. a worktree an agent created by hand for a card, which the card does not know about.
+# Dry-run by default. It never touches done/ (the append-only audit archive) and never invents a
+# time it cannot read — a card with no audit line is listed as such, not backfilled with "now".
+_migrate() {
+  local apply=0; [ "${1:-}" = "--apply" ] && apply=1
+  local f id iso ep n_ts=0 n_wt=0
+  echo "kb migrate — cards in doing/ ($([ "$apply" = 1 ] && echo 'APPLICO' || echo 'prova, non scrivo niente: usa --apply'))"
+  for f in "$KB/doing"/*.md; do
+    [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue;; esac
+    id="$(basename "$f" .md)"
+    if ! grep -q '^started_epoch:' "$f"; then
+      iso="$(grep 'kb_start_audit' "$f" 2>/dev/null | tail -1 | sed 's/.*at=\([^ ]*\).*/\1/')"
+      ep=""
+      [ -n "$iso" ] && ep="$(date -d "$iso" +%s 2>/dev/null || TZ=UTC date -jf '%Y-%m-%dT%H:%M:%SZ' "$iso" +%s 2>/dev/null || true)"
+      if [ -n "$ep" ]; then
+        n_ts=$((n_ts+1))
+        printf '  %s — ora di inizio recuperabile dall audit: %s\n' "$id" \
+          "$(date -d "@$ep" '+%d/%m/%Y %H:%M %Z' 2>/dev/null || date -r "$ep" '+%d/%m/%Y %H:%M %Z' 2>/dev/null)"
+        if [ "$apply" = 1 ]; then
+          { echo "started_at: $(date -d "@$ep" '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null || date -r "$ep" '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null)"
+            echo "started_epoch: $ep"; } >> "$f"
+        fi
+      else
+        printf '  %s — nessuna ora di inizio recuperabile (nessuna riga di audit): restera "-"\n' "$id"
+      fi
+    fi
+    if ! grep -q '^worktree:' "$f" && ! grep -q '^worktree_none:' "$f"; then
+      n_wt=$((n_wt+1))
+      printf '  %s — nessun worktree registrato. Se ne esiste gia uno: kb wt attach %s <path>\n' "$id" "$id"
+      printf '     altrimenti la card resta senza isolamento (la spesa sara attribuita per finestra).\n'
+    fi
+  done
+  echo "  -- $n_ts card con ora recuperabile · $n_wt card senza worktree · done/ non viene mai toccato"
+  [ "$apply" = 0 ] && echo "  (niente scritto. Per applicare: kb migrate --apply)"
+  return 0
+}
+
+# kb wt attach <id> <path> — record a worktree that already exists (one an agent made by hand)
+# onto a card in doing. The path must really be a git worktree: a card that claims one which is
+# not there would make `kb finish` refuse forever, on evidence that was never true.
+_wt_attach() {
+  local id="${1:?card id}" path="${2:?worktree path}" f
+  f="$KB/doing/$id.md"; [ -e "$f" ] || { echo "no doing card $id" >&2; return 1; }
+  path="$(cd "$path" 2>/dev/null && pwd)" || { echo "REFUSED: '$2' non esiste" >&2; return 1; }
+  git -C "$path" rev-parse --git-dir >/dev/null 2>&1 || { echo "REFUSED: '$path' non e un worktree git" >&2; return 1; }
+  grep -q '^worktree:' "$f" && { echo "REFUSED: la card $id ha gia un worktree registrato" >&2; return 1; }
+  { echo "worktree: $path"; echo "branch: $(git -C "$path" rev-parse --abbrev-ref HEAD 2>/dev/null)"; } >> "$f"
+  echo "worktree registrato sulla card $id: $path"
+}
+
 # The boards the current invocation reports on — the same selection _board makes, exposed so
 # `kb dash` details exactly the cards the box above it just listed.
 _selected_boards() {
@@ -357,6 +413,8 @@ usage() {
   echo '  kb list | kb ls                plain vertical list, all columns'
   echo '  kb todo | kb doing | kb done  view one column'
   echo '  kb show <id>                  show a card'
+  echo '  kb migrate [--apply]          card gia esistenti: recupera l ora di inizio, elenca chi non ha worktree'
+  echo '  kb wt attach <id> <path>      registra sulla card un worktree gia creato a mano'
   echo ' federation:'
   echo '  kb init [repo]                make a repo safe to hold cards (local-exclude+de-track+hook+register; idempotent)'
   echo '  kb lint                       schema lint: runner: grammar + human_gates:↔human-only'
@@ -1045,6 +1103,12 @@ case "$cmd" in
     if [ "$KB_MATCHED" -eq 0 ]; then _board --all; else _board; fi
     ;;
   dash) _dash ;;                   # detail blocks alone (no box)
+  migrate) _migrate "${1:-}" ;;    # backfill start times / list cards with no worktree (dry-run)
+  wt)                              # per-card worktrees: attach an existing one, or inspect
+    case "${1:-}" in
+      attach) shift; _wt_attach "${1:-}" "${2:-}" ;;
+      *) echo "usage: kb wt attach <card-id> <path>" >&2; exit 2 ;;
+    esac ;;
   repo|status) _repo_view "${1:?repo name required (kb repo <name>)}" ;;  # per-repo dashboard: git + PRs + cards
   pending|inbox) _pending "$@" ;;  # the approval inbox: everything waiting on Roberto (--count = fast total)
   bot-filter-regex) _pr_bot_filter_regex ;;
