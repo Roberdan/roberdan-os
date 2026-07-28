@@ -93,7 +93,7 @@ opposite.* Not "the canon is proven to work."
 | Skills | `skills/` — verify-done, ship, review, sync, auto-checkpoint, focus-group, premortem, problem-validation | real; some build on external gstack |
 | Hooks | `hooks/` — bash-guard, context-inject, auto-checkpoint, autofmt, verify-done, main-guard, post-task-sync, pre-commit | mixed — see the honest map above for which fire (also bound to Copilot's lifecycle via the native extension, v2.16.0) |
 | Kanban / goal ledger | `kanban/` — the `kb` CLI. Card content is gitignored, local-only | real |
-| Agent bus | `bus/` — durable JSONL messages between agent sessions on a card. Carries messages only: it starts nothing and writes no kanban state | real |
+| Agent bus | `bus/` — durable JSONL messages between agent sessions on a card. Carries messages only: it starts nothing and writes no kanban state. `bus/bus-mcp.py` exposes it to agents as four typed MCP tools (register it per client, see below) | real |
 | Agent factory | `factory/` — bounded headless `claude -p` (native path real; external dispatch dormant) | mixed |
 | Meta-loop | `learn/` (capture+classify) + `ontology/` (promote, human-gated) + `evolve/` | learn→ontology real (v2.10.0); evolve not-yet-fired |
 | Eval | [`eval/README.md`](eval/README.md) — A/B + blind judge harness | harness real; result favored no-canon (4–6 over 10 runs) |
@@ -137,6 +137,48 @@ the hook canon changes — nothing alarms you if the live wiring drifts from the
 
 Pass `--dossier /path/to/profile.md` to `bootstrap.sh` only if you have Roberto's own confidential
 profile; everyone else omits it and the twin degrades gracefully to `[placeholder]`.
+
+### Wiring the bus into an agent (MCP)
+
+The bus is **not** auto-loaded when roberdan-os is installed, and that is on purpose. Which MCP
+servers an agent may load is decided in the *client's* config — `~/.claude.json`,
+`~/.copilot/mcp-config.json`, `~/.codex/config.toml` — and those files belong to the client, not to
+this repo. `sync.sh` has never written one (it only ever looks and warns, same as it does for
+`gbrain`), so an install can never silently hand a new tool surface to every agent on the machine.
+Registering is one command, per client, once:
+
+```
+# Claude Code — user scope, available in every repo
+claude mcp add --scope user roberdan-bus -- /path/to/roberdan-os/bus/bus-mcp.py
+claude mcp list                     # expect: roberdan-bus: ... ✔ Connected
+
+# Copilot CLI — add by hand to ~/.copilot/mcp-config.json (Copilot owns that file)
+#   "roberdan-bus": { "command": "/path/to/roberdan-os/bus/bus-mcp.py" }
+```
+
+`bin/doctor.sh` reports whether any client actually references it, so "installed but not connected"
+does not pass as connected.
+
+Once registered the server is available **in every repository**, not just this one, because the bus
+store is per-machine (`~/.rda/bus/<repo>/<card>.jsonl`) and the tools take the repo and card as
+arguments. Two sessions working the same card talk to each other whatever directory they were
+started in.
+
+What a registered agent gets is a **closed set of four typed tools**, not a shell:
+
+| Tool | Does |
+|---|---|
+| `bus_send` | append a message to a card's thread |
+| `bus_read` | read new messages for a role, advancing that role's cursor |
+| `bus_peek` | read without advancing the cursor |
+| `bus_log` | the whole thread, oldest first |
+
+Deliberately absent: `close`, `open`, `roles`. An agent does not close a thread and does not
+register itself — those stay human, on `bus/bus.sh`. The server is a *narrowing adapter*: it shells
+out exactly once, to `bus.sh`, with `shell=False` and the message body passed as a temp file rather
+than in `argv`, so the eight send-side invariants (slug hygiene, kind enum, role registry, non-empty
+body, scope heuristic, approval-needs-citation, fail-closed leak check, UTF-8) are validated in one
+place instead of two that can drift apart.
 
 ## Prerequisites
 

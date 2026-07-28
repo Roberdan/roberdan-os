@@ -179,6 +179,23 @@ else
     "run bin/bootstrap.sh and paste the block it prints"
 fi
 
+# The bus MCP server is registered in the *client's* config, never by us: those
+# files belong to Claude/Copilot/Codex and sync.sh has never written one. So the
+# only honest thing doctor can do is look and say which clients see it.
+BUS_MCP_SEEN=""
+for cfg in "$HOME/.claude.json" "$HOME/.copilot/mcp-config.json" "$HOME/.codex/config.toml"; do
+  if grep -q 'bus-mcp' "$cfg" 2>/dev/null; then
+    BUS_MCP_SEEN="$BUS_MCP_SEEN $(basename "$(dirname "$cfg")")/$(basename "$cfg")"
+  fi
+done
+if [ -n "$BUS_MCP_SEEN" ]; then
+  emit optional bus-mcp ok "registered in:$BUS_MCP_SEEN"
+else
+  emit optional bus-mcp missing "no MCP client references bus/bus-mcp.py" \
+    "agents can still use bus/bus.sh directly, but the typed tool surface is not exposed to any of them" \
+    "claude mcp add --scope user roberdan-bus -- $ROOT/bus/bus-mcp.py"
+fi
+
 if [ "$MODE" = json ]; then
   printf '{"required_missing":%d,"optional_missing":%d,"checks":[%s]}\n' \
     "$MISSING_REQUIRED" "$MISSING_OPTIONAL" "$JSON_ROWS"
