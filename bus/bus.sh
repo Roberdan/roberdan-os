@@ -580,6 +580,12 @@ _cmd_who() {
 
 _cmd_roles() {
   local f found=0
+  # A missing directory is not an empty one. `$DIR` comes from BASH_SOURCE, which
+  # bash does NOT resolve through a symlink: invoked as a symlinked `bus`, every
+  # path here would point next to the symlink instead of next to the script, and
+  # "no roles defined" would be a lie told about the wrong directory. Say which.
+  [ -d "$ROLES_DIR" ] \
+    || die "no roles directory at $ROLES_DIR — if you reached this through a symlink, point the wrapper at bus/bus.sh itself or set RDA_BUS_ROLES"
   _assert_no_broadcast_manifest
   for f in "$ROLES_DIR"/*.json; do
     [ -e "$f" ] || break
