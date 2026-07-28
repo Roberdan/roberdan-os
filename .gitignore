@@ -38,3 +38,11 @@ docs/*.pdf
 
 # Pause/resume checkpoint — ephemeral local runtime state, per-repo (see kb pause/resume).
 handoff/resume.md
+
+# Serena (coding-agent toolkit) per-machine project config. Scaffolded on its own
+# the first time a session touches this repo with Serena's MCP enabled - it appeared
+# untracked mid-run on 2026-07-28 without anyone asking for it. Machine-local tool
+# state, not repo canon: an unreviewed config landing in a commit by accident is
+# exactly what `git add -A` (already blocked by the pre-commit hook) would do.
+# Force-add it by hand if this repo ever deliberately adopts Serena.
+.serena/
