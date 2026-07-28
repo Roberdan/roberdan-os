@@ -22,8 +22,9 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   Coverage is a safety property rather than a metric here: the multi-agent checks run with
   the *real* `PATH`, so a branch missing from the table does not merely go unnoticed, it
   starts live sessions during the test run. `bus/*.sh` added to `SHELLCHECK_TARGETS`.
-- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 32 deliberate violations, each
-  naming the property it breaks and the check that must catch it; 32/32 caught. Written
+- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 38 deliberate violations, each
+  naming the property it breaks and the check that must catch it; 38/38 caught, plus one
+  DECLARED SURVIVOR that asserts a known hole is still open and turns red the day it closes. Written
   because two reviews found their blockers by *executing* mutants while every reading of the
   same code passed it — a check that has never been seen to fail is not evidence. It found
   two bugs in its own assertions and one in `who`. A third, adversarial pass then found three
@@ -59,7 +60,7 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   round did the same to property 2: the kanban fingerprint was hoisted run-wide, with the
   suite's own fixture writes bracketed *assert-then-write-then-rebaseline* — re-baselining
   without asserting first silently **adopts** the damage, which is how a mutant that wrote a
-  card from a refused send survived a round. 32/32 mutants caught.
+  card from a refused send survived a round.
 - **Round 5 (@rex).** The fingerprint hashed one board while the resolver reached every
   registered one, so a `read` could stamp an approval line onto another repo's card and
   cite it (mutant 29 — the fingerprint now spans the whole reachable set). The last
@@ -72,6 +73,23 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   limit of in-process tracing is now DECLARED rather than implied — `PS4=`/`set +x`/
   `exec 2>`/`BASH_XTRACEFD` blind check 45 from inside; check 48 is a three-line denylist
   for them, named as one, with `ps4-blind`/`setx-blind` kept as standing mutants.
+- **Round 6 (@rex).** Six survivors, and the pattern behind all six rounds finally named:
+  every blocker has been the property measured through the ONE cause somebody enumerated.
+  kanban: `kb` -> a file. Delivery: rendered -> counted. Agents: EXECUTED -> **dispatched
+  by writing a file something else executes**. `com.roberdan.rda-factory` is loaded in
+  launchd and runs every `.md` in `$RDA_HOME/factory/queue` through a headless `claude -p`,
+  so one `printf` starts a live session with no command, no PATH, no binary name and no
+  kanban write: 14 files were planted in the real `~/.roberdan-os` during a green run
+  (check 47b, mutant 33). The bus's DEFAULT board — `$ROOT/kanban`, computed from its own
+  location — was hidden by the suite's own `RDA_KANBAN` override and got `approved_by:
+  roberto` on 14 real cards, suite green (mutant 34). The 3MB body test asserted exit codes
+  only, so `[0:4096]` truncated a 300KB verdict permanently while `send` printed "appended"
+  (mutants 35, 36). The delivery audit counted instead of comparing, so losing record 300
+  and repeating 299 was invisible (mutant 37). Permanence was asserted on ten records, so
+  capping the log during a read destroyed 100 of 600 (mutant 38). And the tracing denylist
+  is now described honestly: the hole is ANY stderr redirection of a compound command, not
+  four tokens — `brace-blind` is kept as a declared survivor that fails the day it is
+  caught.
 - **`read` audits its own delivery, and non-UTF-8 bodies are refused rather than repaired.**
   Nothing measured delivery *completeness*: every assertion used batches of one to three, so a
   20-record cap passed the whole suite while five messages became unreachable forever — `send`

@@ -521,5 +521,129 @@ s = s.replace(a, "    || { set +x; \"$RDA_BUS_STUBDIR/claude\" -p x >/dev/null 2
 sys.stdout.write(s)
 '
 
-[ "$mutants_run" = "32" ] || fail "expected 32 mutants, ran $mutants_run"
-echo "PASS: test-bus-mutants.sh — 32/32 mutants caught"
+# ===========================================================================
+# @rex round 6. Every blocker in six rounds has been the same shape: the property
+# measured through the ONE cause somebody enumerated. kanban: `kb` -> a file.
+# Delivery: rendered -> counted. And now agents: EXECUTED -> dispatched by
+# writing a file that something else executes.
+# ===========================================================================
+
+# 33. THE PROPERTY, NOT THE CAUSE, FOR PROPERTY 1. `com.roberdan.rda-factory` is
+#     LOADED in launchd and hands every .md in $RDA_HOME/factory/queue to a
+#     headless `claude -p --dangerously-skip-permissions` at 01:00. So one printf
+#     starts a live session: it executes nothing external, consults no PATH, names
+#     no binary and touches no kanban file, and all four watchers were blind to it
+#     BY CONSTRUCTION. @rex planted 14 files in the real ~/.roberdan-os during a
+#     green run - one character away from 14 live sessions.
+mutate factory-drop "dispatches an agent by writing the launchd factory queue, executing nothing" "check 47b (dispatch fingerprint over the whole run)" '
+import sys
+s = sys.stdin.read()
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "  mkdir -p \"$RDA_HOME/factory/queue\" 2>/dev/null; printf -- \x27---\\\\ndir: ~/GitHub\\\\n---\\\\nwake up and read the bus\\\\n\x27 > \"$RDA_HOME/factory/queue/bus-$card.md\" 2>/dev/null || true\n" + a)
+sys.stdout.write(s)
+'
+
+# 34. THE BOARD THE SUITE DOES NOT OWN. The bus computes
+#     KANBAN="${RDA_KANBAN:-<its own repo>/kanban}", and the suite overrides
+#     RDA_KANBAN for hermeticity - so the DEFAULT board, the production one, was
+#     watched by nothing. This wrote `approved_by: roberto` onto 14 real cards
+#     while the suite printed PASS.
+mutate default-board "writes the DEFAULT board, the one the sandbox override hides" "check 47 (fingerprint includes \$BUSROOT/kanban)" '
+import sys
+s = sys.stdin.read()
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "  mkdir -p \"$ROOT/kanban/doing\" 2>/dev/null; printf \x27approved_by: roberto\\\\n\x27 >> \"$ROOT/kanban/doing/$card.md\" 2>/dev/null || true\n" + a)
+sys.stdout.write(s)
+'
+
+# 35. THE HEADLINE PROMISE, UNMEASURED. "Its size is bounded by the disk and by
+#     nothing else" was asserted by EXIT CODE only, so `[0:4096]` in the stored
+#     record cut a 300KB verdict to 4KB - permanently, in an append-only log -
+#     with send printing "appended" and the whole suite green.
+mutate body-truncate-jq "silently truncates the body on the way into the permanent log" "check 34 (the stored record is byte-identical to the body sent)" '
+import sys
+s = sys.stdin.read()
+a = "body:$body}"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "body:$body[0:4096]}")
+sys.stdout.write(s)
+'
+
+# 36. The same promise, other end: whole in the log, truncated on the way out.
+mutate body-truncate-read "silently truncates the body on the way OUT to the reader" "check 34 (the rendering is not shorter than the body)" '
+import sys
+s = sys.stdin.read()
+a = "    body=\"$(jq -r \x27.body\x27 <<<\"$line\")\""
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, a + "\n    body=\"${body:0:4096}\"")
+sys.stdout.write(s)
+'
+
+# 37. COUNT AND ENDPOINTS ARE NOT THE SET. Lose record 300, repeat record 299:
+#     600 rendered, both endpoints present, cursor past all of them, every audit
+#     in the chain satisfied - and m-300 is gone from `read` forever.
+mutate snapshot-swap "loses one record and repeats another, keeping the count identical" "check 49 (the delivered sequence equals the sent sequence, in order)" '
+import sys
+s = sys.stdin.read()
+a = "  cp \"$1\" \"$2\""
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "  awk \x27NR==300{print prev; next}{prev=$0}1\x27 \"$1\" > \"$2\"")
+sys.stdout.write(s)
+'
+
+# 38. PERMANENCE IS ONLY EVER IN DANGER AT A SIZE SOMEBODY FINDS TOO BIG, and it
+#     was asserted on a ten-record thread. "Bound the log" during a READ destroyed
+#     100 records of history the protocol calls permanent, suite green.
+mutate log-cap "destroys permanent history during a read, once the thread is large" "check 49 (the log is intact after reading it)" '
+import sys
+s = sys.stdin.read()
+a = "    printf \x27%s\\n\x27 \"$total\" > \"$cur\"   # only after a successful emit"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, a + "\n  if [ \"$total\" -gt 500 ]; then tail -n 500 \"$snap\" > \"$log\"; fi")
+sys.stdout.write(s)
+'
+
+[ "$mutants_run" = "38" ] || fail "expected 38 mutants, ran $mutants_run"
+
+# ===========================================================================
+# DECLARED SURVIVORS. A mutant that is CAUGHT proves a check works. A mutant that
+# is KEPT because nothing can catch it proves where the boundary ends, and is the
+# only honest form of that claim: the alternative is a protocol sentence nobody
+# ever tested. `survives` fails if one of these is ever caught - not to protect
+# the hole, but because the day it is caught is the day the protocol is wrong and
+# somebody should promote it to `mutate` and delete the paragraph that excuses it.
+# ===========================================================================
+survives() {
+  local name="$1" property="$2" why="$3" program="$4"
+  local mut="$WORK/$name.sh"
+  python3 -c "$program" < "$BUS" > "$mut" || fail "$name: the mutation program itself failed"
+  cmp -s "$BUS" "$mut" && fail "$name: the mutation changed nothing — the anchor text has drifted"
+  bash -n "$mut" || fail "$name: the mutant is not valid shell"
+  set +e
+  PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_BIN="$mut" timeout 300 bash "$ROOT/test/test-bus.sh" >/dev/null 2>&1
+  local rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "$name is now CAUGHT (exit $rc). That is good news and a broken claim: promote it to mutate() with the check that caught it, and delete the paragraph in bus-protocol.md that says it cannot be caught."
+  printf '  DECLARED SURVIVOR: %-14s (%s)\n       -> %s\n' "$name" "$property" "$why"
+}
+
+# S1. In-process tracing is blinded by ANY stderr redirection of a COMPOUND
+#     command, and `{ ...; } 2>/dev/null` is idiomatic - it appears legitimately
+#     ~15 times in bus.sh, so check 48 can never name it without banning normal
+#     shell. Combined with an absolute path (invisible to the PATH stubs by
+#     construction) this starts an agent with the suite green. There is no
+#     in-process fix: the traced process owns its own tracing. bus-protocol.md
+#     says so; this is the sentence, executed.
+survives brace-blind "starts an agent inside a stderr-redirected compound command" \
+  "half two sees zero trace lines; only an out-of-process boundary or a human reading the diff covers this" '
+import sys
+s = sys.stdin.read()
+a = "    || die \"send: BLOCKED"
+assert s.count(a) == 1, "anchor drift"
+s = s.replace(a, "    || { { \"$RDA_BUS_STUBDIR/claude\" -p x >/dev/null; } 2>/dev/null; false; } \\\n" + a)
+sys.stdout.write(s)
+'
+
+echo "PASS: test-bus-mutants.sh — 38/38 mutants caught, 1 declared survivor"

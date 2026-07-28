@@ -8,6 +8,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Overridable so the suite can be pointed at a deliberately broken copy: a test
 # that has never been seen to fail is an unverified claim.
 BUS="${RDA_BUS_BIN:-$ROOT/bus/bus.sh}"
+# The bus computes KANBAN="${RDA_KANBAN:-<its own repo>/kanban}". This suite
+# overrides RDA_KANBAN for hermeticity, so the DEFAULT board - the real one - was
+# watched by nothing: a payload spelling "$ROOT/kanban" wrote 14 cards carrying
+# `approved_by: roberto` outside the sandbox while the suite printed PASS.
+# Recompute the root the way the BINARY UNDER TEST computes it, so a relocated
+# mutant is measured on the board it would actually write.
+BUSROOT="$(cd "$(dirname "$BUS")/.." && pwd)"
 TMP="$(mktemp -d)"
 trap '_rda_on_exit' EXIT
 
@@ -46,6 +53,39 @@ exit 0
 LEAKOK
 chmod +x "$TMP/lc/leak-check.sh"
 export RDA_LEAKCHECK="$TMP/lc/leak-check.sh"
+# THE OTHER HALF OF PROPERTY 1: THE EFFECT, NOT THE CAUSE.
+# "Never starts an agent" was measured as "never executes an agent CLI" - the
+# same substitution of a proxy for a property that let `printf >> $card.md`
+# satisfy "never runs kb" while writing kanban state. `com.roberdan.rda-factory`
+# is LOADED in launchd and runs factory/run.sh at 01:00, which dispatches every
+# .md in $RDA_HOME/factory/queue to a headless `claude -p
+# --dangerously-skip-permissions`. So ONE printf into that directory starts a
+# live session, executes nothing external, consults no PATH, names no binary and
+# touches no kanban file: all four watchers are structurally blind to it.
+# Demonstrated: 14 files planted in the REAL ~/.roberdan-os during a green run.
+RDA_REAL_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
+export RDA_HOME="$TMP/home"          # accidents land in the sandbox...
+mkdir -p "$RDA_HOME"
+dispatch_surfaces() {
+  local h
+  for h in "$RDA_REAL_HOME" "$RDA_HOME"; do
+    printf '%s\n' "$h/factory/queue" "$h/factory/state" "$h/factory/done" \
+                  "$h/factory/failed" "$h/runner-allowlist" "$h/kanban-registry"
+  done
+}
+# ...and a payload that spells the real path absolutely is caught here.
+dispatch_fingerprint() {
+  local paths=() p
+  while IFS= read -r p; do [ -e "$p" ] && paths+=("$p"); done < <(dispatch_surfaces)
+  [ "${#paths[@]}" -gt 0 ] || { echo "no-dispatch-surface"; return 0; }
+  { find "${paths[@]}" 2>/dev/null | sort \
+      | while IFS= read -r f; do printf '%s ' "$f"; [ -f "$f" ] && shasum "$f" | awk '{print $1}'; echo; done; } | shasum | awk '{print $1}'
+}
+dispatch_baseline="$(dispatch_fingerprint)"
+assert_no_dispatch() {
+  [ "$(dispatch_fingerprint)" = "$dispatch_baseline" ] \
+    || fail "the bus wrote to a DISPATCH SURFACE - a file in $RDA_REAL_HOME/factory/queue is a headless agent session at 01:00, and starting a session is the one thing this channel may never do ($1)"
+}
 export RDA_KANBAN="$TMP/kanban"
 export RDA_KANBAN_REGISTRY="$TMP/registry"   # hermetic: never consult the real boards
 mkdir -p "$RDA_KANBAN/doing"
@@ -78,10 +118,26 @@ mkdir -p "$RDA_KANBAN/doing"
 # local board is just the nearest part of it.
 kanban_fingerprint() {
   local boards=("$RDA_KANBAN" "$RDA_KANBAN_REGISTRY") r
+  # `if`, not `[ ... ] && boards+=(...)`: find runs under pipefail here, so a
+  # board path that does not exist makes the whole fingerprint exit non-zero and
+  # the suite dies with "the suite itself broke" instead of an assertion. A board
+  # that appears LATER is still caught - it is in the boards list at assert time,
+  # so its files change the hash.
+  if [ -e "$BUSROOT/kanban" ]; then boards+=("$BUSROOT/kanban"); fi
   while IFS= read -r r; do
     [ -n "$r" ] && [ -e "$r/kanban" ] && boards+=("$r/kanban")
   done < "$RDA_KANBAN_REGISTRY"
-  { find "${boards[@]}" -type f 2>/dev/null | sort \
+  # `-L`: a board reached through a symlink (normal for a shared board) is
+  # followed by `[ -f ]` and `grep` in _resolve_ref but invisible to a plain
+  # `find -type f`, which would put it fully inside the bus's reach and fully
+  # outside this hash.
+  local files; files="$(find -L "${boards[@]}" -type f 2>/dev/null | sort)"
+  # AND IT MUST NOT FAIL OPEN. With every board gone this hashed empty input and
+  # returned a constant, so "unchanged" would have been satisfied by a tree that
+  # no longer existed. Check 45 already refuses an empty trace for the same
+  # reason; this is that rule applied to the other watcher.
+  [ -n "$files" ] || { echo "EMPTY-KANBAN-FINGERPRINT"; return 0; }
+  { printf '%s\n' "$files" \
       | while IFS= read -r f; do printf '%s ' "$f"; shasum "$f" | awk '{print $1}'; done; } | shasum | awk '{print $1}'
 }
 assert_kanban_untouched() {
@@ -742,8 +798,20 @@ for _ in $(seq 1 60); do head -c 51200 /dev/zero | tr '\0' 'x' >> "$big"; echo >
 bout="$(busrun send --repo "$R" --card big-body --from implementer --to sol-gate --body-file "$big" 2>&1)" \
   || fail "a 3MB body was refused with: $bout"
 grep -q "appended" <<<"$bout" || fail "a large send did not report success: $bout"
-busrun read --repo "$R" --card big-body --as sol-gate >/dev/null \
+busrun read --repo "$R" --card big-body --as sol-gate > "$TMP/big-back.txt" \
   || fail "a large record cannot be read back"
+#     ...and it survives BYTE FOR BYTE, in the record and in the rendering.
+#     Asserting only the exit code left the headline promise of this channel
+#     ("the body travels verbatim, bounded by the disk and by nothing else")
+#     unmeasured at exactly the sizes a cap gets put at: `body:$body[0:4096]` in
+#     the stored record, or a ${body:0:4096} in the renderer, cut a 300KB verdict
+#     to 4KB - permanently, in an append-only log - with send printing "appended",
+#     read exiting 0 and the whole suite green.
+jq -j '.body' "$RDA_BUS_HOME/$R/big-body.jsonl" > "$TMP/big-stored.txt"
+cmp -s "$big" "$TMP/big-stored.txt" \
+  || fail "the body was REWRITTEN on the way into the permanent log: $(wc -c < "$big" | tr -d ' ') bytes sent, $(wc -c < "$TMP/big-stored.txt" | tr -d ' ') bytes stored"
+[ "$(wc -c < "$TMP/big-back.txt" | tr -d ' ')" -ge "$(wc -c < "$big" | tr -d ' ')" ] \
+  || fail "the body was TRUNCATED on the way out: $(wc -c < "$big" | tr -d ' ') bytes stored, $(wc -c < "$TMP/big-back.txt" | tr -d ' ') bytes rendered"
 
 # 35. `roles/all.json` is refused ON SIGHT. With it present, `bus roles` used to
 #     advertise @all as an actor while every operation involving it failed.
@@ -841,6 +909,7 @@ for want in direct1 bcast1 direct2; do
   grep -q "$want" <<<"$real" || fail "$want was lost between peek and read"
 done
 
+assert_no_dispatch "whole run (pre-floor)"
 # 42. THE FLOOR. Everything above ran with the recording stubs first on PATH, so
 #     this single assertion covers every branch the suite touched, including the
 #     ones nobody enumerated. Six refusal branches were caught by exactly this
@@ -942,6 +1011,7 @@ alias_of_bus="$(grep -nE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="\$BUS"' <<<"$nonc
 #     card executes nothing, so the canary cannot see it, and the fingerprint was
 #     scoped to the table - a refused send that appended to a card walked through.
 assert_kanban_untouched "whole run"
+assert_no_dispatch "whole run"
 
 # 48. THE LID ON HALF TWO, NAMED AS ONE. In-process tracing is a drift detector,
 #     not a sandbox: PS4, `set +x`, `exec 2>` and BASH_XTRACEFD are all reachable
@@ -972,6 +1042,21 @@ big="$(busrun read --repo "$R" --card big --as sol-gate)" || fail "the 600-recor
 [ "$(grep -c '^CLAIM BY' <<<"$big")" = "$BIGN2" ] || fail "delivery is INCOMPLETE at 600: $(grep -c '^CLAIM BY' <<<"$big") of $BIGN2 rendered"
 grep -q "^m-1$" <<<"$big" || fail "the OLDEST record was dropped between the log and the snapshot"
 grep -q "^m-$BIGN2$" <<<"$big" || fail "the NEWEST record was dropped between the log and the snapshot"
+#     COUNT AND ENDPOINTS ARE NOT THE SET. A snapshot that loses record 300 and
+#     repeats record 299 renders 600 records with both endpoints present and the
+#     cursor past all of them - and m-300 is gone from `read` forever. Compare the
+#     whole sequence, in order: loss, duplication and reordering in one assertion,
+#     and the bus promises all three.
+grep -E '^m-[0-9]+$' <<<"$big" > "$TMP/big-seq.txt"
+seq 1 $BIGN2 | sed 's/^/m-/' > "$TMP/big-want.txt"
+cmp -s "$TMP/big-want.txt" "$TMP/big-seq.txt" \
+  || fail "the records delivered are not the records sent, in order: $(cmp "$TMP/big-want.txt" "$TMP/big-seq.txt" 2>&1 | head -1)"
+#     ...and the LOG IS STILL THERE. Permanence was asserted byte-for-byte on a
+#     ten-record thread only, so a `tail -n 500 > $log` added to bound an unbounded
+#     file destroyed 100 records of permanent history during a READ, with the suite
+#     green. Permanence is only ever in danger at a size somebody finds too big.
+[ "$(wc -l < "$BIGLOG" | tr -d ' ')" = "$BIGN2" ] \
+  || fail "READING the thread TRUNCATED the permanent log: $BIGN2 records before, $(wc -l < "$BIGLOG" | tr -d ' ') after"
 [ "$(tr -d '[:space:]' < "$RDA_BUS_HOME/$R/.cursor/big/sol-gate")" = "$BIGN2" ] \
   || fail "the cursor does not cover the whole snapshot"
 
