@@ -210,6 +210,169 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+section "kb dash: local times + elapsed for DOING, and NO fabricated numbers for old cards"
+_DB="$TMP/dashboard"; mkdir -p "$_DB"/{todo,doing,done}
+# A card started under today's kb (epoch stamp) and one closed long before this command existed
+# (date-only stamps, no worktree, no spend) — the two cases that must never look alike.
+{ printf -- '---\ntitle: nuova con orario\nrepo: roberdan-os\nstatus: doing\n---\n'
+  printf 'started_at: 2026-07-28 08:00:00 CEST\nstarted_epoch: %s\n' "$(( $(date +%s) - 7200 ))"
+} > "$_DB/doing/DASH-NEW.md"
+printf -- '---\ntitle: vecchia senza orario\nrepo: roberdan-os\nstatus: done\n---\napproved_at: 2026-01-01\nverified_evidence: commit deadbeef1234; PR #42; 148 passed\nverified_at: 2026-01-02\n' \
+  > "$_DB/done/DASH-OLD.md"
+_dash_out="$(HOME="$TMP" bash kanban/dash.sh "$_DB" 2>&1 || true)"
+if printf '%s' "$_dash_out" | grep -q 'gira da 2h'; then
+  ok "dash: a DOING card shows how long it has been running"
+else
+  err "dash: elapsed missing (got: $(printf '%s' "$_dash_out" | tr '\n' '¶'))"
+fi
+if printf '%s' "$_dash_out" | grep -q 'solo data'; then
+  ok "dash: a date-only card says so instead of inventing a time"
+else
+  err "dash: date-only card did not degrade honestly"
+fi
+# The regression this pins: a closed card with no recorded spend prints "-", never a number
+# recomputed over its window — that would bill it for every other card open at the same time.
+if printf '%s' "$_dash_out" | grep -q 'non misurata'; then
+  ok "dash: an old closed card reports no spend rather than a plausible wrong one"
+else
+  err "dash: old closed card printed a spend it cannot know"
+fi
+if printf '%s' "$_dash_out" | grep -q '#42'; then
+  ok "dash: PR ref extracted from the evidence the card already carries"
+else
+  err "dash: PR ref not surfaced"
+fi
+
+section "kb dash makes NO network call (gh stub with a canary)"
+# Same technique as test-bus.sh: the canary lives OUTSIDE the tree the command is told about,
+# so a stub firing anywhere is visible. gh is the only network-shaped dependency kb has.
+_CAN="$(mktemp -d)"; _BIN="$TMP/stubbin"; mkdir -p "$_BIN"
+printf '#!/usr/bin/env bash\ntouch "%s/gh-was-called"\nexit 0\n' "$_CAN" > "$_BIN/gh"
+chmod +x "$_BIN/gh"
+PATH="$_BIN:$PATH" HOME="$TMP" bash kanban/dash.sh "$_DB" >/dev/null 2>&1 || true
+if [ -e "$_CAN/gh-was-called" ]; then
+  err "dash called gh — the dashboard must stay offline (PR refs come from the card)"
+else
+  ok "dash never invoked gh"
+fi
+rm -rf "$_CAN"
+
+section "kb view stays lean (the SessionStart hook injects it into every session)"
+_view_out="$(RDA_KANBAN="$_DB" bash kanban/kb.sh view 2>&1 || true)"
+if printf '%s' "$_view_out" | grep -qE 'gira da|spesa'; then
+  err "kb view grew dashboard detail — that is a token tax on every session in every repo"
+else
+  ok "kb view unchanged: board only, no dashboard blocks"
+fi
+
+# ---------------------------------------------------------------------------
+section "one worktree per card: kb start creates it, kb finish demands it clean"
+_WR="$TMP/GitHub/wtrepo"; mkdir -p "$_WR"
+( cd "$_WR" && git init -q -b main && git config user.email t@example.com && git config user.name t \
+  && echo seed > seed.txt && git add seed.txt && git commit -qm init ) >/dev/null 2>&1
+_KB2="$TMP/kb2"; mkdir -p "$_KB2"/{todo,doing,done}
+: > "$TMP/reg-empty2"
+_kbrun() { env HOME="$TMP" RDA_KANBAN="$_KB2" RDA_KANBAN_REGISTRY="$TMP/reg-empty2" \
+                RDA_WORKTREES="$TMP/wt" "$@" ; }
+_kbrun RDA_KB_ID_BASE=WT-1 bash kanban/kb.sh add "card con worktree" --repo wtrepo "d" "a" >/dev/null 2>&1
+_kbrun bash kanban/kb.sh start WT-1 --by roberto >/dev/null 2>&1
+if [ -e "$TMP/wt/wtrepo/WT-1/seed.txt" ] && grep -q '^worktree: ' "$_KB2/doing/WT-1.md" 2>/dev/null; then
+  ok "kb start created the card's worktree and wrote it on the card"
+else
+  err "kb start did not create/record the worktree"
+fi
+if grep -q '^started_epoch: ' "$_KB2/doing/WT-1.md" 2>/dev/null; then
+  ok "kb start stamped a machine-readable start time"
+else
+  err "kb start did not stamp started_epoch — durations would be unknowable"
+fi
+echo "sporco" > "$TMP/wt/wtrepo/WT-1/dirty.txt"
+if _kbrun bash kanban/kb.sh finish WT-1 --thor "kanban/dash.sh 148 passed" >/dev/null 2>&1; then
+  err "kb finish closed a card whose worktree still had uncommitted work"
+else
+  ok "kb finish REFUSES while the card's worktree is dirty"
+fi
+if [ -e "$_KB2/doing/WT-1.md" ]; then
+  ok "a refused finish leaves the card in doing, worktree intact"
+else
+  err "a refused finish still moved the card"
+fi
+rm -f "$TMP/wt/wtrepo/WT-1/dirty.txt"
+if _kbrun bash kanban/kb.sh finish WT-1 --thor "kanban/dash.sh 148 passed" >/dev/null 2>&1; then
+  ok "kb finish accepts a clean worktree"
+else
+  err "kb finish refused a clean worktree"
+fi
+if [ ! -d "$TMP/wt/wtrepo/WT-1" ] && grep -q '^worktree_removed_at: ' "$_KB2/done/WT-1.md" 2>/dev/null; then
+  ok "closing the card removed its worktree and recorded it — nothing left behind"
+else
+  err "worktree survived the close (or was not recorded on the card)"
+fi
+# The escape hatch exists, costs a written reason, and is visible on the card.
+_kbrun RDA_KB_ID_BASE=WT-2 bash kanban/kb.sh add "card tenuta aperta" --repo wtrepo "d" "a" >/dev/null 2>&1
+_kbrun bash kanban/kb.sh start WT-2 --by roberto >/dev/null 2>&1
+echo "sporco" > "$TMP/wt/wtrepo/WT-2/dirty.txt"
+if _kbrun bash kanban/kb.sh finish WT-2 --thor "kanban/dash.sh 148 passed" --keep-worktree "review in corso" >/dev/null 2>&1 \
+   && [ -d "$TMP/wt/wtrepo/WT-2" ] && grep -q 'worktree_kept_why' "$_KB2/done/WT-2.md" 2>/dev/null; then
+  ok "--keep-worktree closes the card and writes the reason on it"
+else
+  err "--keep-worktree did not behave as declared"
+fi
+# A card that is not code work must still start — without a worktree, with the reason recorded.
+_kbrun RDA_KB_ID_BASE=WT-3 bash kanban/kb.sh add "non-code" --repo personal "d" "a" >/dev/null 2>&1
+_kbrun bash kanban/kb.sh start WT-3 --by roberto --no-worktree "decisione, niente codice" >/dev/null 2>&1
+if [ -e "$_KB2/doing/WT-3.md" ] && grep -q 'worktree_none' "$_KB2/doing/WT-3.md" 2>/dev/null; then
+  ok "--no-worktree starts the card and records why it has none"
+else
+  err "--no-worktree card did not start cleanly"
+fi
+
+# ---------------------------------------------------------------------------
+section "kb migrate: recovers what is already on disk, invents nothing, writes only with --apply"
+_MG="$TMP/migrate"; mkdir -p "$_MG"/{todo,doing,done}
+# One card with an audit line (its start time IS on disk, just unparsed) and one without
+# (nothing to recover — it must be reported, never backfilled with "now").
+printf -- '---\ntitle: con audit\nrepo: roberdan-os\nstatus: doing\n---\nkb_start_audit: "at=2026-07-25T18:18:15Z by=roberto interactive=no"\n' \
+  > "$_MG/doing/MG-1.md"
+printf -- '---\ntitle: senza audit\nrepo: roberdan-os\nstatus: doing\n---\n' > "$_MG/doing/MG-2.md"
+printf -- '---\ntitle: chiusa\nrepo: roberdan-os\nstatus: done\n---\n' > "$_MG/done/MG-3.md"
+_before="$(cat "$_MG/doing/MG-1.md")"
+RDA_KANBAN="$_MG" bash kanban/kb.sh migrate >/dev/null 2>&1
+if [ "$_before" = "$(cat "$_MG/doing/MG-1.md")" ]; then
+  ok "migrate without --apply writes nothing"
+else
+  err "migrate wrote to a card in dry-run mode"
+fi
+RDA_KANBAN="$_MG" bash kanban/kb.sh migrate --apply >/dev/null 2>&1
+if grep -q '^started_epoch: 1785003495' "$_MG/doing/MG-1.md"; then
+  ok "migrate --apply backfills the start time already recorded in the audit line"
+else
+  err "migrate did not recover the start time (got: $(grep started_epoch "$_MG/doing/MG-1.md" || echo none))"
+fi
+if grep -q 'started_epoch' "$_MG/doing/MG-2.md" 2>/dev/null; then
+  err "migrate INVENTED a start time for a card that has none — the exact thing it must not do"
+else
+  ok "a card with nothing to recover is left alone, not backfilled with a fabricated time"
+fi
+if grep -qE 'started_epoch|worktree' "$_MG/done/MG-3.md" 2>/dev/null; then
+  err "migrate touched done/ — that column is the append-only audit archive"
+else
+  ok "migrate never touches done/"
+fi
+# Attaching a worktree made by hand: accepted when it is real, refused when it is not.
+if RDA_KANBAN="$_MG" bash kanban/kb.sh wt attach MG-2 "$TMP/GitHub/wtrepo" >/dev/null 2>&1 \
+   && grep -q '^worktree: ' "$_MG/doing/MG-2.md"; then
+  ok "kb wt attach records an existing worktree on the card"
+else
+  err "kb wt attach did not record a real worktree"
+fi
+if RDA_KANBAN="$_MG" bash kanban/kb.sh wt attach MG-1 "$TMP/not-a-worktree-at-all" >/dev/null 2>&1; then
+  err "kb wt attach accepted a path that is not a worktree — kb finish would then refuse forever"
+else
+  ok "kb wt attach refuses a path that is not a git worktree"
+fi
+
+# ---------------------------------------------------------------------------
 if [ "$FAIL" -eq 0 ]; then
   echo; echo "test-kb-views: ✅ ALL GREEN"; exit 0
 else
