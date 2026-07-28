@@ -111,7 +111,22 @@ else
   FROZEN_TMP="$(mktemp -d)"
   FROZEN="$FROZEN_TMP/checkout"
   mkdir -p "$FROZEN"
-  git -C "$ROOT" ls-files -z --cached --others --exclude-standard > "$FROZEN_TMP/manifest"
+  # A file DELETED from the working tree but still in the index is listed by
+  # --cached and is not on disk, and rsync --files-from does not forgive that:
+  # it exits 23, which under `set -e` (line 5) kills the suite at this line with
+  # an error about the bus that has nothing to do with the bus. Reachable by
+  # accident - `rm` a tracked script mid-session, then run the gate.
+  # Filtered here rather than with --ignore-missing-args, which macOS does NOT
+  # have: /usr/bin/rsync is openrsync ("rsync version 2.6.9 compatible") and
+  # rejects that flag outright. Verified by running it, not by reading a man page
+  # for a different rsync.
+  # The NUL-delimited read is not decoration: it is the only reason a filename
+  # containing a space or a newline survives the filter, and -z above only helps
+  # if what consumes it agrees.
+  git -C "$ROOT" ls-files -z --cached --others --exclude-standard \
+    | while IFS= read -r -d "" f; do
+        [ -e "$ROOT/$f" ] && printf '%s\0' "$f"
+      done > "$FROZEN_TMP/manifest"
   rsync -a --files-from="$FROZEN_TMP/manifest" --from0 "$ROOT"/ "$FROZEN"/
   mkdir -p "$FROZEN/kanban"
   BUS="$FROZEN/bus/bus.sh"
