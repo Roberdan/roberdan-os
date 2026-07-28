@@ -25,6 +25,21 @@ greps forbade and passed every one of them.
    moment a code path started a session on a pending message, this would become
    `factory/dispatch-runner.sh` — which is **dormant** by a reviewed @rex/@luca
    decision (test 13c pins it that way).
+   **And "starts an agent" is not the same sentence as "executes an agent CLI",
+   which is what the gate measured for six rounds.** `com.roberdan.rda-factory`
+   is loaded in launchd and hands every `.md` in `$RDA_HOME/factory/queue` to a
+   headless `claude -p --dangerously-skip-permissions`. One `printf` into that
+   directory therefore starts a live session while executing nothing external,
+   consulting no `PATH`, naming no binary and touching no kanban file — blind to
+   the canary, the allowlist, the fingerprint and check 48 *by construction*.
+   @rex planted 14 files in the real `~/.roberdan-os` during a green run, one
+   character from the live path. Check 47b hashes the dispatch surfaces
+   (`factory/{queue,state,done,failed}`, `runner-allowlist`, `kanban-registry`)
+   under both the sandbox `RDA_HOME` and the real one, at the same two floors as
+   the kanban hash. That list is an **enumeration of today's consumers**: a
+   directory no launchd job reads yet is not covered, and the day a new
+   dispatcher is added this list has to grow with it. Said plainly, because the
+   enumeration is the weak part.
    The gate is **one boundary in two halves**, and it is worth stating exactly
    what each half can and cannot see, because the two blockers of the second
    review were both born from over-claiming here.
@@ -87,7 +102,16 @@ greps forbade and passed every one of them.
    process itself, and that process owns its own tracing: `PS4=''`, `set +x`,
    `exec 2>` and `BASH_XTRACEFD` all blind check 45 from inside, and both of the
    first two were demonstrated starting a live agent with the suite printing
-   PASS. There is no eighth mechanism that fixes this from in-process — only an
+   PASS. **Those four tokens are not the exposure — they are four members of an
+   open set, and its most important member cannot be denylisted at all.** Any
+   stderr redirection of a *compound* command blinds the trace: `{ …; }
+   2>/dev/null`, `( … ) 2>/dev/null`, `while … done 2>/dev/null`, and so do
+   `set +o xtrace`, `unset PS4` and `PS4[0]=''`. `2>/dev/null` appears
+   legitimately about fifteen times in `bus.sh`, so check 48 can never name it
+   without banning normal shell. `brace-blind` is kept in the harness as a
+   **declared survivor** for exactly that: it asserts the mutant still passes,
+   and turns red the day something catches it, because that is the day this
+   paragraph is wrong. There is no eighth mechanism that fixes this from in-process — only an
    out-of-process boundary (a sandbox, a syscall monitor) or a human reading the
    diff. So the honest description of half two is: it catches a call that was
    *added*, by any spelling, and it does not catch a call that also *edits the
@@ -102,15 +126,33 @@ greps forbade and passed every one of them.
    `$root/kanban` for **every** registered repo, so a plain `read` stamped an
    approval line onto another repo's card and then cited that card as resolving —
    the citation and the thing it cites both written by the bus, suite green. The
-   fingerprint now spans every board `_card_boards` can reach (mutant 29).
-   **Delivery is audited with no unaudited hop.** The chain is log → snapshot →
-   filter → renderer → cursor, and the count that polices it is taken under the
-   same lock as the snapshot. A `tail -n 500` "to bound the memory a read may
-   use" dropped 100 records of a 600-record thread with exit 0, a correct trailer
-   and the cursor parked past all of them, because every count downstream was
-   counting the truncated copy and honestly agreeing (mutants 27, 28, 30; check
-   49 sends 600 and demands 600).
-   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 32
+   fingerprint spans every board `_card_boards` can reach — including
+   `$BUSROOT/kanban`, the **default** board the bus computes from its own
+   location, which the suite's own `RDA_KANBAN` override hid: a payload spelling
+   `$ROOT/kanban` wrote `approved_by: roberto` onto 14 real cards while the suite
+   printed PASS (mutants 29, 34). It follows symlinks (`find -L`), because
+   `[ -f ]` and `grep` in `_resolve_ref` do and a plain `find -type f` does not,
+   and it refuses to hash nothing at all — an empty tree hashes to a constant, so
+   "unchanged" would have been satisfied by a board that no longer existed.
+   **Delivery is audited by identity, not by cardinality.** The chain is log →
+   snapshot → filter → renderer → cursor, and the count that polices it is taken
+   under the same lock as the snapshot — but a count is not the set: a snapshot
+   that lost record 300 and repeated 299 rendered 600 records with both endpoints
+   present and the cursor past all of them, and `m-300` was gone from `read`
+   forever (mutant 37). Check 49 compares the whole delivered sequence against
+   the sent one, in order, which covers loss, duplication and reordering in one
+   assertion. The **body** is compared byte for byte as well, into the log and
+   out of it: "bounded by the disk and by nothing else" was asserted by exit code
+   alone, so a five-character `[0:4096]` cut a 300KB verdict to 4KB — permanently,
+   in an append-only log — with `send` printing "appended" and the suite green
+   (mutants 35, 36). And permanence is asserted at 600 records, not only at ten,
+   because permanence is only ever in danger at a size somebody finds too big
+   (mutant 38). The hop that started this paragraph was log → snapshot: a
+   `tail -n 500` "to bound the memory a read may use" dropped 100 records of a
+   600-record thread with exit 0, a correct trailer and the cursor parked past
+   all of them, because every count downstream was counting the truncated copy
+   and honestly agreeing (mutants 27, 28, 30).
+   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 38
    deliberate violations and asserts that each is caught by a *named* check,
    including every evasion above. A check that has never been seen to fail is not
    evidence — and the three most recent mutants exist because an adversarial pass
