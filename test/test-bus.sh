@@ -16,6 +16,11 @@ BUS="${RDA_BUS_BIN:-$ROOT/bus/bus.sh}"
 # mutant is measured on the board it would actually write.
 BUSROOT="$(cd "$(dirname "$BUS")/.." && pwd)"
 TMP="$(mktemp -d)"
+# A scratch directory the binary under test is never told about: the canary and
+# the write-marker live here, because everything under $TMP is one dirname away
+# from the RDA_BUS_HOME the bus is handed.
+CANDIR="$(mktemp -d)"
+: > "$CANDIR/.t0"
 trap '_rda_on_exit' EXIT
 
 fail() { echo "FAIL: $*" >&2; : > "$TMP/.asserted"; exit 1; }
@@ -37,7 +42,7 @@ _rda_on_exit() {
   if [ "$rc" -ne 0 ] && [ ! -e "$TMP/.asserted" ]; then
     echo "test-bus: ABORTED at line $(cat "$TMP/.errline" 2>/dev/null || echo '?') (set -e) - no assertion failed, the suite itself broke" >&2
   fi
-  rm -rf "$TMP"
+  rm -rf "$TMP" ${CANDIR:+"$CANDIR"}
 }
 
 export RDA_BUS_HOME="$TMP/bus"
@@ -67,24 +72,79 @@ RDA_REAL_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 export RDA_HOME="$TMP/home"          # accidents land in the sandbox...
 mkdir -p "$RDA_HOME"
 dispatch_surfaces() {
-  local h
+  local h r
   for h in "$RDA_REAL_HOME" "$RDA_HOME"; do
     printf '%s\n' "$h/factory/queue" "$h/factory/state" "$h/factory/done" \
                   "$h/factory/failed" "$h/runner-allowlist" "$h/kanban-registry"
   done
+  # A queue is not the only way to make an agent start without executing one.
+  # Every path below is a LOADED consumer on this machine, demonstrated by a
+  # mutant that wrote it during a green run:
+  #  - ~/.claude/{scripts,hooks,agents,commands}: com.roberdan.rustsweep executes
+  #    ~/.claude/scripts/rust-sweep.sh on a schedule, and settings.json hooks run
+  #    on every Claude session.
+  #  - ~/.orca/agent-hooks: named by ~/.claude/settings.json PermissionRequest.
+  #  - ~/Library/LaunchAgents: a plist dropped here is a job at next login.
+  #  - <repo>/.git/hooks: post-commit runs on the human's next commit.
+  #  - <repo>/handoff: factory/run.sh concatenates it into the PROMPT of every
+  #    headless --dangerously-skip-permissions agent, i.e. prompt injection.
+  printf '%s\n' "$HOME/.claude/scripts" "$HOME/.claude/hooks" \
+                "$HOME/.claude/agents" "$HOME/.claude/commands" \
+                "$HOME/.claude/settings.json" "$HOME/.orca/agent-hooks" \
+                "$HOME/Library/LaunchAgents"
+  for r in "$ROOT" "$BUSROOT"; do
+    printf '%s\n' "$r/.git/hooks" "$r/handoff"
+  done
+  # ...and the same two surfaces for every board the registry can reach.
+  if [ -f "${RDA_KANBAN_REGISTRY:-}" ]; then
+    while IFS= read -r r; do
+      [ -n "$r" ] || continue
+      printf '%s\n' "$r/.git/hooks" "$r/handoff"
+    done < <(awk '{print $NF}' "$RDA_KANBAN_REGISTRY" 2>/dev/null || true)
+  fi
 }
 # ...and a payload that spells the real path absolutely is caught here.
 dispatch_fingerprint() {
   local paths=() p
   while IFS= read -r p; do [ -e "$p" ] && paths+=("$p"); done < <(dispatch_surfaces)
   [ "${#paths[@]}" -gt 0 ] || { echo "no-dispatch-surface"; return 0; }
-  { find "${paths[@]}" 2>/dev/null | sort \
+  # -L, for the same reason kanban_fingerprint has it: a plain `find` lists a
+  # symlinked directory and never descends into it, so a factory/queue that is a
+  # symlink (an external volume, a synced folder) is 100% blind. Demonstrated:
+  # the hash is byte-identical before and after a job file is written inside.
+  { find -L "${paths[@]}" 2>/dev/null | sort \
       | while IFS= read -r f; do printf '%s ' "$f"; [ -f "$f" ] && shasum "$f" | awk '{print $1}'; echo; done; } | shasum | awk '{print $1}'
 }
 dispatch_baseline="$(dispatch_fingerprint)"
+# Some consumers are directories with tens of thousands of files in them
+# (~/.claude/skills is 20k), so hashing every byte of them four times a run costs
+# six minutes. Hash is the wrong instrument there: what matters is that NOTHING
+# WAS WRITTEN. A single stat-only sweep for anything newer than a marker taken
+# before the first bus invocation costs 0.5s and catches creation and
+# modification alike. The marker lives in $CANDIR, not $TMP, for the same reason
+# the canary does: $TMP is one dirname from RDA_BUS_HOME.
+exec_config_roots() {
+  local r
+  for r in "$HOME/.claude/skills" "$HOME/.claude/scripts" "$HOME/.claude/hooks" \
+           "$HOME/.claude/agents" "$HOME/.claude/commands" "$HOME/.claude/rules" \
+           "$HOME/.claude/output-styles" "$HOME/.orca/agent-hooks" \
+           "$HOME/Library/LaunchAgents" "$ROOT/hooks" "$BUSROOT/hooks" \
+           "$ROOT/.git/hooks" "$BUSROOT/.git/hooks"; do
+    [ -e "$r" ] && printf '%s\n' "$r"
+  done
+  return 0
+}
+assert_no_new_exec_config() {
+  local roots=() r out
+  while IFS= read -r r; do roots+=("$r"); done < <(exec_config_roots)
+  [ "${#roots[@]}" -gt 0 ] || return 0
+  out="$(find -L "${roots[@]}" -newer "$CANDIR/.t0" 2>/dev/null || true)"
+  [ -z "$out" ] || fail "the bus wrote EXECUTABLE CONFIGURATION: $(tr '\n' ' ' <<<"$out") - ~/.claude/{skills,scripts,hooks,agents,commands}, ~/.orca/agent-hooks, ~/Library/LaunchAgents and <repo>/{hooks,.git/hooks} are all executed by a loaded launchd job, a session hook or the next commit. Writing one starts an agent without executing one ($1)"
+}
 assert_no_dispatch() {
+  assert_no_new_exec_config "$1"
   [ "$(dispatch_fingerprint)" = "$dispatch_baseline" ] \
-    || fail "the bus wrote to a DISPATCH SURFACE - a file in $RDA_REAL_HOME/factory/queue is a headless agent session at 01:00, and starting a session is the one thing this channel may never do ($1)"
+    || fail "the bus wrote to a DISPATCH SURFACE - one of the paths listed in dispatch_surfaces(): a launchd queue, a scheduled script, a session hook, a git hook or a prompt input. Every one of them starts an agent WITHOUT executing one, and starting a session is the one thing this channel may never do ($1)"
 }
 export RDA_KANBAN="$TMP/kanban"
 export RDA_KANBAN_REGISTRY="$TMP/registry"   # hermetic: never consult the real boards
@@ -172,7 +232,16 @@ kb_rebaseline
 # decides what gets watched. That is the difference between coverage as a metric
 # and coverage as a boundary.
 # ===========================================================================
-STUB="$TMP/stub"; CANARY="$TMP/canary"; mkdir -p "$STUB"; : > "$CANARY"
+# The canary must not live where the BINARY UNDER TEST can find it. $TMP is one
+# dirname away from RDA_BUS_HOME, which the bus is handed: a payload that ran
+# `kb` through PATH and then `: > "$(dirname "$RDA_BUS_HOME")/canary"` erased the
+# evidence of its own execution and the suite printed PASS. So the canary lives
+# in a second scratch directory the bus is never told about, and it is
+# TAMPER-EVIDENT: a sentinel written here must still be the whole file at every
+# floor, so truncation is a failure rather than a clean bill of health.
+STUB="$TMP/stub"; CANARY="$CANDIR/canary"; mkdir -p "$STUB"
+CANARY_SENTINEL="rex-canary-sentinel-$$"
+printf '%s\n' "$CANARY_SENTINEL" > "$CANARY"
 # What is stubbed here is what the bus can NEVER legitimately cause, directly or
 # transitively. Interpreters were on this list and had to come off: leak-check.sh
 # falls back to a python tier when `private/.denylist` is absent (it is
@@ -196,7 +265,12 @@ export PATH="$STUB:$PATH"
 # does will see an opaque exit 127 — remove that name from the list above
 # deliberately rather than wondering.
 assert_never_executed() {
-  [ -s "$CANARY" ] && fail "the bus EXECUTED $(tr '\n' ';' < "$CANARY") - it must never start an agent, a scheduler or kb ($1)"
+  [ -f "$CANARY" ] \
+    || fail "the canary file is GONE - the evidence of execution was destroyed, which is not the same as no execution ($1)"
+  [ "$(head -n 1 "$CANARY")" = "$CANARY_SENTINEL" ] \
+    || fail "the canary was REWRITTEN - the evidence of execution was tampered with ($1)"
+  [ "$(wc -l < "$CANARY" | tr -d ' ')" = "1" ] \
+    || fail "the bus EXECUTED $(tail -n +2 "$CANARY" | tr '\n' ';') - it must never start an agent, a scheduler or kb ($1)"
   return 0
 }
 
@@ -795,8 +869,18 @@ grep -qi "damaged" <<<"$dout" || fail "a damaged log did not fail loudly: $dout"
 #     whose whole purpose is carrying verdicts with diffs in them.
 big="$TMP/big-body.txt"; : > "$big"
 for _ in $(seq 1 60); do head -c 51200 /dev/zero | tr '\0' 'x' >> "$big"; echo >> "$big"; done
+#     ...and the comparison must not be a file the BUS can reach. Check 34 used
+#     to cmp the stored body against $big - the caller's own --body-file, an
+#     absolute path handed to the bus. A mutant that truncated the record to 4096
+#     bytes AND rewrote $big to the same 4096 bytes passed both halves. A digest
+#     taken HERE, into a shell variable of the test process, is the one artifact
+#     the binary under test cannot rewrite.
+big_sum_before="$(shasum "$big" | awk '{print $1}')"
+big_len_before="$(wc -c < "$big" | tr -d ' ')"
 bout="$(busrun send --repo "$R" --card big-body --from implementer --to sol-gate --body-file "$big" 2>&1)" \
   || fail "a 3MB body was refused with: $bout"
+[ "$(shasum "$big" | awk '{print $1}')" = "$big_sum_before" ] \
+  || fail "the bus REWROTE the caller's --body-file: send is not allowed to modify its input"
 grep -q "appended" <<<"$bout" || fail "a large send did not report success: $bout"
 busrun read --repo "$R" --card big-body --as sol-gate > "$TMP/big-back.txt" \
   || fail "a large record cannot be read back"
@@ -808,10 +892,10 @@ busrun read --repo "$R" --card big-body --as sol-gate > "$TMP/big-back.txt" \
 #     to 4KB - permanently, in an append-only log - with send printing "appended",
 #     read exiting 0 and the whole suite green.
 jq -j '.body' "$RDA_BUS_HOME/$R/big-body.jsonl" > "$TMP/big-stored.txt"
-cmp -s "$big" "$TMP/big-stored.txt" \
-  || fail "the body was REWRITTEN on the way into the permanent log: $(wc -c < "$big" | tr -d ' ') bytes sent, $(wc -c < "$TMP/big-stored.txt" | tr -d ' ') bytes stored"
-[ "$(wc -c < "$TMP/big-back.txt" | tr -d ' ')" -ge "$(wc -c < "$big" | tr -d ' ')" ] \
-  || fail "the body was TRUNCATED on the way out: $(wc -c < "$big" | tr -d ' ') bytes stored, $(wc -c < "$TMP/big-back.txt" | tr -d ' ') bytes rendered"
+[ "$(shasum "$TMP/big-stored.txt" | awk '{print $1}')" = "$big_sum_before" ] \
+  || fail "the body was REWRITTEN on the way into the permanent log: $big_len_before bytes sent, $(wc -c < "$TMP/big-stored.txt" | tr -d ' ') bytes stored"
+[ "$(wc -c < "$TMP/big-back.txt" | tr -d ' ')" -ge "$big_len_before" ] \
+  || fail "the body was TRUNCATED on the way out: $big_len_before bytes stored, $(wc -c < "$TMP/big-back.txt" | tr -d ' ') bytes rendered"
 
 # 35. `roles/all.json` is refused ON SIGHT. With it present, `bus roles` used to
 #     advertise @all as an actor while every operation involving it failed.
@@ -1038,6 +1122,8 @@ mkdir -p "$RDA_BUS_HOME/$R"; : > "$BIGLOG"
 for i in $(seq 1 $BIGN2); do
   printf '{"ts":"2026-07-27T00:00:00Z","repo":"%s","card":"big","from":"implementer","to":"sol-gate","kind":"note","ref":null,"body":"m-%s"}\n' "$R" "$i" >> "$BIGLOG"
 done
+BIGWANT="$(seq 1 $BIGN2 | sed 's/^/m-/')"
+BIGLOG_SUM_BEFORE="$(shasum "$BIGLOG" | awk '{print $1}')"
 big="$(busrun read --repo "$R" --card big --as sol-gate)" || fail "the 600-record read failed outright"
 [ "$(grep -c '^CLAIM BY' <<<"$big")" = "$BIGN2" ] || fail "delivery is INCOMPLETE at 600: $(grep -c '^CLAIM BY' <<<"$big") of $BIGN2 rendered"
 grep -q "^m-1$" <<<"$big" || fail "the OLDEST record was dropped between the log and the snapshot"
@@ -1047,17 +1133,37 @@ grep -q "^m-$BIGN2$" <<<"$big" || fail "the NEWEST record was dropped between th
 #     cursor past all of them - and m-300 is gone from `read` forever. Compare the
 #     whole sequence, in order: loss, duplication and reordering in one assertion,
 #     and the bus promises all three.
-grep -E '^m-[0-9]+$' <<<"$big" > "$TMP/big-seq.txt"
-seq 1 $BIGN2 | sed 's/^/m-/' > "$TMP/big-want.txt"
-cmp -s "$TMP/big-want.txt" "$TMP/big-seq.txt" \
-  || fail "the records delivered are not the records sent, in order: $(cmp "$TMP/big-want.txt" "$TMP/big-seq.txt" 2>&1 | head -1)"
+#     The expectation is held in a VARIABLE, not in a file under $TMP: the bus
+#     derives $TMP from RDA_BUS_HOME, so any comparison file it can reach is an
+#     artifact it can also fix up.
+[ "$(grep -E '^m-[0-9]+$' <<<"$big")" = "$BIGWANT" ] \
+  || fail "the records delivered are not the records sent, in order"
 #     ...and the LOG IS STILL THERE. Permanence was asserted byte-for-byte on a
 #     ten-record thread only, so a `tail -n 500 > $log` added to bound an unbounded
 #     file destroyed 100 records of permanent history during a READ, with the suite
 #     green. Permanence is only ever in danger at a size somebody finds too big.
 [ "$(wc -l < "$BIGLOG" | tr -d ' ')" = "$BIGN2" ] \
   || fail "READING the thread TRUNCATED the permanent log: $BIGN2 records before, $(wc -l < "$BIGLOG" | tr -d ' ') after"
+#     ...and PERMANENCE IS IDENTITY, NOT CARDINALITY - the same lesson as
+#     delivery, one line later. An `awk` pass over the log during a read that
+#     rewrote m-300 into a second copy of m-299 kept the count at 600 and the
+#     rendering correct (it renders from the snapshot, taken before), and m-300
+#     was gone from permanent history with the suite green.
+[ "$(shasum "$BIGLOG" | awk '{print $1}')" = "$BIGLOG_SUM_BEFORE" ] \
+  || fail "READING the thread REWROTE the permanent log: the byte content of an append-only file changed during a read"
+[ "$(jq -r '.body' "$BIGLOG")" = "$BIGWANT" ] \
+  || fail "the permanent log no longer contains the records that were sent, in order"
 [ "$(tr -d '[:space:]' < "$RDA_BUS_HOME/$R/.cursor/big/sol-gate")" = "$BIGN2" ] \
   || fail "the cursor does not cover the whole snapshot"
+
+# 50. THE FLOORS, AFTER THE LAST INVOCATION OF THE BUS. Checks 42, 47 and 47b
+#     are called "whole run" but they run at line ~910/~1010, and the suite keeps
+#     driving the bus after them (43, 44, 49). A payload gated on `[ "$total" -gt
+#     100 ]` - i.e. firing only during the 600-record read of check 49 - planted
+#     a file in $RDA_HOME/factory/queue and the suite printed PASS. A floor is
+#     only a floor if nothing runs underneath it.
+assert_never_executed "final (after every bus invocation)"
+assert_kanban_untouched "final (after every bus invocation)"
+assert_no_dispatch "final (after every bus invocation)"
 
 echo "PASS: test-bus.sh"

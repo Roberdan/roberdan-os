@@ -12,7 +12,10 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   `UNVERIFIED` on every delivery, roles addressable only through a manifest that claims no
   human-gated action. Not wired into `AGENTS.md`, `hooks/` or `kb`: that is human gate #7.
 - **`test/test-bus.sh`, wired into `validate.sh`.** The two load-bearing properties — never
-  executes anything, never writes kanban state — are enforced **behaviourally**, in two
+  STARTS an agent session, never writes kanban state — are enforced **behaviourally**. (Not
+  "never executes anything": that is the proxy round 6 rejected, and it is neither necessary
+  nor sufficient — the bus legitimately runs `jq`, and two rounds of mutants started agents
+  while executing nothing at all.) The enforcement is in two
   halves with different blind spots: a table of *argument paths* (not subcommand names) runs
   against a `PATH` of stub binaries with a canary, and an allowlist of external commands is
   derived from an xtrace of what actually ran, **each traced word normalised** (`VAR=` prefix
@@ -23,7 +26,7 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   the *real* `PATH`, so a branch missing from the table does not merely go unnoticed, it
   starts live sessions during the test run. `bus/*.sh` added to `SHELLCHECK_TARGETS`.
 - **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 38 deliberate violations, each
-  naming the property it breaks and the check that must catch it; 38/38 caught, plus one
+  naming the property it breaks and the check that must catch it; 45/45 caught, plus one
   DECLARED SURVIVOR that asserts a known hole is still open and turns red the day it closes. Written
   because two reviews found their blockers by *executing* mutants while every reading of the
   same code passed it — a check that has never been seen to fail is not evidence. It found
@@ -90,6 +93,23 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   is now described honestly: the hole is ANY stderr redirection of a compound command, not
   four tokens — `brace-blind` is kept as a declared survivor that fails the day it is
   caught.
+- **Round 7 (@rex).** The factory queue was one of NINE surfaces that start an agent
+  without executing one: `~/.claude/scripts` (a loaded launchd job runs it), `~/.claude/skills`
+  (every future session reads it), the `~/.claude` and `~/.orca` hook/agent/command trees,
+  **this repo's own `hooks/`** (run on every tool call, and the bus computes `$ROOT` itself),
+  `~/Library/LaunchAgents`, `.git/hooks`, and `handoff/` (concatenated into the prompt of
+  every `--dangerously-skip-permissions` agent — dispatch by prompt injection). Enumerating
+  is now backed by inversion: a marker file before the first bus invocation, and nothing
+  under any of those roots may be newer than it (0.5s over ~20k files; mutants 39-41).
+  Three more ways to fool an assertion rather than pass it: a payload gated on a large
+  thread fired UNDERNEATH every "whole run" floor, so the floors are repeated after the
+  last bus invocation (check 50, mutant 43); check 34 compared the stored body against the
+  file it handed the bus, and a mutant rewrote both, so the digest is now taken before the
+  send and held in the test process (mutant 42); and the canary lived under a directory the
+  bus is given, so a mutant ran `kb` and then erased the record of it — it now lives where
+  the bus is never told and is tamper-evident rather than merely non-empty (mutant 45).
+  Permanence is audited by content, not line count (mutant 44), and the dispatch hash
+  follows symlinks like the kanban one already did.
 - **`read` audits its own delivery, and non-UTF-8 bodies are refused rather than repaired.**
   Nothing measured delivery *completeness*: every assertion used batches of one to three, so a
   20-record cap passed the whole suite while five messages became unreachable forever — `send`
