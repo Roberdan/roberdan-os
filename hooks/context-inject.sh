@@ -39,6 +39,14 @@ echo "- \`$ROOT/AGENTS.md\` — canon + human gates"
 echo
 echo "### Active kanban (gated: todo->doing needs your approval; doing->done needs @thor):"
 if [ -x "$HOME/.local/bin/kb" ]; then
-  RDA_KANBAN="$ROOT/kanban" "$HOME/.local/bin/kb" view 2>/dev/null | sed 's/^/  /' | head -24
+  # Compact by design: the full board + per-card descriptions is ~40 lines of agent-facing
+  # context that Roberto reads too, every single session, and it drowns the two things he
+  # actually needs (what's in flight, what's waiting on him). Print only what's DOING plus
+  # counts; run `kb view` on demand for the board. See behavior/roberto-mode.md § volume.
+  RDA_KANBAN="$ROOT/kanban" "$HOME/.local/bin/kb" list 2>/dev/null \
+    | sed -n '/^DOING:/,/^DONE/p' | sed '1d;$d' | sed 's/^ */  in corso: /' | head -6
+  RDA_KANBAN="$ROOT/kanban" "$HOME/.local/bin/kb" view 2>/dev/null \
+    | grep -o '\(TO DO\|DOING\|DONE\) ([^)]*)' | paste -sd' · ' - | sed 's/^/  /'
+  echo "  (board completo: \`kb view\` · dettaglio card: \`kb show <id>\`)"
 fi
 exit 0
