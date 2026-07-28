@@ -137,7 +137,7 @@ section "shellcheck (hooks + bin + test + eval + factory + dispatcher shims + li
 # factory/*.sh, the runner-shims and kanban/lint-cards.sh are security-sensitive (dispatcher
 # sandbox path) — kept in the gate, not just hand-checked (rex nit #1). kanban/kb.sh is
 # deliberately NOT globbed: it carries pre-existing SC1010/SC2010 warnings in untouched code.
-SHELLCHECK_TARGETS=(hooks/*.sh bin/*.sh test/*.sh eval/*.sh factory/*.sh factory/runner-shims/* kanban/lint-cards.sh learn/*.sh ontology/*.sh)
+SHELLCHECK_TARGETS=(hooks/*.sh bin/*.sh test/*.sh eval/*.sh factory/*.sh factory/runner-shims/* kanban/lint-cards.sh kanban/dash.sh kanban/worktree.sh learn/*.sh ontology/*.sh)
 if command -v shellcheck >/dev/null 2>&1; then
   if shellcheck -S warning "${SHELLCHECK_TARGETS[@]}"; then ok "shellcheck clean"; else err "shellcheck warning/error"; fi
 else
