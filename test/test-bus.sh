@@ -20,7 +20,15 @@ TMP="$(mktemp -d)"
 # the write-marker live here, because everything under $TMP is one dirname away
 # from the RDA_BUS_HOME the bus is handed.
 CANDIR="$(mktemp -d)"
-: > "$CANDIR/.t0"
+# The reference for the sweep is a TIMESTAMP HELD IN A VARIABLE, not a marker
+# file. A marker under the system temp dir is one glob away from inside the bus
+# - $TMP is dirname "$RDA_BUS_HOME", so "$(dirname "$TMP")"/tmp.*/.t0 finds it -
+# and a payload that wrote a skill into the real ~/.claude/skills and then
+# rewrote every such marker made its own write invisible, with the suite green.
+# `date` truncates DOWN to the second, so every write after this line is
+# strictly newer; nothing is missed, and a file written in the same second
+# BEFORE this line only ever fails closed.
+MARK_TS="$(date '+%Y-%m-%d %H:%M:%S')"
 trap '_rda_on_exit' EXIT
 
 fail() { echo "FAIL: $*" >&2; : > "$TMP/.asserted"; exit 1; }
@@ -71,6 +79,17 @@ export RDA_LEAKCHECK="$TMP/lc/leak-check.sh"
 RDA_REAL_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 export RDA_HOME="$TMP/home"          # accidents land in the sandbox...
 mkdir -p "$RDA_HOME"
+# FIXTURE: the sandbox queue is a SYMLINK to a sibling directory, which is what
+# it looks like on a machine that keeps the queue on an external or synced
+# volume. Both fingerprints below use `find -L` for exactly this case, and a
+# check that has never been seen to fail is not evidence - without this fixture
+# the -L is an unverified claim, and a plain `find` lists a symlinked directory
+# without ever descending into it, so a job file written inside is 100%
+# invisible. A bus-only mutant cannot create the symlink, so it belongs here in
+# setup rather than in the mutation harness; with it, mutant 39 (factory-drop)
+# becomes the pin for -L at zero cost.
+mkdir -p "$TMP/queue-volume" "$RDA_HOME/factory"
+ln -s "$TMP/queue-volume" "$RDA_HOME/factory/queue"
 dispatch_surfaces() {
   local h r
   for h in "$RDA_REAL_HOME" "$RDA_HOME"; do
@@ -123,23 +142,77 @@ dispatch_baseline="$(dispatch_fingerprint)"
 # before the first bus invocation costs 0.5s and catches creation and
 # modification alike. The marker lives in $CANDIR, not $TMP, for the same reason
 # the canary does: $TMP is one dirname from RDA_BUS_HOME.
+# DERIVE THE LIST FROM LAUNCHD, DO NOT REMEMBER IT. Three loaded jobs execute
+# scripts that no hand-written enumeration on this branch has ever mentioned
+# (~/.claude/scripts/rust-sweep.sh, ~/.gbrain/gbrain-vault-sync.sh,
+# ~/.local/bin/gbrain-refresh-code, the Actions runner's runsvc.sh), and five
+# more execute scripts inside this checkout. Asking launchd what it will run is
+# the difference between a list that decays and one that cannot.
+# Only regular executable files: the StandardOut/ErrorPath entries in the same
+# plists are logs the jobs write to themselves.
+launchd_targets() {
+  local p t
+  for p in "$HOME/Library/LaunchAgents"/*.plist; do
+    [ -f "$p" ] || continue
+    grep -o '<string>[^<]*</string>' "$p" 2>/dev/null | sed -e 's/<[^>]*>//g'
+  done | tr ';' '\n' \
+       | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' \
+       | sed -e "s#\$HOME#$HOME#g" | grep '^/' | sort -u \
+       | while IFS= read -r t; do
+           case "$t" in *.log|*.err|*.out) continue;; esac
+           [ -f "$t" ] && [ -x "$t" ] && printf '%s\n' "$t"
+         done
+  return 0
+}
 exec_config_roots() {
   local r
-  for r in "$HOME/.claude/skills" "$HOME/.claude/scripts" "$HOME/.claude/hooks" \
-           "$HOME/.claude/agents" "$HOME/.claude/commands" "$HOME/.claude/rules" \
-           "$HOME/.claude/output-styles" "$HOME/.orca/agent-hooks" \
-           "$HOME/Library/LaunchAgents" "$ROOT/hooks" "$BUSROOT/hooks" \
-           "$ROOT/.git/hooks" "$BUSROOT/.git/hooks"; do
+  # ~/.claude WHOLESALE, not a list of directories inside it. The enumeration
+  # missed settings.local.json - a file Claude reads for `hooks` and
+  # `permissions`, i.e. a session hook - and it would have missed the next one
+  # too. What is session-mutable is subtracted below, and that subtraction is a
+  # DECLARED DENYLIST: everything else in ~/.claude is treated as executable.
+  for r in "$HOME/.claude" "$HOME/.orca/agent-hooks" "$HOME/Library/LaunchAgents" \
+           "$HOME/.zshenv" "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.zlogin" \
+           "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"; do
     [ -e "$r" ] && printf '%s\n' "$r"
   done
+  # THE WHOLE CHECKOUT, not a list of directories inside it. FIVE loaded launchd
+  # jobs execute scripts that live in this repo - factory/run.sh, evolve/watch.sh,
+  # learn/distill.sh, ontology/curate.sh, bin/pending-digest.sh - and the bus
+  # computes $ROOT from its own location, so `>> "$ROOT/factory/run.sh"` is
+  # arbitrary code at 01:00 with no external command, no PATH and no agent name.
+  # A payload that appended 92 lines to factory/run.sh and to .git/config passed
+  # the whole suite. Enumerating executable directories inside a repo is the same
+  # losing game as enumerating dispatch queues: watch the checkout.
+  # Only when it IS a checkout: under the mutant harness $BUSROOT is the system
+  # temp directory, and scanning that is neither cheap nor stable.
+  # The explicit pair stays even though the whole checkout is swept below: under
+  # the mutant harness the binary lives in a scratch directory, so $BUSROOT is
+  # the system temp dir - not checkout-shaped, therefore not swept wholesale, and
+  # mutant 41 walked straight back through the gap the moment the wholesale rule
+  # replaced them. Two mechanisms, deliberately overlapping.
+  for r in "$ROOT" "$BUSROOT"; do
+    [ -e "$r/hooks" ] && printf '%s\n' "$r/hooks"
+    [ -e "$r/.git/hooks" ] && printf '%s\n' "$r/.git/hooks"
+    [ -d "$r/.git" ] && printf '%s\n' "$r"
+  done
+  launchd_targets
   return 0
 }
 assert_no_new_exec_config() {
   local roots=() r out
   while IFS= read -r r; do roots+=("$r"); done < <(exec_config_roots)
   [ "${#roots[@]}" -gt 0 ] || return 0
-  out="$(find -L "${roots[@]}" -newer "$CANDIR/.t0" 2>/dev/null || true)"
-  [ -z "$out" ] || fail "the bus wrote EXECUTABLE CONFIGURATION: $(tr '\n' ' ' <<<"$out") - ~/.claude/{skills,scripts,hooks,agents,commands}, ~/.orca/agent-hooks, ~/Library/LaunchAgents and <repo>/{hooks,.git/hooks} are all executed by a loaded launchd job, a session hook or the next commit. Writing one starts an agent without executing one ($1)"
+  # git's own bookkeeping is the only thing that legitimately moves inside a
+  # checkout while the suite runs (fsmonitor cookies, index, objects, refs).
+  # .git/hooks and .git/config are NOT ignored: both are execution surfaces -
+  # core.hooksPath and [alias] run arbitrary commands on the human's next git
+  # command. This ignore list is a DENYLIST and is declared as one.
+  out="$(find -L "${roots[@]}" -newermt "$MARK_TS" 2>/dev/null \
+          | grep -vE '/\.git(/(fsmonitor--daemon|objects|index|logs|refs|worktrees|packed-refs|shallow|modules|COMMIT_EDITMSG|FETCH_HEAD|ORIG_HEAD|MERGE_[A-Z]+)|$)' \
+          | grep -vE '/\.claude/(sessions|history\.jsonl|logs|cache|file-history|paste-cache|image-cache|uploads|telemetry|projects|shell-snapshots|daemon|session-env|backups|tasks|jobs|todos|statsig|plans|reports|stats-cache\.json|chrome|sandbox)' \
+          || true)"
+  [ -z "$out" ] || fail "the bus wrote EXECUTABLE CONFIGURATION: $(tr '\n' ' ' <<<"$out") - ~/.claude (wholesale, minus the declared session-mutable denylist), ~/.orca/agent-hooks, ~/Library/LaunchAgents, the shell rc files that /bin/bash -lc sources for five loaded launchd jobs, and the whole CHECKOUT (factory/run.sh, evolve/watch.sh, learn/distill.sh, ontology/curate.sh, bin/pending-digest.sh are all executed on a schedule, and .git/{hooks,config} on the next git command). Writing one starts an agent without executing one ($1)"
 }
 assert_no_dispatch() {
   assert_no_new_exec_config "$1"
@@ -1077,6 +1150,48 @@ while IFS= read -r cmd; do
     *) fail "the bus executed the external command '$cmd', which is not on the allowlist - add it here deliberately or remove the call";;
   esac
 done <<<"$executed"
+
+# 45b. ARGUMENTS ARE CODE TOO. Check 45 takes `awk '{print $1}'` of every traced
+#      line: it polices the command NAME and never looks at what that command was
+#      asked to do. Three of the names on the allowlist are interpreters.
+#      `git -C "$ROOT" -c alias.z='!/abs/path/claude -p wake' z` started 92 real
+#      agent sessions during a green run - no PATH lookup (so the canary is
+#      blind), no unallowed command name (so check 45 is blind), no dispatch file
+#      (so 47b/47c are blind) and no trace manipulation (so check 48 is blind).
+#      `awk 'BEGIN{system("/abs/path/claude -p x")}'` is the same hole in a second
+#      allowlisted name. Two DENYLISTS, declared as such, because a denylist that
+#      is named is worth more than an allowlist that inspects nothing:
+#      (a) no agent binary may appear as ANY word of any traced line, however it
+#          is spelled or pathed;
+#      (b) the escape hatches of the allowlisted interpreters are refused
+#          outright - the bus has never needed one and never should.
+tracewords="$(cat "$TRACEDIR"/t.* 2>/dev/null \
+  | grep -E '^#+XT# ' | sed -E 's/^#+XT#[[:space:]]*//' \
+  | tr ' \t' '\n\n' | sed -E 's#.*/##' | sed -E 's/[^A-Za-z0-9._+-]//g' | sort -u)"
+# That second sed is not cosmetic. xtrace renders
+# `awk 'BEGIN{system("/abs/claude -p x")}'` with the quoting glued to the words,
+# so the word carrying the agent came out as `claude'` after basename - which is
+# not `claude`, and list (a) walked straight past it. The mutant was caught by
+# list (b) instead, and the only reason that is KNOWN is that its evidence regex
+# names the check it expects rather than accepting any red line.
+# `kb` is deliberately NOT in this list: the roles manifests and the message
+# bodies of this very suite say the word, so it is not evidence. It is covered
+# by the PATH canary, which is evidence.
+for _agent in claude codex copilot gemini aider cursor-agent dispatch-runner.sh; do
+  grep -qxF "$_agent" <<<"$tracewords" \
+    && fail "the name of an agent CLI ('$_agent') appears as an ARGUMENT in the trace - an allowlisted interpreter was handed an agent to run, which starts a session without ever executing one under its own name"
+done
+escape="$(cat "$TRACEDIR"/t.* 2>/dev/null | grep -E '^#+XT# ' \
+  | sed -E 's/^#+XT#[[:space:]]*//' \
+  | awk '{ c=$1; sub(/.*\//,"",c);
+           if (c=="git"  && $0 ~ /(^| )-c([ =])/)                    { print "git -c: " $0 }
+           else if (c=="git"  && $0 ~ /--exec-path/)                 { print "git --exec-path: " $0 }
+           else if (c=="awk"  && $0 ~ /system\(/)                    { print "awk system(): " $0 }
+           else if (c=="sort" && $0 ~ /--compress-program/)          { print "sort --compress-program: " $0 }
+           else if ($0 ~ /alias\.[A-Za-z]|core\.(pager|sshCommand|hooksPath|editor)/) { print "git config escape: " $0 } }' \
+  | head -3 || true)"
+[ -z "$escape" ] \
+  || fail "the bus used an INTERPRETER ESCAPE HATCH of an allowlisted command (git -c / alias / core.pager / core.sshCommand / awk system()): $escape"
 
 # 46. NO UNTRACED CALL SITE. Check 45 only covers what busrun ran, so a future
 #     `bash "$BUS" ...` written straight into this file would quietly opt that

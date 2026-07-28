@@ -32,31 +32,87 @@ greps forbade and passed every one of them.
    directory therefore starts a live session while executing nothing external,
    consulting no `PATH`, naming no binary and touching no kanban file — blind to
    the canary, the allowlist, the fingerprint and check 48 *by construction*.
+   The sharpest instance of that shape needs no new surface at all: check 45
+   allowlists the command **name** — it is `awk '{print $1}'` of every traced
+   line — and three of the allowlisted names are interpreters, so
+   `git -C "$ROOT" -c alias.z='!/abs/claude -p wake' z` started **92 real agent
+   sessions during a green run**. No `PATH` lookup, no unallowed name, no
+   dispatch file, no trace manipulation. Check 45**b** is what polices the
+   arguments, and it is two denylists rather than an allowlist, because a
+   denylist that is named is worth more than an allowlist that inspects nothing:
+   (a) no agent CLI may appear as *any* word of *any* traced line, however
+   spelled or pathed — `kb` is deliberately absent from (a), because the roles
+   manifests and this suite's own message bodies say the word, so it is not
+   evidence, and it is covered by the `PATH` canary, which is; and (b) the
+   interpreter escape hatches are refused outright (`git -c`, `--exec-path`,
+   `alias.*`, `core.{pager,sshCommand,hooksPath,editor}`, `awk ... system(`,
+   `sort --compress-program`). Each traced word is basenamed *and* stripped of
+   punctuation before comparison: without the second step `awk` renders the
+   payload with its quoting glued on, the word carrying the agent basenames to
+   `claude'`, and that is not `claude`. (a) walked past it; (b) caught it; the
+   only reason that is known is that the mutant's evidence regex names the check
+   it expects instead of accepting any red line.
    @rex planted 14 files in the real `~/.roberdan-os` during a green run, one
    character from the live path.
-   **And that queue is one of nine.** Enumerating it was the same mistake one
-   layer along, and the next round produced the rest of the list, each verified
-   live on this machine: `~/.claude/scripts` (executed by the loaded
-   `com.roberdan.rustsweep`), `~/.claude/skills` (read by *every future session*),
-   `~/.claude/{hooks,agents,commands,rules,output-styles}`, `~/.orca/agent-hooks`
-   (run on every tool call through `settings.json`), **`<repo>/hooks`** (this
-   repo's own hooks, run on every tool call — and the bus computes `$ROOT`
-   itself, so that is the shortest path from this channel to execution),
-   `~/Library/LaunchAgents`, `<repo>/.git/hooks`, and `handoff/` (concatenated
-   into the prompt of every `--dangerously-skip-permissions` agent the factory
-   starts, which is dispatch by prompt injection). Negative result worth keeping:
-   there is no crontab, no `at` queue, no launchd `WatchPaths` and no
-   `QueueDirectories` on this machine.
-   So the mechanism is **inverted rather than enumerated**. Check 47b still
-   content-hashes the narrow dispatch surfaces, and check 47c takes a marker file
-   before the first bus invocation and requires that **nothing under any of those
-   roots is newer than it** — a stat-only sweep, 0.5s over ~20k files, where
-   content-hashing them four times a run costs six minutes. Two limits, declared
-   rather than implied: `~/.claude/{plugins,tasks,jobs}` are excluded because a
-   live session mutates them continuously (`jobs` is plausibly executable config,
-   and is the first thing to revisit if this ever needs to be tighter), and
-   `-newer` sees creation and modification but not deletion — the right asymmetry
-   for "starts an agent", the wrong one for "destroys config".
+   **And that queue was one of at least twenty** — the count is not the point,
+   and quoting one was the mistake. Enumerating the queue was the same error one
+   layer along; enumerating the nine surfaces that replaced it was the same error
+   again, and three further rounds each walked through a root the list did not
+   name: a script inside *this checkout* that five loaded launchd jobs execute,
+   `~/.gbrain/autopilot-run.sh` and `~/.local/bin/gbrain-refresh-code` (named by
+   plists nobody had read), and `~/.claude/settings.local.json` (a file Claude
+   reads for `hooks` and `permissions`, sitting one level above every
+   sub-directory that *was* listed). So the doctrine is no longer a list at all,
+   and the three rules that replaced it are stated as rules:
+   - **Derive it from launchd, do not remember it.** `launchd_targets()` parses
+     every plist in `~/Library/LaunchAgents` and sweeps every regular executable
+     file they name. A hand-written list is a snapshot of one person's memory on
+     one day; the plists are what actually runs.
+   - **Sweep the whole checkout**, gated on `-d .git`, not a list of executable
+     directories inside it. `factory/run.sh`, `evolve/watch.sh`,
+     `learn/distill.sh`, `ontology/curate.sh` and `bin/pending-digest.sh` are all
+     on a schedule, and the bus computes `$ROOT` from its own location, so
+     `>> "$ROOT/factory/run.sh"` is arbitrary code at 01:00 with no external
+     command, no `PATH` and no agent name. `.git/config` is the same thing on the
+     human's next `git` command (`[alias]`, `core.hooksPath`), which is why the
+     `.git` ignore list covers bookkeeping and deliberately does **not** cover
+     `.git/{hooks,config}`.
+   - **Sweep `~/.claude` wholesale**, minus a *declared* session-mutable denylist
+     (`sessions`, `history.jsonl`, `logs`, `cache`, `projects`, `tasks`, `jobs`,
+     `plans`, ...). `plugins` used to be excluded on the assumption that a live
+     session churns it; measured, it changes zero times in 125s and it carries
+     hooks, commands and skills. The assumption was the hole.
+   Plus `~/.orca/agent-hooks`, `~/Library/LaunchAgents`, and the shell rc files
+   (`~/.zshenv`, `~/.zprofile`, `~/.zshrc`, `~/.zlogin`, `~/.bashrc`,
+   `~/.bash_profile`, `~/.profile`) that `/bin/bash -lc` sources for every one of
+   those jobs. Negative result worth keeping: there is no crontab, no `at` queue,
+   no launchd `WatchPaths` and no `QueueDirectories` on this machine.
+   So the mechanism is **inverted within roots that are themselves derived**,
+   which is a weaker claim than "inverted rather than enumerated" and the honest
+   one: check 47b still content-hashes the narrow dispatch surfaces, and check
+   47c requires that **nothing under any swept root is newer than the reference**
+   -- a stat-only sweep, 0.638s over the whole of `~/.claude` (~20k files), where
+   content-hashing it four times a run costs six minutes.
+   **The reference is a timestamp held in a variable of the test process**, not a
+   marker file, and that distinction is the whole check. A marker file placed
+   under the system temp dir is reachable without knowing its name -- `$TMP` is
+   `dirname "$RDA_BUS_HOME"`, so `"$(dirname "$TMP")"/tmp.*/.t0` finds it -- and a
+   payload that wrote a skill into the real `~/.claude/skills` and then truncated
+   every such marker switched the entire sweep off with the suite green. The
+   canary had been moved out of the bus's reach and made tamper-evident one round
+   earlier; the marker was then placed *in the same directory* and left
+   forgeable. The lesson was learned for one artifact and not for the other, one
+   line apart. `date` truncates down to the second, so every write after that
+   line is strictly newer, and a write inside the same second only ever fails
+   closed.
+   One declared limit remains, and one that used to be declared was **false**:
+   `-newermt` cannot distinguish a write from a touch, so a payload that only
+   bumps mtime is caught and one that rewrites a file in place with the same
+   mtime is not (`touch -r`). It was previously claimed here that `-newer` misses
+   *deletion*; it does not -- unlinking bumps the parent directory's mtime and the
+   directory is inside the root (`rm dt/sub/victim` then `find -L dt -newermt $TS`
+   prints `dt/sub`). A declared limit that is not real costs as much as an
+   undeclared one that is.
    **And a floor is only a floor if nothing runs underneath it.** The run-wide
    asserts sat above checks 43/44/49, which drive the bus again — so a payload
    gated on a large thread fired entirely beneath them and planted a dispatch
@@ -163,7 +219,9 @@ greps forbade and passed every one of them.
    — and so does the dispatch hash, which did not for one round, because a lesson
    learned on one watcher is not learned on the other until somebody carries it
    across (a symlinked `factory/queue`, normal for an external volume, was 100%
-   invisible),
+   invisible) -- and the sandbox queue is now a symlink in setup, because a check
+   that has never been seen to fail is not evidence and `find -L` was otherwise
+   an unverified claim in both fingerprints,
    and it refuses to hash nothing at all — an empty tree hashes to a constant, so
    "unchanged" would have been satisfied by a board that no longer existed.
    **Delivery is audited by identity, not by cardinality.** The chain is log →
@@ -192,7 +250,7 @@ greps forbade and passed every one of them.
    600-record thread with exit 0, a correct trailer and the cursor parked past
    all of them, because every count downstream was counting the truncated copy
    and honestly agreeing (mutants 27, 28, 30).
-   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 45
+   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 52
    deliberate violations and asserts that each is caught by a *named* check,
    including every evasion above. A check that has never been seen to fail is not
    evidence — and the three most recent mutants exist because an adversarial pass

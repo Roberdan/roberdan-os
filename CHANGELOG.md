@@ -26,7 +26,7 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   the *real* `PATH`, so a branch missing from the table does not merely go unnoticed, it
   starts live sessions during the test run. `bus/*.sh` added to `SHELLCHECK_TARGETS`.
 - **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 38 deliberate violations, each
-  naming the property it breaks and the check that must catch it; 45/45 caught, plus one
+  naming the property it breaks and the check that must catch it; 52/52 caught, plus one
   DECLARED SURVIVOR that asserts a known hole is still open and turns red the day it closes. Written
   because two reviews found their blockers by *executing* mutants while every reading of the
   same code passed it — a check that has never been seen to fail is not evidence. It found
@@ -110,6 +110,27 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   the bus is never told and is tamper-evident rather than merely non-empty (mutant 45).
   Permanence is audited by content, not line count (mutant 44), and the dispatch hash
   follows symlinks like the kanban one already did.
+- **Round 8 (@rex).** Five more, and the first one needed no new surface at all: check 45
+  allowlists the command NAME (`awk '{print $1}'` of the trace) and three allowlisted names
+  are interpreters, so `git -c alias.z='!/abs/claude -p wake' z` started **92 real agent
+  sessions during a green run** - blind to the canary, the allowlist, the dispatch hash and
+  the tracing denylist simultaneously. Check 45b now polices the arguments: no agent CLI as
+  any word of any traced line, and the interpreter escape hatches (`git -c`, `alias.*`,
+  `core.{pager,sshCommand,hooksPath,editor}`, `awk system(`, `sort --compress-program`)
+  refused outright. Then the same lesson three times over: the sweep MARKER was placed in
+  the directory the canary had just been moved out of, and was forgeable without knowing its
+  name, so the reference is now a timestamp held in a variable of the test process; the
+  nine-surface list was still a hand list, so the roots are now DERIVED - every plist in
+  `~/Library/LaunchAgents` is parsed for the scripts launchd will run, the whole checkout is
+  swept (five loaded jobs execute scripts inside it, and `>> "$ROOT/factory/run.sh"` is
+  arbitrary code at 01:00), and `~/.claude` is swept wholesale minus a declared
+  session-mutable denylist. `plugins` had been excluded on an assumption; measured, it
+  changes zero times in 125s and carries hooks and skills. Mutants 46-52 plus a
+  symlinked-queue fixture that finally pins `find -L`, a repo-shaped mutant sandbox so
+  `$ROOT` has production shape, and a lock so two harnesses cannot corrupt each other's
+  evidence now that the sweep watches the real `$HOME`. Also corrected here: the doc claimed
+  `-newer` cannot see deletion. It can - unlinking bumps the parent directory's mtime. A
+  declared limit that is not real costs as much as an undeclared one that is.
 - **`read` audits its own delivery, and non-UTF-8 bodies are refused rather than repaired.**
   Nothing measured delivery *completeness*: every assertion used batches of one to three, so a
   20-record cap passed the whole suite while five messages became unreachable forever — `send`
