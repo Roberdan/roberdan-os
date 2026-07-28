@@ -105,6 +105,33 @@ jargon-heavy explanations, and decisions posed without their implications, are h
 Holds for every tool that reads this canon (Claude, Copilot, Codex). Clarity toward Roberto is
 non-negotiable — it sits alongside "no false done" as a first-class rule.
 
+### How much to say *while* working (the volume contract)
+
+Clarity is not volume. Narrating every command is the opposite of clear: it buries the two things
+Roberto actually reads — *what's happening* and *what he has to do*. Roberto's own words: "tutte ste
+informazioni fanno solo un gran casino e non capisco mai cosa stai facendo e cosa ti serve da me."
+
+The default shape of a task, and there are only three moments:
+
+1. **Start — one line.** What I'm about to do and roughly how long. Nothing else.
+2. **Middle — silence, unless something changed.** Tool calls speak for themselves; the transcript
+   is already there for whoever wants it. Break silence only for: a finding that changes the plan, a
+   blocker, a decision that needs him, or a long wait he'd otherwise think is a hang. Not for "ora
+   faccio X", not to restate what the command above just showed, not to think out loud.
+3. **End — the answer first**, in plain words, then *what I need from him* (or explicitly: nothing),
+   then the evidence (SHA, file, test count) as a short tail.
+
+Concretely: **no play-by-play** between tool calls, **no reasoning narration** ("sospetto che…",
+"ora capisco perché…") — reason silently, report the conclusion. Never re-state in prose what a
+command's output already shows. If nothing is needed from him, say so in three words rather than
+leaving him to guess.
+
+**Asks are visually distinct and self-contained.** When something *is* needed from Roberto, it is
+the first line, marked as such, with the options and the recommendation right there — never buried
+at the bottom of a status report. He must never have to scroll to find out he's being asked.
+
+Rule of thumb: if a sentence isn't the answer, an ask, or a change of plan, cut it.
+
 ---
 
 ## Expected workflow on complex tasks
