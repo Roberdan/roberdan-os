@@ -98,6 +98,17 @@ because any list you write down is already stale"). The product had been finishe
 The rules:
 - **Declare the budget before round 1**, in the card: number of rounds (**default 2, hard cap
   3**) and the scope of the property being proven. An undeclared budget is an infinite one.
+- **Two rounds on the same CLASS = stop patching instances.** This is the half a counter alone
+  misses. Seven rounds on one route check each found another *instance* of one class (two
+  hand-written descriptions that drift apart); each round fixed the instance. That loop does
+  not end by exhausting instances — it ended by changing the **shape of the guarantee** (one
+  reader, and the gate asks it). So at the second round on a class, exactly two moves are
+  allowed, both in one step: change the shape so the class cannot occur, or **minute it** as a
+  known limit with its cost and stop. A third round of instances is refused.
+- **Anything discovered while doing card X becomes a NEW CARD, never a commit in X's PR.**
+  The other failure is drift, not repetition: a card that said *"sort before cutting"* produced
+  a **+6153-line PR about macOS ACL permissions** over 18 rounds. The work was good. It was not
+  the work that was asked for. The discovery keeps; the scope does not.
 - **Bound the property or bound the rounds.** If the property's surface is external and
   mutable, it cannot be closed — write down *which* surface is in scope and treat the rest as
   a declared limit, exactly like a declared survivor in a mutation suite.
@@ -108,6 +119,10 @@ The rules:
   three options, with the evidence: (a) ship as it stands, with the open findings listed;
   (b) one more round, with the single named question it must answer; (c) cut the scope.
   Silence is not option (b).
+- **A DEMONSTRATED live exposure overrides the cap** — and nothing else does. Without this
+  counterweight the budget becomes a way to ship holes on schedule. *Demonstrated*, not
+  feared: say what you ran and what it did. "An attacker could…" is a risk, and a cap that
+  yields to *might* is not a cap. The override goes on the record and into the PR.
 - **Cost is a terminal-condition, not an afterthought.** Wall-clock and token spend per card
   are tracked like any other metric, and crossing the declared budget escalates to the human
   *automatically* — the same way 2 failed attempts escalate the model. An agent may not spend
@@ -115,10 +130,19 @@ The rules:
 - **A standing "keep going until it's done" does NOT authorise unbounded rounds.** It
   authorises finishing the **declared scope**. When the scope is what keeps growing, the
   standing instruction has expired and the human has to be asked again.
+- **Every PR states its own round count.** `review-budget.sh line <card>` prints the line to
+  paste: rounds used, the classes they hit, discoveries filed elsewhere, any override. This
+  canon already says *prose did not prevent it, a gate did* — and it applies to this rule too.
+  Nobody looped last night for lack of reading ability. A number that has to be **written down**
+  does what prose cannot: it makes the eighteenth round embarrassing to type, before anyone
+  gets round to forbidding it.
 
 Enforcement is mechanical, not honour-based: **[`loop/review-budget.sh`](review-budget.sh)**
-records each round against a card and exits non-zero once the budget is spent, so the
-next round has to be an explicit human decision rather than a default.
+records each round against a card and exits 3 once the budget is spent — or at the second
+round on one class, whichever comes first — so the next round has to be an explicit human
+decision rather than a default. `discovery` files out-of-scope work away from the PR,
+`override` takes a demonstrated exposure and only a demonstrated one, and `line` prints the
+count for the PR body.
 
 ---
 

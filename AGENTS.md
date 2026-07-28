@@ -113,6 +113,17 @@ a real blocker. When the budget is spent, the agent hands Roberto a **decision**
 options — never another round by default. A standing "keep going until it's done" authorises
 finishing the **declared scope**; when the scope is what keeps growing, that instruction has
 expired and Roberto has to be asked again.
+
+Three mechanical gates, because there are two distinct defects and one counterweight:
+**(1) two rounds on the same CLASS** stop the patching — seven rounds on one route check each
+fixed another *instance* of one class; that ends by changing the shape of the guarantee, not by
+running out of instances, so a third round of instances is refused. **(2) Anything discovered
+while doing card X becomes a NEW CARD**, never a commit in X's PR — a card that said "sort
+before cutting" produced a +6153-line PR about macOS ACLs across 18 rounds; good work, not the
+work asked for. **(3) A DEMONSTRATED live exposure overrides the cap**, and nothing else does —
+"an attacker could…" is a risk, and a cap that yields to *might* is not a cap. Every PR states
+its own round count (`review-budget.sh line <card>`): a number that has to be written down makes
+the eighteenth round embarrassing to type, which prose never has.
 The loop is reliable without a daemon; Convergio is an **optional** observer, never a single point of failure.
 
 **Goal tracking = [`kanban/`](kanban/) (durable, auditable, token-bounded, GATED — default).**
@@ -211,9 +222,10 @@ Autonomy ≠ black box. These **always** go through Roberto (direct message):
 5. Strategic/product decisions with non-obvious tradeoffs (agent proposes with evidence, Roberto decides)
 6. Material published in Roberto's / Fight the Stroke's name
 7. Architectural changes >4 files with cross-cutting invariants
-8. **Another review round once the declared budget is spent** (`loop/review-budget.sh` exits 3) —
-   continuing is a spend decision, and the agent is the worst-placed party to make it: every round
-   that finds something true feels like justification for the next one
+8. **Another review round once the declared budget is spent, or a third round on one class**
+   (`loop/review-budget.sh` exits 3) — continuing is a spend decision, and the agent is the
+   worst-placed party to make it: every round that finds something true feels like justification
+   for the next one. Overriding the cap needs a **demonstrated** exposure, on the record
 
 ---
 
