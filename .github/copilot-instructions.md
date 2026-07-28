@@ -20,7 +20,7 @@ choices / with non-obvious tradeoffs: convene the **sounding board** (different 
 lenses) and **always** run a red-team that argues the strongest case *against* the frontrunner
 option before recommending. Never rubber-stamp; default-to-refute; pre-mortem.
 
-**Human gates:** never automated — full 7-item list is `AGENTS.md` § Human gates (already
+**Human gates:** never automated — full 8-item list is `AGENTS.md` § Human gates (already
 natively loaded in full alongside this file).
 
 Detail in `~/GitHub/roberdan-os`: `behavior/roberto-mode.md` (engineering),
