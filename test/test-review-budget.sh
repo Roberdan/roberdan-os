@@ -69,4 +69,72 @@ run bash "$BIN" check 260101-000004
 run bash "$BIN" check "../../etc/passwd"
 [ "$rc" = 2 ] || fail "a traversing card id must be refused, got $rc: $out"
 
+# --- LOOP A: rounds on the same CLASS -------------------------------------
+# The count is only half the brake. Seven rounds on one route check each found
+# another INSTANCE of one class; patching instances does not end by exhausting
+# them. The second round on a class stops the patching by name.
+
+# 9. Two rounds on the same class stop it, even though the class is spelled
+#    differently — a checker fooled by capitalisation notices nothing.
+run bash "$BIN" declare 260101-000005 3 "the route gate"
+[ "$rc" = 0 ] || fail "declare failed: $out"
+run bash "$BIN" record 260101-000005 "DO NOT SHIP" "desc drifted on /api/x" route-desc
+[ "$rc" = 0 ] || fail "round 1 on a class should be fine, got $rc: $out"
+run bash "$BIN" record 260101-000005 "DO NOT SHIP" "desc drifted on /api/y" "Route-Desc "
+[ "$rc" = 3 ] || fail "the SECOND round on one class must stop, got $rc: $out"
+grep -q "SECOND ROUND ON THE CLASS 'route-desc'" <<<"$out" || fail "the stop must name the class, normalised: $out"
+grep -q "change the shape" <<<"$out" || fail "the way out must be a change of shape, not another patch: $out"
+grep -q "MINUTE IT" <<<"$out" || fail "the second way out (write it down and stop) must be offered: $out"
+
+# 10. It fires on the CLASS, not on the budget: this card still had a round left.
+grep -q "2/3" <<<"$out" || fail "the class stop must fire while budget remains, showing 2/3: $out"
+
+# 11. Different classes do not trip it — otherwise the rule would just be a
+#     lower round cap wearing a costume.
+run bash "$BIN" declare 260101-000006 3 "two different classes"
+run bash "$BIN" record 260101-000006 "DO NOT SHIP" "a" class-one
+[ "$rc" = 0 ] || fail "first class, first round: $out"
+run bash "$BIN" record 260101-000006 "DO NOT SHIP" "b" class-two
+[ "$rc" = 0 ] || fail "a DIFFERENT class must not trip the same-class stop, got $rc: $out"
+
+# --- LOOP B: scope drift ---------------------------------------------------
+# A card that said "sort before cutting" produced a +6153-line PR about macOS
+# ACLs over 18 rounds. Good work; not the work asked for.
+
+# 12. A discovery is recorded as NOT part of this PR, and hands back the command
+#     that files it as its own card.
+run bash "$BIN" discovery 260101-000005 "macOS ACL permissions need sorting"
+[ "$rc" = 0 ] || fail "discovery should record cleanly, got $rc: $out"
+grep -q "does NOT go in this PR" <<<"$out" || fail "a discovery must be excluded from this PR: $out"
+grep -q 'kb add "macOS ACL permissions need sorting"' <<<"$out" || fail "it must hand back the filing command: $out"
+
+# --- The counterweight -----------------------------------------------------
+# Without this, the cap is a way to ship holes on schedule.
+
+# 13. A THEORETICAL risk does not override the cap. A cap that yields to "might"
+#     is not a cap.
+run bash "$BIN" override 260101-000005 "an attacker could escalate this"
+[ "$rc" = 2 ] || fail "a theoretical risk must not override the cap, got $rc: $out"
+grep -q "that is a risk, not an exposure" <<<"$out" || fail "the refusal must name the difference: $out"
+
+# 14. A DEMONSTRATED exposure does, and it lifts both brakes — the loop is
+#     allowed to continue precisely because something real was shown.
+run bash "$BIN" override 260101-000005 "ran the mutant: it started 92 live agent sessions in a green run"
+[ "$rc" = 0 ] || fail "a demonstrated exposure must override, got $rc: $out"
+run bash "$BIN" record 260101-000005 "DO NOT SHIP" "third instance" route-desc
+[ "$rc" = 0 ] || fail "after a demonstrated override the class stop must yield, got $rc: $out"
+
+# --- The visible number ----------------------------------------------------
+# Prose did not stop this happening to anyone who could read. A count that has
+# to be written into the PR makes the eighteenth round embarrassing to type.
+
+# 15. `line` is one line, and it carries every fact someone would rather omit.
+run bash "$BIN" line 260101-000005
+[ "$rc" = 0 ] || fail "line failed: $out"
+[ "$(wc -l <<<"$out" | tr -d ' ')" = "1" ] || fail "the PR line must be ONE line: $out"
+grep -q "Review rounds: 3/3" <<<"$out" || fail "the count must be in the line: $out"
+grep -q "classes: route-desc" <<<"$out" || fail "the classes must be in the line: $out"
+grep -q "discovery(ies) filed as separate cards" <<<"$out" || fail "discoveries must be in the line: $out"
+grep -q "CAP OVERRIDDEN" <<<"$out" || fail "an override must be visible in the line, not buried: $out"
+
 echo "PASS: test-review-budget.sh"
