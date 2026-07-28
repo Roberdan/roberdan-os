@@ -3,6 +3,171 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [Unreleased]
+
+### Added
+- **`bus/` — agent-to-agent messages, per repo and per card.** Generalises the improvised
+  `/tmp` file channel two sessions used across seven review rounds of VirtualBPM PR #46.
+  Append-only JSONL thread per (repo, card), per-role cursors, provenance stamped
+  `UNVERIFIED` on every delivery, roles addressable only through a manifest that claims no
+  human-gated action. Not wired into `AGENTS.md`, `hooks/` or `kb`: that is human gate #7.
+- **`test/test-bus.sh`, wired into `validate.sh`.** The two load-bearing properties — never
+  STARTS an agent session, never writes kanban state — are enforced **behaviourally**. (Not
+  "never executes anything": that is the proxy round 6 rejected, and it is neither necessary
+  nor sufficient — the bus legitimately runs `jq`, and two rounds of mutants started agents
+  while executing nothing at all.) The enforcement is in two
+  halves with different blind spots: a table of *argument paths* (not subcommand names) runs
+  against a `PATH` of stub binaries with a canary, and an allowlist of external commands is
+  derived from an xtrace of what actually ran, **each traced word normalised** (`VAR=` prefix
+  stripped, basename taken) before matching. The normalisation is the boundary, not the
+  stubs: a command invoked by **absolute path never consults `PATH`**, so the stub half
+  cannot see it at all — a @rex mutant spawned 54 agents that way and passed every check.
+  Coverage is a safety property rather than a metric here: the multi-agent checks run with
+  the *real* `PATH`, so a branch missing from the table does not merely go unnoticed, it
+  starts live sessions during the test run. `bus/*.sh` added to `SHELLCHECK_TARGETS`.
+- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** One deliberate violation per
+  load-bearing check, each naming the property it breaks and the check that must catch it,
+  plus DECLARED SURVIVORS that assert a known hole is still open and turn red the day it
+  closes. No count is written here: the harness asserts its own mutant count and derives its
+  own coverage, and a number restated in prose is the exact defect this repo spent eight
+  review rounds on. Written
+  because two reviews found their blockers by *executing* mutants while every reading of the
+  same code passed it — a check that has never been seen to fail is not evidence. It found
+  two bugs in its own assertions and one in `who`. A third, adversarial pass then found three
+  more real holes: a payload in `close`/`open` (subcommands added after the path table and
+  never added to it), kanban state written by **shell redirection** — which violated the
+  property while satisfying its proxy, since no command is executed at all — and a `--peek`
+  that consumed broadcasts, the one failure mode where a message is accepted, never
+  delivered, and nothing prints an error. The gate now hashes the kanban tree around the run
+  instead of only watching for `kb`. A fourth pass (@thor, refusing to mark the card done)
+  found the same coverage hole in its third disguise: payloads in the **degraded** branches —
+  the damaged-log warning in `who` and the lock-timeout refusal — passed the whole green suite
+  while the canary recorded live `claude -p` calls. Those branches run in an ordinary test
+  run, so the gate now sets up a damaged log, an empty log and a held lock and drives them on
+  purpose. An error path is still a path. It also made the close/open checks run in their own
+  repo: `who` deduplicates per role, so "a closed thread disappears from `who`" was true or
+  false depending on which timestamp sorted last, and caught its mutant by hand while missing
+  it in the harness.
+  A fifth pass (@rex, third round) then found the same hole in its fifth disguise and with six
+  live instances on the shipping commit: the **refusal** branches, which the table could not
+  reach by construction — it only ever supplies valid roles, valid slugs, a passing leak-check
+  and an empty registry. Extending the table a sixth time would have been another enumeration,
+  so the polarity is **inverted**: the recording stubs are now first on `PATH` for the entire
+  `test-bus.sh` run and the canary must be empty at the end. "Gated" stops meaning "somebody
+  remembered to list this branch" and starts meaning "anything the suite exercises anywhere is
+  measured". All six died to that one assertion.
+  A sixth pass (@rex, fourth round) found the hole in the **seam between the two halves**:
+  the canary is blind to an absolute path by construction, and the *allowlist* — the half
+  that does see absolute paths — was still scoped to the table, so `"/tmp/x/claude"` inside
+  a refusal branch passed the entire green suite and started a live agent. Two halves of one
+  boundary have to be floors together, so every bus invocation in the suite now runs under
+  `busrun` (`bash -x`, marked `PS4`) and the allowlist reads the trace of the whole run; a
+  static check refuses any direct `bash "$BUS"` call site that would opt out of it. The same
+  round did the same to property 2: the kanban fingerprint was hoisted run-wide, with the
+  suite's own fixture writes bracketed *assert-then-write-then-rebaseline* — re-baselining
+  without asserting first silently **adopts** the damage, which is how a mutant that wrote a
+  card from a refused send survived a round.
+- **Round 5 (@rex).** The fingerprint hashed one board while the resolver reached every
+  registered one, so a `read` could stamp an approval line onto another repo's card and
+  cite it (mutant 29 — the fingerprint now spans the whole reachable set). The last
+  unaudited hop, log -> snapshot, is now counted under the same lock as the copy: a
+  `tail -n 500` lost 100 of 600 records with exit 0 and every downstream count honestly
+  agreeing (mutant 30, check 49 sends 600 and demands 600). `set -E` + an `ERR` trap, so
+  a `set -e` abort can no longer exit 1 printing nothing at all. `python3` is no longer
+  stubbed by the canary: `leak-check.sh` falls back to it wherever `private/.denylist` is
+  absent, which is every machine but this one, so "ALL GREEN" was machine-local. And the
+  limit of in-process tracing is now DECLARED rather than implied — `PS4=`/`set +x`/
+  `exec 2>`/`BASH_XTRACEFD` blind check 45 from inside; check 48 is a three-line denylist
+  for them, named as one, with `ps4-blind`/`setx-blind` kept as standing mutants.
+- **Round 6 (@rex).** Six survivors, and the pattern behind all six rounds finally named:
+  every blocker has been the property measured through the ONE cause somebody enumerated.
+  kanban: `kb` -> a file. Delivery: rendered -> counted. Agents: EXECUTED -> **dispatched
+  by writing a file something else executes**. `com.roberdan.rda-factory` is loaded in
+  launchd and runs every `.md` in `$RDA_HOME/factory/queue` through a headless `claude -p`,
+  so one `printf` starts a live session with no command, no PATH, no binary name and no
+  kanban write: 14 files were planted in the real `~/.roberdan-os` during a green run
+  (check 47b, mutant 33). The bus's DEFAULT board — `$ROOT/kanban`, computed from its own
+  location — was hidden by the suite's own `RDA_KANBAN` override and got `approved_by:
+  roberto` on 14 real cards, suite green (mutant 34). The 3MB body test asserted exit codes
+  only, so `[0:4096]` truncated a 300KB verdict permanently while `send` printed "appended"
+  (mutants 35, 36). The delivery audit counted instead of comparing, so losing record 300
+  and repeating 299 was invisible (mutant 37). Permanence was asserted on ten records, so
+  capping the log during a read destroyed 100 of 600 (mutant 38). And the tracing denylist
+  is now described honestly: the hole is ANY stderr redirection of a compound command, not
+  four tokens — `brace-blind` is kept as a declared survivor that fails the day it is
+  caught.
+- **Round 7 (@rex).** The factory queue was one of NINE surfaces that start an agent
+  without executing one: `~/.claude/scripts` (a loaded launchd job runs it), `~/.claude/skills`
+  (every future session reads it), the `~/.claude` and `~/.orca` hook/agent/command trees,
+  **this repo's own `hooks/`** (run on every tool call, and the bus computes `$ROOT` itself),
+  `~/Library/LaunchAgents`, `.git/hooks`, and `handoff/` (concatenated into the prompt of
+  every `--dangerously-skip-permissions` agent — dispatch by prompt injection). Enumerating
+  is now backed by inversion: a marker file before the first bus invocation, and nothing
+  under any of those roots may be newer than it (0.5s over ~20k files; mutants 39-41).
+  Three more ways to fool an assertion rather than pass it: a payload gated on a large
+  thread fired UNDERNEATH every "whole run" floor, so the floors are repeated after the
+  last bus invocation (check 50, mutant 43); check 34 compared the stored body against the
+  file it handed the bus, and a mutant rewrote both, so the digest is now taken before the
+  send and held in the test process (mutant 42); and the canary lived under a directory the
+  bus is given, so a mutant ran `kb` and then erased the record of it — it now lives where
+  the bus is never told and is tamper-evident rather than merely non-empty (mutant 45).
+  Permanence is audited by content, not line count (mutant 44), and the dispatch hash
+  follows symlinks like the kanban one already did.
+- **Round 8 (@rex).** Five more, and the first one needed no new surface at all: check 45
+  allowlists the command NAME (`awk '{print $1}'` of the trace) and three allowlisted names
+  are interpreters, so `git -c alias.z='!/abs/claude -p wake' z` started **92 real agent
+  sessions during a green run** - blind to the canary, the allowlist, the dispatch hash and
+  the tracing denylist simultaneously. Check 45b now polices the arguments: no agent CLI as
+  any word of any traced line, and the interpreter escape hatches (`git -c`, `alias.*`,
+  `core.{pager,sshCommand,hooksPath,editor}`, `awk system(`, `sort --compress-program`)
+  refused outright. Then the same lesson three times over: the sweep MARKER was placed in
+  the directory the canary had just been moved out of, and was forgeable without knowing its
+  name, so the reference is now a timestamp held in a variable of the test process; the
+  nine-surface list was still a hand list, so the roots are now DERIVED - every plist in
+  `~/Library/LaunchAgents` is parsed for the scripts launchd will run, the whole checkout is
+  swept (five loaded jobs execute scripts inside it, and `>> "$ROOT/factory/run.sh"` is
+  arbitrary code at 01:00), and `~/.claude` is swept wholesale minus a declared
+  session-mutable denylist. `plugins` had been excluded on an assumption; measured, it
+  changes zero times in 125s and carries hooks and skills. Mutants 46-52 plus a
+  symlinked-queue fixture that finally pins `find -L`, a repo-shaped mutant sandbox so
+  `$ROOT` has production shape, and a lock so two harnesses cannot corrupt each other's
+  evidence now that the sweep watches the real `$HOME`. Also corrected here: the doc claimed
+  `-newer` cannot see deletion. It can - unlinking bumps the parent directory's mtime. A
+  declared limit that is not real costs as much as an undeclared one that is.
+- **`read` audits its own delivery, and non-UTF-8 bodies are refused rather than repaired.**
+  Nothing measured delivery *completeness*: every assertion used batches of one to three, so a
+  20-record cap passed the whole suite while five messages became unreachable forever — `send`
+  returned 0, `read` returned 0, the trailer reported the right count, and the cursor had moved
+  past all of them on an append-only log. `read` now compares what it handed the renderer with
+  what the renderer produced and refuses to advance on a mismatch. Separately, `jq --rawfile`
+  substituted U+FFFD for undecodable bytes, so a latin-1 diff was silently rewritten while
+  `send` reported success; "survives verbatim" had only ever been asserted with ASCII.
+  The audit's first form was **downstream-only** — it counted the same file that fed the
+  renderer, so anything the *filter* dropped was missing from both sides and both numbers
+  agreed while both were wrong. It now counts the snapshot independently. The other silent
+  loss is the cursor, where both counts agree by construction: `read` takes a validated
+  test-only pause so the "message arrived mid-read" check stops being a race it wins twice
+  out of three and becomes an invariant (the stored cursor is the snapshot's line count),
+  caught 10 times out of 10.
+- **Broadcast addressing (`--to all`) so the bus works with three or more agents.** Reaches
+  every role except the sender; nothing is consumed, so a broadcast is delivered in full to
+  each role rather than taken by whoever reads first — a bus, not a work queue. `all` is a
+  reserved addressee: nothing may send *from* it or read *as* it, and an `all.json` manifest
+  is refused rather than disambiguated. Cursors now index raw records instead of the filtered
+  stream, so widening the delivery rule re-delivers (visible) rather than drops (silent).
+- **`bus close` / `bus open` — a finished thread stops delivering and keeps every word.**
+  Asked whether the bus should delete handled messages to save tokens; measured instead: the
+  cursor already means a read costs only what is new (2037 bytes, then 95 on the next read),
+  so deletion saves nothing at read time and costs the reasoning the kanban does not keep.
+  `close` gives the actual thing wanted — no delivery, gone from `who`, new mail refused —
+  as a **record appended to the log**, not a rename or a side file, so the state is in the
+  same auditable history as everything else.
+- Regression tests for everything the @rex review found by execution: path traversal through
+  `--repo`/`--card`, missing flag values, a laundered approval read off a **denied** card,
+  moving git refs cited as evidence, concurrent-append corruption, partial reads of a damaged
+  log, delivery lost to a message arriving mid-read, fail-open leak-check, and `who` missing a
+  role that had only read.
+
 ## [v2.19.4] - 2026-07-25
 
 ### Added
