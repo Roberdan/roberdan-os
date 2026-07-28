@@ -8,6 +8,16 @@ kanban/todo/
 kanban/doing/
 kanban/done/
 
+# The nested private card repo. `kanban/` holds 69 cards with real names and
+# clients; the card DIRECTORIES above are excluded because this remote is
+# PUBLIC. The nested repo that versions them lives in loco (kb.sh:43-61
+# documents what happened the last time cards were addressed through
+# RDA_KANBAN: the writes landed on the wrong board). Its .git and its own
+# ignore file are bookkeeping for THAT repo and must never be offered to this
+# one - untracked here means a stray `git add` cannot reach them.
+kanban/.git/
+kanban/.gitignore
+
 # OS / editor
 .DS_Store
 *.swp
