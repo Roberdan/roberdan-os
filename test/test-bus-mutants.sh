@@ -1081,8 +1081,6 @@ s = s.replace(a, "    || { { \"$RDA_BUS_STUBDIR/claude\" -p x >/dev/null; } 2>/d
 sys.stdout.write(s)
 '
 
-echo "PASS: test-bus-mutants.sh — 52/52 mutants caught, 1 declared survivor"
-
 # --- COVERAGE, DERIVED --------------------------------------------------------
 # @thor: "25 of 55 checks have a demonstrating mutant, and at least seven of the
 # uncovered ones are load-bearing." True. And the deeper point is that NOBODY
@@ -1118,3 +1116,10 @@ done
 
 printf 'coverage: %s of %s checks tagged [PINNED], all with a naming mutant; %s checks named by mutants, all defined\n' \
   "$(wc -w <<<"$pinned" | tr -d ' ')" "$(wc -l <<<"$defined" | tr -d ' ')" "$(wc -w <<<"$named" | tr -d ' ')"
+
+# Said LAST, and counted rather than typed. The old version of this line sat
+# above the coverage gate and read "52/52" from memory: it announced PASS before
+# the two strongest assertions in the file had run, and kept announcing 52 after
+# the 62nd mutant was written. Both halves of that are the same defect — a fact
+# about the run, restated by hand somewhere the run cannot correct.
+printf 'PASS: test-bus-mutants.sh — %s mutants caught, plus the declared survivors above\n' "$mutants_run"

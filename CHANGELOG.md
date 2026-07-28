@@ -25,9 +25,12 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   Coverage is a safety property rather than a metric here: the multi-agent checks run with
   the *real* `PATH`, so a branch missing from the table does not merely go unnoticed, it
   starts live sessions during the test run. `bus/*.sh` added to `SHELLCHECK_TARGETS`.
-- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** 38 deliberate violations, each
-  naming the property it breaks and the check that must catch it; 52/52 caught, plus one
-  DECLARED SURVIVOR that asserts a known hole is still open and turns red the day it closes. Written
+- **`test/test-bus-mutants.sh`, wired into `validate.sh`.** One deliberate violation per
+  load-bearing check, each naming the property it breaks and the check that must catch it,
+  plus DECLARED SURVIVORS that assert a known hole is still open and turn red the day it
+  closes. No count is written here: the harness asserts its own mutant count and derives its
+  own coverage, and a number restated in prose is the exact defect this repo spent eight
+  review rounds on. Written
   because two reviews found their blockers by *executing* mutants while every reading of the
   same code passed it — a check that has never been seen to fail is not evidence. It found
   two bugs in its own assertions and one in `who`. A third, adversarial pass then found three

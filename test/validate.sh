@@ -257,9 +257,14 @@ section "agent bus — messages, never execution (test/test-bus.sh)"
 if bash test/test-bus.sh >/dev/null 2>&1; then ok "bus delivers durably, attributes, resolves citations to no more than they prove, and executes nothing"; else err "test-bus — see bash test/test-bus.sh"; fi
 # And the suite above is itself only worth what it has been seen to catch: the
 # first @rex review found one bus check that was dead code and several that a
-# malicious mutant walked past. ~100s, and it is the reason the green above means
-# anything.
-if bash test/test-bus-mutants.sh >/dev/null 2>&1; then ok "every load-bearing bus check has been seen to fail (52/52 mutants caught, 1 declared survivor)"; else err "test-bus-mutants — a mutant SURVIVED, see bash test/test-bus-mutants.sh"; fi
+# malicious mutant walked past. It is the reason the green above means anything,
+# and it is by far the slowest gate in this file: every mutant runs a whole
+# test-bus.sh, so the cost is tens of minutes and grows with each mutant added.
+# No count is written here on purpose. The harness asserts its own mutant count
+# and its own coverage; a number copied into this line is a second, hand-written
+# description of the same fact, and this repo has now spent eight review rounds
+# on exactly that defect class.
+if bash test/test-bus-mutants.sh >/dev/null 2>&1; then ok "every load-bearing bus check has been seen to fail (mutants caught, declared survivors accounted for)"; else err "test-bus-mutants — a mutant SURVIVED, see bash test/test-bus-mutants.sh"; fi
 
 # --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
 # eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The
