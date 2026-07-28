@@ -301,21 +301,111 @@ _board() {
   # It lives BELOW the box because titles are long and may be non-ASCII, which would desync the
   # box's │ column separators if placed inside a fixed-width cell. Done cards are omitted (many,
   # and finished). Same board order as the columns above, so an ID is easy to look up.
-  local _lf _legend=0
+  # When the dashboard follows (bare `kb`) it details every DOING card just below, so the legend
+  # drops that column rather than printing each doing title twice.
+  local _lf _legend=0 _lhdr="TO DO / DOING — cosa fa ogni card:"
+  local -a _lcols=("todo" "doing")
+  if [ "${KB_LEGEND_TODO_ONLY:-0}" = "1" ]; then
+    _lcols=("todo"); _lhdr="TO DO — cosa fa ogni card (le DOING sono dettagliate sotto):"
+  fi
+  local _lc
   for bd in "${boards[@]}"; do
-    for _lf in "$bd/todo"/*.md "$bd/doing"/*.md; do
+   for _lc in "${_lcols[@]}"; do
+    for _lf in "$bd/$_lc"/*.md; do
       [ -e "$_lf" ] || continue; case "$(basename "$_lf")" in _*) continue ;; esac
-      [ "$_legend" -eq 0 ] && { echo; echo "TO DO / DOING — cosa fa ogni card:"; _legend=1; }
+      [ "$_legend" -eq 0 ] && { echo; echo "$_lhdr"; _legend=1; }
       printf '  %s (%s) — %s\n' "$(basename "$_lf" .md)" "$(_repo_tag "$_lf")" "$(_field "$_lf" title)"
     done
+   done
   done
   _archive_hint
+}
+
+# --- migrating the cards that already exist --------------------------------
+# Nothing has to be migrated for the board to keep working: every field added by the worktree /
+# dashboard work is optional, and a card without it degrades to "-" by design. But two things CAN
+# be recovered, and a dashboard is worth more when the cards already on the board answer too:
+#   1. the start TIME of every card in doing — `kb start` has been appending a UTC audit line
+#      since long before started_epoch existed, so the number is already on disk, unparsed;
+#   2. a worktree an agent created by hand for a card, which the card does not know about.
+# Dry-run by default. It never touches done/ (the append-only audit archive) and never invents a
+# time it cannot read — a card with no audit line is listed as such, not backfilled with "now".
+_migrate() {
+  local apply=0; [ "${1:-}" = "--apply" ] && apply=1
+  local f id iso ep n_ts=0 n_wt=0
+  echo "kb migrate — cards in doing/ ($([ "$apply" = 1 ] && echo 'APPLICO' || echo 'prova, non scrivo niente: usa --apply'))"
+  for f in "$KB/doing"/*.md; do
+    [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue;; esac
+    id="$(basename "$f" .md)"
+    if ! grep -q '^started_epoch:' "$f"; then
+      iso="$(grep 'kb_start_audit' "$f" 2>/dev/null | tail -1 | sed 's/.*at=\([^ ]*\).*/\1/')"
+      ep=""
+      [ -n "$iso" ] && ep="$(date -d "$iso" +%s 2>/dev/null || TZ=UTC date -jf '%Y-%m-%dT%H:%M:%SZ' "$iso" +%s 2>/dev/null || true)"
+      if [ -n "$ep" ]; then
+        n_ts=$((n_ts+1))
+        printf '  %s — ora di inizio recuperabile dall audit: %s\n' "$id" \
+          "$(date -d "@$ep" '+%d/%m/%Y %H:%M %Z' 2>/dev/null || date -r "$ep" '+%d/%m/%Y %H:%M %Z' 2>/dev/null)"
+        if [ "$apply" = 1 ]; then
+          { echo "started_at: $(date -d "@$ep" '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null || date -r "$ep" '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null)"
+            echo "started_epoch: $ep"; } >> "$f"
+        fi
+      else
+        printf '  %s — nessuna ora di inizio recuperabile (nessuna riga di audit): restera "-"\n' "$id"
+      fi
+    fi
+    if ! grep -q '^worktree:' "$f" && ! grep -q '^worktree_none:' "$f"; then
+      n_wt=$((n_wt+1))
+      printf '  %s — nessun worktree registrato. Se ne esiste gia uno: kb wt attach %s <path>\n' "$id" "$id"
+      printf '     altrimenti la card resta senza isolamento (la spesa sara attribuita per finestra).\n'
+    fi
+  done
+  echo "  -- $n_ts card con ora recuperabile · $n_wt card senza worktree · done/ non viene mai toccato"
+  [ "$apply" = 0 ] && echo "  (niente scritto. Per applicare: kb migrate --apply)"
+  return 0
+}
+
+# kb wt attach <id> <path> — record a worktree that already exists (one an agent made by hand)
+# onto a card in doing. The path must really be a git worktree: a card that claims one which is
+# not there would make `kb finish` refuse forever, on evidence that was never true.
+_wt_attach() {
+  local id="${1:?card id}" path="${2:?worktree path}" f
+  f="$KB/doing/$id.md"; [ -e "$f" ] || { echo "no doing card $id" >&2; return 1; }
+  path="$(cd "$path" 2>/dev/null && pwd)" || { echo "REFUSED: '$2' non esiste" >&2; return 1; }
+  git -C "$path" rev-parse --git-dir >/dev/null 2>&1 || { echo "REFUSED: '$path' non e un worktree git" >&2; return 1; }
+  grep -q '^worktree:' "$f" && { echo "REFUSED: la card $id ha gia un worktree registrato" >&2; return 1; }
+  { echo "worktree: $path"; echo "branch: $(git -C "$path" rev-parse --abbrev-ref HEAD 2>/dev/null)"; } >> "$f"
+  echo "worktree registrato sulla card $id: $path"
+}
+
+# The boards the current invocation reports on — the same selection _board makes, exposed so
+# `kb dash` details exactly the cards the box above it just listed.
+_selected_boards() {
+  local bd
+  if [ "$KB_MATCHED" -eq 0 ]; then
+    while IFS= read -r bd; do
+      [ -n "$bd" ] && [ -d "$bd/kanban" ] && printf '%s\n' "$bd/kanban"
+    done < <(_board_roots)
+  else
+    printf '%s\n' "$KB"
+  fi
+}
+# kb dash — the informative view (start times, elapsed, spend, evidence, worktree).
+# Kept out of `kb view`: that one is injected into every session by the SessionStart hook and
+# must stay token-lean. Rendering lives in kanban/dash.sh.
+_dash() {
+  local -a dboards=()
+  local bd
+  while IFS= read -r bd; do [ -n "$bd" ] && dboards+=("$bd"); done < <(_selected_boards)
+  [ "${#dboards[@]}" -eq 0 ] && dboards=("$KB")
+  bash "$ROOT/kanban/dash.sh" "${dboards[@]}"
 }
 
 usage() {
   echo 'kb — gated kanban. Commands:'
   echo ' view:'
-  echo '  kb                            view whole board (todo+doing+done); aggregate if outside a repo'
+  echo '  kb                            board + dashboard: inizio/durata delle DOING, durata+spesa+esito delle DONE'
+  echo '  kb view                       lean board only (what the SessionStart hook injects)'
+  echo '  kb dash                       dashboard only (no box)'
   echo '  kb all | kb g                 AGGREGATED view across every registered board (cards tagged repo:)'
   echo '  kb handoff                    per-repo handoff/latest.md (in a repo) or aggregated (outside)'
   echo '  kb pause ["next step"]        write a resume checkpoint for this repo (safe to leave/reboot)'
@@ -323,6 +413,8 @@ usage() {
   echo '  kb list | kb ls                plain vertical list, all columns'
   echo '  kb todo | kb doing | kb done  view one column'
   echo '  kb show <id>                  show a card'
+  echo '  kb migrate [--apply]          card gia esistenti: recupera l ora di inizio, elenca chi non ha worktree'
+  echo '  kb wt attach <id> <path>      registra sulla card un worktree gia creato a mano'
   echo ' federation:'
   echo '  kb init [repo]                make a repo safe to hold cards (local-exclude+de-track+hook+register; idempotent)'
   echo '  kb lint                       schema lint: runner: grammar + human_gates:↔human-only'
@@ -330,8 +422,8 @@ usage() {
   echo ' gates:'
   echo '  kb add "<title>" --repo <r> [dod] [acc]  new card in todo (repo = ~/GitHub dir-name, or "personal")'
   echo '  kb edit <id>                  edit a card (fill dod/acceptance)'
-  echo '  kb start <id> --by roberto    GATE: todo->doing (needs your approval)'
-  echo '  kb finish <id> --thor "<ev>"  GATE: doing->done (@thor validates + evidence)'
+  echo '  kb start <id> --by roberto [--no-worktree "<why>"]   GATE: todo->doing (+ crea il worktree della card)'
+  echo '  kb finish <id> --thor "<ev>" [--keep-worktree "<why>"]  GATE: doing->done (worktree pulito, poi rimosso)'
   echo '  kb block <id> "<reason>"      mark a card blocked, move back to todo/'
   echo ' detail (everything ever done, on demand):'
   echo '  kb history                    ALL work: done/ cards + every archived goal, newest first'
@@ -1002,9 +1094,21 @@ _cover() {
 }
 
 case "$cmd" in
-  view|board|"")                   # visual kanban (default); aggregate if cwd
+  "")                              # bare `kb` (a human typed it): board + the detail blocks
+    KB_LEGEND_TODO_ONLY=1
+    if [ "$KB_MATCHED" -eq 0 ]; then _board --all; else _board; fi
+    _dash
+    ;;
+  view|board)                      # lean board only — what the SessionStart hook injects
     if [ "$KB_MATCHED" -eq 0 ]; then _board --all; else _board; fi
     ;;
+  dash) _dash ;;                   # detail blocks alone (no box)
+  migrate) _migrate "${1:-}" ;;    # backfill start times / list cards with no worktree (dry-run)
+  wt)                              # per-card worktrees: attach an existing one, or inspect
+    case "${1:-}" in
+      attach) shift; _wt_attach "${1:-}" "${2:-}" ;;
+      *) echo "usage: kb wt attach <card-id> <path>" >&2; exit 2 ;;
+    esac ;;
   repo|status) _repo_view "${1:?repo name required (kb repo <name>)}" ;;  # per-repo dashboard: git + PRs + cards
   pending|inbox) _pending "$@" ;;  # the approval inbox: everything waiting on Roberto (--count = fast total)
   bot-filter-regex) _pr_bot_filter_regex ;;
@@ -1076,7 +1180,18 @@ case "$cmd" in
     ;;
 
   start)
-    id="${1:?id required}"; by=""; [ "${2:-}" = "--by" ] && by="${3:-}"
+    id="${1:?id required}"; shift || true
+    by=""; no_wt=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --by) by="${2:-}"; shift 2 ;;
+        # A card that is not code work (repo: personal, an approval, a decision) has nothing to
+        # isolate — but the reason is written on the card, so "no worktree" is a decision on the
+        # record rather than a silent absence.
+        --no-worktree) no_wt="${2:-non serve isolamento per questa card}"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
     f="$KB/todo/$id.md"; [ -e "$f" ] || { echo "no todo card $id" >&2; exit 1; }
     # DISCIPLINE gate, not a security boundary: --by is honor-system — any caller can pass
     # `--by roberto`. There is deliberately no blocking check here (that would break the
@@ -1096,8 +1211,30 @@ case "$cmd" in
       echo "REFUSED: fill repo first (kb edit $id) — e.g. repo: roberdan-os, repo: convergio, repo: personal" >&2; exit 1
     fi
     _set_status "$f" doing
-    { echo "approved_by: $by"; echo "approved_at: $(date +%Y-%m-%d)"; } >> "$f"
-    mv "$f" "$KB/doing/"; echo "doing/$id started (approved by $by)"
+    # started_at is LOCAL and human-readable (Roberto reads it), started_epoch is the machine
+    # value every duration is computed from — epoch renders portably on both BSD and GNU date,
+    # which parsing a formatted string does not (the _mtime scar, kb.sh §portable mtime).
+    { echo "approved_by: $by"; echo "approved_at: $(date +%Y-%m-%d)"
+      echo "started_at: $(date '+%Y-%m-%d %H:%M:%S %Z')"; echo "started_epoch: $(date +%s)"; } >> "$f"
+    mv "$f" "$KB/doing/"
+    d="$KB/doing/$id.md"
+    # One worktree per card (rules/best-practices.md § Parallel work): the card is exactly the
+    # unit that can run in parallel with another card, so it is the unit of isolation — and a
+    # dedicated cwd is what makes this card's token spend attributable instead of guessed.
+    if [ -n "$no_wt" ]; then
+      echo "worktree_none: \"$no_wt\"" >> "$d"
+      echo "doing/$id started (approved by $by; nessun worktree: $no_wt)"
+    else
+      wt="$(bash "$ROOT/kanban/worktree.sh" create "$repo_val" "$id" 2>/dev/null || true)"
+      if [ -n "$wt" ]; then
+        { echo "worktree: $wt"; echo "branch: card/$id"; } >> "$d"
+        echo "doing/$id started (approved by $by)"
+        echo "  worktree: $wt   (branch card/$id — lavora QUI, non nel checkout principale)"
+      else
+        echo "worktree_none: \"repo '$repo_val' non e un git repo raggiungibile\"" >> "$d"
+        echo "doing/$id started (approved by $by; nessun worktree — repo '$repo_val' non e un git repo)"
+      fi
+    fi
     ;;
 
   block)
@@ -1116,7 +1253,17 @@ case "$cmd" in
   done) n=$(ls "$KB/done"/*.md 2>/dev/null | grep -vc '/_' || true); echo "DONE ($n):"; _list done; _archive_hint ;;
 
   finish)
-    id="${1:?id required}"; ev=""; [ "${2:-}" = "--thor" ] && ev="${3:-}"
+    id="${1:?id required}"; shift || true
+    ev=""; keep_wt=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --thor) ev="${2:-}"; shift 2 ;;
+        # The escape hatch from the clean-worktree gate — it costs a written reason, stamped on
+        # the card, so "I left a mess behind" is a decision on the record and not the default.
+        --keep-worktree) keep_wt="${2:-}"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
     f="$KB/doing/$id.md"; [ -e "$f" ] || { echo "no doing card $id" >&2; exit 1; }
     if [ -z "$ev" ]; then
       echo "REFUSED: doing->done needs @thor validation with EVIDENCE (not a rubber-stamp)." >&2
@@ -1124,8 +1271,31 @@ case "$cmd" in
       exit 1
     fi
     if ! _verify_evidence "$ev"; then exit 1; fi
+    # Closing a card means nothing is left behind: the worktree must be committed AND merged, or
+    # the close is refused. Checked BEFORE any state is written, so a refusal leaves the card
+    # exactly where it was — in doing, with its worktree intact.
+    # `|| true`: _field ends in grep, which exits 1 when the key is ABSENT — under `set -e` an
+    # assignment carrying that status kills the script mid-close. Every card created before this
+    # feature has no `worktree:` key, so without this guard `kb finish` would have silently
+    # refused all of them. Found by test-kb-done-gate, which closes cards that have no worktree.
+    wt="$(_field "$f" worktree || true)"
+    if [ -n "$wt" ] && [ -z "$keep_wt" ]; then
+      if ! bash "$ROOT/kanban/worktree.sh" remove "$wt" "$(_field "$f" repo)"; then exit 1; fi
+      wt_removed=1
+    else
+      wt_removed=0
+    fi
     _set_status "$f" done
-    { echo 'verified_by: thor'; echo "verified_evidence: $ev"; echo "verified_at: $(date +%Y-%m-%d)"; } >> "$f"
+    fin_epoch="$(date +%s)"
+    { echo 'verified_by: thor'; echo "verified_evidence: $ev"; echo "verified_at: $(date +%Y-%m-%d)"
+      echo "finished_at: $(date '+%Y-%m-%d %H:%M:%S %Z')"; echo "finished_epoch: $fin_epoch"; } >> "$f"
+    # Freeze the spend now: the transcripts it is computed from grow forever, so a closed card
+    # that recomputed on every `kb dash` would get slower and slower for an answer that cannot
+    # change. Best-effort — a card with no attributable session simply carries no spend line.
+    sp="$(bash "$ROOT/kanban/dash.sh" --spend-line "$f" "$fin_epoch" 2>/dev/null || true)"
+    [ -n "$sp" ] && echo "spend: $sp" >> "$f"
+    [ "$wt_removed" = "1" ] && echo "worktree_removed_at: $(date '+%Y-%m-%d %H:%M %Z')" >> "$f"
+    [ -n "$keep_wt" ] && [ -n "$wt" ] && echo "worktree_kept_why: \"$keep_wt\"" >> "$f"
     mv "$f" "$KB/done/"; echo "done/$id verified by @thor ($ev)"
     ;;
 

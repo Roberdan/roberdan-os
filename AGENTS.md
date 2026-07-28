@@ -144,13 +144,21 @@ tool and this protocol are versioned.
   for the duration of the task so `doing` shows what's actually in progress. Open + `start` first,
   then work, then `finish` — don't batch add+start+finish at the end (that leaves `doing` empty
   and uninformative). See `kanban/README.md § start when you BEGIN`.
+- **One worktree per card.** `kb start` creates `~/GitHub/worktrees/<repo>/<card-id>` on branch
+  `card/<id>` and writes it on the card — **work there, not in the shared checkout** (the § Parallel
+  work scar). `kb finish` **refuses** while it holds uncommitted or unmerged work and removes it
+  when clean, so a closed card leaves nothing behind. Escapes cost a written reason on the card:
+  `--no-worktree "<why>"` (non-code card) · `--keep-worktree "<why>"` (review still open).
 - **Gate `doing → done`:** **`@thor` validates** against the acceptance criteria with **evidence**
   (`kb finish … --thor "<commit/test/output>"`) — never a rubber-stamp.
   **Same honest limit as `--by`:** `--thor` is a discipline gate, not a security boundary — the
   evidence string isn't verified by the CLI on the manual path (the factory path runs a real
   headless verification). The audit trail is the evidence itself, reviewable on the card.
 - Only `todo`+`doing` are "hot" (small, loaded at session start via the `SessionStart` context-inject
-  hook); `done` is the audit archive, read **on demand** so it can grow without burning tokens.
+  hook, which calls the lean **`kb view`**); `done` is the audit archive, read **on demand** so it
+  can grow without burning tokens. Bare **`kb`** (a human typed it) adds the dashboard: start time
+  and elapsed per DOING card, duration + spend + what was done per DONE card, all in local time —
+  and prints `-` wherever it has no measurement, never a plausible number (`kb dash`).
 - **Meta-card budget** (at most 1 active self-improvement card while an external-facing card waits
   in `todo/`) → `kanban/README.md § Meta-card budget`. Discipline norm, not a `kb.sh` gate.
 
