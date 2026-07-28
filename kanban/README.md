@@ -10,12 +10,15 @@ three directories start empty; `kb.sh` creates them on demand.
 
 ## Fast commands (`kb`)
 ```
-kb                                    # view the board (fast)
+kb                                    # board + dashboard: when each DOING card started and how
+                                     #   long it has run, what each DONE card cost and produced
+kb view                              # the lean board alone — what the SessionStart hook injects
+kb dash                              # the dashboard blocks alone (no box)
 kb show <id>                         # show a card
 kb add "<title>" --repo <r> [dod] [acc]   # new card in todo/ (repo required)
 kb edit <id>                         # fill Definition of Done + Acceptance + repo
-kb start <id> --by roberto           # GATE: todo->doing (needs Roberto's approval)
-kb finish <id> --thor "<ev>"         # GATE: doing->done (@thor validates with evidence)
+kb start <id> --by roberto [--no-worktree "<why>"]      # GATE: todo->doing (+ the card's worktree)
+kb finish <id> --thor "<ev>" [--keep-worktree "<why>"]  # GATE: doing->done (worktree must be clean)
 kb pause "<next step>"               # lean per-repo checkpoint handoff/resume.md (overwritten;
                                      #   a Stop hook runs `kb pause --auto` after every turn)
 kb resume [--done]                   # show checkpoint + live backlog | clear when resumed
@@ -43,6 +46,46 @@ same second, `doing` always 0). The correct rhythm on a non-trivial task:
 2. Do the work, committing per phase (update the card with evidence as you go).
 3. **`kb finish <id> --thor "<evidence>"`** only when @thor's acceptance is met.
 A card should *live* in `doing` for the duration of the work, not flicker through it.
+
+## One worktree per card — and nothing left behind when it closes
+`kb start` creates a git worktree for the card (`$RDA_WORKTREES/<repo>/<card-id>`, default
+`~/GitHub/worktrees/…`, branch `card/<id>`, forked from the repo's default branch) and writes
+`worktree:` + `branch:` onto the card. **Work there, not in the shared checkout.** The card is
+exactly the unit that can run in parallel with another card, so it is the unit of isolation
+(`rules/best-practices.md` § Parallel work — the scar where two sessions on one checkout swept a
+live mutation into a `docs(...)` commit).
+
+`kb finish` **refuses** while that worktree has uncommitted files or commits the base branch does
+not contain, prints what is dirty, and leaves the card in `doing`. When it is clean the worktree is
+removed and the branch deleted (only with `git branch -d`, never `-D`: an unmerged branch is the
+last copy of that work). Two escapes, both written onto the card, never silent:
+`--no-worktree "<why>"` at start (a decision, an approval, anything that is not code) and
+`--keep-worktree "<why>"` at finish (e.g. a review still open).
+
+## Cards that already exist — nothing breaks, and two things can be recovered
+Every field above is **optional**: a card written before any of this simply shows `-` where a
+measurement is missing, and both gates behave exactly as they did. Two things, though, are already
+on disk and worth recovering:
+```
+kb migrate            # dry-run: what could be recovered, and which doing cards have no worktree
+kb migrate --apply    # backfills started_at/started_epoch from the kb_start_audit line
+kb wt attach <id> <path>   # records a worktree an agent already created by hand onto the card
+```
+`kb migrate` **never touches `done/`** (append-only audit archive) and **never invents a time**: a
+card with no audit line is reported, not backfilled with "now". `kb wt attach` refuses a path that
+is not a real git worktree — a card claiming one that isn't there would make `kb finish` refuse
+forever, on evidence that was never true.
+
+## What the dashboard can and cannot tell you (`kb dash`)
+- **Times are local** and come from `started_epoch:` / `finished_epoch:`, stamped by `kb`.
+  Cards closed before those stamps existed show their date and `-` for the duration — never a
+  computed `0m`, which would be a fabricated fact.
+- **Token spend is attributed by working directory**, read from Claude Code's own session
+  transcripts. A card with its own worktree gets **its own** number. A card without one falls back
+  to the repo over the card's window and says so, including how many other cards shared that
+  window. A closed card reports the spend frozen onto it at `kb finish`, never a recomputed one.
+- **No network.** PR references are extracted from the evidence the card already carries; `gh` is
+  never called (a canary test in `test/test-kb-views.sh` pins this).
 
 ## Every card has (mandatory)
 `title:` — states the **objective** (what outcome this card produces, not just a label) ·
