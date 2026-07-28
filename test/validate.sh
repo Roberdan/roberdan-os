@@ -264,7 +264,12 @@ if bash test/test-bus.sh >/dev/null 2>&1; then ok "bus delivers durably, attribu
 # and its own coverage; a number copied into this line is a second, hand-written
 # description of the same fact, and this repo has now spent eight review rounds
 # on exactly that defect class.
-if bash test/test-bus-mutants.sh >/dev/null 2>&1; then ok "every load-bearing bus check has been seen to fail (mutants caught, declared survivors accounted for)"; else err "test-bus-mutants — a mutant SURVIVED, see bash test/test-bus-mutants.sh"; fi
+# The output is KEPT, not swallowed. This gate cost 40 minutes twice on 2026-07-28
+# because `>/dev/null 2>&1` turned "which mutant survived and why" into "a mutant
+# survived", and the only way to read the missing line was to run the whole thing
+# again. A failure that does not name itself is a failure you pay for twice.
+MUTLOG="${TMPDIR:-/tmp}/rda-validate-mutants.log"
+if bash test/test-bus-mutants.sh >"$MUTLOG" 2>&1; then ok "every load-bearing bus check has been seen to fail (mutants caught, declared survivors accounted for)"; else err "test-bus-mutants — $(tail -n 4 "$MUTLOG" | tr '\n' ' ' | cut -c1-400) [full log: $MUTLOG]"; fi
 
 # --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
 # eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The
