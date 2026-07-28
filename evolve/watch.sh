@@ -13,9 +13,35 @@ repo_root="$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null || e
 # Cards land in the kanban todo column (gitignored, local-only). Overridable for tests so a
 # run never dirties the real board.
 kb_todo="${RDA_KANBAN_TODO:-$repo_root/kanban/todo}"
+# A card already being worked on suppresses a new one just as much as an untouched
+# one does: the agent holding it will read the refreshed body.
+kb_doing="${RDA_KANBAN_DOING:-$repo_root/kanban/doing}"
 seen="$state_dir/seen"            # flat: one line "name=sha256" per source
 mkdir -p "$state_dir" "$kb_todo"
 touch "$seen"
+
+# --- BACKPRESSURE (2026-07-28) ------------------------------------------------
+# This watcher is a generator with no guaranteed consumer, and on 2026-07-28 that
+# showed: proposals/ stopped at 07-19, the five cards from 07-25 were never worked,
+# and the next Saturday run would have added five more. A board that grows by five
+# a week regardless of what gets closed is unusable within a month.
+#
+# The fix is COALESCING, not expiry. An unresolved card for a source already IS the
+# open request "assess $name"; a second one carries no more information, it just
+# splits attention. So a later changelog change REFRESHES that card instead of
+# adding a sibling, and the card states how many changes it now covers.
+#
+# It deliberately does NOT close or expire anything. Moving a card out of todo/ is a
+# human gate (kb start needs Roberto, kb finish needs @thor); a watcher that retired
+# its own cards on a timer would be exactly the automated gate-crossing the rest of
+# this system refuses. Staleness is ANNOTATED here and decided by a human.
+_open_card_for() {
+  local name="$1" f
+  for f in "$kb_todo"/*-"$name".md "$kb_doing"/*-"$name".md; do
+    [ -e "$f" ] && { printf '%s\n' "$f"; return 0; }
+  done
+  return 1
+}
 
 # Sources: name → changelog URL (versioned). Expandable.
 sources_names=(claude-code copilot codex hermes-agent warp)
@@ -28,7 +54,9 @@ sources_urls=(
 )
 
 now="$(date +%Y-%m-%d)"
-new_count=0
+new_count=0        # changelog deltas detected
+created=0          # cards actually added to the board
+coalesced=0        # deltas folded into a card that was already open
 
 for i in "${!sources_names[@]}"; do
   name="${sources_names[$i]}"; url="${sources_urls[$i]}"
@@ -42,6 +70,28 @@ for i in "${!sources_names[@]}"; do
   [ "$fp" = "$prev" ] && continue
 
   new_count=$((new_count+1))
+
+  # COALESCE: an unresolved card for this source already carries the request.
+  # Refresh it and move on — never add a sibling. `seen` is still advanced, so the
+  # same change is not re-detected forever.
+  if existing="$(_open_card_for "$name")"; then
+    # `grep -c` prints 0 AND exits 1 when there is no match, so a `|| echo 0`
+    # fallback appends a SECOND zero and the arithmetic dies on "0\n0". Let the
+    # count stand and only neutralise the exit status.
+    covered=$(( $(grep -c '^- changelog changed on ' "$existing" 2>/dev/null || true) + 2 ))
+    {
+      echo
+      echo "- changelog changed on $now (still unresolved; this card now covers $covered changes)"
+    } >> "$existing"
+    coalesced=$((coalesced+1))
+    echo "watch: COALESCED into $existing ($name changed again, no new card)" >&2
+    grep -v "^${name}=" "$seen" > "$seen.tmp" 2>/dev/null || true
+    printf '%s=%s\n' "$name" "$fp" >> "$seen.tmp"
+    mv "$seen.tmp" "$seen"
+    continue
+  fi
+
+  created=$((created+1))
   # One card per novel source. Id is timestamped AND suffixed with the source name so two
   # changelogs changing in the same second don't collide on the id. Frontmatter matches the
   # kb schema (title, repo, dod, acceptance, status, created) that test/validate.sh lints.
@@ -87,4 +137,4 @@ for i in "${!sources_names[@]}"; do
   mv "$seen.tmp" "$seen"
 done
 
-echo "watch: $new_count novelties → $new_count kanban card(s) in $kb_todo (run \`kb\` to see them)" >&2
+echo "watch: $new_count novelt(ies) → $created new card(s), $coalesced folded into cards already open, in $kb_todo (run \`kb\` to see them)" >&2
