@@ -75,7 +75,7 @@ _suite_out() { cat "$_PARDIR/$1.out" 2>/dev/null; }
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate \
           test-federated-kb test-leak-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
-          test-evolve-declined test-review-budget test-bus test-bus-mcp; do
+          test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp; do
   _spawn "$_s"
 done
 unset _s
@@ -312,6 +312,9 @@ if _suite test-metaloop; then ok "meta-loop promotes end-to-end (see bash test/t
 # buffer actually reaches the agent through the card watch.sh writes (wired, not just present).
 section "evolve rejected-proposal buffer (test/test-evolve-declined.sh)"
 if _suite test-evolve-declined; then ok "declined buffer matches rewordings, spares novelties, reaches the card"; else err "test-evolve-declined — see bash test/test-evolve-declined.sh"; fi
+
+section "evolve watcher backpressure (test/test-evolve-watch.sh)"
+if _suite test-evolve-watch; then ok "a changelog change while a card is still open refreshes it instead of adding a sibling, and the watcher never moves a card between columns"; else _suite_out test-evolve-watch; err "test-evolve-watch — see bash test/test-evolve-watch.sh"; fi
 
 # Messages between agents, never execution. The load-bearing checks are the negative
 # ones: the bus must not be able to start an agent (that is factory/dispatch-runner.sh,
