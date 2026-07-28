@@ -33,20 +33,48 @@ greps forbade and passed every one of them.
    consulting no `PATH`, naming no binary and touching no kanban file — blind to
    the canary, the allowlist, the fingerprint and check 48 *by construction*.
    @rex planted 14 files in the real `~/.roberdan-os` during a green run, one
-   character from the live path. Check 47b hashes the dispatch surfaces
-   (`factory/{queue,state,done,failed}`, `runner-allowlist`, `kanban-registry`)
-   under both the sandbox `RDA_HOME` and the real one, at the same two floors as
-   the kanban hash. That list is an **enumeration of today's consumers**: a
-   directory no launchd job reads yet is not covered, and the day a new
-   dispatcher is added this list has to grow with it. Said plainly, because the
-   enumeration is the weak part.
+   character from the live path.
+   **And that queue is one of nine.** Enumerating it was the same mistake one
+   layer along, and the next round produced the rest of the list, each verified
+   live on this machine: `~/.claude/scripts` (executed by the loaded
+   `com.roberdan.rustsweep`), `~/.claude/skills` (read by *every future session*),
+   `~/.claude/{hooks,agents,commands,rules,output-styles}`, `~/.orca/agent-hooks`
+   (run on every tool call through `settings.json`), **`<repo>/hooks`** (this
+   repo's own hooks, run on every tool call — and the bus computes `$ROOT`
+   itself, so that is the shortest path from this channel to execution),
+   `~/Library/LaunchAgents`, `<repo>/.git/hooks`, and `handoff/` (concatenated
+   into the prompt of every `--dangerously-skip-permissions` agent the factory
+   starts, which is dispatch by prompt injection). Negative result worth keeping:
+   there is no crontab, no `at` queue, no launchd `WatchPaths` and no
+   `QueueDirectories` on this machine.
+   So the mechanism is **inverted rather than enumerated**. Check 47b still
+   content-hashes the narrow dispatch surfaces, and check 47c takes a marker file
+   before the first bus invocation and requires that **nothing under any of those
+   roots is newer than it** — a stat-only sweep, 0.5s over ~20k files, where
+   content-hashing them four times a run costs six minutes. Two limits, declared
+   rather than implied: `~/.claude/{plugins,tasks,jobs}` are excluded because a
+   live session mutates them continuously (`jobs` is plausibly executable config,
+   and is the first thing to revisit if this ever needs to be tighter), and
+   `-newer` sees creation and modification but not deletion — the right asymmetry
+   for "starts an agent", the wrong one for "destroys config".
+   **And a floor is only a floor if nothing runs underneath it.** The run-wide
+   asserts sat above checks 43/44/49, which drive the bus again — so a payload
+   gated on a large thread fired entirely beneath them and planted a dispatch
+   file with the suite green. Check 50 repeats all three asserts *after the last
+   bus invocation in the file*.
    The gate is **one boundary in two halves**, and it is worth stating exactly
    what each half can and cannot see, because the two blockers of the second
    review were both born from over-claiming here.
    *Half one (check 13)* drives the bus through a table of **argument paths** —
    not subcommand names — with `PATH` pointed at a directory of stub binaries
    (`claude`, `copilot`, `codex`, `osascript`, `launchctl`, `nohup`, `kb.sh`, …)
-   that drop a canary when invoked. It catches env-var indirection and
+   that drop a canary when invoked. The canary itself has to be **outside the
+   blast radius**: it used to live under the parent of `RDA_BUS_HOME`, which is
+   handed to the bus, so a mutant ran `kb` through `PATH` and then truncated the
+   file that recorded it — and `[ -s "$CANARY" ]` reads a destroyed canary as a
+   clean bill of health. It now lives in a scratch directory the bus is never
+   told about, seeded with a sentinel, and the assertion fails if the file is
+   missing or the sentinel changed rather than only if it grew. It catches env-var indirection and
    `"cla""ude"` splicing, because it measures rather than reads. It **cannot**
    see a command invoked by absolute path — such a command never consults `PATH`
    — and it cannot see a branch the table never reaches. Both are real: @rex
@@ -131,7 +159,11 @@ greps forbade and passed every one of them.
    location, which the suite's own `RDA_KANBAN` override hid: a payload spelling
    `$ROOT/kanban` wrote `approved_by: roberto` onto 14 real cards while the suite
    printed PASS (mutants 29, 34). It follows symlinks (`find -L`), because
-   `[ -f ]` and `grep` in `_resolve_ref` do and a plain `find -type f` does not,
+   `[ -f ]` and `grep` in `_resolve_ref` do and a plain `find -type f` does not
+   — and so does the dispatch hash, which did not for one round, because a lesson
+   learned on one watcher is not learned on the other until somebody carries it
+   across (a symlinked `factory/queue`, normal for an external volume, was 100%
+   invisible),
    and it refuses to hash nothing at all — an empty tree hashes to a constant, so
    "unchanged" would have been satisfied by a board that no longer existed.
    **Delivery is audited by identity, not by cardinality.** The chain is log →
@@ -142,17 +174,25 @@ greps forbade and passed every one of them.
    forever (mutant 37). Check 49 compares the whole delivered sequence against
    the sent one, in order, which covers loss, duplication and reordering in one
    assertion. The **body** is compared byte for byte as well, into the log and
-   out of it: "bounded by the disk and by nothing else" was asserted by exit code
+   out of it — against a digest taken *before* the send and held in the test
+   process, because the first version compared against the file it handed the
+   bus, and a mutant that truncated the body **and that file** made both sides
+   agree at 4KB (an assertion is worth no more than the thing it compares
+   against, and that thing was inside the blast radius): "bounded by the disk and by nothing else" was asserted by exit code
    alone, so a five-character `[0:4096]` cut a 300KB verdict to 4KB — permanently,
    in an append-only log — with `send` printing "appended" and the suite green
    (mutants 35, 36). And permanence is asserted at 600 records, not only at ten,
    because permanence is only ever in danger at a size somebody finds too big
-   (mutant 38). The hop that started this paragraph was log → snapshot: a
+   (mutant 38) — and by **content**, not by line count: rewriting `m-300` to
+   `m-299` in the permanent log during a read left `wc -l` at 600 and the
+   rendering correct (it came from the snapshot) while `m-300` was gone from
+   history forever, one line after this paragraph claimed cardinality was no
+   longer the measure (mutant 44). The hop that started this paragraph was log → snapshot: a
    `tail -n 500` "to bound the memory a read may use" dropped 100 records of a
    600-record thread with exit 0, a correct trailer and the cursor parked past
    all of them, because every count downstream was counting the truncated copy
    and honestly agreeing (mutants 27, 28, 30).
-   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 38
+   None of this is believed on inspection. `test/test-bus-mutants.sh` writes 45
    deliberate violations and asserts that each is caught by a *named* check,
    including every evasion above. A check that has never been seen to fail is not
    evidence — and the three most recent mutants exist because an adversarial pass
