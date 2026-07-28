@@ -5,16 +5,6 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# Overridable so the suite can be pointed at a deliberately broken copy: a test
-# that has never been seen to fail is an unverified claim.
-BUS="${RDA_BUS_BIN:-$ROOT/bus/bus.sh}"
-# The bus computes KANBAN="${RDA_KANBAN:-<its own repo>/kanban}". This suite
-# overrides RDA_KANBAN for hermeticity, so the DEFAULT board - the real one - was
-# watched by nothing: a payload spelling "$ROOT/kanban" wrote 14 cards carrying
-# `approved_by: roberto` outside the sandbox while the suite printed PASS.
-# Recompute the root the way the BINARY UNDER TEST computes it, so a relocated
-# mutant is measured on the board it would actually write.
-BUSROOT="$(cd "$(dirname "$BUS")/.." && pwd)"
 TMP="$(mktemp -d)"
 # A scratch directory the binary under test is never told about: the canary and
 # the write-marker live here, because everything under $TMP is one dirname away
@@ -62,8 +52,77 @@ _rda_on_exit() {
   if [ "$rc" -ne 0 ] && [ ! -e "$TMP/.asserted" ]; then
     echo "test-bus: ABORTED at line $(cat "$TMP/.errline" 2>/dev/null || echo '?') (set -e) - no assertion failed, the suite itself broke" >&2
   fi
-  rm -rf "$TMP" ${CANDIR:+"$CANDIR"} ${RDA_BUS_LOCKDIR:+"$RDA_BUS_LOCKDIR"}
+  rm -rf "$TMP" ${CANDIR:+"$CANDIR"} ${FROZEN_TMP:+"$FROZEN_TMP"} ${RDA_BUS_LOCKDIR:+"$RDA_BUS_LOCKDIR"}
 }
+
+# Overridable so the suite can be pointed at a deliberately broken copy: a test
+# that has never been seen to fail is an unverified claim.
+#
+# UNSET, THE BUS UNDER TEST IS A FROZEN COPY OF THE CHECKOUT, NOT THE CHECKOUT.
+# The kanban fingerprint below deliberately watches $BUSROOT/kanban - the board
+# the bus would write by DEFAULT - and $BUSROOT used to be this checkout. So any
+# OTHER session writing a card while the gate ran (the whole point of a kanban:
+# a human moves cards while machines work) changed the hash and the suite
+# accused the bus of crossing Roberto's approval gate. Reproduced deliberately:
+# validate.sh running + one card written into kanban/doing/ mid-run -> RED, on a
+# diff that is innocent. Same class as the ~/.claude sweep two comment blocks
+# down: a gate that another session can turn red is a gate nobody can trust.
+#
+# The fix is NOT to stop watching that path - it is the last check left that
+# looks at a real location on this machine, and a mutant ignoring RDA_KANBAN
+# lands there and nowhere else. It is to make the watched path ATTRIBUTABLE to
+# this run: point the binary at a copy, and $BUSROOT - which is derived from
+# $BUS, not from $ROOT - follows it, so the board observed is one only this run
+# can touch. Not one assertion changes; the check keeps its teeth and loses its
+# ability to blame a bystander.
+#
+# kanban/ CARDS ARE NOT THE ONLY THING THAT MUST NOT REACH /tmp, so the copy is
+# an ALLOWLIST: exactly what git tracks, plus untracked files git does not
+# ignore. The obvious spelling - `rsync -a --exclude .git --exclude kanban` -
+# was written first and is wrong in a way that only shows up by looking: this
+# checkout also holds `private/roberto-profile.md`, the NDA-split confidential
+# dossier, plus handoff/resume.md and .agent-state/. All gitignored, all live
+# working state, all copied world-readable into /tmp by that command. Verified
+# by running it, not by reading it.
+# A denylist has the failure direction backwards - forget an entry and the leak
+# is SILENT, which is the same shape of hole the argument-table enumeration left
+# open below for five rounds. The allowlist fails the other way: anything
+# genuinely private is gitignored, and anything not gitignored is already headed
+# for a public repo. It still reflects the WORKING TREE, uncommitted edits
+# included - the files are copied off disk, git only decides which ones - so the
+# suite keeps testing the diff in front of you rather than HEAD.
+# `git` being required here is not a new dependency: check 21 below already runs
+# `git -C "$ROOT" rev-parse HEAD` unconditionally.
+#
+# kanban/ then contains only its versioned tooling (kb.sh, README) and no cards.
+# The mkdir is kept anyway, because `[ -e "$BUSROOT/kanban" ]` staying true is
+# load-bearing: if that path is missing the check silently stops applying, which
+# is the blinded-gate outcome this whole change exists to avoid.
+#
+# When RDA_BUS_BIN IS set the suite is being run by the mutant harness against a
+# mutant in its own checkout-shaped dir. Overriding it there would point every
+# mutant run at a pristine bus and turn 50-odd mutants into 50-odd green runs
+# that test nothing, so the copy is built only when nobody has named a binary.
+if [ -n "${RDA_BUS_BIN:-}" ]; then
+  BUS="$RDA_BUS_BIN"
+  FROZEN=""
+  FROZEN_TMP=""
+else
+  FROZEN_TMP="$(mktemp -d)"
+  FROZEN="$FROZEN_TMP/checkout"
+  mkdir -p "$FROZEN"
+  git -C "$ROOT" ls-files -z --cached --others --exclude-standard > "$FROZEN_TMP/manifest"
+  rsync -a --files-from="$FROZEN_TMP/manifest" --from0 "$ROOT"/ "$FROZEN"/
+  mkdir -p "$FROZEN/kanban"
+  BUS="$FROZEN/bus/bus.sh"
+fi
+# The bus computes KANBAN="${RDA_KANBAN:-<its own repo>/kanban}". This suite
+# overrides RDA_KANBAN for hermeticity, so the DEFAULT board - the real one - was
+# watched by nothing: a payload spelling "$ROOT/kanban" wrote 14 cards carrying
+# `approved_by: roberto` outside the sandbox while the suite printed PASS.
+# Recompute the root the way the BINARY UNDER TEST computes it, so a relocated
+# mutant is measured on the board it would actually write.
+BUSROOT="$(cd "$(dirname "$BUS")/.." && pwd)"
 
 export RDA_BUS_HOME="$TMP/bus"
 export RDA_BUS_ROLES="$ROOT/bus/roles"
