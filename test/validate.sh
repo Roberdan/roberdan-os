@@ -321,7 +321,7 @@ section "review budget — a review loop that cannot run forever (test/test-revi
 if _suite test-review-budget; then ok "a spent review budget exits 3 and demands a human decision instead of another round"; else err "test-review-budget — see bash test/test-review-budget.sh"; fi
 
 section "agent bus — messages, never execution (test/test-bus.sh)"
-if _suite test-bus; then ok "bus delivers durably, attributes, resolves citations to no more than they prove, and executes nothing"; else err "test-bus — see bash test/test-bus.sh"; fi
+if _suite test-bus; then ok "bus delivers durably, attributes, resolves citations to no more than they prove, and executes nothing"; else _suite_out test-bus; err "test-bus — see bash test/test-bus.sh"; fi
 
 section "agent bus — the typed MCP surface (test/test-bus-mcp.sh)"
 if _suite test-bus-mcp; then ok "the MCP surface dispatches send/read/log only, refuses unknown tools, and stores shell metacharacters as inert data"; else _suite_out test-bus-mcp; err "test-bus-mcp — see bash test/test-bus-mcp.sh"; fi
