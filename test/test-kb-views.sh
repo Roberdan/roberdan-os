@@ -328,6 +328,51 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+section "kb migrate: recovers what is already on disk, invents nothing, writes only with --apply"
+_MG="$TMP/migrate"; mkdir -p "$_MG"/{todo,doing,done}
+# One card with an audit line (its start time IS on disk, just unparsed) and one without
+# (nothing to recover — it must be reported, never backfilled with "now").
+printf -- '---\ntitle: con audit\nrepo: roberdan-os\nstatus: doing\n---\nkb_start_audit: "at=2026-07-25T18:18:15Z by=roberto interactive=no"\n' \
+  > "$_MG/doing/MG-1.md"
+printf -- '---\ntitle: senza audit\nrepo: roberdan-os\nstatus: doing\n---\n' > "$_MG/doing/MG-2.md"
+printf -- '---\ntitle: chiusa\nrepo: roberdan-os\nstatus: done\n---\n' > "$_MG/done/MG-3.md"
+_before="$(cat "$_MG/doing/MG-1.md")"
+RDA_KANBAN="$_MG" bash kanban/kb.sh migrate >/dev/null 2>&1
+if [ "$_before" = "$(cat "$_MG/doing/MG-1.md")" ]; then
+  ok "migrate without --apply writes nothing"
+else
+  err "migrate wrote to a card in dry-run mode"
+fi
+RDA_KANBAN="$_MG" bash kanban/kb.sh migrate --apply >/dev/null 2>&1
+if grep -q '^started_epoch: 1785003495' "$_MG/doing/MG-1.md"; then
+  ok "migrate --apply backfills the start time already recorded in the audit line"
+else
+  err "migrate did not recover the start time (got: $(grep started_epoch "$_MG/doing/MG-1.md" || echo none))"
+fi
+if grep -q 'started_epoch' "$_MG/doing/MG-2.md" 2>/dev/null; then
+  err "migrate INVENTED a start time for a card that has none — the exact thing it must not do"
+else
+  ok "a card with nothing to recover is left alone, not backfilled with a fabricated time"
+fi
+if grep -qE 'started_epoch|worktree' "$_MG/done/MG-3.md" 2>/dev/null; then
+  err "migrate touched done/ — that column is the append-only audit archive"
+else
+  ok "migrate never touches done/"
+fi
+# Attaching a worktree made by hand: accepted when it is real, refused when it is not.
+if RDA_KANBAN="$_MG" bash kanban/kb.sh wt attach MG-2 "$TMP/GitHub/wtrepo" >/dev/null 2>&1 \
+   && grep -q '^worktree: ' "$_MG/doing/MG-2.md"; then
+  ok "kb wt attach records an existing worktree on the card"
+else
+  err "kb wt attach did not record a real worktree"
+fi
+if RDA_KANBAN="$_MG" bash kanban/kb.sh wt attach MG-1 "$TMP/not-a-worktree-at-all" >/dev/null 2>&1; then
+  err "kb wt attach accepted a path that is not a worktree — kb finish would then refuse forever"
+else
+  ok "kb wt attach refuses a path that is not a git worktree"
+fi
+
+# ---------------------------------------------------------------------------
 if [ "$FAIL" -eq 0 ]; then
   echo; echo "test-kb-views: ✅ ALL GREEN"; exit 0
 else
