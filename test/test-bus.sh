@@ -29,6 +29,27 @@ CANDIR="$(mktemp -d)"
 # strictly newer; nothing is missed, and a file written in the same second
 # BEFORE this line only ever fails closed.
 MARK_TS="$(date '+%Y-%m-%d %H:%M:%S')"
+# ONE RUN AT A TIME, and the lock is SHARED WITH THE MUTANT HARNESS on purpose.
+# Both watch the real $HOME for writes, so a harness running alongside this suite
+# plants its probes inside this suite's measurement window: check 47c then reports
+# an executable-config write that this run did not make, against a diff that is
+# innocent. That is not hypothetical - it happened twice, and the second time the
+# harness was @thor's, running the exact same commit.
+# The harness already took this dir; taking it here too makes the exclusion
+# mutual instead of one-sided.
+RDA_BUS_LOCKDIR="${TMPDIR:-/tmp}/rda-bus-mutants.lock"
+# The mutant harness runs THIS suite once per mutant while already holding the
+# dir, so it declares ownership rather than deadlocking against itself. The flag
+# is set by the harness, never by a mutant: a mutant edits bus.sh, it does not
+# get to choose the suite's environment.
+if [ "${RDA_BUS_LOCK_HELD:-}" = "1" ]; then
+  RDA_BUS_LOCKDIR=""
+elif ! mkdir "$RDA_BUS_LOCKDIR" 2>/dev/null; then
+  echo "REFUSED: another bus suite or mutant run holds $RDA_BUS_LOCKDIR." >&2
+  echo "  Both watch the real \$HOME, so two at once corrupt each other's evidence" >&2
+  echo "  and fail the innocent one. Wait, or remove the dir if it is stale." >&2
+  exit 2
+fi
 trap '_rda_on_exit' EXIT
 
 fail() { echo "FAIL: $*" >&2; : > "$TMP/.asserted"; exit 1; }
@@ -50,7 +71,7 @@ _rda_on_exit() {
   if [ "$rc" -ne 0 ] && [ ! -e "$TMP/.asserted" ]; then
     echo "test-bus: ABORTED at line $(cat "$TMP/.errline" 2>/dev/null || echo '?') (set -e) - no assertion failed, the suite itself broke" >&2
   fi
-  rm -rf "$TMP" ${CANDIR:+"$CANDIR"}
+  rm -rf "$TMP" ${CANDIR:+"$CANDIR"} ${RDA_BUS_LOCKDIR:+"$RDA_BUS_LOCKDIR"}
 }
 
 export RDA_BUS_HOME="$TMP/bus"
@@ -1131,10 +1152,17 @@ ALLOWED=" jq git date grep mkdir rmdir cp cat wc tail sort awk printf mktemp rm 
 # Only MARKED lines name a command: an entry whose argument spans newlines
 # continues over unmarked lines, and treating those as commands turned 60KB of
 # message body into 60KB of imaginary command names.
+# The `|$` in the strip is not cosmetic either. A line that is ONLY an assignment
+# has no trailing space, so it survived the strip, and the basename then turned
+# `BUS_HOME=/Users/x/.roberdan-os/bus` into the command name `bus`. Harmless
+# until the day `bus` was installed on PATH — at which point `type -t` said
+# `file` and the check reported an execution that never happened. A checker that
+# invents commands out of paths will eventually accuse the wrong one; strip the
+# assignment whether or not something follows it.
 executed="$(cat "$TRACEDIR"/t.* 2>/dev/null \
   | grep -E '^#+XT# ' \
   | sed -E 's/^#+XT#[[:space:]]*//' \
-  | sed -E 's/^([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)+//' \
+  | sed -E 's/^([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*([[:space:]]+|$))+//' \
   | awk '{print $1}' | sed -E 's#.*/##' \
   | grep -E '^[a-zA-Z_][a-zA-Z0-9_.-]*$' | sort -u \
   | while IFS= read -r w; do

@@ -49,6 +49,9 @@ if ! mkdir "$LOCKDIR" 2>/dev/null; then
   exit 2
 fi
 trap 'rm -rf "$WORK" "$LOCKDIR"; probe_sweep' EXIT
+# test-bus.sh takes the same dir now (it watches the real $HOME too), and this
+# harness runs it once per mutant. Tell it the lock is already held by its caller.
+export RDA_BUS_LOCK_HELD=1
 probe_sweep
 
 fail() { echo "FAIL: $*" >&2; exit 1; }

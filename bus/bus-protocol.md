@@ -508,18 +508,28 @@ Conductor/orca worktrees are not registered, so a commit that lives only there
 reads `UNRESOLVED` unless you read from inside that worktree. The failure is in
 the safe direction: noisy, never credulous.
 
-## What is NOT wired yet
+## What is wired, and what is not
 
-On purpose. Touching `AGENTS.md`, `hooks/` or `kb` is a cross-cutting
-architectural change: **human gate #7**, Roberto's decision, not an agent's.
+`AGENTS.md` now carries an **Agent bus** section: every session that reads the canon knows
+the channel exists, knows its three rules, and knows the four commands. `bin/bootstrap.sh`
+puts `bus` on `PATH` so those four commands are true as written. That is the whole wiring,
+and it is deliberate.
 
-- no hook invokes it
+The `PATH` entry is a **wrapper, not a symlink**, and the difference is load-bearing: this
+script derives its roles directory, its leak-check and its kanban root from
+`dirname "${BASH_SOURCE[0]}"`, and bash does not resolve symlinks there. Symlinked, `bus`
+looked for all three next to the symlink and reported `no roles defined` — a true sentence
+about the wrong directory. It now refuses out loud instead, naming the path it looked in.
+
+Still NOT wired, on purpose:
+
+- no hook invokes it — nothing runs `bus read` for you
 - `context-inject.sh` does not read it (and must not: see the first board correction)
 - `kb` does not know about it
 
-Which means adoption is **manual and opt-in**, and that is the intended first
-step: a channel nothing auto-invokes cannot surprise anyone. To bring a second
-agent onto a thread, paste this into that session — it is the whole onboarding:
+So adoption stays **opt-in**: a channel nothing auto-invokes cannot surprise anyone, and it
+cannot spend tokens you did not ask it to spend. To bring a second agent onto a thread from
+a session that has not read `AGENTS.md`, paste this — it is the whole onboarding:
 
 ```
 You can exchange messages with the other agent working this card, using the bus in
