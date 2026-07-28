@@ -20,6 +20,7 @@ Everything else is engine — upstream-owned, merge-clean for forks by construct
 | **Goals** | Durable, auditable, human-gated task ledger (`kb`); card content local-only | [`kanban/`](kanban/README.md) |
 | **Agents** | The curated roster: architect, reviewer, security, done-gate, first-principles, board, orchestrator, twin | [`agents/`](agents/) — role prose is engine; the twin's persona is identity |
 | **Execution** | The loop contract, unattended overnight factory, per-tool wrapper generation | [`loop/loop-protocol.md`](loop/loop-protocol.md) · [`factory/`](factory/factory-protocol.md) · [`bin/sync.sh`](bin/sync.sh) · [`skills/`](skills/) · [`hooks/`](hooks/) |
+| **Coordination** | Durable agent-to-agent messages on a per-repo, per-card thread. Pull-only: it delivers into sessions that already exist, never starts one, never writes kanban state | [`bus/bus-protocol.md`](bus/bus-protocol.md) |
 | **Reflection** | Self-improvement that proposes, never self-applies: capture→distill→quarantine, weekly upstream watch | [`learn/`](learn/learn-protocol.md) · [`evolve/`](evolve/evolve-protocol.md) |
 | **Governance** | The seven human gates, 3-tier privacy leak-check, guard hooks, audit trail on gate crossings | [`AGENTS.md § Human gates`](AGENTS.md) · [`test/leak-check.sh`](test/leak-check.sh) · [`hooks/`](hooks/) |
 | **Metrics** | Does the canon actually change agent output? A/B with-/without-canon + blind pairwise judging | [`eval/`](eval/README.md) |
