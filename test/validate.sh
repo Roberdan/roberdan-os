@@ -234,6 +234,9 @@ if bash test/test-evolve-declined.sh >/dev/null 2>&1; then ok "declined buffer m
 # ones: the bus must not be able to start an agent (that is factory/dispatch-runner.sh,
 # dormant by a reviewed decision), write kanban state, or carry acceptance criteria.
 # An unwired test is an unverified claim, so it runs here — see bus/bus-protocol.md.
+section "review budget — a review loop that cannot run forever (test/test-review-budget.sh)"
+if bash test/test-review-budget.sh >/dev/null 2>&1; then ok "a spent review budget exits 3 and demands a human decision instead of another round"; else err "test-review-budget — see bash test/test-review-budget.sh"; fi
+
 section "agent bus — messages, never execution (test/test-bus.sh)"
 if bash test/test-bus.sh >/dev/null 2>&1; then ok "bus delivers durably, attributes, resolves citations to no more than they prove, and executes nothing"; else err "test-bus — see bash test/test-bus.sh"; fi
 # And the suite above is itself only worth what it has been seen to catch: the

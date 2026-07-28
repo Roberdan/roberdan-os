@@ -68,7 +68,20 @@ code **and** business. Default = `roberto-mode` + loop; the twin and the agents
 activate on top of this base.
 
 → [`loop/loop-protocol.md`](loop/loop-protocol.md) — standard loop contract: durable
-state on file, empirical terminal-condition, per-phase checkpoints, escalation, idempotent resume.
+state on file, empirical terminal-condition, per-phase checkpoints, escalation, idempotent resume,
+**review budget**.
+
+**A review loop needs a declared budget before round 1** (default 2 rounds, hard cap 3) →
+[`loop/loop-protocol.md` § 7](loop/loop-protocol.md), enforced by
+[`loop/review-budget.sh`](loop/review-budget.sh). Escalation covers a loop that keeps *failing*;
+this covers one that keeps *succeeding* and still never ends. When the property being proven has
+an external, mutable surface (the whole machine, the network), an adversarial reviewer can always
+produce one more true finding — so "the reviewer has no further objection" is a perimeter, not a
+terminal-condition. Measured: eight rounds in one night on a finished 640-line script, every round
+a real blocker. When the budget is spent, the agent hands Roberto a **decision** with three named
+options — never another round by default. A standing "keep going until it's done" authorises
+finishing the **declared scope**; when the scope is what keeps growing, that instruction has
+expired and Roberto has to be asked again.
 The loop is reliable without a daemon; Convergio is an **optional** observer, never a single point of failure.
 
 **Goal tracking = [`kanban/`](kanban/) (durable, auditable, token-bounded, GATED — default).**
@@ -167,6 +180,9 @@ Autonomy ≠ black box. These **always** go through Roberto (direct message):
 5. Strategic/product decisions with non-obvious tradeoffs (agent proposes with evidence, Roberto decides)
 6. Material published in Roberto's / Fight the Stroke's name
 7. Architectural changes >4 files with cross-cutting invariants
+8. **Another review round once the declared budget is spent** (`loop/review-budget.sh` exits 3) —
+   continuing is a spend decision, and the agent is the worst-placed party to make it: every round
+   that finds something true feels like justification for the next one
 
 ---
 
