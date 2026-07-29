@@ -73,6 +73,7 @@ _suite() {
 _suite_out() { cat "$_PARDIR/$1.out" 2>/dev/null; }
 
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate \
+          test-kb-root-resolution \
           test-federated-kb test-leak-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp; do
@@ -258,7 +259,17 @@ if _suite test-factory-kb; then ok "kb gates + factory guardrails green"; else e
 section "kb views (history/archive/plans/plan/sched)"
 if _suite test-kb-views; then ok "kb views green"; else err "test-kb-views — see bash test/test-kb-views.sh"; fi
 
-# --- 6b2) the done-gate must be mechanical, not honor-system -------------------
+# --- 6b3) $ROOT must survive the symlink it is always reached through ---------
+# `kb` is installed as ~/.local/bin/kb -> kanban/kb.sh, and BASH_SOURCE reports
+# the LINK. The naive derivation therefore resolved ~/.local on every PATH
+# invocation: `kb lint` looked for a script that was not there, RDA_LEAKCHECK
+# pointed at a privacy check that was not there, and the fallback board became
+# ~/.local/kanban — created by mkdir -p, so 32 real cards accumulated on a board
+# no view aggregated. One loud symptom, three silent ones.
+section "kb \$ROOT resolution (symlinked install)"
+if _suite test-kb-root-resolution; then ok "\$ROOT survives symlinks; no phantom board"; else err "test-kb-root-resolution — see bash test/test-kb-root-resolution.sh"; fi
+
+# --- 6b4) kb done-gate must be mechanical, not honor-system -------------------
 # Pins both directions: forged evidence (rubber-stamps, fake SHAs) is refused, and
 # real evidence (resolvable SHA, test output, existing path) still passes. The gate
 # that only refuses is as useless as the one that only accepts.

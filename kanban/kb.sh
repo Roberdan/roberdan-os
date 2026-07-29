@@ -8,7 +8,30 @@ RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 # repo ROOT (independent of $KB, which under tests points at a temp fixture
 # dir) — needed so `kb plans`/`kb plan`/`kb sched` resolve docs/ and
 # proposals/ from the real repo no matter what directory `kb` is invoked from.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+#
+# Resolve the symlink chain FIRST. `kb` is installed as ~/.local/bin/kb -> this
+# file, and bash does not resolve symlinks for BASH_SOURCE: it reports the link
+# path. So the naive `dirname "${BASH_SOURCE[0]}"/..` computed ~/.local on every
+# PATH invocation — i.e. essentially always. Nothing crashed, because every
+# consumer of $ROOT either fails soft or writes a directory into existence,
+# which is why it survived from install until 2026-07-29:
+#   - `kb lint` looked for ~/.local/kanban/lint-cards.sh and reported it missing
+#     (the one loud symptom; filed 2026-07-07, never traced to its cause);
+#   - RDA_LEAKCHECK pointed at a privacy check that was not there;
+#   - the worktree calls swallow their own failure with `2>/dev/null || true`;
+#   - and the fallback board `$ROOT/kanban` became ~/.local/kanban, which the
+#     `mkdir -p` below duly CREATED — so 32 real cards accumulated on a board
+#     nobody chose and no view aggregated.
+# `pwd -P` would not have helped: the wrong path is the argument, not the way it
+# is printed. Keep this ahead of every other use of $ROOT.
+_kb_src="${BASH_SOURCE[0]}"
+while [ -L "$_kb_src" ]; do
+  _kb_dir="$(cd -P "$(dirname "$_kb_src")" && pwd)"
+  _kb_src="$(readlink "$_kb_src")"
+  case "$_kb_src" in /*) ;; *) _kb_src="$_kb_dir/$_kb_src" ;; esac
+done
+ROOT="$(cd -P "$(dirname "$_kb_src")/.." && pwd)"
+unset _kb_src _kb_dir
 
 # --- Federation read-path (design §2a/§2b) ---------------------------------
 # The registry (~/.roberdan-os/kanban-registry, local-only, one repo path per
