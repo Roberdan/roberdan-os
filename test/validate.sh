@@ -73,7 +73,7 @@ _suite() {
 _suite_out() { cat "$_PARDIR/$1.out" 2>/dev/null; }
 
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate \
-          test-kb-root-resolution \
+          test-kb-root-resolution test-kb-start-worktree-cause \
           test-federated-kb test-leak-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp; do
@@ -268,6 +268,7 @@ if _suite test-kb-views; then ok "kb views green"; else err "test-kb-views — s
 # no view aggregated. One loud symptom, three silent ones.
 section "kb \$ROOT resolution (symlinked install)"
 if _suite test-kb-root-resolution; then ok "\$ROOT survives symlinks; no phantom board"; else err "test-kb-root-resolution — see bash test/test-kb-root-resolution.sh"; fi
+if _suite test-kb-start-worktree-cause; then ok "kb start names the real worktree failure, never a false one"; else err "test-kb-start-worktree-cause — see bash test/test-kb-start-worktree-cause.sh"; fi
 
 # --- 6b4) kb done-gate must be mechanical, not honor-system -------------------
 # Pins both directions: forged evidence (rubber-stamps, fake SHAs) is refused, and
