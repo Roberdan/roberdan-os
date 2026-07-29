@@ -98,4 +98,30 @@ run_hook "$silent/target.py"
 [ -s "$TMP/calls.log" ] \
   && fail "a config outside the repo opted it in: $(cat "$TMP/calls.log")"
 
+# 8. setup.cfg IS NOT A DECLARATION, and this case exists because the card that
+#    specified this lane said it was - listing setup.cfg next to pyproject.toml
+#    and ruff.toml. It reads as an oversight to be tidied up later, so it needs
+#    to fail loudly the moment someone tidies it.
+#    Neither tool reads that file. Measured on the installed binaries rather than
+#    recalled: with `[tool.black] line-length = 200` in setup.cfg, black
+#    reformatted a 110-column line anyway (default 88), and `ruff check
+#    --verbose` printed "Using Ruff default settings".
+#    So a setup.cfg says nothing about black or ruff - it says flake8, pytest,
+#    isort or setuptools, which is precisely the population that must be left
+#    alone. Honouring it would reformat repositories that declared a DIFFERENT
+#    toolchain: the same defect this hook was changed to remove, wearing the
+#    costume of completeness.
+setupcfg="$TMP/setup-cfg-only"
+mkdir -p "$setupcfg"
+git -C "$setupcfg" init -q
+printf '[tool.black]\nline-length = 200\n\n[tool.ruff]\n' > "$setupcfg/setup.cfg"
+printf 'import os\nx   =    1\n' > "$setupcfg/target.py"
+before="$(shasum "$setupcfg/target.py" | cut -d' ' -f1)"
+: > "$TMP/calls.log"
+run_hook "$setupcfg/target.py"
+[ -s "$TMP/calls.log" ] \
+  && fail "setup.cfg was treated as a black/ruff declaration - neither tool reads it, so this opts in repos that declared flake8 or pytest: $(cat "$TMP/calls.log")"
+[ "$(shasum "$setupcfg/target.py" | cut -d' ' -f1)" = "$before" ] \
+  || fail "the file was modified in a repo whose only config is setup.cfg"
+
 echo "PASS: autofmt input contract (stdin JSON + degenerate inputs + legacy fallback + opt-in policy)"
