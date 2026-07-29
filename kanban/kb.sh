@@ -114,6 +114,23 @@ _sha_resolves() {
     [ -d "$repo/.git" ] || continue
     git -C "$repo" cat-file -e "${sha}^{commit}" 2>/dev/null && return 0
   done < <(_registry_repos)
+  # The BOARD itself can be a git repo, and since 2026-07-28 this one is: the
+  # cards are versioned in a private repo nested at kanban/, because the repo
+  # that holds them is public and they carry real names and clients. That repo
+  # is deliberately NOT in the registry — the registry lists boards, and adding
+  # it there would make kb resolve a board inside a board.
+  #
+  # Without this line a REAL commit is refused as forged. Reproduced, not
+  # deduced: `git cat-file -e a1c5f41` fails in the public repo and succeeds in
+  # kanban/, and a1c5f41 is the commit that recorded @thor's certification.
+  #
+  # This does not widen the gate. The property stays "the sha must resolve to a
+  # commit that exists on this machine" — the opposite of the trading-os failure
+  # cited above, where `evidence.ci == "pass"` was accepted as a self-declared
+  # string. A gate that refuses true evidence teaches people to cite weaker
+  # evidence, which is how it ends up accepting strings again.
+  [ -n "${KB:-}" ] && [ -d "$KB/.git" ] && \
+    git -C "$KB" cat-file -e "${sha}^{commit}" 2>/dev/null && return 0
   return 1
 }
 
