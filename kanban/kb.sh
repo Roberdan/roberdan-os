@@ -1288,9 +1288,23 @@ case "$cmd" in
       else
         # Strip worktree.sh's own prefix and its "card runs without a worktree" tail: the
         # caller already says that. What is worth keeping is the cause.
-        _wt_why="$(sed -e 's/^worktree: //' -e 's/ — card runs without a worktree$//' \
-                       -e 's/"/\x27/g' "$_wt_err" | grep -v '^[[:space:]]*$' | tail -1)"
-        [ -n "$_wt_why" ] || _wt_why="worktree.sh non ha spiegato perche' (nessun messaggio su stderr)"
+        # Prefer worktree.sh's OWN lines (it prefixes them "worktree: ") over whatever else
+        # landed on stderr. The first version just took the last line, which quietly assumed
+        # the cause is always last — @thor produced a case where a later unrelated warning
+        # became the reported cause. An assumption about the callee does not belong in the
+        # caller, so ask for the callee's own prefix and only then fall back.
+        #
+        # Every stage ends in `|| true` because kb runs under `set -euo pipefail`: on EMPTY
+        # stderr `grep -v` exits 1, pipefail propagates it, and set -e killed kb start
+        # mid-way — card already moved to doing, no message, no worktree_none, rc=1. That
+        # made the fallback line below unreachable: scaffolding that bought confidence it
+        # had not earned, in the exact branch written so kb would not go silent. Found by
+        # @thor, reproduced here before fixing.
+        _wt_why="$(grep '^worktree: ' "$_wt_err" 2>/dev/null | tail -1 || true)"
+        [ -n "$_wt_why" ] || _wt_why="$(grep -v '^[[:space:]]*$' "$_wt_err" 2>/dev/null | tail -1 || true)"
+        _wt_why="$(printf '%s' "$_wt_why" | sed -e 's/^worktree: //' \
+                     -e 's/ — card runs without a worktree$//' -e 's/"/\x27/g' || true)"
+        [ -n "$_wt_why" ] || _wt_why="worktree.sh e' fallito senza dire perche' (stderr vuoto, rc diverso da 0)"
         echo "worktree_none: \"$_wt_why\"" >> "$d"
         echo "doing/$id started (approved by $by; nessun worktree — $_wt_why)"
       fi
