@@ -40,6 +40,15 @@ find_up() {
 # Has this repo DECLARED the formatter? $1 = pyproject.toml section pattern,
 # remaining args = standalone config filenames that count on their own.
 #
+# setup.cfg is NOT among them, deliberately, and the omission is worth a line
+# because the card specifying this change listed it as one. Neither tool reads
+# it: with `[tool.black] line-length = 200` in a setup.cfg, black reformatted to
+# 88 anyway, and `ruff check --verbose` printed "Using Ruff default settings".
+# What a setup.cfg does declare is flake8, pytest, isort or setuptools - exactly
+# the repositories that must be left alone. Accepting it would reformat projects
+# that chose a different toolchain, which is the defect below, re-entering
+# dressed as completeness. test/test-autofmt.sh case 8 fails if it is added.
+#
 # Python formatters used to run everywhere, unlike the prettier branch below
 # which only fires where a package.json declares the toolchain. That asymmetry
 # rewrote repositories that never asked: black would reformat 63 of 87 files in
