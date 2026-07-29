@@ -108,13 +108,15 @@ fi
 # the fallback board is $ROOT/kanban; with the old $ROOT that was ~/.local/kanban
 # and `mkdir -p` brought it into being. Assert the fallback is the REPO's board.
 section "the fallback board is the repo's board, not the installer's directory"
-fallback="$(cd "$TMP" && env -u RDA_KANBAN HOME="$TMP" bash "$TMP/bin/kb" wt 2>/dev/null; echo)"
+# Run kb with no board override and no registered repo: the point is the SIDE
+# EFFECT (kb's own `mkdir -p` on the fallback board), not the output, so the
+# command is run for its effect and its result deliberately discarded.
+( cd "$TMP" && env -u RDA_KANBAN HOME="$TMP" bash "$TMP/bin/kb" wt >/dev/null 2>&1 ) || true
 if [ -d "$TMP/kanban" ]; then
   err "REGRESSION: a board was created next to the symlink ($TMP/kanban)"
 else
   ok "no phantom board created beside the installed symlink"
 fi
-unset fallback
 
 # ---------------------------------------------------------------------------
 # dash.sh carries the same derivation. Today it happens to work because kb.sh
