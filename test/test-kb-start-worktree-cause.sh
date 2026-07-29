@@ -101,6 +101,42 @@ grep -q '^worktree_none:' "$KB/doing/C4.md" \
   && err "success path wrote a worktree_none line" \
   || ok "success path writes no failure line"
 
+section "worktree.sh fallisce SENZA scrivere su stderr: kb deve parlare lo stesso"
+# @thor found the first fix's fallback line was unreachable. kb runs under `set -euo
+# pipefail`; on empty stderr `grep -v` exits 1, pipefail propagates, set -e killed
+# `kb start` mid-way: the card was already in doing, and there was NO message, NO
+# worktree_none line, rc=1. Worse than the bug the card was filed for — that one lied,
+# this one says nothing at all, in the exact branch written so kb would not go silent.
+ROS="$TMP/ros2"
+cp -R "$ROOT" "$ROS" 2>/dev/null
+printf '#!/usr/bin/env bash\nexit 1\n' > "$ROS/kanban/worktree.sh"
+_card C5 realrepo
+out="$(_start C5 "$ROS/kanban/kb.sh")"; rc=$?
+[ "$rc" = 0 ] && ok "kb start esce 0, non muore a meta'" || err "kb start e' morto (rc=$rc)"
+case "$out" in
+  *"stderr vuoto"*) ok "nomina il fatto che worktree.sh non ha spiegato niente" ;;
+  *) err "silenzioso sul ramo a stderr vuoto: [$out]" ;;
+esac
+grep -q '^worktree_none:' "$KB/doing/C5.md" 2>/dev/null \
+  && ok "la card porta comunque un motivo" \
+  || err "card in doing senza worktree e senza motivo — stato incoerente"
+
+section "rumore DOPO la causa: si riporta la causa, non l'ultima riga"
+# The first fix took `tail -1` of stderr, which assumed the cause is always last — an
+# assumption about the callee living in the caller. worktree.sh prefixes its own lines
+# with "worktree: ", so ask for that and fall back to the last line only if absent.
+printf '#!/usr/bin/env bash\necho "worktree: la causa vera" >&2\necho "warning: rumore scollegato" >&2\nexit 1\n' > "$ROS/kanban/worktree.sh"
+_card C6 realrepo
+out="$(_start C6 "$ROS/kanban/kb.sh")"
+case "$out" in
+  *"la causa vera"*) ok "sceglie la riga di worktree.sh, non l'ultima" ;;
+  *) err "riporta il rumore invece della causa: $out" ;;
+esac
+case "$out" in
+  *"rumore scollegato"*) err "riporta il rumore: $out" ;;
+  *) ok "non riporta la riga scollegata" ;;
+esac
+
 printf "\n"
 [ "$FAIL" = 0 ] && echo "test-kb-start-worktree-cause: PASS" || echo "test-kb-start-worktree-cause: FAIL"
 exit "$FAIL"
