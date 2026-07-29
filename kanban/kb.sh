@@ -1265,15 +1265,36 @@ case "$cmd" in
       echo "worktree_none: \"$no_wt\"" >> "$d"
       echo "doing/$id started (approved by $by; nessun worktree: $no_wt)"
     else
-      wt="$(bash "$ROOT/kanban/worktree.sh" create "$repo_val" "$id" 2>/dev/null || true)"
+      # worktree.sh already distinguishes its failures on stderr — not a git repo, git
+      # refused to attach the branch, git refused to create it from the base. The old
+      # `2>/dev/null || true` threw all three away and then asserted ONE of them, so a repo
+      # that IS a git repo was told it was not. A false message costs more than an error:
+      # you believe it and go looking for the problem where it isn't. Reproduced before
+      # fixing — a repo whose worktree path was occupied by a file reported "non e un git
+      # repo" while worktree.sh had said "git refused to create card/TEST-3 from master".
+      # So: keep the stderr and report what actually failed. `|| true` stays because a card
+      # must still start without a worktree (worktree.sh's own contract, its header) — what
+      # changes is that the reason is now carried instead of invented.
+      _wt_err="$(mktemp)"
+      if [ ! -f "$ROOT/kanban/worktree.sh" ]; then
+        wt=""; printf 'worktree.sh non trovato in %s/kanban/\n' "$ROOT" > "$_wt_err"
+      else
+        wt="$(bash "$ROOT/kanban/worktree.sh" create "$repo_val" "$id" 2>"$_wt_err" || true)"
+      fi
       if [ -n "$wt" ]; then
         { echo "worktree: $wt"; echo "branch: card/$id"; } >> "$d"
         echo "doing/$id started (approved by $by)"
         echo "  worktree: $wt   (branch card/$id — lavora QUI, non nel checkout principale)"
       else
-        echo "worktree_none: \"repo '$repo_val' non e un git repo raggiungibile\"" >> "$d"
-        echo "doing/$id started (approved by $by; nessun worktree — repo '$repo_val' non e un git repo)"
+        # Strip worktree.sh's own prefix and its "card runs without a worktree" tail: the
+        # caller already says that. What is worth keeping is the cause.
+        _wt_why="$(sed -e 's/^worktree: //' -e 's/ — card runs without a worktree$//' \
+                       -e 's/"/\x27/g' "$_wt_err" | grep -v '^[[:space:]]*$' | tail -1)"
+        [ -n "$_wt_why" ] || _wt_why="worktree.sh non ha spiegato perche' (nessun messaggio su stderr)"
+        echo "worktree_none: \"$_wt_why\"" >> "$d"
+        echo "doing/$id started (approved by $by; nessun worktree — $_wt_why)"
       fi
+      rm -f "$_wt_err"; unset _wt_err _wt_why
     fi
     ;;
 
