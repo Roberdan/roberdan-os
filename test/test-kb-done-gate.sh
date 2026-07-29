@@ -87,6 +87,31 @@ if $KB finish a3 --thor "runbook written in kanban/README.md and validated" >/de
   ok "an existing file path is accepted"
 else err "an existing file path was refused — the gate blocks honest work"; fi
 
+# The board can be a git repo of its own, and since 2026-07-28 this one is: the
+# cards live in a private repo nested at kanban/, because the repo that holds
+# them is public and they carry real names and clients. That repo is NOT in the
+# registry on purpose (the registry lists boards), so before the fix a REAL
+# commit of a REAL card was refused as forged evidence — the gate calling an
+# honest citation a lie. Hermetic here: the temp board becomes a git repo, and
+# the sha exists NOWHERE else, so this passes only if kb consults the board.
+card a4
+BOARDSHA=""
+if git -C "$RDA_KANBAN" init -q 2>/dev/null; then
+  printf 'seed\n' > "$RDA_KANBAN/.board-seed"
+  git -C "$RDA_KANBAN" add -A >/dev/null 2>&1
+  git -C "$RDA_KANBAN" -c user.name=t -c user.email=t@t commit -qm "board history" >/dev/null 2>&1
+  BOARDSHA="$(git -C "$RDA_KANBAN" rev-parse --short HEAD 2>/dev/null || echo "")"
+fi
+if [ -z "$BOARDSHA" ]; then
+  err "could not build the board-repo fixture — case not exercised, not passed"
+elif git -C "$ROOT" cat-file -e "${BOARDSHA}^{commit}" 2>/dev/null; then
+  err "fixture sha $BOARDSHA also resolves in the main repo — the case proves nothing"
+elif $KB finish a4 --thor "cards committed in the board repo at $BOARDSHA" >/dev/null 2>&1 && accepted a4; then
+  ok "a sha that resolves ONLY in the board's own repo is accepted"
+else
+  err "a REAL commit in the board's own repo was refused as forged — the gate blocks honest work"
+fi
+
 section "the accepted card records the evidence"
 if grep -q "^verified_evidence:" "$RDA_KANBAN/done/a2.md" 2>/dev/null; then
   ok "verified_evidence is persisted on the card"
