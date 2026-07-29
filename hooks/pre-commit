@@ -16,3 +16,44 @@ if ! bash test/leak-check.sh; then
   echo "Fix the content, or if this is a false positive, adjust private/.denylist." >&2
   exit 1
 fi
+
+# --- the board is a repo INSIDE this one, and this repo cannot see it ---------------
+#
+# `kanban/` is a separate private git repo nested in this one (the cards carry real names
+# and clients, so they are not in the public history). Two consequences that bit on
+# 2026-07-29 within an hour of each other:
+#   - `git add -A` here does NOT stage anything under kanban/. Git treats a nested repo as
+#     an opaque entry, and kanban/ is ignored on top of that.
+#   - `git status` here says nothing about it either.
+# So you amend a card, commit, read "3 files changed", and believe the card is saved. It
+# is not. It fails SILENTLY — the same failure shape as the $ROOT bug that quietly built a
+# second board at ~/.local/kanban: nothing errors, so nothing gets looked at.
+#
+# This WARNS, it does not block, and that is deliberate. A dirty board is the normal state
+# while a card is being worked, so blocking would fire constantly and train `--no-verify`
+# — which would ALSO disable the leak check above. Trading a real confidentiality control
+# for a bookkeeping one is a bad trade. The warning lands at the exact moment the false
+# belief forms, which is the moment the commit is made, and it names the command to run.
+# Every git call below is failure-tolerant on purpose: `set -e` is in force, and a hook
+# that aborts on an unexpected git exit would BLOCK the commit — turning an advisory note
+# into the blocking control this comment just argued against. A check that cannot answer
+# stays silent instead.
+_board="$ROOT/kanban"
+if git -C "$_board" rev-parse --show-toplevel >/dev/null 2>&1 \
+   && [ "$(git -C "$_board" rev-parse --show-toplevel 2>/dev/null)" != "$ROOT" ]; then
+  _dirty="$(git -C "$_board" status --porcelain 2>/dev/null || true)"
+  if [ -n "$_dirty" ]; then
+    echo "" >&2
+    echo "pre-commit: nota — la board (kanban/) e' un repo separato e questo commit NON la include:" >&2
+    printf '%s\n' "$_dirty" | sed 's/^/    /' >&2
+    echo "  salvale con:  git -C kanban add -A && git -C kanban commit -m '...' && git -C kanban push" >&2
+    echo "  (avviso, non blocco: il commit prosegue)" >&2
+  fi
+  # Committed but never pushed is the other half: the card exists in exactly one place on
+  # one disk, which is not saved, it is just not lost yet.
+  _ahead="$(git -C "$_board" rev-list --count @{u}..HEAD 2>/dev/null || echo 0)"
+  if [ "${_ahead:-0}" -gt 0 ] 2>/dev/null; then
+    echo "" >&2
+    echo "pre-commit: nota — la board ha $_ahead commit non pushati (git -C kanban push)" >&2
+  fi
+fi
