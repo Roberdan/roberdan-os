@@ -18,7 +18,22 @@
 #     never from `gh` (same precedent as `kb pending --count`).
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Resolve the symlink chain before deriving ROOT — same defect, same fix as
+# kb.sh (see the long note there). Today kb.sh invokes this script by its real
+# path, so the naive derivation happens to work; that is a property of the
+# caller, not of this file, and the failure it would produce is silent: WT
+# would point at a worktree.sh that is not there and every worktree column
+# would simply render empty. Two copies of the loop rather than one shared
+# helper on purpose — locating a shared helper needs exactly the resolution
+# being fixed here.
+_dash_src="${BASH_SOURCE[0]}"
+while [ -L "$_dash_src" ]; do
+  _dash_dir="$(cd -P "$(dirname "$_dash_src")" && pwd)"
+  _dash_src="$(readlink "$_dash_src")"
+  case "$_dash_src" in /*) ;; *) _dash_src="$_dash_dir/$_dash_src" ;; esac
+done
+ROOT="$(cd -P "$(dirname "$_dash_src")/.." && pwd)"
+unset _dash_src _dash_dir
 WT="$ROOT/kanban/worktree.sh"
 DONE_N="${RDA_DASH_DONE:-5}"   # how many closed cards to detail
 
