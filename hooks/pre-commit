@@ -17,6 +17,17 @@ if ! bash test/leak-check.sh; then
   exit 1
 fi
 
+# The denylist above can only catch secrets somebody thought to write down. A colleague's
+# name is not on it and never will be — that is what made the 2026-07-30 leak in a sibling
+# repository invisible to it: 39 corporate addresses and 4 real names, harvested from a
+# live org walk into a test fixture and pushed. This check asks about SHAPE instead of
+# vocabulary, so it does not need to know the names in advance.
+if ! bash test/directory-dump-check.sh --staged; then
+  echo "" >&2
+  echo "pre-commit: BLOCKED — corporate directory data (see above)." >&2
+  exit 1
+fi
+
 # --- the board is a repo INSIDE this one, and this repo cannot see it ---------------
 #
 # `kanban/` is a separate private git repo nested in this one (the cards carry real names

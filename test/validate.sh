@@ -74,7 +74,7 @@ _suite_out() { cat "$_PARDIR/$1.out" 2>/dev/null; }
 
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate \
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
-          test-federated-kb test-leak-check test-fork-merge test-autofmt \
+          test-federated-kb test-leak-check test-directory-dump-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp; do
   _spawn "$_s"
@@ -301,6 +301,10 @@ fi
 # --- 7) Leak-check self-test (salted-hash tier b) -----------------------------
 section "leak-check self-test — tier (b) salted-hash catches a planted leak"
 if _suite test-leak-check; then ok "leak-check tiers verified (see bash test/test-leak-check.sh)"; else err "test-leak-check — see bash test/test-leak-check.sh"; fi
+
+section "directory-dump-check — corporate rosters, which no denylist can name in advance"
+if bash test/directory-dump-check.sh >/dev/null 2>&1; then ok "0 directory dumps tracked"; else err "directory dump tracked — see bash test/directory-dump-check.sh"; fi
+if _suite test-directory-dump-check; then ok "ratchet verified: grandfathered passes, one more address fails"; else err "test-directory-dump-check — see bash test/test-directory-dump-check.sh"; fi
 
 section "pre-commit hook e' installato E aggiornato (il leak check blocca solo se e' acceso)"
 # Nothing checked this until 2026-07-29, and on that day the installed hook was still the
