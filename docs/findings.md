@@ -156,7 +156,48 @@ di tutto il resto messo insieme: attacca meccanicamente il problema numero 1. Il
 suggerisce di appoggiarsi al runtime invece di riparare a mano la stessa famiglia una sesta
 volta. Cosa prendere lo decide Roberto.
 
-## 5. `kb finish` dichiara "verified by @thor" anche quando non è vero
+## 5. Nove skill di roberdan-os sono irraggiungibili dall'agente interno di gbrain
+
+**Come e' emerso** (30 luglio 2026): `gbrain doctor` riporta `[FAIL] resolver_health` con
+9 errori, tutti della stessa forma — `UNREACHABLE: verify-done`, `ship`, `review`, `sync`,
+`premortem`, `focus-group`, `auto-checkpoint`, `problem-validation`, `engineering-reference`.
+Nessuna ha una riga nella tabella di `~/gbrain/skills/RESOLVER.md`, quindi l'agente interno
+di gbrain non ha modo di arrivarci.
+
+**E' il difetto che questo repo chiama "esiste ma non e' collegato"**, applicato alle sue
+stesse skill: definite, montate, e raggiungibili da nessuno.
+
+**Perche' non e' urgente, ed e' l'unica ragione per cui non e' una card.** Quelle skill
+funzionano **benissimo in Claude Code**, che e' dove Roberto le usa: compaiono nell'elenco
+degli strumenti e si invocano con `/nome`. L'irraggiungibilita' riguarda solo l'agente che
+gira *dentro* gbrain, che lui non usa. L'impatto pratico oggi e' vicino a zero.
+
+**Se peggiora.** Diventa una card il giorno in cui l'agente interno di gbrain viene messo a
+lavorare davvero — perche' da quel momento gira senza poter usare nessuna delle regole di
+Roberto.
+
+**La riparazione**: 9 righe nella tabella di `~/gbrain/skills/RESOLVER.md`, piu' un
+`triggers:` nel frontmatter di ogni skill. Il doctor stampa l'azione esatta per ciascuna.
+
+---
+
+## 6. Il limite dei blocchi di codice e' una costante, non e' derivato dall'embedder
+
+**Come e' emerso** (30 luglio 2026, chiudendo la card `260730-102955`):
+`DEFAULT_MAX_CHUNK_TOKENS = 2000` in `~/gbrain/src/core/chunkers/code.ts` e' tarato — lo dice
+il commento — sul **piu' piccolo** embedder comune (`nomic-embed-text`, contesto 2048). Con
+l'embedder in uso (`bge-m3`, contesto 8192) il margine e' oltre 6000 token invece di 48, e
+l'errore non si e' mai verificato: zero occorrenze nei log.
+
+**Perche' resta una riga e non una card.** Oggi il numero prudente non fa danno. Ma e' una
+costante che **finge di conoscere l'embedder** senza chiederglielo: se un giorno si cambia
+modello, quel 2000 sara' sbagliato in una delle due direzioni — troppo stretto (blocchi
+inutilmente piccoli, recupero peggiore) o troppo largo (embedding rifiutati).
+
+**Se peggiora.** Il giorno in cui si cambia embedder. La riparazione giusta **non** e'
+cambiare la costante: e' derivarla dal contesto del modello configurato.
+
+## 7. `kb finish` dichiara "verified by @thor" anche quando non è vero
 
 **Come è emerso** (30 luglio 2026): @thor era sospeso per decisione di Roberto, e ogni card
 chiusa quel giorno è stata verificata da Claude. `kb finish` ha comunque stampato
