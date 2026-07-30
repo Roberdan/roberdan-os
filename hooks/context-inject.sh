@@ -49,4 +49,23 @@ if [ -x "$HOME/.local/bin/kb" ]; then
     | grep -o '\(TO DO\|DOING\|DONE\) ([^)]*)' | paste -sd' · ' - | sed 's/^/  /'
   echo "  (board completo: \`kb view\` · dettaglio card: \`kb show <id>\`)"
 fi
+
+# --- la coda autorizzata di questa sessione ---------------------------------------------------
+# DECISIONE DI ROBERTO, 2026-07-30: "completa tutte le card che ci sono quando comincia una
+# sessione, poi fermati, così io vedo solo se hai aggiunto altro." Lo scatto va QUI e non a mano,
+# perché "quando comincia una sessione" è un momento che solo questo hook conosce.
+#
+# NOTA sul board: qui NON si forza RDA_KANBAN come fa il blocco sopra. Quel blocco mostra sempre
+# roberdan-os di proposito (è il board di casa); la coda invece deve essere quella del repo in cui
+# la sessione è aperta, altrimenti fotograferebbe il lavoro di un altro progetto.
+if [ -x "$HOME/.local/bin/kb" ]; then
+  _coda="$("$HOME/.local/bin/kb" queue 2>/dev/null)"
+  if [ -n "$_coda" ]; then
+    echo
+    echo "### 🎫 Coda autorizzata di questa sessione (Roberto ha già detto sì a queste):"
+    printf '%s\n' "$_coda" | sed 's/^/  /'
+    echo "  Vai avanti con \`kb next\` fino a LISTA FINITA. Non chiedere approvazione per queste."
+    echo "  Quello che nasce dopo NON è autorizzato: resta per Roberto, ed è l'unica cosa che vuole vedere."
+  fi
+fi
 exit 0

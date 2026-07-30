@@ -72,7 +72,7 @@ _suite() {
 
 _suite_out() { cat "$_PARDIR/$1.out" 2>/dev/null; }
 
-for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate test-kb-diet \
+for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate test-kb-diet test-kb-queue \
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
@@ -282,6 +282,12 @@ if _suite test-kb-done-gate; then ok "done-gate refuses forged evidence, accepts
 # perche' un test che nessuno lancia e' codice morto che sembra un gate.
 section "kanban — i freni al board che cresce (una card in corso per repo, una condizione, un progetto alla volta)"
 if _suite test-kb-diet; then ok "i tre freni rifiutano il caso cattivo E lasciano passare quello legittimo"; else err "test-kb-diet — see bash test/test-kb-diet.sh"; fi
+
+# La coda autorizzata sposta il gate umano da "quale card" a "quale lista". La proprieta' che
+# lo rende uno SPOSTAMENTO e non una RIMOZIONE e' una sola — cio' che nasce dopo lo scatto non
+# parte — ed e' asserita li' dentro.
+section "kanban — coda autorizzata (Roberto approva la lista, non le card una per una)"
+if _suite test-kb-queue; then ok "la coda cammina da sola E si ferma su cio' che e' nato dopo"; else err "test-kb-queue — see bash test/test-kb-queue.sh"; fi
 
 # --- 6c) federated kanban + dormant dispatcher --------------------------------
 section "federated kanban (cwd-scoping, kb all/handoff, init, locks, dormant dispatcher)"

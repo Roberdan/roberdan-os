@@ -31,7 +31,13 @@ kb repo <name>                       # per-repo dashboard ON TOP of the board: g
 ```
 
 ## The two gates (no rubber-stamping)
-- **`todo → doing`** is a **human gate** — only Roberto approves what becomes active.
+- **`todo → doing`** is a **human gate on the LIST, not on each card** (Roberto's decision,
+  2026-07-30). `kb queue` photographs the repo's `todo` cards at session start; `kb next` walks
+  that list to the end without asking. **A card created after the snapshot is not in the list
+  and does not start** — that single property is what keeps this a *moved* gate rather than a
+  *removed* one, and `kb next` names those cards out loud when the list runs out. Revoke with
+  `kb queue --stop`. Full contract: `AGENTS.md § Goal tracking`, asserted in
+  `test/test-kb-queue.sh`.
 - **`doing → done`** needs **`@thor`** (the done-gate agent) to validate against the card's
   **acceptance criteria**, with **evidence** (commit/test/output). No rubber-stamps.
 

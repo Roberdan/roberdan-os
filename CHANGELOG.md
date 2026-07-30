@@ -3,6 +3,32 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.22.0] - 2026-07-30
+
+### Changed
+
+- **Il gate umano `todo → doing` non è più per singola card: è per LISTA.** Decisione di
+  Roberto, presa dopo che gli avevo proposto una versione più stretta e lui ha chiesto questa:
+  *"completa tutte le card che ci sono quando comincia una sessione e poi fermati, così io
+  vedo solo se hai aggiunto altro."* Il gate esisteva perché un agente non si scegliesse il
+  lavoro da solo, e il costo era che ogni card si fermava su di lui — il problema numero 3 della
+  sua lista del mattino: *"si blocca in continuazione in attesa di me"*. Misurato lo stesso
+  giorno: una sessione ha chiuso una card, rilasciato `4.8.1`, e si è fermata. Non era rotta:
+  obbediva.
+  - `kb queue` fotografa all'inizio sessione le card `todo` **del repo in cui sei** (una board
+    ne tiene di più d'uno, e una coda che li mescolasse farebbe partire lavoro altrove).
+  - `kb next` prende la successiva **senza chiedere**, una per volta — la regola "una card in
+    corso per progetto" vale ancora dentro la coda.
+  - L'approvazione scritta sulla card **nomina la sua origine** (`roberto (coda autorizzata,
+    scatto del …)`), così una card partita da sola è distinguibile da un `--by roberto` digitato.
+  - **La proprietà che rende questo uno spostamento del gate e non una rimozione**: una card
+    creata **dopo** lo scatto non è nella lista e **non parte**. A lista esaurita `kb next` le
+    elenca per nome. Se quel report tace, il gate è sparito — è l'unica cosa che Roberto ha
+    chiesto di vedere, ed è asserita nei due sensi in `test/test-kb-queue.sh`.
+  - Si revoca con `kb queue --stop`: si torna all'approvazione per singola card.
+  - Lo scatto è agganciato a `hooks/context-inject.sh`, perché "quando comincia una sessione"
+    è un momento che solo quel hook conosce.
+
 ## [v2.21.0] - 2026-07-30
 
 ### Added

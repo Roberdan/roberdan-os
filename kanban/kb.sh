@@ -1062,6 +1062,132 @@ _repo_view() {
   fi
 }
 
+# --- kb queue / kb next — l'autorizzazione permanente di Roberto ------------------------------
+#
+# DECISIONE DI ROBERTO, 2026-07-30, presa dopo che gli avevo proposto una versione più stretta
+# e lui ha chiesto questa: *"fai sì che completi tutte le card che ci sono quando comincia una
+# sessione e poi si fermi solo quando ha finito quella lista, così io poi vedo solo se ha
+# aggiunto altro."*
+#
+# COSA CAMBIA, DETTO CHIARO: il gate umano `todo → doing` non è più per singola card. Una
+# sessione fotografa la lista all'inizio e la percorre TUTTA senza chiedere.
+#
+# PERCHÉ NON È UN GATE TOLTO MA SPOSTATO. Il gate serviva a impedire che un agente si scegliesse
+# il lavoro da solo. La fotografia lo impedisce lo stesso, in un modo che costa a Roberto una
+# lettura invece di trentatré: una card creata DOPO lo scatto NON è nella lista e non parte.
+# Quindi ciò che un agente aggiunge mentre lavora resta fuori, ed è esattamente la cosa che
+# Roberto vuole vedere — "vedo solo se ha aggiunto altro". Il gate è passato da *quali card*
+# a *quale lista*, e la lista è scritta su file, con data, prima che parta qualcosa.
+#
+# IL RISCHIO, DICHIARATO: se la lista contiene una card che non voleva, parte lo stesso. Si
+# revoca cancellando la fotografia (`kb queue --stop`), e `kb queue` la stampa per intero prima
+# di scattarla, così è leggibile in dieci secondi.
+_queue_file() { printf '%s/.coda-%s.md' "$KB" "$1"; }
+
+_queue_repo() { # il repo del cwd, come fa `kb pending`
+  basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+}
+
+_queue() {
+  local repo="" arg
+  for arg in "$@"; do case "$arg" in --*) ;; *) repo="$arg" ;; esac; done
+  [ -n "$repo" ] || repo="$(_queue_repo)"
+  local qf; qf="$(_queue_file "$repo")"
+
+  case " $* " in
+    *" --stop "*|*" --revoca "*)
+      [ -f "$qf" ] && { rm -f "$qf"; echo "coda revocata per '$repo' — si torna all'approvazione per singola card."; } \
+                   || echo "nessuna coda attiva per '$repo'."
+      return 0 ;;
+  esac
+
+  local rinnova=0
+  case " $* " in *" --nuova "*|*" --new "*) rinnova=1 ;; esac
+
+  if [ -f "$qf" ] && [ "$rinnova" -eq 0 ]; then
+    local fatte=0 restanti=0 id
+    while read -r id; do
+      case "$id" in ''|\#*) continue ;; esac
+      if [ -e "$KB/todo/$id.md" ] || [ -e "$KB/doing/$id.md" ]; then restanti=$((restanti+1)); else fatte=$((fatte+1)); fi
+    done < "$qf"
+    echo "coda '$repo': $fatte chiuse, $restanti da fare  ($(sed -n '2p' "$qf"))"
+    [ "$restanti" -gt 0 ] && echo "  prossima: \`kb next\`" || echo "  LISTA FINITA — vedi \`kb queue --aggiunte\` per cosa e' nato dopo."
+    return 0
+  fi
+
+  # Lo scatto. Solo le card del repo chiesto: una board puo' tenerne di piu' d'uno, e una coda
+  # che mescolasse i repo farebbe partire lavoro su un progetto che non e' quello dove sei.
+  local ids="" n=0 f
+  for f in "$KB/todo"/*.md; do
+    [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue ;; esac
+    [ "$(_field "$f" repo)" = "$repo" ] || continue
+    ids="$ids$(basename "$f" .md)
+"; n=$((n+1))
+  done
+  if [ "$n" -eq 0 ]; then echo "nessuna card in attesa per '$repo': niente da fotografare."; return 0; fi
+  { echo "# CODA AUTORIZZATA — $repo"
+    echo "# scattata il $(date '+%Y-%m-%d %H:%M:%S %Z') · autorizzazione permanente di Roberto del 2026-07-30"
+    echo "# Le card qui sotto partono senza chiedere. Quelle nate DOPO questo scatto no."
+    printf '%s' "$ids"; } > "$qf"
+  echo "coda '$repo' fotografata: $n card, in quest'ordine."
+  local id
+  while read -r id; do
+    case "$id" in ''|\#*) continue ;; esac
+    printf '  • %s — %s\n' "$id" "$(_field "$KB/todo/$id.md" title)"
+  done < "$qf"
+  echo "  parti con \`kb next\` · revoca con \`kb queue --stop\`"
+}
+
+_next() {
+  local repo="" arg
+  for arg in "$@"; do case "$arg" in --*) ;; *) repo="$arg" ;; esac; done
+  [ -n "$repo" ] || repo="$(_queue_repo)"
+  local qf; qf="$(_queue_file "$repo")"
+  [ -f "$qf" ] || { echo "REFUSED: nessuna coda per '$repo'. Scattala con \`kb queue\`." >&2; return 1; }
+
+  # La regola 1 vale ancora: se c'e' gia' una card in corso su questo repo, non se ne apre un'altra.
+  local d
+  for d in "$KB/doing"/*.md; do
+    [ -e "$d" ] || continue; case "$(basename "$d")" in _*) continue ;; esac
+    if [ "$(_field "$d" repo)" = "$repo" ]; then
+      echo "'$repo' ha gia' una card in corso: $(basename "$d" .md) — $(_field "$d" title)" >&2
+      echo "  finiscila (kb finish ...) e poi richiama kb next." >&2
+      return 1
+    fi
+  done
+
+  local id
+  while read -r id; do
+    case "$id" in ''|\#*) continue ;; esac
+    [ -e "$KB/todo/$id.md" ] || continue
+    echo "kb next: prendo $id — $(_field "$KB/todo/$id.md" title)"
+    # Si richiama lo STESSO script invece di duplicare il corpo di `start`: quel corpo scrive
+    # la riga di audit, controlla dod/acceptance/repo, applica la regola 1 e crea il worktree.
+    # Riscriverlo qui vorrebbe dire avere due gate che devono restare d'accordo, ed e' cosi'
+    # che un gate smette di valere senza che nessuno se ne accorga.
+    RDA_KANBAN="$KB" bash "${BASH_SOURCE[0]}" start "$id" \
+      --by "roberto (coda autorizzata, scatto del $(sed -n '2p' "$qf" | sed 's/^# scattata il //;s/ ·.*//'))"
+    return $?
+  done < "$qf"
+
+  # Lista finita. Qui il report deve dire cosa e' NATO DOPO: e' l'unica cosa che Roberto ha
+  # chiesto di vedere, e se questo blocco tace il gate spostato diventa un gate tolto.
+  echo "LISTA FINITA per '$repo': tutte le card della fotografia sono chiuse."
+  local scatto nate=0 f
+  scatto="$(sed -n '2p' "$qf" | sed 's/^# scattata il //;s/ ·.*//')"
+  for f in "$KB/todo"/*.md; do
+    [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue ;; esac
+    [ "$(_field "$f" repo)" = "$repo" ] || continue
+    grep -qx "$(basename "$f" .md)" "$qf" && continue
+    [ "$nate" -eq 0 ] && echo "" && echo "NATE DOPO lo scatto del $scatto — queste aspettano TE:"
+    nate=$((nate+1))
+    printf '  • %s — %s\n' "$(basename "$f" .md)" "$(_field "$f" title)"
+  done
+  [ "$nate" -eq 0 ] && echo "Nessuna card nuova: la sessione non ha aggiunto niente." \
+                    || echo "  ($nate nuove. Per autorizzarle: \`kb queue --nuova\`.)"
+  return 0
+}
+
 # --- kb cover — the plan→card gate (rules/best-practices.md § Carded End-to-End) -------------
 # Every gate in this system operates DOWNSTREAM of the card: kb, @thor, the merge-gate and CI all
 # verify a card. A requirement that never BECOMES a card is invisible to all four simultaneously.
@@ -1175,6 +1301,8 @@ case "$cmd" in
     esac ;;
   repo|status) _repo_view "${1:?repo name required (kb repo <name>)}" ;;  # per-repo dashboard: git + PRs + cards
   pending|inbox) _pending "$@" ;;  # the approval inbox: everything waiting on Roberto (--count = fast total)
+  queue|coda) _queue "$@" ;;       # fotografa la lista di inizio sessione (autorizzazione permanente)
+  next|prossima) _next "$@" ;;     # prende la prossima card della fotografia, senza chiedere
   bot-filter-regex) _pr_bot_filter_regex ;;
   init) _kb_init "${1:-$ROOT}" ;;  # scaffold + privatize a repo's board (idempotent)
   lint) RDA_KANBAN="$KB" bash "$ROOT/kanban/lint-cards.sh" ;;  # runner/human_gates schema lint

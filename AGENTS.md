@@ -146,11 +146,23 @@ tool and this protocol are versioned.
 - **Every card carries a `repo:` (which repo/scope it's about — a `~/GitHub` dir-name, or
   `personal` for non-code work), a Definition of Done (`dod:`) + Acceptance criteria
   (`acceptance:`)** — a card can't start without all three filled. See `kanban/README.md`.
-- **Gate `todo → doing`:** human — needs **Roberto's approval** (`kb start … --by roberto`).
-  **Honest limit:** `--by` is a **discipline gate, not a security boundary** — any caller can pass
-  `--by roberto`; there's no blocking check (it would break the "do all the todos" autonomous
-  flow). `kb start` appends an audit line to the card on every call, refused or not (timestamp,
-  the `--by` value given, whether stdin was a TTY) — see `kanban/README.md`.
+- **Gate `todo → doing`: the LIST, not the card** (Roberto's decision, 2026-07-30). At session
+  start the hook photographs every `todo` card of the repo you are in (`kb queue`); an agent
+  walks that list to the end with `kb next`, **without asking**, and stops when it is done.
+  His words: *"completa tutte le card che ci sono quando comincia una sessione e poi fermati,
+  così io vedo solo se hai aggiunto altro."*
+  - **The one property that makes this a MOVED gate and not a REMOVED one:** a card created
+    **after** the snapshot is not in the list and does not start. So what an agent adds while
+    working stays for Roberto — asserted in `test/test-kb-queue.sh`, in both directions.
+  - `kb next` prints the cards born after the snapshot when the list runs out. If that report
+    ever goes silent, the gate is gone: it is the only thing Roberto asked to see.
+  - Revoke with `kb queue --stop` → back to per-card approval. Rule "one card in progress per
+    repo" still applies inside the queue.
+  - **Honest limit, unchanged:** `--by` is a **discipline gate, not a security boundary** — any
+    caller can pass `--by roberto`. `kb start` appends an audit line on every call, refused or
+    not (timestamp, the `--by` value, whether stdin was a TTY) — see `kanban/README.md`. What
+    the queue adds is that the approval now names **where it came from**, so an auto-started
+    card is distinguishable from a hand-typed `--by roberto`.
 - **`start` at the BEGINNING of the work, not retrospectively.** A card must *live* in `doing`
   for the duration of the task so `doing` shows what's actually in progress. Open + `start` first,
   then work, then `finish` — don't batch add+start+finish at the end (that leaves `doing` empty
