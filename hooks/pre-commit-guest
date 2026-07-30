@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# hooks/pre-commit-guest — the hook this repo installs into OTHER repositories.
+#
+# Why a second hook instead of reusing hooks/pre-commit: that one is about THIS repo. It
+# runs `test/leak-check.sh` against a denylist that lives here and warns about `kanban/`,
+# a nested board that exists only here. Installed elsewhere it would abort on the first
+# missing file, and a hook that aborts blocks every commit — which is how a guard gets
+# uninstalled within the hour.
+#
+# So the guest hook carries exactly one check, the only one that is about a mistake rather
+# than about this repository: do not commit corporate directory data. That mistake was
+# made on 2026-07-30 in a DIFFERENT repository, by an agent that harvested a live org walk
+# into a test fixture and pushed it. A control installed only here would have watched the
+# wrong door — this repo has never contained a single corporate address.
+#
+# It BLOCKS, unlike the nested-board notice. A dirty board is a normal working state and
+# blocking on it would train bypass; published personnel data is never a working state.
+set -euo pipefail
+
+CHECK="__CHECK_PATH__"
+
+if [ ! -x "$CHECK" ] && [ ! -f "$CHECK" ]; then
+  # Fail loudly rather than letting the commit through unchecked. A guard that goes
+  # quiet when its own body is missing is worse than no guard: it still looks installed.
+  echo "pre-commit: BLOCCATO — il controllo $CHECK non esiste (roberdan-os spostato?)." >&2
+  echo "  reinstalla con: bin/install-git-hooks.sh --into \"\$(git rev-parse --show-toplevel)\"" >&2
+  exit 1
+fi
+
+exec bash "$CHECK" --staged
