@@ -3,7 +3,7 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
-## [v2.25.0] - 2026-07-30
+## [v2.26.0] - 2026-07-30
 
 ### Added
 

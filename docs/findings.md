@@ -82,6 +82,16 @@ chi lo usa, e che questo file esiste per non fingere che basti.
 `remote` del repo in cui sei, invece di lasciare che sia uno stato globale conteso. Il repo
 sa già a chi appartiene: `git remote get-url origin`.
 
+**Stessa famiglia, stesso giorno, altro file: `VERSION` e `CHANGELOG.md`.** Le due sessioni
+hanno bruciato **lo stesso numero di versione (2.25.0)** per due lavori diversi, e il CHANGELOG
+si e' ritrovato con due sezioni `## [v2.25.0]`. Chi ha etichettato per primo ha vinto; l'altro
+ha rinumerato a 2.26.0. `rules/best-practices.md § Parallel work` lo dice gia' —
+*"tieni `VERSION`, `CHANGELOG.md`, `README.md` FUORI dai rami paralleli: si scrivono una volta
+sola, in sequenza, al momento del rilascio"* — ma quella riga governa i **rami**, e qui le due
+sessioni erano sullo **stesso ramo**. La regola va estesa al caso "due sessioni, un checkout",
+oppure `kb`/`bin` deve proporre il prossimo numero libero invece di lasciarlo scegliere a
+ognuno.
+
 ## 4. Claude Code ha gia' risolto a monte due dei cinque problemi del 30 luglio
 
 **Come e' emerso**: lette **34 versioni per intero** (2.1.206 -> 2.1.220), non un riassunto.
