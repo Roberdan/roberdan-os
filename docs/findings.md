@@ -59,7 +59,30 @@ nel hook sopravvive alla card che l'ha installato.
 
 ---
 
-## 3. `kb finish` dichiara "verified by @thor" anche quando non è vero
+## 3. Due sessioni si contendono l'account GitHub, e una delle due perde in silenzio
+
+**Come è emerso** (30 luglio 2026): due sessioni attive, una su `roberdan-os` (account
+`Roberdan`) e una su `VirtualBPMFy27` (account `roberdan_microsoft`, Enterprise Managed User).
+`gh auth switch` scrive in una configurazione **globale**: ogni volta che una delle due
+cambiava account, l'altra si ritrovava sotto quello sbagliato. Esiti osservati: due
+`pull request create failed: Unauthorized`, un `mergePullRequest` rifiutato, e un `HTTP 401`
+mentre le credenziali erano tutte valide.
+
+**Perché conta più di quanto sembri.** Il messaggio d'errore parla di autorizzazione, quindi
+la diagnosi naturale è "le credenziali sono scadute" — che è falsa. Si perde tempo a
+riautenticare qualcosa che funziona. E un merge rifiutato per questo motivo, in una sessione
+che non se ne accorge, diventa "l'ho pushato" senza che sia vero.
+
+**Aggirato**, non riparato: `GH_CONFIG_DIR=/tmp/gh-config-mio` dà a una sessione la sua
+configurazione privata, mentre quella globale resta all'altra. Funziona, ma è una variabile
+d'ambiente che va ricordata a mano — cioè il tipo di rimedio che dipende dalla disciplina di
+chi lo usa, e che questo file esiste per non fingere che basti.
+
+**La riparazione**: `bin/` dovrebbe esporre un piccolo wrapper che sceglie l'account dal
+`remote` del repo in cui sei, invece di lasciare che sia uno stato globale conteso. Il repo
+sa già a chi appartiene: `git remote get-url origin`.
+
+## 4. `kb finish` dichiara "verified by @thor" anche quando non è vero
 
 **Come è emerso** (30 luglio 2026): @thor era sospeso per decisione di Roberto, e ogni card
 chiusa quel giorno è stata verificata da Claude. `kb finish` ha comunque stampato
