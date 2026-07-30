@@ -3,9 +3,46 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
-## [Unreleased]
+## [v2.20.0] - 2026-07-30
 
 ### Added
+- **The bus doorbell: `bus count` + `hooks/bus-doorbell.sh`.** Pull-only delivery had a
+  cost nobody had paid yet — a message waits until somebody asks, and nobody asks, because
+  nobody knows it is there. The fix is a **count, never the mail**: `bus count --repo R`
+  prints one `card<TAB>role<TAB>n` line per role with unread mail and **nothing at all** when
+  there is none, and a `PostToolUse` hook injects it as `hookSpecificOutput.additionalContext`
+  inside a session that is **already running**. Nothing is woken, so property 1 is untouched;
+  a number carries no claim, so the anti-laundering property the board protected is untouched
+  too. Bodies still only arrive through `bus read`, stamped `UNVERIFIED`.
+  Four properties are pinned, not promised (checks 49b–49d in `test/test-bus.sh` and the new
+  `test/test-bus-doorbell.sh`, wired into `validate.sh`): it renders no body, it advances no
+  cursor, it is silent at zero, and it is wired on `PostToolUse` **and nowhere else** — the
+  test parses the generated settings snippet and fails on `Stop`, because a Stop hook that
+  surfaces pending mail is one edit away from "if a message is pending, continue the session",
+  the mutation `bus-protocol.md` names as the most dangerous.
+  **The detail this would have shipped broken on:** for `PostToolUse`, Claude Code writes hook
+  stdout to the debug log and the model never sees it (only `UserPromptSubmit`,
+  `UserPromptExpansion` and `SessionStart` get stdout as context). A doorbell written with
+  `echo` is a doorbell nobody hears and looks identical to a working one — so the JSON dialect
+  is asserted.
+  **Five mutants were run by hand**; four died immediately (cursor advanced, `.body` counted
+  instead of matched, a preview added with an off-allowlist command, a preview on every view),
+  and **one survived**: a body appended to the *repo-wide* summary line — the exact form the
+  hook calls — passed the whole suite green, because the marker the test grepped for sat in an
+  already-read record. The assertion now uses a marker unread *at the moment of the count*.
+  Declared limits, both real: the count is role-agnostic (the hook is not told which role the
+  session plays, so it also rings for mail *you* sent — the line names the recipient), and it
+  is taken without the append lock (so it can be short by one mid-append; the cursor never
+  moves, and `read` stays exact).
+- **Three more bus roles: `architect`, `qa-gate`, `security`.** "Only two agents" was never a
+  property of the design — it was the number of manifests that happened to exist. `_assert_role`
+  knows no cardinality: a role is addressable if `bus/roles/<role>.json` exists and claims no
+  human-gated action. `qa-gate` states in its own manifest that it is **not** the done-gate:
+  moving a card stays `kb finish` by @thor. The genuinely unsolved case — two sessions playing
+  the *same* role, which share one cursor and split the mail — is written up in
+  `bus-protocol.md` § Two sessions, one job, with the two constraints any future design must
+  respect (an instance id may key a cursor but never be an addressee; it must be
+  machine-assigned, never self-chosen).
 - **`bus/` — agent-to-agent messages, per repo and per card.** Generalises the improvised
   `/tmp` file channel two sessions used across seven review rounds of VirtualBPM PR #46.
   Append-only JSONL thread per (repo, card), per-role cursors, provenance stamped

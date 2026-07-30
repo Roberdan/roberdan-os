@@ -76,7 +76,8 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
           test-federated-kb test-leak-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
-          test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp; do
+          test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
+          test-bus-doorbell; do
   _spawn "$_s"
 done
 unset _s
@@ -313,7 +314,14 @@ section "pre-commit hook e' installato E aggiornato (il leak check blocca solo s
 # first draft grepped for that path and passed on a stale COPY, because the copy carries
 # it in its own header comment. Verified by putting the old copy back and watching this
 # turn red — a check nobody has seen fail is a guess.
-_gitdir="$(git rev-parse --git-dir 2>/dev/null || true)"
+# --git-common-dir, not --git-dir: inside a worktree the latter is
+# .git/worktrees/<name>/, which never holds hooks. This check reported "no
+# pre-commit installed" in every worktree even when one was installed — and the
+# canon mandates one worktree per card, so that was every place work happens.
+# Same one-word defect as bin/install-git-hooks.sh had, in the check that was
+# supposed to catch it.
+_gitdir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+case "$_gitdir" in /*|"") ;; *) _gitdir="$(git rev-parse --show-toplevel)/$_gitdir" ;; esac
 _ih="$_gitdir/hooks/pre-commit"
 if [ ! -x "$_ih" ]; then
   # I git hook NON si clonano. Su una macchina di CI il hook non e' quindi assente per
@@ -392,6 +400,9 @@ if _suite test-review-budget; then ok "a spent review budget exits 3 and demands
 
 section "agent bus — messages, never execution (test/test-bus.sh)"
 if _suite test-bus; then ok "bus delivers durably, attributes, resolves citations to no more than they prove, and executes nothing"; else _suite_out test-bus; err "test-bus — see bash test/test-bus.sh"; fi
+
+section "agent bus — the doorbell rings, it never delivers (test/test-bus-doorbell.sh)"
+if _suite test-bus-doorbell; then ok "the PostToolUse doorbell announces a COUNT in the one dialect the model hears, leaks no body, consumes no mail, is silent at zero, and is wired nowhere that can continue a turn"; else _suite_out test-bus-doorbell; err "test-bus-doorbell — see bash test/test-bus-doorbell.sh"; fi
 
 section "agent bus — the typed MCP surface (test/test-bus-mcp.sh)"
 if _suite test-bus-mcp; then ok "the MCP surface dispatches send/read/log only, refuses unknown tools, and stores shell metacharacters as inert data"; else _suite_out test-bus-mcp; err "test-bus-mcp — see bash test/test-bus-mcp.sh"; fi

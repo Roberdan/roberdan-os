@@ -13,10 +13,18 @@
 # turn a missing file into a confidentiality hole.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GITDIR="$(git -C "$ROOT" rev-parse --git-dir)"
+# --git-common-dir, not --git-dir: inside a worktree the latter points at
+# .git/worktrees/<name>/, which has no hooks/ directory and never gets one. This
+# script used to write there and die with "No such file or directory", so in a
+# worktree the hook was never installed — and the canon mandates one worktree per
+# card, which is to say: it was never installed WHERE THE WORK HAPPENS. Hooks are
+# shared across worktrees by design, and the common dir is where they live.
+GITDIR="$(git -C "$ROOT" rev-parse --git-common-dir)"
+case "$GITDIR" in /*) ;; *) GITDIR="$ROOT/$GITDIR" ;; esac
 
 install_hook() {
   local name="$1" src="$ROOT/hooks/$1" dst="$GITDIR/hooks/$1"
+  mkdir -p "$GITDIR/hooks"
   [ -f "$src" ] || { echo "install-git-hooks: skip $name (no hooks/$name in repo)"; return 0; }
   cat > "$dst" <<SHIM
 #!/usr/bin/env bash
