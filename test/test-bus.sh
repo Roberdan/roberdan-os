@@ -561,6 +561,15 @@ read --repo $R --card $C --as sol-gate
 read --repo $R --card $C --as implementer
 peek --repo $R --card $C --as sol-gate
 read --repo $R --card $C --as all
+count --repo $R
+count --repo $R --card $C
+count --repo $R --card $C --as sol-gate
+count --repo $R --as nosuchrole
+count --repo $R --as all
+count --card $C
+count --repo ../escape
+count --repo $R --nosuchflag
+count --repo nosuchrepo
 log --repo $R --card $C
 who --repo $R
 roles
@@ -580,6 +589,8 @@ who --repo $R
 send --repo $R --card locked$1 --from implementer --to sol-gate --body-file $TMP/body.txt
 read --repo $R --card empty$1 --as sol-gate
 log --repo $R --card empty$1
+count --repo $R --card dmg$1
+count --repo $R --card empty$1
 PATHS
 }
 
@@ -639,7 +650,7 @@ grep -q '^readonly OS_FLOOR_PRESENT=0' "$ROOT/factory/dispatch-runner.sh" \
 #     an existing thread survives every subcommand, byte for byte.
 before="$(shasum "$RDA_BUS_HOME/$R/$C.jsonl" | awk '{print $1}')"
 for sub in "read --repo $R --card $C --as sol-gate" "peek --repo $R --card $C --as sol-gate" \
-           "log --repo $R --card $C" "who --repo $R" "roles"; do
+           "log --repo $R --card $C" "who --repo $R" "roles" "count --repo $R"; do
   # shellcheck disable=SC2086
   busrun $sub >/dev/null 2>&1 || true
 done
@@ -1283,6 +1294,63 @@ grep -q "^m-$BIGN2$" <<<"$big" || fail "the NEWEST record was dropped between th
   || fail "the permanent log no longer contains the records that were sent, in order"
 [ "$(tr -d '[:space:]' < "$RDA_BUS_HOME/$R/.cursor/big/sol-gate")" = "$BIGN2" ] \
   || fail "the cursor does not cover the whole snapshot"
+
+# 49b. THE DOORBELL RINGS, IT DOES NOT DELIVER. `count` exists so a hook can say [PINNED]
+#      HOW MANY messages wait, inside a session that is already running, without
+#      the message itself arriving anywhere except through `read`. If a body can
+#      leak through the counter, the counter has become an unstamped delivery
+#      channel - the exact thing the board cut context-inject delivery for.
+BELLBODY="DOORBELL-BODY-MUST-NEVER-APPEAR-1f3a"
+echo "$BELLBODY" | busrun send --repo "$R" --card bell --from sol-gate --to implementer >/dev/null
+bell="$(busrun count --repo "$R" --card bell)"
+grep -q "$BELLBODY" <<<"$bell" && fail "count RENDERED A BODY: it is a delivery channel, not a counter"
+[ "$bell" = "$(printf 'bell\timplementer\t1')" ] \
+  || fail "count did not report exactly one unread for @implementer, it said: $bell"
+
+# 49c. THE DOORBELL DOES NOT CONSUME THE MAIL IT ANNOUNCES. A counter that moves [PINNED]
+#      the cursor is worse than no counter: the log is append-only and the cursor
+#      only goes forward, so the announced message would be gone from `read`
+#      forever, and the hook that ate it runs on EVERY tool call.
+BELLCUR="$RDA_BUS_HOME/$R/.cursor/bell/implementer"
+[ ! -e "$BELLCUR" ] || fail "count created a cursor for a role that has never read"
+busrun count --repo "$R" >/dev/null
+[ ! -e "$BELLCUR" ] || fail "count ADVANCED (created) the cursor - the mail it announced is now unreachable"
+bellread="$(busrun read --repo "$R" --card bell --as implementer)"
+grep -q "$BELLBODY" <<<"$bellread" || fail "the message announced by count was not delivered by read"
+grep -q "CLAIM BY @sol-gate" <<<"$bellread" || fail "the announced message arrived without provenance"
+#      ...and once read, the doorbell goes quiet by itself.
+[ -z "$(busrun count --repo "$R" --card bell)" ] \
+  || fail "count still reports unread mail after it was read"
+
+# 49d. IT COUNTS WITHOUT A ROLE, because the hook that calls it has none - and it [PINNED]
+#      still refuses the reserved broadcast addressee, counts nothing for the
+#      SENDER of a message, and stays silent on a closed thread and on a repo with
+#      no traffic. Silence matters as much as the count here: this runs on every
+#      tool call, so anything printed at zero is context spent forever.
+BELLBODY2="DOORBELL-BODY-2-MUST-NEVER-APPEAR-9c1d"
+echo "$BELLBODY2" | busrun send --repo "$R" --card bell --from sol-gate --to implementer >/dev/null
+BELLALL="$(busrun count --repo "$R")"
+grep -q "bell	implementer	1" <<<"$BELLALL" \
+  || fail "count without --as did not find the unread message"
+#      This is THE path the hook actually calls (it has no --card and no --as), so
+#      it is the path whose output reaches a model's context. 49b pins the
+#      single-card form by exact equality; here the assertion is per-line, so a
+#      body smuggled onto a summary line would pass it - hence this grep, which is
+#      the one that carries the weight on this branch.
+#      The marker has to be in the message that is UNREAD RIGHT NOW: a mutant that
+#      appends "the latest body" to the summary line was invisible to a marker
+#      sitting in an already-read record, and passed the whole suite green.
+grep -qE "$BELLBODY|$BELLBODY2" <<<"$BELLALL" \
+  && fail "the repo-wide count RENDERED A BODY - the doorbell became an unstamped delivery channel"
+[ -z "$(busrun count --repo "$R" --card bell --as sol-gate)" ] \
+  || fail "count reported the SENDER's own message as unread mail for the sender"
+busrun count --repo "$R" --as all >/dev/null 2>&1 \
+  && fail "count accepted the reserved broadcast addressee as a role to count for"
+busrun close --repo "$R" --card bell --by sol-gate >/dev/null
+[ -z "$(busrun count --repo "$R" --card bell)" ] \
+  || fail "count still rings on a CLOSED thread"
+quiet="$(busrun count --repo norepo-at-all 2>&1)" || fail "count failed on a repo with no traffic - an empty channel is not an error"
+[ -z "$quiet" ] || fail "count printed something for a repo with no traffic: $quiet"
 
 # 50. THE FLOORS, AFTER THE LAST INVOCATION OF THE BUS. Checks 42, 47 and 47b [PINNED]
 #     are called "whole run" but they run at line ~910/~1010, and the suite keeps

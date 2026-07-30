@@ -20,6 +20,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+
 if [ "${1:-}" = "--into" ]; then
   TARGET="${2:-}"
   [ -n "$TARGET" ] || { echo "install-git-hooks: --into richiede il path di un repo" >&2; exit 2; }
@@ -59,10 +60,18 @@ if [ "${1:-}" = "--into" ]; then
   exit 0
 fi
 
-GITDIR="$(git -C "$ROOT" rev-parse --git-dir)"
+# `--git-path hooks` e non `--git-dir`/hooks, per la stessa ragione per cui
+# test/validate.sh lo fa: in un WORKTREE git-dir e' .git/worktrees/<nome>, che non
+# contiene hook e non ne avra' mai. Questo script scriveva la' e moriva con "No such
+# file or directory" — quindi in un worktree il hook non veniva installato, e il canone
+# impone un worktree per card: cioe' non veniva installato in nessun posto dove il
+# lavoro avviene davvero. Si chiede a git DOVE guarda, non si ricostruisce il percorso.
+HOOKDIR="$(git -C "$ROOT" rev-parse --git-path hooks)"
+case "$HOOKDIR" in /*) ;; *) HOOKDIR="$ROOT/$HOOKDIR" ;; esac
 
 install_hook() {
-  local name="$1" src="$ROOT/hooks/$1" dst="$GITDIR/hooks/$1"
+  local name="$1" src="$ROOT/hooks/$1" dst="$HOOKDIR/$1"
+  mkdir -p "$HOOKDIR"
   [ -f "$src" ] || { echo "install-git-hooks: skip $name (no hooks/$name in repo)"; return 0; }
   cat > "$dst" <<SHIM
 #!/usr/bin/env bash
