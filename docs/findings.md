@@ -82,7 +82,81 @@ chi lo usa, e che questo file esiste per non fingere che basti.
 `remote` del repo in cui sei, invece di lasciare che sia uno stato globale conteso. Il repo
 sa già a chi appartiene: `git remote get-url origin`.
 
-## 4. `kb finish` dichiara "verified by @thor" anche quando non è vero
+## 4. Claude Code ha gia' risolto a monte due dei cinque problemi del 30 luglio
+
+**Come e' emerso**: lette **34 versioni per intero** (2.1.206 -> 2.1.220), non un riassunto.
+La prima lettura ne aveva viste otto tramite una fetch riassunta e aveva trovato tre voci;
+leggendo il changelog vero le voci pertinenti sono molte di piu', e due colpiscono in pieno
+i problemi che Roberto aveva elencato quella mattina. Il guardiano `evolve/` non ha contribuito
+nulla: era spento, e quando girava produceva "il changelog e' cambiato, vai a leggerlo".
+
+### a) Il problema "non finisce mai" ha ora dei tetti nel runtime
+
+Non erano regole da scrivere: erano manopole gia' esistenti e mai impostate.
+
+| Manopola | Valore di serie | Perche' riguarda Roberto |
+|---|---|---|
+| `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | **3** (alzato in 2.1.219, era 1) | Un subagente puo' generare subagenti che generano subagenti. E' il moltiplicatore del lavoro non richiesto, ed e' acceso di serie. |
+| `CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION` | 200 (2.1.212) | Tetto per sessione contro le catene di delega scappate di mano. |
+| `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | 20 (2.1.217) | Tetto su quanti girano insieme. |
+| `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` | 200 (2.1.212) | Tetto contro i cicli di ricerca infiniti. |
+| `--max-budget-usd` | assente | Dal 2.1.217 **ferma davvero** gli agenti in background: prima li lasciava correre. |
+
+**E Anthropic ha fatto la stessa scelta che abbiamo fatto qui il 30 luglio**: dal 2.1.215
+*"Claude non esegue piu' `/verify` e `/code-review` da solo"*, e dal 2.1.218 lo stesso per
+`/deep-research`. Cioe': i revisori che partono da soli producono lavoro che nessuno ha
+chiesto. E' la stessa diagnosi, presa a monte.
+
+### b) Il problema "gli agenti si pestano i piedi" era in gran parte un difetto del runtime
+
+Cinque riparazioni sui worktree in quattro versioni, e sono **la stessa famiglia** dei cinque
+difetti trovati qui in due giorni:
+
+- 2.1.216: subagenti isolati in worktree che redirigevano git sul checkout condiviso via
+  `git -C`, `--git-dir`, `GIT_DIR`/`GIT_WORK_TREE` — **letteralmente il nostro difetto**
+- 2.1.216: sessioni che finivano nel worktree avanzato di un altro progetto
+- 2.1.211: le regole "consenti sempre" ora si salvano nella radice del repo, cosi'
+  un'approvazione data in un worktree sopravvive
+- 2.1.210: subagenti in worktree che potevano eseguire comandi git sul checkout principale
+- 2.1.210: sessioni uccise che lasciavano un `git worktree lock` permanente
+
+**E il finding numero 3 di questo file** — due sessioni che si contendono le credenziali — ha
+il suo gemello a monte: 2.1.211, *"sessioni parallele che si scollegavano tutte insieme dopo
+il risveglio quando condividono un solo archivio di credenziali"*.
+
+### c) Sandbox: la regola sul raggio d'azione puo' diventare meccanica
+
+- `sandbox.network.strictAllowlist` (2.1.219) nega gli host non in lista **senza chiedere**
+- `sandbox.filesystem.disabled` (2.1.216) permette di tenere il controllo sulla rete senza
+  l'isolamento del filesystem
+
+`rules/best-practices.md § Security` dice gia' che *"il controllo e' il raggio d'azione, non
+la prosa"*. Oggi e' buona volonta'; queste due voci la rendono configurazione. **E' anche
+l'unica idea che valeva la pena prendere da langchain-ai/deepagents**: non serve un framework.
+
+### d) Cose che toccano il canone e vanno verificate, non assunte
+
+- **2.1.214: i hook con codice di uscita 2 non bloccavano** quando il JSON su stdout falliva
+  la validazione. Diversi hook di roberdan-os contano su quel blocco. Riparato a monte, ma
+  vale sapere che per un periodo *non* bloccavano.
+- 2.1.212: un `continue:false` di un hook veniva perso se lo strumento falliva a meta'.
+- 2.1.206: `/doctor` propone di **sfoltire i `CLAUDE.md` committati** tagliando cio' che si
+  puo' dedurre dal codice — un parere esterno sul fatto che il canone sia troppo grande.
+- 2.1.210: una scrittura che lascia `MEMORY.md` oltre il limite ora **da' errore** invece di
+  troncare in silenzio.
+- 2.1.214: i `SessionStart` hook riportano `"fork"` come sorgente — la fotografia della coda
+  in `context-inject.sh` non distingue una sessione nuova da un fork.
+
+**Lato Copilot**: "Agent automation controls in GitHub Issues" (23 lug) e "agent session
+streaming" (2 lug) spostano il coordinamento fra agenti su GitHub. Da guardare **prima** di
+investire altro sul `bus` fatto in casa.
+
+**Perche' non sono card.** Il gruppo (a) e' una manciata di variabili d'ambiente e vale piu'
+di tutto il resto messo insieme: attacca meccanicamente il problema numero 1. Il gruppo (b)
+suggerisce di appoggiarsi al runtime invece di riparare a mano la stessa famiglia una sesta
+volta. Cosa prendere lo decide Roberto.
+
+## 5. `kb finish` dichiara "verified by @thor" anche quando non è vero
 
 **Come è emerso** (30 luglio 2026): @thor era sospeso per decisione di Roberto, e ogni card
 chiusa quel giorno è stata verificata da Claude. `kb finish` ha comunque stampato
