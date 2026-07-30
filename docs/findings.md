@@ -207,7 +207,36 @@ inutilmente piccoli, recupero peggiore) o troppo largo (embedding rifiutati).
 **Se peggiora.** Il giorno in cui si cambia embedder. La riparazione giusta **non** e'
 cambiare la costante: e' derivarla dal contesto del modello configurato.
 
-## 7. `kb finish` dichiara "verified by @thor" anche quando non è vero
+## 7. Una pagina sovradimensionata non si indicizza, e il rimedio esiste ma non e' retroattivo
+
+**Come e' emerso** (30 luglio 2026, sera): durante `gbrain sync`, in diretta —
+`Error embedding apps-web-src-components-settings-sections-profile-settings-tsx:
+[embed(ollama:bge-m3)] the input length exceeds the context length`. Osservato **due volte**.
+
+**Cosa NON era**, e questa e' la parte istruttiva: sembrava la card `260730-102955` (taglio a
+2000 token contro 2048), chiusa quel mattino dicendo *"non e' mai successo, non puo' succedere
+con bge-m3"*. **Quella chiusura era sbagliata su un punto**: il conteggio a zero era vero, la
+conclusione tratta da quel conteggio no. "Non e' mai successo finora" non e' "non puo' succedere".
+
+**Cosa ho trovato scavando.** `bge-m3` dichiara `bert.context_length = 8192`, ma ollama non
+aveva **nessun parametro impostato** e lo serviva col proprio valore di serie, **2048** — un
+quarto della capacita' del modello. gbrain non passa `num_ctx`. Quindi il margine reale contro
+il taglio a 2000 token *stimati* era davvero **48 token**, come diceva la card.
+**Riparato**: `bge-m3` ricostruito con `PARAMETER num_ctx 8192`, stesso nome, cosi' gbrain non
+vede cambiare il modello e non re-indicizza nulla.
+
+**Perche' resta una riga e non una card.** Dopo la riparazione l'errore su quella pagina
+**persiste**: quel blocco supera anche gli 8192, quindi non e' il problema di margine — e' una
+**pagina sovradimensionata** sfuggita al taglio, di **un altro progetto** (`apps-web`), 2 blocchi
+su un corpus di centinaia di pagine. Il doctor ha gia' un rimedio dichiarato per la famiglia
+(`frontmatter.embed_skip`, applicato **d'ufficio ai nuovi ingressi**) — quello che manca e' la
+retroattivita' sulle pagine entrate prima.
+
+**Se peggiora.** Quando le pagine non indicizzabili passano da 2 blocchi a una quota che sposta
+i risultati di ricerca. Oggi non lo sono. La riparazione: `gbrain quarantine` o `embed_skip` sui
+casi esistenti, una volta.
+
+## 8. `kb finish` dichiara "verified by @thor" anche quando non è vero
 
 **Come è emerso** (30 luglio 2026): @thor era sospeso per decisione di Roberto, e ogni card
 chiusa quel giorno è stata verificata da Claude. `kb finish` ha comunque stampato
