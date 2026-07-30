@@ -30,14 +30,21 @@ _codice() {
   git ls-files 2>/dev/null | grep -vE '\.(md|txt|json|lock)$' | grep -vE '^(docs/|CHANGELOG)'
 }
 
-# Le forme con cui Playwright sceglie il browser: `chromium.launch()`, `channel: "chrome"`,
-# `--browser chromium`, `browser_type="chromium"`. Si cercano le forme, non la parola sola:
-# "chromium" dentro un commento che spiega perché NON si usa è legittimo.
+# Le forme con cui Playwright sceglie il browser, scritte QUI SPEZZATE di proposito:
+#   chromium ⟨punto⟩ launch()   ·   channel ⟨due punti⟩ "chrome"
+#   --browser ⟨spazio⟩ chromium ·   browser_type ⟨uguale⟩ "chromium"
+#
+# Spezzate perché la prima stesura le scriveva per esteso e **questo file faceva fallire se
+# stesso**: la CI diventava rossa citando le righe di commento che spiegavano cosa cercare.
+# La tentazione era escludere questo file dalla scansione — sarebbe stato un gate cieco
+# proprio su se stesso, cioè il posto più comodo dove nascondere una violazione vera.
+# Si cercano le FORME, non la parola sola: "chromium" dentro una frase che spiega perché non
+# si usa è legittimo, ed è esattamente ciò che stai leggendo.
 _violazioni() {
   local f n riga
   while read -r f; do
     [ -f "$f" ] || continue
-    grep -nE 'chromium[.[:space:]]*\.?launch|channel[[:space:]]*[:=][[:space:]]*.?(chrome|chromium)|--browser[[:space:]]+(chrome|chromium)|browser_type[[:space:]]*=[[:space:]]*.?(chrome|chromium)' \
+    grep -nE 'chromium[[:space:].]*\.?launch|channel[[:space:]]*[:=][[:space:]]*.?(chrome|chromium)|--browser[[:space:]]+(chrome|chromium)|browser_type[[:space:]]*=[[:space:]]*.?(chrome|chromium)' \
       "$f" 2>/dev/null | while IFS=: read -r n riga; do
         # L'eccezione, sulla riga stessa o su quella prima.
         case "$riga" in *"$MARCATORE"*) continue ;; esac
