@@ -125,9 +125,13 @@ Three mechanical gates, because there are two distinct defects and one counterwe
 **(1) two rounds on the same CLASS** stop the patching — seven rounds on one route check each
 fixed another *instance* of one class; that ends by changing the shape of the guarantee, not by
 running out of instances, so a third round of instances is refused. **(2) Anything discovered
-while doing card X becomes a NEW CARD**, never a commit in X's PR — a card that said "sort
-before cutting" produced a +6153-line PR about macOS ACLs across 18 rounds; good work, not the
-work asked for. **(3) A DEMONSTRATED live exposure overrides the cap**, and nothing else does —
+while doing card X goes in `docs/findings.md`** — not in X's PR, and **not in a new card**
+either: a card that said "sort before cutting" produced a +6153-line PR about macOS ACLs across
+18 rounds; good work, not the work asked for. *(Revised 2026-07-30: this used to say "becomes a
+NEW CARD". The scar's lesson was "not in this PR"; as "make a card" it made every reviewer a
+card factory aimed at Roberto's gate — 33 cards waiting, 19 on one project, that project with
+zero in progress. A finding is a line with the condition that would make it worth a card; only
+Roberto promotes it.)* **(3) A DEMONSTRATED live exposure overrides the cap**, and nothing else does —
 "an attacker could…" is a risk, and a cap that yields to *might* is not a cap. Every PR states
 its own round count (`review-budget.sh line <card>`): a number that has to be written down makes
 the eighteenth round embarrassing to type, which prose never has.

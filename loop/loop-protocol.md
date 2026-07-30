@@ -105,10 +105,25 @@ The rules:
   reader, and the gate asks it). So at the second round on a class, exactly two moves are
   allowed, both in one step: change the shape so the class cannot occur, or **minute it** as a
   known limit with its cost and stop. A third round of instances is refused.
-- **Anything discovered while doing card X becomes a NEW CARD, never a commit in X's PR.**
-  The other failure is drift, not repetition: a card that said *"sort before cutting"* produced
-  a **+6153-line PR about macOS ACL permissions** over 18 rounds. The work was good. It was not
-  the work that was asked for. The discovery keeps; the scope does not.
+- **Anything discovered while doing card X goes in a FINDINGS LIST — not in X's PR, and not
+  in a new card either.** The other failure is drift, not repetition: a card that said
+  *"sort before cutting"* produced a **+6153-line PR about macOS ACL permissions** over 18
+  rounds. The work was good. It was not the work that was asked for. The discovery keeps; the
+  scope does not.
+
+  **Revised 2026-07-30, and it reverses what this line used to say** ("becomes a NEW CARD").
+  The scar's real lesson was *"not in this PR"*; implementing it as *"make a card"* turned
+  every reviewer — and reviewers are rewarded for finding one true thing — into a card factory
+  pointed at the one gate that only Roberto can open. Measured that morning: **33 cards waiting
+  on his approval**, 19 on a single project, most of them findings nobody had asked for, while
+  that project had **zero** cards in progress. The gates were not broken; they were faithfully
+  verifying an input that had already buried the work.
+
+  A finding is a line in `docs/findings.md` (per repo), ordered by risk, each with **the
+  condition that would make it worth a card**. It becomes a card only when Roberto says so.
+  This is deliberately a *weaker* default than a card, because the failure mode being fixed is
+  a board nobody can read — and a finding nobody triages costs one line, while a card nobody
+  triages costs a gate.
 - **Bound the property or bound the rounds.** If the property's surface is external and
   mutable, it cannot be closed — write down *which* surface is in scope and treat the rest as
   a declared limit, exactly like a declared survivor in a mutation suite.
