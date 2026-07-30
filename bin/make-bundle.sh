@@ -18,12 +18,23 @@ TMP="$(mktemp "${TMPDIR:-/tmp}/rda-bundle.XXXXXX.md")"
 trap 'rm -f "$TMP"' EXIT
 
 # The ONLY sources allowed into the bundle — all committed canon, never private/.
+#
+# WHY engineering-reference IS HERE AND THE OTHER SKILLS ARE NOT. Claude JIT-loads a
+# skill when it needs one; ChatGPT/web has no such mechanism — this bundle IS its whole
+# canon. So every MIGRATION out of rules/ into that skill silently deleted the material
+# from this surface: the 2026-07-14 batch (code style, testing, local CI, merge
+# discipline, review comments, repo setup, git hooks) and the 2026-07-30 batch (carded
+# end-to-end, documentation, documentation budget) both left rules/ and never arrived
+# anywhere the web surface reads. A pointer to a skill is not a pointer THERE.
+# The skill is a normal committed canon file, so including it costs one paste, not one
+# token per turn — the reason it left rules/ does not apply to this artifact.
 SECTIONS=(
   "behavior/roberto-mode.md"
   "identity/voice.md"
   "behavior/thinking-toolkit.md"
   "rules/constitution.md"
   "rules/best-practices.md"
+  "skills/engineering-reference/skill.md"
 )
 
 {

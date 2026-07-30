@@ -103,30 +103,12 @@ Concrete failure modes this rule exists to catch (all seen in this repo or its w
 (a coverage gate, a grep-for-caller test, a link check) rather than relying on a human to notice.
 An unwired feature that ships green is worse than one that fails loudly.
 
-## Carded End-to-End (requirements must become cards, not just prose)
+## Carded End-to-End (skill, not canon)
 
-The twin of § Wired End-to-End, one level up: **a requirement that lives in a plan but never becomes
-a card is not planned — it's a wish that looks planned.**
-
-Every gate we have — `kb`, `@thor`, the merge-gate, CI — operates **downstream of the card**. A
-requirement that never became one is invisible to all four *simultaneously*. They are not broken;
-they faithfully verify an input that was already amputated. The plan→card translation is the only
-link in the chain with **no gate**, and it is exactly where requirements die.
-
-- **Walk from the plan, never from the board.** A board can only show you the cards that exist. It
-  cannot show you the **absence** of one — which is the entire failure mode.
-- **A card may not weaken the clause it claims to satisfy.** Plan says "X, Y **and** Z are
-  mandatory"; card says "at least one of X/Y/Z" — that closes green while deleting Y and Z from the
-  product. **Quantifiers are where requirements go to die.**
-- **The gate, not this paragraph, is the control:** `kb cover <plan.md>` fails red on any clause with
-  no card and no written decision (`<plan>.coverage`). It runs inside `test/validate.sh`. Prose did
-  not stop this from happening — a gate does.
-
-*(Scar: trading-os 2026-07-13. The signed plan mandated "SEC EDGAR/RSS, company IR and GDELT"; the
-one card that could have delivered it read "at least one mandatory free live source", closed honestly
-green, and the news evaporated. The system then built the news graph, the news UI and news realtime
-freshness — and nothing that fetches a news item. A full plan→DAG audit found **77 of 149 normative
-clauses never reached the product**. Full report: `trading-os/docs/execution/plan-coverage-audit.md`.)*
+A requirement that lives in a plan but never becomes a card is not planned. The control is the
+`kb cover <plan.md>` gate inside `test/validate.sh`, not this paragraph — so the discipline and its
+scar moved to the **`engineering-reference` skill** (2026-07-30), loaded when you translate a plan
+into cards.
 
 ## Context & Token Economy
 
@@ -169,20 +151,11 @@ Code best practices, current 2026.)
 | "it works, trust me" | Run tests, attach output |
 | "refactor later" | Now or tracked issue |
 
-## Documentation
+## Documentation & Documentation Budget (skill, not canon)
 
-JSDoc / docstrings for public APIs (WHY, not WHAT). CHANGELOG: `## [vX.Y.Z] - date` → `### Added | Changed | Fixed`. Keep TROUBLESHOOTING.md current.
-
-## Documentation Budget
-
-A system that documents itself more than it does the work is a smell. Keep meta-documentation to:
-
-- **One living plan**: `docs/plan.md`. Not a plan per session — the plan, updated in place.
-- **One living handoff**: `handoff/latest.md`. Not a handoff per session — overwritten each time, git history is the log.
-- **Dated session artifacts** (plans, judgments, test reports tied to a specific date) move to `docs/archive/` once their actions are closed. They stay for reference; nothing there is maintained going forward.
-- **No build artifacts** (PDF, generated bundles, compiled output) committed to git. Regenerate from source; git history keeps old copies if ever needed.
-
-The behavioral canon (`AGENTS.md`, `behavior/`, `rules/`, `agents/`) must always outweigh the system's self-documentation. If a repo has more words describing its own process than governing actual behavior, that's a sign the process writing has run away — prune it back to the living plan + living handoff, archive the rest.
+Docstring/CHANGELOG conventions and the meta-documentation budget (one living plan, one living
+handoff, dated artifacts to `docs/archive/`, no build artifacts in git) moved to the
+**`engineering-reference` skill** (2026-07-30). They apply while writing docs, not before.
 
 ## Parallel work — worktree + PR, never concurrent commits on one checkout
 

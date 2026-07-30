@@ -3,7 +3,13 @@
 # file in baseline: 11
 # Un file NON in questa lista che supera le 300 righe fa fallire test/test-file-size-ratchet.sh.
 # Si accorcia una riga togliendola; si allarga solo con una decisione visibile in un diff.
-1623 kanban/kb.sh
+# 2026-07-30, decisione visibile come il file stesso chiede: +39 kb.sh, +62 test-kb-views.sh
+# per `kb counts`. Il SessionStart hook rendeva l'intero board (stat su 96 card done, sort,
+# box, legenda) per stampare tre interi: 2.5 s pagati prima che Roberto potesse scrivere, in
+# ogni sessione di ogni repo. Il comando nuovo li conta e basta, e il test lo inchioda ai
+# numeri che il box mostra (mutazione provata: 3 su 3 rosse). Righe pagate una volta contro
+# secondi pagati sempre.
+1662 kanban/kb.sh
 1364 test/test-bus.sh
 1131 test/test-bus-mutants.sh
 774 bus/bus.sh
@@ -12,5 +18,5 @@
 597 test/validate.sh
 574 test/test-factory-kb.sh
 438 eval/test-eval-pipeline.sh
-380 test/test-kb-views.sh
+442 test/test-kb-views.sh
 344 eval/report.sh

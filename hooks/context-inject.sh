@@ -43,10 +43,18 @@ if [ -x "$HOME/.local/bin/kb" ]; then
   # context that Roberto reads too, every single session, and it drowns the two things he
   # actually needs (what's in flight, what's waiting on him). Print only what's DOING plus
   # counts; run `kb view` on demand for the board. See behavior/roberto-mode.md § volume.
-  RDA_KANBAN="$ROOT/kanban" "$HOME/.local/bin/kb" list 2>/dev/null \
-    | sed -n '/^DOING:/,/^DONE/p' | sed '1d;$d' | sed 's/^ */  in corso: /' | head -6
-  RDA_KANBAN="$ROOT/kanban" "$HOME/.local/bin/kb" view 2>/dev/null \
-    | grep -o '\(TO DO\|DOING\|DONE\) ([^)]*)' | paste -sd' · ' - | sed 's/^/  /'
+  #
+  # ASK FOR THE COLUMN, NOT THE BOARD. These two lines used to be `kb list` (all three
+  # columns, then sed out DOING) and `kb view` (render the whole board, then grep three
+  # numbers back out of it) — so both walked all 96 done cards, spawning grep+sed+basename
+  # per card, in order to print two card titles and one counter line. Measured on the real
+  # board 2026-07-30 (96 done cards), A/B alternated at the same machine load, 3 rounds:
+  # old pair 2.534 / 2.917 / 2.579 s, new pair 0.074 / 0.075 / 0.074 s — ~34x, ~2.5 s off
+  # every session start. Byte-identical output but for the counter separator. A
+  # SessionStart hook is paid before the human can type, in every session, in every repo.
+  RDA_KANBAN="$ROOT/kanban" "$HOME/.local/bin/kb" doing 2>/dev/null \
+    | sed '1d' | sed 's/^ */  in corso: /' | head -6
+  RDA_KANBAN="$ROOT/kanban" "$HOME/.local/bin/kb" counts 2>/dev/null | sed 's/^/  /'
   echo "  (board completo: \`kb view\` · dettaglio card: \`kb show <id>\`)"
 fi
 

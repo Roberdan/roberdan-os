@@ -380,6 +380,43 @@ _board() {
   _archive_hint
 }
 
+# kb counts — the three column totals ALONE, for the SessionStart hook.
+#
+# WHY IT EXISTS. The hook wanted one line ("TO DO (n) · DOING (n) · DONE (n +m arch)")
+# and was paying `kb view` for it: a full board render that `stat`s every done card to
+# sort the newest ten, renders a box, and prints a legend — all of which the hook threw
+# away with a `grep -o`. Measured on the real board (96 done cards, 2026-07-30):
+# `kb view` 1.08 s of the hook's 3.3 s, for three integers. This counts files and stops.
+#
+# It mirrors _board's board selection EXACTLY — aggregate when the cwd resolved to no
+# recognized board, this board otherwise. A different selection would print numbers that
+# disagree with the box a human sees two lines above, and "the counts lie" is worse than
+# "the counts are slow". test-kb-views pins the two equal so they cannot drift apart.
+_counts() {
+  local bd f _af nt=0 nd=0 nn=0 narch=0
+  local -a boards=()
+  if [ "$KB_MATCHED" -eq 0 ]; then
+    while IFS= read -r bd; do
+      [ -n "$bd" ] && [ -d "$bd/kanban" ] && boards+=("$bd/kanban")
+    done < <(_board_roots)
+  fi
+  [ "${#boards[@]}" -eq 0 ] && boards=("$KB")
+  for bd in "${boards[@]}"; do
+    # ${f##*/} instead of $(basename "$f"): same answer, and this loop runs once per card
+    # on every board — a subshell here is the cost this command exists to remove.
+    for f in "$bd/todo"/*.md;  do [ -e "$f" ] || continue; case "${f##*/}" in _*) continue;; esac; nt=$((nt+1)); done
+    for f in "$bd/doing"/*.md; do [ -e "$f" ] || continue; case "${f##*/}" in _*) continue;; esac; nd=$((nd+1)); done
+    for f in "$bd/done"/*.md;  do [ -e "$f" ] || continue; case "${f##*/}" in _*) continue;; esac; nn=$((nn+1)); done
+    for _af in "$bd/done"/_archive-*.md; do
+      [ -e "$_af" ] || continue
+      narch=$((narch + $(grep -cE '^\| [0-9]+ \|' "$_af" 2>/dev/null || true)))
+    done
+  done
+  local done_label="DONE ($nn"
+  [ "$narch" -gt 0 ] && done_label="$done_label +$narch arch"
+  printf 'TO DO (%s) · DOING (%s) · %s)\n' "$nt" "$nd" "$done_label"
+}
+
 # --- migrating the cards that already exist --------------------------------
 # Nothing has to be migrated for the board to keep working: every field added by the worktree /
 # dashboard work is optional, and a card without it degrades to "-" by design. But two things CAN
@@ -464,6 +501,7 @@ usage() {
   echo ' view:'
   echo '  kb                            board + dashboard: inizio/durata delle DOING, durata+spesa+esito delle DONE'
   echo '  kb view                       lean board only (what the SessionStart hook injects)'
+  echo '  kb counts                     solo i tre totali (TO DO / DOING / DONE) — niente render'
   echo '  kb dash                       dashboard only (no box)'
   echo '  kb all | kb g                 AGGREGATED view across every registered board (cards tagged repo:)'
   echo '  kb handoff                    per-repo handoff/latest.md (in a repo) or aggregated (outside)'
@@ -1309,6 +1347,7 @@ case "$cmd" in
   view|board)                      # lean board only — what the SessionStart hook injects
     if [ "$KB_MATCHED" -eq 0 ]; then _board --all; else _board; fi
     ;;
+  counts)  _counts ;;              # the three column totals ALONE (SessionStart hook)
   dash) _dash ;;                   # detail blocks alone (no box)
   migrate) _migrate "${1:-}" ;;    # backfill start times / list cards with no worktree (dry-run)
   wt)                              # per-card worktrees: attach an existing one, or inspect
