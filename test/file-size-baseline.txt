@@ -9,13 +9,13 @@
 # ogni sessione di ogni repo. Il comando nuovo li conta e basta, e il test lo inchioda ai
 # numeri che il box mostra (mutazione provata: 3 su 3 rosse). Righe pagate una volta contro
 # secondi pagati sempre.
-1662 kanban/kb.sh
+1680 kanban/kb.sh
 1364 test/test-bus.sh
 1131 test/test-bus-mutants.sh
 774 bus/bus.sh
 634 bin/sync.sh
 601 test/test-federated-kb.sh
-597 test/validate.sh
+602 test/validate.sh
 574 test/test-factory-kb.sh
 438 eval/test-eval-pipeline.sh
 442 test/test-kb-views.sh

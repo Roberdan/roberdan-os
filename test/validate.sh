@@ -73,7 +73,7 @@ _suite() {
 _suite_out() { cat "$_PARDIR/$1.out" 2>/dev/null; }
 
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate test-kb-diet test-kb-queue \
-          test-file-size-ratchet test-edge-only \
+          test-file-size-ratchet test-edge-only test-kb-precheck \
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
@@ -289,6 +289,11 @@ if _suite test-kb-diet; then ok "i tre freni rifiutano il caso cattivo E lascian
 # parte — ed e' asserita li' dentro.
 section "kanban — coda autorizzata (Roberto approva la lista, non le card una per una)"
 if _suite test-kb-queue; then ok "la coda cammina da sola E si ferma su cio' che e' nato dopo"; else err "test-kb-queue — see bash test/test-kb-queue.sh"; fi
+
+# Le tre domande da fare a una card PRIMA di eseguirla. La direzione che conta di piu' e' il
+# SILENZIO: un avviso che compare sempre e' rumore, e il giorno che dice il vero nessuno lo legge.
+section "kanban — precheck (e' ancora valida? la fa gia' un'altra? e' gia' stata fatta?)"
+if _suite test-kb-precheck; then ok "avvisa sui tre casi E tace su una card pulita"; else err "test-kb-precheck:"; _suite_out test-kb-precheck | sed 's/^/    /'; fi
 
 section "dimensione dei file — ratchet a 300 righe (i vecchi passano, i nuovi no)"
 if _suite test-file-size-ratchet; then ok "nessun file nuovo nasce oltre 300 righe, nessun file baselinato cresce"; else err "test-file-size-ratchet — see bash test/test-file-size-ratchet.sh"; fi
