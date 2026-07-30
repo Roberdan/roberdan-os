@@ -35,8 +35,13 @@ mkdir -p "$OUT/test" "$OUT/.git"
 git init -q "$OUT"
 git -C "$OUT" config user.name t; git -C "$OUT" config user.email t@t
 printf '#!/usr/bin/env bash\nexit 0\n' > "$OUT/test/leak-check.sh"
+# Anche la gamba anti-dump va stubbata, per la stessa ragione della leak-check: questo
+# test parla della board. Senza lo stub il hook BLOCCA ogni commit del fixture perche' il
+# controllo manca, e i casi qui sotto diventano verdi/rossi per un motivo che non c'entra
+# — cosa successa davvero: aggiunta la gamba, questa suite e' rimasta rotta.
+printf '#!/usr/bin/env bash\nexit 0\n' > "$OUT/test/directory-dump-check.sh"
 cp "$ROOT/hooks/pre-commit" "$OUT/.git/hooks/pre-commit"
-chmod +x "$OUT/.git/hooks/pre-commit" "$OUT/test/leak-check.sh"
+chmod +x "$OUT/.git/hooks/pre-commit" "$OUT/test/leak-check.sh" "$OUT/test/directory-dump-check.sh"
 echo seed > "$OUT/file.txt"
 git -C "$OUT" add -A >/dev/null 2>&1
 git -C "$OUT" commit -q -m seed >/dev/null 2>&1
@@ -123,6 +128,46 @@ if [ -d "$CL/bin" ]; then
   fi
 else
   err "clone fallito: impossibile verificare l'installer"
+fi
+
+section "una verifica ASSENTE non deve spacciarsi per un ritrovamento"
+# Il hook deve fallire chiuso se il controllo anti-dump manca — ma dicendo la verita'.
+# Stampare "corporate directory data" per un controllo mai eseguito insegna al lettore
+# che quel messaggio non vuol dire niente, e il giorno in cui e' un leak vero lo bypassa.
+mv "$OUT/test/directory-dump-check.sh" "$TMP/dump-parcheggiato.sh"
+echo change4 >> "$OUT/file.txt"
+git -C "$OUT" add -A >/dev/null 2>&1
+out="$(git -C "$OUT" commit -m c4 2>&1)"
+if git -C "$OUT" log --oneline | grep -q ' c4$'; then
+  err "commit passato con il controllo anti-dump mancante: la guardia si spegne da sola"
+else
+  ok "controllo mancante = commit bloccato (fail closed)"
+fi
+case "$out" in
+  *"nothing was checked"*) ok "dice che non ha controllato, invece di accusare un leak" ;;
+  *) err "messaggio fuorviante per un controllo mai eseguito: $out" ;;
+esac
+mv "$TMP/dump-parcheggiato.sh" "$OUT/test/directory-dump-check.sh"
+
+section "worktree: nessun falso allarme sulla board"
+# Il difetto opposto, ed e' quello che ha davvero morso. git esporta GIT_DIR ai suoi
+# hook e un `git -C kanban` annidato lo EREDITA: in un worktree — dove kanban/ esiste
+# come directory ma senza `.git` — la sonda rispondeva sul repo PADRE, elencando i file
+# del commit stesso come "card non salvate". Un avviso che grida al lupo in ogni
+# worktree e' un avviso che nessuno legge nel checkout dove e' vero.
+WT="$TMP/wt"
+git -C "$OUT" worktree add -q "$WT" -b wt-case >/dev/null 2>&1
+mkdir -p "$WT/kanban/todo"          # la directory c'e' (script tracciati), il repo no
+echo "non e' una card" > "$WT/sporco.txt"
+if [ -e "$WT/kanban/.git" ]; then
+  err "il fixture non riproduce il worktree: kanban/.git non dovrebbe esistere qui"
+else
+  out="$( cd "$WT" && GIT_DIR="$(git rev-parse --absolute-git-dir)" \
+          ROOT="$WT" bash "$OUT/.git/hooks/pre-commit" 2>&1 || true )"
+  case "$out" in
+    *"la board"*) err "falso allarme nel worktree: la sonda risponde sul repo padre: $out" ;;
+    *) ok "tace dove non c'e' nessuna board da guardare" ;;
+  esac
 fi
 
 printf "\n"
