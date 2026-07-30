@@ -3,6 +3,69 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.21.0] - 2026-07-30
+
+### Added
+
+- **Tre freni al board che cresce come le ninfee**, misurati prima di essere scritti. Il
+  30 luglio 2026 il board aveva **33 card in attesa** dell'approvazione di Roberto, **sette
+  in `doing`** di cui **quattro sullo stesso lavoro** aperte da sette giorni, e **zero card
+  in corso sul progetto principale**, che ne aveva diciannove in coda. Nessun gate era rotto:
+  mancavano. `review-budget.sh` limita i *giri* dentro una card e il meta-card budget limita
+  le card di auto-miglioramento; niente limitava **quante** card esistono, **quanto vecchie**
+  sono, e **quante** ne girano insieme sullo stesso progetto.
+  - **Una card in corso per progetto** (`kb start` rifiuta il secondo fronte sullo stesso
+    `repo:`). Il limite è per repo e non globale: due progetti in parallelo sono legittimi,
+    il secondo fronte sullo stesso progetto è il modo in cui nascono i duplicati.
+    Esenzione esplicita: `RDA_KB_ALLOW_PARALLEL=1`.
+  - **Una condizione verificabile per card** (`kb add` rifiuta un'`acceptance` che contenga
+    `;`, ` e `, ` and `, `1)`, `2)`). Una card in `doing` aveva 491 caratteri e nove
+    condizioni in fila: card così non si chiudono mai, e la sessione dopo qualcuno ne apre
+    un'altra sullo stesso argomento. **È un ratchet**: le card preesistenti non vengono
+    toccate, perché un gate rosso il giorno in cui nasce è un gate che viene aggirato.
+    Esenzione esplicita: `RDA_KB_ALLOW_MULTI_CLAUSE=1`.
+  - **Le card in corso da più di 72 ore vengono chiamate per nome** nel dashboard, con il
+    numero di commit sul loro ramo: `ferma da 20g e ZERO commit: bloccata o morta?`. Il
+    board sa mostrare le card che esistono; non sapeva mostrare che una era morta, e una
+    card morta aveva lo stesso aspetto di una viva.
+- **`kb pending` mostra un progetto alla volta**, quello del cwd, e conta gli altri
+  (`kb pending --tutti` apre l'elenco). Impilava otto board in un muro di 33 righe. L'effetto
+  osservato non era che Roberto approvasse le cose sbagliate: era che non ne approvava
+  nessuna. Il conteggio totale (`--count`, quello dell'hook di inizio sessione e del digest)
+  **non** è ristretto dalla vista, ed è asserito: una vista che restringe anche il numero
+  è una vista che mente.
+- **`test/test-kb-diet.sh`**, agganciato a `validate.sh`, 13 asserzioni **in due direzioni**
+  ciascuna: il caso rifiutato *e* il caso legittimo che deve passare. La prima stesura del
+  test usava `kb ... | grep -q` sotto `set -o pipefail` e riportava "ACCETTATA" su tre gate
+  che funzionavano — l'errore fortunato, perché quello opposto stampa PASS su un gate spento.
+
+### Fixed
+
+- **`bin/install-git-hooks.sh` non installava niente dentro un worktree**: chiedeva a git
+  `--git-dir`, che in un worktree è `.git/worktrees/<nome>/` e non contiene hook. Il canone
+  impone **un worktree per card**, quindi il controllo anti-fughe non era installato in
+  nessun posto dove il lavoro avviene davvero. Ora usa `--git-path hooks`, come già fa
+  `validate.sh`. Terza istanza della stessa famiglia in due giorni.
+- **Il campanello del bus suonava due volte per lo stesso stato su Linux.** `stat -f`
+  significa "formato" per BSD e "stato del **filesystem**" per GNU coreutils, dove **esce 0**:
+  il fallback `stat -f … || stat -c …` non scattava mai, e la firma smetteva di seguire
+  l'mtime dei singoli file. Passava su macOS, rosso su ubuntu-latest. Onestà sul metodo: la
+  controprova tentata in locale con un finto `stat` GNU **non** ha riprodotto il difetto,
+  quindi non provava nulla; la prova è il run su Linux vero.
+- **`test/test-bus-mutants.sh` aveva un mutante silenziosamente in pensione.** La sua ancora
+  era un rientro più `echo "bus: WARNING`, e ha smesso di essere unica quando `count` ha
+  aggiunto il proprio avviso a un rientro più profondo: il testo a 8 spazi combaciava anche
+  con gli ultimi 8 di quella riga, il conteggio passava a 2 e l'intera batteria si fermava
+  con "anchor drift". Ora l'ancora nomina il ramo che muta. Eseguita per intero: **32
+  mutanti catturati, 1 sopravvissuto** (`factory-drop`), registrato in `docs/findings.md`.
+
+### Changed
+
+- **`docs/findings.md`**: le cose vere trovate durante un lavoro vanno in una lista che
+  Roberto smista, **non** in una card. Questo ribalta di proposito una regola nata da una
+  cicatrice — la lezione vera era *"non dentro questa PR"*, ed era stata implementata come
+  *"fanne una card"*. È così che nascono le ninfee.
+
 ## [v2.20.0] - 2026-07-30
 
 ### Added

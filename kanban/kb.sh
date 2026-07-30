@@ -906,16 +906,40 @@ _pending() {
 
   # 1) Kanban todo cards across every registered board — gate: todo->doing is your approval.
   echo
+  # REGOLA 5 — un progetto alla volta, quello dove sei.
+  #
+  # Questo elenco impilava OTTO board in un muro unico. Il 2026-07-30 erano 33 righe, di cui
+  # 19 su un solo progetto, mescolate a MirrorHR, MirrorBuddy, trading-os e ConvergioEdu2030
+  # senza un ordine leggibile. Il risultato osservato non e' che Roberto approvasse le cose
+  # sbagliate: e' che non ne approvava nessuna, perche' un muro di 33 righe non si smista.
+  #
+  # Ora il progetto del cwd viene per primo e per intero; gli altri si contano, non si
+  # elencano, e `kb pending --tutti` li apre. Un permesso si da' su una coda, non su 33 pezzi.
   echo "### Kanban todo — approvazione todo→doing"
-  n=0
+  _p_qui="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+  _p_tutti=""; case "${1:-}" in --tutti|--all) _p_tutti=1 ;; esac
+  n=0; _p_qui_n=0; _p_altri_n=0; _p_altri_repo=""
   for bd in "${boards[@]}"; do
     for f in "$bd/todo"/*.md; do
       [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue ;; esac
-      printf '  • %s (%s) — %s\n' "$(basename "$f" .md)" "$(_repo_tag "$f")" "$(_field "$f" title)"
       n=$((n+1))
+      _p_r="$(_repo_tag "$f")"
+      if [ -n "$_p_tutti" ] || [ "$_p_r" = "$_p_qui" ]; then
+        printf '  • %s (%s) — %s\n' "$(basename "$f" .md)" "$_p_r" "$(_field "$f" title)"
+        _p_qui_n=$((_p_qui_n+1))
+      else
+        _p_altri_n=$((_p_altri_n+1))
+        case " $_p_altri_repo " in *" $_p_r "*) ;; *) _p_altri_repo="$_p_altri_repo $_p_r" ;; esac
+      fi
     done
   done
   [ "$n" -eq 0 ] && echo "  (nessuna)"
+  if [ "$_p_qui_n" -eq 0 ] && [ "$n" -gt 0 ]; then
+    echo "  (nessuna per '$_p_qui', dove sei adesso)"
+  fi
+  if [ "$_p_altri_n" -gt 0 ]; then
+    echo "  + $_p_altri_n su altri progetti:$_p_altri_repo — \`kb pending --tutti\` per vederle"
+  fi
   total=$((total+n))
 
   # 2) Learning candidates awaiting your approval (approved: false in quarantine) — flip
@@ -1207,6 +1231,38 @@ case "$cmd" in
       echo "  (use the ~/GitHub dir-name for a code repo, or 'personal' for non-repo work)" >&2
       exit 1
     fi
+    # REGOLA 4 — un criterio di chiusura, uno solo, verificabile.
+    #
+    # Misurato il 2026-07-30, non supposto: una card in `doing` aveva 491 caratteri di
+    # acceptance con nove condizioni in fila ("aggiorna/versioning/libreria/slideshow
+    # funzionano; invarianti e audit bloccano il caso fancoil; ..."). Card cosi' non si
+    # chiudono MAI, e una card che non si chiude produce, la sessione dopo, una card nuova
+    # sullo stesso argomento: quel giorno ce n'erano quattro identiche, aperte da sette
+    # giorni. Le congiunzioni sono il posto dove i requisiti muoiono, in due modi opposti:
+    # una lista con "e" non si chiude mai, e una lista con "almeno uno di" chiude verde
+    # cancellando il resto.
+    #
+    # Il controllo e' un RATCHET, non una retroattivita': vale solo su card NUOVE. Le card
+    # esistenti non vengono toccate, perche' un gate rosso il giorno in cui nasce e' un
+    # gate che viene aggirato — la stessa famiglia di difetti chiusa tre volte in due giorni
+    # in questo repo.
+    if [ -n "${args[2]:-}" ]; then
+      _clausole=0
+      case "$acc" in *";"*) _clausole=1 ;; esac
+      case "$acc" in *" e "*) _clausole=1 ;; esac
+      case "$acc" in *" and "*) _clausole=1 ;; esac
+      case "$acc" in *"1)"*|*"2)"*) _clausole=1 ;; esac
+      if [ "$_clausole" = "1" ] && [ -z "${RDA_KB_ALLOW_MULTI_CLAUSE:-}" ]; then
+        echo "REFUSED: l'acceptance ha piu' di una condizione." >&2
+        echo "  Trovato uno fra: ';'  ' e '  ' and '  '1)'  '2)'" >&2
+        echo "  Una card = una condizione verificabile. Se ce ne sono tre, sono tre card." >&2
+        echo "  Motivo: una card con nove condizioni non si chiude mai, e la sessione dopo" >&2
+        echo "  qualcuno ne apre un'altra sullo stesso argomento. Il 2026-07-30 ce n'erano 4." >&2
+        echo "  Scritto: \"$acc\"" >&2
+        echo "  Se e' davvero una condizione sola e la frase contiene 'e': RDA_KB_ALLOW_MULTI_CLAUSE=1 kb add ..." >&2
+        exit 1
+      fi
+    fi
     base_id="${RDA_KB_ID_BASE:-$(date +%y%m%d-%H%M%S)}"
     id="$(_new_card_id "$base_id")"
     { echo '---'; echo "title: $title"; echo "repo: $repo"; echo "dod: \"$dod\""; echo "acceptance: \"$acc\"";
@@ -1249,6 +1305,36 @@ case "$cmd" in
     repo_val="$(_field "$f" repo)"
     if [ -z "$repo_val" ] || printf '%s' "$repo_val" | grep -q 'FILL:'; then
       echo "REFUSED: fill repo first (kb edit $id) — e.g. repo: roberdan-os, repo: convergio, repo: personal" >&2; exit 1
+    fi
+    # REGOLA 1 — una card in corso per progetto.
+    #
+    # Misurato il 2026-07-30: sette card in `doing`, di cui quattro sullo stesso lavoro
+    # ("Casa Martucci"), aperte da sette giorni, mentre il progetto principale
+    # (VirtualBPMFy27) aveva ZERO card in corso e diciannove in attesa. `doing` non
+    # raccontava cosa era in corso: raccontava cosa era stato iniziato e mai chiuso.
+    #
+    # Il limite e' per REPO, non globale, perche' lavorare su due progetti diversi in
+    # parallelo e' legittimo; aprire il secondo fronte sullo STESSO progetto e' il modo in
+    # cui nascono i duplicati. Le card senza worktree (approvazioni, decisioni) contano
+    # comunque: il problema non e' il conflitto di file, e' non sapere cosa e' in corso.
+    if [ -z "${RDA_KB_ALLOW_PARALLEL:-}" ]; then
+      _gia_in_corso=""
+      for _dc in "$KB/doing"/*.md; do
+        [ -e "$_dc" ] || continue
+        case "$(basename "$_dc")" in _*) continue ;; esac
+        if [ "$(_field "$_dc" repo)" = "$repo_val" ]; then
+          _gia_in_corso="$(basename "$_dc" .md)"
+          break
+        fi
+      done
+      if [ -n "$_gia_in_corso" ]; then
+        echo "REFUSED: '$repo_val' ha gia' una card in corso: $_gia_in_corso" >&2
+        echo "  $(_field "$KB/doing/$_gia_in_corso.md" title)" >&2
+        echo "  Chiudila (kb finish $_gia_in_corso --thor \"...\") o parcheggiala prima di aprire questa." >&2
+        echo "  Motivo: il 2026-07-30 c'erano 4 card aperte sullo stesso lavoro e 0 sul progetto vero." >&2
+        echo "  Se servono davvero due fronti sullo stesso progetto: RDA_KB_ALLOW_PARALLEL=1 kb start $id --by roberto" >&2
+        exit 1
+      fi
     fi
     _set_status "$f" doing
     # started_at is LOCAL and human-readable (Roberto reads it), started_epoch is the machine

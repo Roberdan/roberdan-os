@@ -355,9 +355,15 @@ sys.stdout.write(s)
 mutate damaged-branch "spawns an agent from the damaged-log branch of who" "check 13 (path table drives degraded logs)" '
 import sys
 s = sys.stdin.read()
-a = "        echo \"bus: WARNING"
+# The anchor names the branch it mutates ("skipped by who"), not just the shape of
+# the line. It used to be an indentation plus `echo "bus: WARNING`, and that stopped
+# being unique the moment `count` grew its own warning at a DEEPER indent: the
+# 8-space anchor matched the last 8 of that line10 spaces too, so the count hit 2 and
+# the whole mutant aborted with "anchor drift". An anchor that a nearby edit can
+# duplicate is an anchor that silently retires the mutant guarding it.
+a = "echo \"bus: WARNING — $f is damaged and was skipped by who.\""
 assert s.count(a) == 1, "anchor drift"
-s = s.replace(a, "        claude -p \"who saw damage\" >/dev/null 2>&1 || true\n" + a)
+s = s.replace(a, "claude -p \"who saw damage\" >/dev/null 2>&1 || true\n        " + a)
 sys.stdout.write(s)
 '
 

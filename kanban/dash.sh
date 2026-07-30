@@ -205,6 +205,31 @@ _doing_block() {
       else
         _row "iniziata" "$(_field "$f" approved_at) (solo data — card avviata prima che kb registrasse l'ora)"
       fi
+      # REGOLA 3 — una card in corso da piu' di 72 ore senza un commit va CHIAMATA per nome.
+      #
+      # Il board sa mostrare le card che esistono; non sa mostrare che una di quelle e' morta.
+      # Il 2026-07-30 quattro card erano in `doing` da sette giorni sullo stesso lavoro, con
+      # zero commit, e il board le elencava esattamente come quelle vive. Un elenco in cui
+      # una card morta e una viva hanno lo stesso aspetto e' un elenco che non si legge.
+      #
+      # La soglia e' 72 ore per lasciare passare un fine settimana, e la domanda e' rivolta a
+      # una persona ("bloccata o morta?") perche' nessun programma puo' rispondere: il numero
+      # dice che va guardata, non cosa fare.
+      if [ -n "$s" ] && [ $((now - s)) -gt 259200 ]; then
+        _rd_branch="$(_field "$f" branch)"; _rd_repo="$(_field "$f" repo)"
+        _rd_commit=""
+        if [ -n "$_rd_branch" ] && [ -d "$HOME/GitHub/$_rd_repo/.git" ]; then
+          _rd_commit="$(git -C "$HOME/GitHub/$_rd_repo" rev-list --count \
+            --since="@$s" "$_rd_branch" 2>/dev/null || echo "")"
+        fi
+        if [ "$_rd_commit" = "0" ]; then
+          _row "ATTENZIONE" "ferma da $(_dur $((now - s))) e ZERO commit sul suo ramo: bloccata o morta?"
+        elif [ -z "$_rd_commit" ]; then
+          _row "ATTENZIONE" "ferma da $(_dur $((now - s))); nessun ramo da misurare: bloccata o morta?"
+        else
+          _row "ATTENZIONE" "aperta da $(_dur $((now - s))) ($_rd_commit commit): va chiusa o divisa?"
+        fi
+      fi
       line="$(_wt_line "$f")"; [ -n "$line" ] && _row "worktree" "$line"
       line="$(_spend_line "$f" "$s" 0 "$((conc - 1))")" && _row "spesa" "$line" || _row "spesa" "- (nessuna sessione attribuibile)"
     done

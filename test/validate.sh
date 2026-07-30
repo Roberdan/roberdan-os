@@ -72,7 +72,7 @@ _suite() {
 
 _suite_out() { cat "$_PARDIR/$1.out" 2>/dev/null; }
 
-for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate \
+for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate test-kb-diet \
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
@@ -277,6 +277,11 @@ if _suite test-kb-start-worktree-cause; then ok "kb start names the real worktre
 # that only refuses is as useless as the one that only accepts.
 section "kb done-gate (mechanical evidence, no rubber-stamps)"
 if _suite test-kb-done-gate; then ok "done-gate refuses forged evidence, accepts real"; else err "test-kb-done-gate — see bash test/test-kb-done-gate.sh"; fi
+
+# I tre freni al board (regole 1/4/5 del 2026-07-30). Qui, e non solo nel file di test,
+# perche' un test che nessuno lancia e' codice morto che sembra un gate.
+section "kanban — i freni al board che cresce (una card in corso per repo, una condizione, un progetto alla volta)"
+if _suite test-kb-diet; then ok "i tre freni rifiutano il caso cattivo E lasciano passare quello legittimo"; else err "test-kb-diet — see bash test/test-kb-diet.sh"; fi
 
 # --- 6c) federated kanban + dormant dispatcher --------------------------------
 section "federated kanban (cwd-scoping, kb all/handoff, init, locks, dormant dispatcher)"

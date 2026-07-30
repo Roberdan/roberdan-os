@@ -44,7 +44,13 @@ _card() { # _card <id> <repo-name>
 }
 
 _start() { # _start <id> [<kb.sh path>] — prints the combined output of `kb start`
+  # RDA_KB_ALLOW_PARALLEL=1 per TUTTA questa suite, e non per distrazione: il soggetto qui e'
+  # COME viene riportata la causa di un worktree rifiutato, e ogni sezione ha bisogno di una
+  # seconda card sullo stesso repo fittizio 'realrepo', dove la prima e' gia' in doing. Dal
+  # 2026-07-30 `kb start` rifiuta il secondo fronte sullo stesso progetto (regola 1), quindi
+  # senza questa esenzione la suite proverebbe la regola 1 al posto di quello che deve provare.
   RDA_KANBAN="$KB" RDA_KANBAN_REGISTRY="$TMP/registry" RDA_WORKTREES="$TMP/wt" \
+    RDA_KB_ALLOW_PARALLEL=1 \
     bash "${2:-$ROOT/kanban/kb.sh}" start "$1" --by roberto 2>&1
 }
 
