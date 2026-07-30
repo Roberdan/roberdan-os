@@ -317,9 +317,14 @@ section "pre-commit hook e' installato E aggiornato (il leak check blocca solo s
 # first draft grepped for that path and passed on a stale COPY, because the copy carries
 # it in its own header comment. Verified by putting the old copy back and watching this
 # turn red — a check nobody has seen fail is a guess.
-_gitdir="$(git rev-parse --git-dir 2>/dev/null || true)"
-_ih="$_gitdir/hooks/pre-commit"
-if [ ! -x "$_ih" ]; then
+# `--git-path hooks/...` e non `--git-dir`/hooks: in un WORKTREE git-dir e'
+# .git/worktrees/<nome>, dove gli hook non stanno mai — stanno nella common dir. Il gate
+# era quindi rosso in ogni worktree, cioe' esattamente dove il piano dice di lavorare
+# (`kb start` crea un worktree per card). Rosso sempre = spento, la stessa famiglia di
+# difetti che questo controllo esiste per prendere. Stesso bug della board notice, che
+# leggeva il repo padre da un worktree: chiedere a git DOVE guarda, non ricostruirlo.
+_ih="$(git rev-parse --git-path hooks/pre-commit 2>/dev/null || true)"
+if [ -z "$_ih" ] || [ ! -x "$_ih" ]; then
   # I git hook NON si clonano. Su una macchina di CI il hook non e' quindi assente per
   # negligenza: e' assente per costruzione, e non controlla comunque niente perche' la CI
   # non committa. Trattarlo come errore ha reso rossa la CI di main dal merge di PR #30 —
@@ -338,7 +343,7 @@ elif diff -q hooks/pre-commit "$_ih" >/dev/null 2>&1; then
 else
   err "il pre-commit installato NON e' il sorgente versionato: le modifiche a hooks/pre-commit non hanno effetto (bash bin/install-git-hooks.sh)"
 fi
-unset _gitdir _ih
+unset _ih
 
 section "board annidata — un commit che non include le card lo dice"
 if _suite test-nested-board-notice; then ok "kanban/ sporca -> il commit avvisa, e passa comunque"; else err "test-nested-board-notice — see bash test/test-nested-board-notice.sh"; fi
