@@ -108,6 +108,25 @@ _board_roots() {
 }
 
 _field() { grep -m1 "^$2:" "$1" 2>/dev/null | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"\$//"; }
+
+# _repo_qui — COME SI CHIAMA il progetto in cui sto, anche da dentro un worktree.
+#
+# `basename $(git rev-parse --show-toplevel)` sembra la risposta e non lo e': dentro un worktree
+# quel percorso e' `worktrees/<repo>/<card-id>`, quindi il "repo" risultava chiamarsi come la
+# CARD. `kb pending` filtrava su un nome che nessuna card porta e mostrava zero righe; `kb queue`
+# avrebbe fotografato una lista vuota. E il canone impone un worktree per card, cioe' il difetto
+# colpiva esattamente dove il lavoro avviene.
+#
+# Quinta istanza in due giorni della stessa famiglia — il hook installato col percorso del
+# worktree, `--git-dir` invece di `--git-path` in due file, il pre-commit inciso su un worktree
+# rimosso. La forma e' sempre quella: **si chiede a git DOVE guarda, non si deduce dal cwd**.
+# `--git-common-dir` punta sempre al `.git` del checkout principale, anche da un worktree.
+_repo_qui() {
+  local comune
+  comune="$(git rev-parse --git-common-dir 2>/dev/null)" || { basename "$PWD"; return; }
+  case "$comune" in /*) ;; *) comune="$PWD/$comune" ;; esac
+  basename "$(dirname "$comune")"
+}
 # Shared regex for "bot authors" in PR views. Both kb.sh and tests consume this exact value.
 _PR_BOT_FILTER_RE='dependabot|renovate|github-actions|\[bot\]|-bot$'
 _pr_bot_filter_regex() { printf '%s\n' "$_PR_BOT_FILTER_RE"; }
@@ -916,7 +935,7 @@ _pending() {
   # Ora il progetto del cwd viene per primo e per intero; gli altri si contano, non si
   # elencano, e `kb pending --tutti` li apre. Un permesso si da' su una coda, non su 33 pezzi.
   echo "### Kanban todo — approvazione todo→doing"
-  _p_qui="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+  _p_qui="$(_repo_qui)"
   _p_tutti=""; case "${1:-}" in --tutti|--all) _p_tutti=1 ;; esac
   n=0; _p_qui_n=0; _p_altri_n=0; _p_altri_repo=""
   for bd in "${boards[@]}"; do
@@ -1084,9 +1103,7 @@ _repo_view() {
 # di scattarla, così è leggibile in dieci secondi.
 _queue_file() { printf '%s/.coda-%s.md' "$KB" "$1"; }
 
-_queue_repo() { # il repo del cwd, come fa `kb pending`
-  basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-}
+_queue_repo() { _repo_qui; }  # stessa risoluzione di `kb pending`
 
 _queue() {
   local repo="" arg
