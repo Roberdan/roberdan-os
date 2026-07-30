@@ -1,0 +1,16 @@
+# Baseline delle 300 righe — file scritti a mano gia' oltre soglia il 2026-07-30.
+# Congelati, non condannati: passano cosi' come sono, ma non possono CRESCERE.
+# file in baseline: 11
+# Un file NON in questa lista che supera le 300 righe fa fallire test/test-file-size-ratchet.sh.
+# Si accorcia una riga togliendola; si allarga solo con una decisione visibile in un diff.
+1623 kanban/kb.sh
+1364 test/test-bus.sh
+1131 test/test-bus-mutants.sh
+774 bus/bus.sh
+634 bin/sync.sh
+601 test/test-federated-kb.sh
+592 test/validate.sh
+574 test/test-factory-kb.sh
+438 eval/test-eval-pipeline.sh
+380 test/test-kb-views.sh
+344 eval/report.sh

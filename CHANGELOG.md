@@ -3,6 +3,34 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.23.0] - 2026-07-30
+
+### Added
+
+- **La regola delle 300 righe smette di essere un consiglio.** `rules/best-practices.md` la
+  dichiarava da tempo; nessuno la misurava, e **undici file l'avevano superata** — uno a 1606
+  righe. `test/test-file-size-ratchet.sh` la fa valere come **ratchet**: i file già oltre soglia
+  sono congelati in `test/file-size-baseline.txt` e passano, mentre un file **nuovo** oltre 300
+  righe e un file baselinato che **cresce** fanno fallire il gate. Provato per mutazione nei due
+  sensi: file finto da 350 righe → rosso; file della baseline allargato di 50 → rosso; ripristino
+  → verde. Non chiede di spezzare i file esistenti, come la card dice esplicitamente.
+  - La baseline dichiara il proprio numero di voci, così non la si può allargare di nascosto.
+  - **Il gate ha subito preso il suo autore**: la correzione qui sotto faceva crescere
+    `kanban/kb.sh` da 1606 a 1623 righe e il ratchet è diventato rosso. La baseline è stata
+    alzata di proposito, in questo diff — che è l'uscita di sicurezza dichiarata nel file, non
+    un aggiramento.
+
+### Fixed
+
+- **`kb pending` e `kb queue` erano ciechi dentro un worktree**, cioè esattamente dove il canone
+  impone di lavorare. Deducevano il nome del progetto da
+  `basename $(git rev-parse --show-toplevel)`, che in un worktree è
+  `worktrees/<repo>/<card-id>`: il "repo" risultava chiamarsi come la **card**, il filtro non
+  trovava niente e `kb queue` avrebbe fotografato una lista vuota. Ora c'è `_repo_qui`, che usa
+  `--git-common-dir`. **Quinta istanza in due giorni della stessa famiglia** (il hook installato
+  col percorso del worktree, `--git-dir` invece di `--git-path` in due file, il pre-commit inciso
+  su un worktree rimosso): la forma è sempre *si chiede a git dove guarda, non si deduce dal cwd*.
+
 ## [v2.22.0] - 2026-07-30
 
 ### Changed
