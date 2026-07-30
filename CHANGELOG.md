@@ -3,6 +3,27 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.24.0] - 2026-07-30
+
+### Added
+
+- **La regola "Playwright parla con Edge" smette di essere solo una frase.**
+  `test/test-canon-guardrails.sh` proteggeva già il TESTO nel canone;
+  `test/test-edge-only.sh` protegge il **comportamento**: nessun file di codice può avviare
+  Chrome o Chromium (`chromium.launch`, `channel: chrome`, `--browser chromium`,
+  `browser_type=chromium`). I file di documentazione sono esclusi, perché nominano Chrome per
+  vietarlo e un gate rosso sul canone che lo istituisce sarebbe assurdo.
+  - **L'eccezione è prevista e va scritta**: il marcatore `cross-browser: richiesto da Roberto`,
+    sulla riga stessa o su quella prima, la dichiara. Vive nel diff che una persona legge, non
+    nella memoria di chi l'ha introdotta.
+  - **Limite dichiarato in cima al file, perché rende onesto il suo verde**: in roberdan-os
+    oggi **non c'è una riga di codice Playwright**. Un PASS significa "nessuno ha violato la
+    regola", non "abbiamo visto Edge funzionare". Il gate esiste perché il primo codice browser
+    che entrerà qui non nasca puntato su Chrome.
+  - Provato per mutazione in **tre** direzioni: codice che lancia Chromium → rosso col file e la
+    riga; stessa riga con l'eccezione dichiarata → verde; clausola "se Edge manca, fermati"
+    cancellata dal canone → rosso. Ripristino → verde.
+
 ## [v2.23.0] - 2026-07-30
 
 ### Added
