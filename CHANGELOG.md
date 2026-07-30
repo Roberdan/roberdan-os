@@ -3,6 +3,62 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.25.0] - 2026-07-30
+
+### Fixed
+
+- **Il SessionStart hook renderizzava tutto il board per stampare tre numeri.**
+  `hooks/context-inject.sh` chiedeva `kb list` (tutte e tre le colonne, poi `sed` per tenere
+  solo DOING) e `kb view` (disegna il box intero, poi `grep` per tre interi). Tutte e due
+  attraversavano le 96 card in `done/` chiamando grep+sed+basename **una volta per card**, per
+  produrre due titoli e una riga di conteggi. È un costo pagato prima che Roberto possa
+  scrivere, in ogni sessione, in ogni repo.
+  - Ora chiede la colonna, non il board: `kb doing` + **`kb counts`** (comando nuovo — conta i
+    file e si ferma: niente `stat`, niente sort, niente box, niente legenda).
+  - **Misurato**, A/B alternato sullo stesso carico macchina, 3 giri sul board vero:
+    vecchio **2.534 / 2.917 / 2.579 s** → nuovo **0.074 / 0.075 / 0.074 s**. ~34×, ~2,5 s in
+    meno a ogni avvio di sessione. Output identico a meno del separatore dei conteggi.
+  - **`kb counts` rispecchia la selezione dei board di `_board`** (aggregata fuori da un board
+    riconosciuto, questa altrimenti): numeri diversi dal box che una persona legge due righe
+    sopra sarebbero peggio di numeri lenti. `test/test-kb-views.sh` li inchioda **uguali** —
+    l'asserzione è l'uguaglianza con l'header di `kb view`, non una tripla scritta a mano, che
+    passerebbe verde proprio il giorno in cui `_board` cambia cosa conta.
+  - **Provato per mutazione, in un worktree usa-e-getta** (mai nel checkout dove si committa —
+    § Parallel work): hook riportato a `kb list`/`kb view` → rosso; `_counts` che smette di
+    contare l'archivio → rosso; `_counts` che conta i file `_archive-*.md` come card → rosso.
+    Ripristino → verde. Tre su tre.
+  - Il ratchet delle 300 righe ha fatto il suo lavoro e ha bloccato la crescita: la baseline è
+    alzata **con la motivazione scritta dentro**, come il file stesso prescrive.
+
+- **Il bundle per ChatGPT/web perdeva in silenzio ogni migrazione verso `engineering-reference`.**
+  `bin/make-bundle.sh` includeva `rules/` ma non `skills/`. Claude carica una skill quando
+  serve; ChatGPT non ha quel meccanismo — quel bundle **è** tutto il suo canone. Così il batch
+  del 2026-07-14 (code style, testing, CI locale, merge discipline, review comments, repo
+  setup, git hooks) e quello del 2026-07-30 (carded end-to-end, documentation, documentation
+  budget) erano usciti da `rules/` e non erano arrivati da nessuna parte su quella superficie.
+  Un puntatore a una skill non è un puntatore **lì**.
+  - `skills/engineering-reference/skill.md` entra in `SECTIONS`. Costa una incollata, non un
+    token per turno: la ragione per cui è uscito da `rules/` non vale per questo artefatto.
+  - Verificato sul prodotto, non sullo script: bundle rigenerato, leak-check passato, entrambe
+    le migrazioni presenti (1.052 righe).
+
+### Changed
+
+- **`rules/best-practices.md` -27 righe**: `Carded End-to-End`, `Documentation` e
+  `Documentation Budget` passano alla skill `engineering-reference`, con due puntatori al loro
+  posto. Stessa mossa già fatta il 2026-07-14 e per la stessa ragione — il controllo di
+  Carded End-to-End è il gate `kb cover` dentro `test/validate.sh`, non il paragrafo. Il file
+  sempre caricato scende da 17.628 a 15.300 caratteri (~-582 token stimati per sessione).
+
+### Note
+
+- **Un avviso della diagnosi precedente era sbagliato e va ritirato**: `hooks/bus-doorbell.sh`
+  era stato segnalato lento (media 2.029 ms, picco 40.280 ms nei transcript). Misurato: **293 ms
+  a freddo, 112 ms a caldo**. Quei numeri venivano da un test di carico lasciato girare da
+  un'altra sessione (25 processi `while True: pass`, load average 45 su 18 core), non dall'hook.
+  Nessuna modifica al doorbell: non aveva niente che non andasse. Lezione generale: un numero di
+  performance misurato su una macchina satura misura la macchina, non il codice.
+
 ## [v2.24.0] - 2026-07-30
 
 ### Added

@@ -1,6 +1,6 @@
 ---
 name: engineering-reference
-description: Lookup reference for executing a task already decided on — code style per language, test/mock boundaries, API conventions, the local CI sequence before push, merge discipline, how to resolve review comments, repo settings and git hooks. Read it when you are about to push, merge, review, or set up a repo; not before.
+description: Lookup reference for executing a task already decided on — code style per language, test/mock boundaries, API conventions, the local CI sequence before push, merge discipline, how to resolve review comments, repo settings and git hooks, plan→card coverage discipline, documentation and meta-documentation budget. Read it when you are about to push, merge, review, set up a repo, turn a plan into cards, or write docs; not before.
 providers: [claude, copilot, codex]
 ---
 
@@ -13,8 +13,12 @@ The canon's own rule sends exactly this to a skill: *"knowledge that applies som
 skill (progressive disclosure), never in the canon."*
 
 What stayed in the canon is what changes behaviour without being asked: No False Done, Wired
-End-to-End, Carded End-to-End, Surgical Edits, the Persuasion Guardrails, token economy, and the
-parallel-work rule. Those must be in the room before you know you need them. This must not.
+End-to-End, Surgical Edits, the Persuasion Guardrails, token economy, and the parallel-work rule.
+Those must be in the room before you know you need them. This must not.
+
+A second batch moved here on 2026-07-30, for the same reason: Carded End-to-End (its control is the
+`kb cover` gate, not the prose) plus the documentation conventions and the documentation budget.
+They apply when you translate a plan into cards or write docs — not before.
 
 ## Code Style
 
@@ -117,3 +121,43 @@ Install per-repo when relevant:
 | `pre-commit` FileSizeGuard | new hand-written source/test files >300 lines; unjustified growth in oversized legacy files (technical artifacts exempt) |
 | `pre-commit` SecretScan | commits containing API keys, tokens, passwords |
 | `commit-msg` CommitLint | non-conventional commit messages |
+
+## Carded End-to-End (requirements must become cards, not just prose)
+
+The twin of § Wired End-to-End, one level up: **a requirement that lives in a plan but never becomes
+a card is not planned — it's a wish that looks planned.**
+
+Every gate we have — `kb`, `@thor`, the merge-gate, CI — operates **downstream of the card**. A
+requirement that never became one is invisible to all four *simultaneously*. They are not broken;
+they faithfully verify an input that was already amputated. The plan→card translation is the only
+link in the chain with **no gate**, and it is exactly where requirements die.
+
+- **Walk from the plan, never from the board.** A board can only show you the cards that exist. It
+  cannot show you the **absence** of one — which is the entire failure mode.
+- **A card may not weaken the clause it claims to satisfy.** Plan says "X, Y **and** Z are
+  mandatory"; card says "at least one of X/Y/Z" — that closes green while deleting Y and Z from the
+  product. **Quantifiers are where requirements go to die.**
+- **The gate, not this paragraph, is the control:** `kb cover <plan.md>` fails red on any clause with
+  no card and no written decision (`<plan>.coverage`). It runs inside `test/validate.sh`. Prose did
+  not stop this from happening — a gate does.
+
+*(Scar: trading-os 2026-07-13. The signed plan mandated "SEC EDGAR/RSS, company IR and GDELT"; the
+one card that could have delivered it read "at least one mandatory free live source", closed honestly
+green, and the news evaporated. The system then built the news graph, the news UI and news realtime
+freshness — and nothing that fetches a news item. A full plan→DAG audit found **77 of 149 normative
+clauses never reached the product**. Full report: `trading-os/docs/execution/plan-coverage-audit.md`.)*
+
+## Documentation
+
+JSDoc / docstrings for public APIs (WHY, not WHAT). CHANGELOG: `## [vX.Y.Z] - date` → `### Added | Changed | Fixed`. Keep TROUBLESHOOTING.md current.
+
+## Documentation Budget
+
+A system that documents itself more than it does the work is a smell. Keep meta-documentation to:
+
+- **One living plan**: `docs/plan.md`. Not a plan per session — the plan, updated in place.
+- **One living handoff**: `handoff/latest.md`. Not a handoff per session — overwritten each time, git history is the log.
+- **Dated session artifacts** (plans, judgments, test reports tied to a specific date) move to `docs/archive/` once their actions are closed. They stay for reference; nothing there is maintained going forward.
+- **No build artifacts** (PDF, generated bundles, compiled output) committed to git. Regenerate from source; git history keeps old copies if ever needed.
+
+The behavioral canon (`AGENTS.md`, `behavior/`, `rules/`, `agents/`) must always outweigh the system's self-documentation. If a repo has more words describing its own process than governing actual behavior, that's a sign the process writing has run away — prune it back to the living plan + living handoff, archive the rest.

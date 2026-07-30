@@ -257,6 +257,68 @@ else
 fi
 rm -rf "$_CAN"
 
+section "kb counts: the same three numbers the box prints, without rendering the box"
+# WHY THIS IS PINNED. `kb counts` exists so the SessionStart hook stops paying a full board
+# render (stat on every done card, newest-ten sort, legend) for three integers. That is only
+# safe while the two agree: a human reads the box, the hook prints the counter line, and if
+# they drift the session is told a number nobody can see. So the assertion is EQUALITY with
+# kb view's own header, never a hardcoded triple — a fixture-pinned number would still pass
+# on the day _board changes what it counts, which is exactly the failure worth catching.
+_CB="$TMP/counts"; mkdir -p "$_CB"/{todo,doing,done}
+printf -- '---\ntitle: t1\nrepo: r\nstatus: todo\n---\n'  > "$_CB/todo/C-T1.md"
+printf -- '---\ntitle: t2\nrepo: r\nstatus: todo\n---\n'  > "$_CB/todo/C-T2.md"
+printf -- '---\ntitle: d1\nrepo: r\nstatus: doing\n---\n' > "$_CB/doing/C-D1.md"
+printf -- '---\ntitle: n1\nrepo: r\nstatus: done\n---\n'  > "$_CB/done/C-N1.md"
+printf -- '---\ntitle: n2\nrepo: r\nstatus: done\n---\n'  > "$_CB/done/C-N2.md"
+printf -- '---\ntitle: n3\nrepo: r\nstatus: done\n---\n'  > "$_CB/done/C-N3.md"
+cat > "$_CB/done/_archive-2026-05-01.md" <<'EOF'
+| # | Goal | Status | Evidence |
+|---|---|---|---|
+| 1 | archived one | verified | ev |
+| 2 | archived two | verified | ev |
+EOF
+# Normalize both sides to the bare numbers: the box spaces its labels for a human, the
+# counter line for a log. What must match is the NUMBERS, not the punctuation between them.
+# stderr is dropped on purpose — RDA_KANBAN prints a legitimate "you are overriding this
+# repo's board" warning here, and folding it into the parse would compare noise.
+_nums() { grep -oE '\([0-9]+( \+[0-9]+ arch)?\)' | tr -cd '0-9\n' | paste -sd' ' -; }
+_c_line="$(RDA_KANBAN="$_CB" bash kanban/kb.sh counts 2>/dev/null)"
+_c_from_counts="$(printf '%s\n' "$_c_line" | _nums)"
+_c_from_view="$(RDA_KANBAN="$_CB" bash kanban/kb.sh view 2>/dev/null | grep -m1 'TO DO (' | _nums)"
+if [ -n "$_c_from_counts" ] && [ "$_c_from_counts" = "$_c_from_view" ]; then
+  ok "kb counts agrees with the box kb view renders ($_c_line)"
+else
+  err "kb counts disagrees with kb view — counts='$_c_from_counts' view='$_c_from_view' line='$_c_line'"
+fi
+# The archive roll-up is counted, not silently dropped: DONE (3 +2 arch) on this fixture.
+if printf '%s' "$_c_line" | grep -q 'DONE (3 +2 arch)'; then
+  ok "kb counts reports archived goals alongside the live done count"
+else
+  err "kb counts lost the archive roll-up — got: $_c_line"
+fi
+# The hook reads this on a board with cards; an empty board must still print, not crash.
+if _e="$(RDA_KANBAN="$EMPTY" bash kanban/kb.sh counts 2>&1)" && printf '%s' "$_e" | grep -q 'TO DO (0)'; then
+  ok "kb counts on an empty board prints zeros instead of crashing"
+else
+  err "kb counts on an empty board misbehaved — got: ${_e:-<crash>}"
+fi
+
+section "the SessionStart hook asks for columns, never for the whole board"
+# The regression this pins is a PERFORMANCE one that no output diff would show: reverting
+# these two calls to `kb list`/`kb view` reproduces the same text and silently puts ~2.5 s
+# back on every session start in every repo (measured 2026-07-30, 96 done cards).
+if grep -qE '"\$HOME/\.local/bin/kb" (list|view)' hooks/context-inject.sh; then
+  err "context-inject.sh calls kb list/view again — it renders the whole board to print 3 numbers"
+else
+  ok "context-inject.sh uses the cheap per-column commands"
+fi
+if grep -q '"\$HOME/\.local/bin/kb" doing' hooks/context-inject.sh \
+   && grep -q '"\$HOME/\.local/bin/kb" counts' hooks/context-inject.sh; then
+  ok "context-inject.sh asks kb for doing + counts"
+else
+  err "context-inject.sh no longer asks for doing + counts — the injected board block is broken"
+fi
+
 section "kb view stays lean (the SessionStart hook injects it into every session)"
 _view_out="$(RDA_KANBAN="$_DB" bash kanban/kb.sh view 2>&1 || true)"
 if printf '%s' "$_view_out" | grep -qE 'gira da|spesa'; then
