@@ -17,6 +17,27 @@ if ! bash test/leak-check.sh; then
   exit 1
 fi
 
+# The denylist above can only catch secrets somebody thought to write down. A colleague's
+# name is not on it and never will be — that is what made the 2026-07-30 leak in a sibling
+# repository invisible to it: 39 corporate addresses and 4 real names, harvested from a
+# live org walk into a test fixture and pushed. This check asks about SHAPE instead of
+# vocabulary, so it does not need to know the names in advance.
+_dump_check="$ROOT/test/directory-dump-check.sh"
+if [ ! -f "$_dump_check" ]; then
+  # Fail closed, but say the true reason. Reporting "corporate directory data" for a
+  # check that never ran is a lie in the one direction that matters: it teaches the
+  # reader that this message means nothing, so the day it IS a leak they will bypass it.
+  echo "" >&2
+  echo "pre-commit: BLOCKED — $_dump_check is missing, so nothing was checked." >&2
+  echo "This is not a finding. Restore the file or reinstall the hooks." >&2
+  exit 1
+fi
+if ! bash "$_dump_check" --staged; then
+  echo "" >&2
+  echo "pre-commit: BLOCKED — corporate directory data (see above)." >&2
+  exit 1
+fi
+
 # --- the board is a repo INSIDE this one, and this repo cannot see it ---------------
 #
 # `kanban/` is a separate private git repo nested in this one (the cards carry real names
@@ -38,10 +59,19 @@ fi
 # that aborts on an unexpected git exit would BLOCK the commit — turning an advisory note
 # into the blocking control this comment just argued against. A check that cannot answer
 # stays silent instead.
+# Two things make the probe below narrower than it looks, and both were learned by
+# watching it misfire. A worktree checks out `kanban/`'s tracked SCRIPTS but not the
+# nested board — no `.git` there — so requiring one is what tells "the board" apart from
+# "a directory with the board's name". And git exports GIT_DIR to its hooks, which a
+# nested `git -C` inherits: the probe then answers about the PARENT repository, so the
+# notice listed the commit's own files as though they were unsaved cards. A warning that
+# cries wolf in every worktree is one nobody reads in the checkout where it is true.
 _board="$ROOT/kanban"
-if git -C "$_board" rev-parse --show-toplevel >/dev/null 2>&1 \
-   && [ "$(git -C "$_board" rev-parse --show-toplevel 2>/dev/null)" != "$ROOT" ]; then
-  _dirty="$(git -C "$_board" status --porcelain 2>/dev/null || true)"
+_git_here() { env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE git "$@"; }
+if [ -e "$_board/.git" ] \
+   && _git_here -C "$_board" rev-parse --show-toplevel >/dev/null 2>&1 \
+   && [ "$(_git_here -C "$_board" rev-parse --show-toplevel 2>/dev/null)" != "$ROOT" ]; then
+  _dirty="$(_git_here -C "$_board" status --porcelain 2>/dev/null || true)"
   if [ -n "$_dirty" ]; then
     echo "" >&2
     echo "pre-commit: nota — la board (kanban/) e' un repo separato e questo commit NON la include:" >&2
@@ -51,7 +81,7 @@ if git -C "$_board" rev-parse --show-toplevel >/dev/null 2>&1 \
   fi
   # Committed but never pushed is the other half: the card exists in exactly one place on
   # one disk, which is not saved, it is just not lost yet.
-  _ahead="$(git -C "$_board" rev-list --count @{u}..HEAD 2>/dev/null || echo 0)"
+  _ahead="$(_git_here -C "$_board" rev-list --count @{u}..HEAD 2>/dev/null || echo 0)"
   if [ "${_ahead:-0}" -gt 0 ] 2>/dev/null; then
     echo "" >&2
     echo "pre-commit: nota — la board ha $_ahead commit non pushati (git -C kanban push)" >&2

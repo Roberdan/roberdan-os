@@ -74,7 +74,7 @@ _suite_out() { cat "$_PARDIR/$1.out" 2>/dev/null; }
 
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate \
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
-          test-federated-kb test-leak-check test-fork-merge test-autofmt \
+          test-federated-kb test-leak-check test-directory-dump-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
           test-bus-doorbell; do
@@ -303,6 +303,10 @@ fi
 section "leak-check self-test — tier (b) salted-hash catches a planted leak"
 if _suite test-leak-check; then ok "leak-check tiers verified (see bash test/test-leak-check.sh)"; else err "test-leak-check — see bash test/test-leak-check.sh"; fi
 
+section "directory-dump-check — corporate rosters, which no denylist can name in advance"
+if bash test/directory-dump-check.sh >/dev/null 2>&1; then ok "0 directory dumps tracked"; else err "directory dump tracked — see bash test/directory-dump-check.sh"; fi
+if _suite test-directory-dump-check; then ok "ratchet verified: grandfathered passes, one more address fails"; else err "test-directory-dump-check — see bash test/test-directory-dump-check.sh"; fi
+
 section "pre-commit hook e' installato E aggiornato (il leak check blocca solo se e' acceso)"
 # Nothing checked this until 2026-07-29, and on that day the installed hook was still the
 # 2 July copy: hooks/pre-commit had been edited, the gate was green, and the new check had
@@ -314,16 +318,14 @@ section "pre-commit hook e' installato E aggiornato (il leak check blocca solo s
 # first draft grepped for that path and passed on a stale COPY, because the copy carries
 # it in its own header comment. Verified by putting the old copy back and watching this
 # turn red — a check nobody has seen fail is a guess.
-# --git-common-dir, not --git-dir: inside a worktree the latter is
-# .git/worktrees/<name>/, which never holds hooks. This check reported "no
-# pre-commit installed" in every worktree even when one was installed — and the
-# canon mandates one worktree per card, so that was every place work happens.
-# Same one-word defect as bin/install-git-hooks.sh had, in the check that was
-# supposed to catch it.
-_gitdir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
-case "$_gitdir" in /*|"") ;; *) _gitdir="$(git rev-parse --show-toplevel)/$_gitdir" ;; esac
-_ih="$_gitdir/hooks/pre-commit"
-if [ ! -x "$_ih" ]; then
+# `--git-path hooks/...` e non `--git-dir`/hooks: in un WORKTREE git-dir e'
+# .git/worktrees/<nome>, dove gli hook non stanno mai — stanno nella common dir. Il gate
+# era quindi rosso in ogni worktree, cioe' esattamente dove il piano dice di lavorare
+# (`kb start` crea un worktree per card). Rosso sempre = spento, la stessa famiglia di
+# difetti che questo controllo esiste per prendere. Stesso bug della board notice, che
+# leggeva il repo padre da un worktree: chiedere a git DOVE guarda, non ricostruirlo.
+_ih="$(git rev-parse --git-path hooks/pre-commit 2>/dev/null || true)"
+if [ -z "$_ih" ] || [ ! -x "$_ih" ]; then
   # I git hook NON si clonano. Su una macchina di CI il hook non e' quindi assente per
   # negligenza: e' assente per costruzione, e non controlla comunque niente perche' la CI
   # non committa. Trattarlo come errore ha reso rossa la CI di main dal merge di PR #30 —
@@ -342,7 +344,7 @@ elif diff -q hooks/pre-commit "$_ih" >/dev/null 2>&1; then
 else
   err "il pre-commit installato NON e' il sorgente versionato: le modifiche a hooks/pre-commit non hanno effetto (bash bin/install-git-hooks.sh)"
 fi
-unset _gitdir _ih
+unset _ih
 
 section "board annidata — un commit che non include le card lo dice"
 if _suite test-nested-board-notice; then ok "kanban/ sporca -> il commit avvisa, e passa comunque"; else err "test-nested-board-notice — see bash test/test-nested-board-notice.sh"; fi
