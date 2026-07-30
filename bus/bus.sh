@@ -481,6 +481,107 @@ _cmd_read() {
   echo "bus: $total record(s) on $repo/$card, $mine deliverable to @$as."
 }
 
+# --- count: HOW MANY, never WHAT -------------------------------------------
+# The doorbell problem. Delivery is pull-only by design (property 1), so a
+# message waits until somebody asks - and nobody asks, because nobody knows it
+# is there. A COUNT is the only signal that can be pushed into a live session
+# without becoming delivery: a number carries no claim, so it cannot be believed
+# like context, which is the exact harm the board cut `context-inject` delivery
+# for. Bodies still only ever arrive through `read`, stamped UNVERIFIED.
+#
+# Three properties, each pinned by a check in test/test-bus.sh:
+#   - it NEVER renders a body: jq emits the literal `1` per match and never
+#     touches `.body`. Counting with `jq -c 'select(...)' | wc -l` would work
+#     just as well and would put every body on a pipe, which is the shape of the
+#     bug, not of the fix.
+#   - it NEVER advances a cursor. A doorbell that consumes the mail it announces
+#     is worse than no doorbell: the message is then gone from `read` forever.
+#   - it does NOT require --as. The hook that calls it has no role - it only
+#     knows the repo. Role-agnostic counting also cannot launder a read: that
+#     @sol-gate has two unread messages says nothing about what they say.
+#
+# ADVISORY BY DECLARATION: the count is taken WITHOUT the append lock. Taking it
+# would let a doorbell that fires on every tool call block behind a 3MB send for
+# up to 10s, and a slow doorbell gets removed. So a count taken mid-append may
+# be short by one and the next one corrects it. Nothing can be LOST this way -
+# the cursor never moves, and `read` is still the thing that is exact.
+_count_unread() {
+  local log="$1" role="$2" seen="$3"
+  tail -n +$((seen + 1)) "$log" \
+    | jq -r --arg me "$role" --arg all "$BROADCAST" \
+        'select(.to == $me or (.to == $all and .from != $me)) | 1' 2>/dev/null \
+    | wc -l | tr -d ' '
+}
+
+_cmd_count() {
+  local repo="" card="" as=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo) _need $# "--repo"; repo="$2"; shift 2;;
+      --card) _need $# "--card"; card="$2"; shift 2;;
+      --as)   _need $# "--as";   as="$2";   shift 2;;
+      *) die "count: unknown argument '$1'";;
+    esac
+  done
+  [ -n "$repo" ] || die "count: --repo is required"
+  repo="$(_slug "--repo" "$repo")"
+  [ -z "$card" ] || card="$(_slug "--card" "$card")"
+  # Roles are held in a space-separated string, not an array: role names are
+  # slugs by construction, and `"${a[@]}"` on an empty array is an unbound
+  # variable under `set -u` in bash 3.2, which is what macOS ships.
+  local roles=""
+  if [ -n "$as" ]; then
+    _assert_role "$as"
+    roles="$as"
+  else
+    [ -d "$ROLES_DIR" ] \
+      || die "no roles directory at $ROLES_DIR — if you reached this through a symlink, point the wrapper at bus/bus.sh itself or set RDA_BUS_ROLES"
+    _assert_no_broadcast_manifest
+    local rf
+    for rf in "$ROLES_DIR"/*.json; do
+      [ -e "$rf" ] || break
+      rf="${rf##*/}"
+      roles="$roles ${rf%.json}"
+    done
+  fi
+  local dir="$BUS_HOME/$repo"
+  # Silence, not an error: a repo with no traffic is the normal case, and this
+  # runs on every tool call. Anything printed at zero is context spent for nothing.
+  [ -d "$dir" ] || return 0
+  local f
+  for f in "$dir"/*.jsonl; do
+    [ -e "$f" ] || continue
+    [ -s "$f" ] || continue
+    local cname; cname="${f##*/}"; cname="${cname%.jsonl}"
+    [ -z "$card" ] || [ "$cname" = "$card" ] || continue
+    # Same posture as `who`: one damaged thread must not take down the summary.
+    # Delivery still fails loud and whole - this only decides whether to ring.
+    if ! jq -e . "$f" >/dev/null 2>&1; then
+      echo "bus: WARNING — $f is damaged and was skipped by count." >&2
+      continue
+    fi
+    [ "$(_thread_state "$f")" != "closed" ] || continue
+    local role cur seen n
+    for role in $roles; do
+      cur="$(_cursor_path "$repo" "$cname" "$role")"
+      seen=0
+      if [ -f "$cur" ]; then
+        seen="$(tr -d '[:space:]' < "$cur")"
+        # A corrupt cursor makes `read` die and say so. Here it must not: the
+        # doorbell degrades towards RINGING (count from zero), never towards
+        # silence, because the failure direction that loses a message is silence.
+        if ! [[ "$seen" =~ ^[0-9]+$ ]]; then
+          echo "bus: WARNING — the cursor $cur is corrupt; counting from the start." >&2
+          seen=0
+        fi
+      fi
+      n="$(_count_unread "$f" "$role" "$seen")"
+      [ "$n" -gt 0 ] || continue
+      printf '%s\t%s\t%s\n' "$cname" "$role" "$n"
+    done
+  done
+}
+
 # --- closing a thread ------------------------------------------------------
 # The answer to "a finished message should stop costing anything" WITHOUT the
 # answer being deletion. Reads already cost only what is new - each role has a
@@ -619,11 +720,19 @@ bus — durable agent-to-agent messages. Pull-only: it never starts an agent.
   bus send --repo R --card C --from ROLE --to ROLE|all [--kind request|verdict|note|question]
            [--ref kb:<card>|git:<sha>] [--body-file F]      (body on stdin if no --body-file)
   bus read --repo R --card C --as ROLE [--peek]              unread for ROLE (--peek: don't advance)
+  bus count --repo R [--card C] [--as ROLE]                  HOW MANY are unread, never what they say
   bus who  --repo R                                          who is alive, from the last append or read
   bus roles                                                  addressable roles + their manifests
   bus close --repo R --card C --by ROLE                       finished: stop delivering, keep every word
   bus open  --repo R --card C --by ROLE                       deliberately reopen a closed thread
   bus log  --repo R --card C                                 the whole permanent thread
+
+Nobody is woken, so how does anyone know there is mail?
+  `bus count` prints one `card<TAB>role<TAB>n` line per role with unread mail and
+  NOTHING at all when there is none - so a hook can ring a doorbell inside a session
+  that is already running. A count carries no claim; bodies still only arrive
+  through `read`. It never advances a cursor, and it is taken without the append
+  lock, so it can be short by one mid-append and is corrected by the next one.
 
 Cost, since it is the usual worry:
   - `read` delivers only what is NEW to that role; history is never re-sent.
@@ -654,6 +763,7 @@ case "${1:-}" in
   send)  shift; _cmd_send "$@";;
   read)  shift; _cmd_read "$@";;
   peek)  shift; _cmd_read "$@" --peek;;
+  count) shift; _cmd_count "$@";;
   who)   shift; _cmd_who "$@";;
   close) shift; _cmd_close "" "$@";;
   open)  shift; _cmd_close "reopen" "$@";;

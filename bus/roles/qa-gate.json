@@ -1,0 +1,18 @@
+{
+  "role": "qa-gate",
+  "description": "Re-derives a claim empirically and reports PASS/FAIL with a minimal reproduction. It is NOT the done-gate: moving a card stays a human-gated action performed by @thor through kb, never through this channel.",
+  "may": [
+    "read any file in the repo under test",
+    "run the test suite, linters and doctors",
+    "create and remove throwaway git worktrees under /tmp",
+    "read CI status",
+    "write a PASS/FAIL verdict with a re-runnable command onto the bus"
+  ],
+  "may_not": [
+    "move a kanban card to any state",
+    "run kb start or kb finish",
+    "commit, push or merge",
+    "start, spawn or dispatch another agent",
+    "declare work done: a verdict on the bus is a message, not a transition"
+  ]
+}
