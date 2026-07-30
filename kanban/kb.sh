@@ -1473,6 +1473,24 @@ case "$cmd" in
       esac
     done
     f="$KB/todo/$id.md"; [ -e "$f" ] || { echo "no todo card $id" >&2; exit 1; }
+
+    # PRECHECK — le tre domande da fare a una card PRIMA di eseguirla: e' ancora valida? la sta
+    # gia' facendo un'altra card? e' gia' stata fatta? Il 2026-07-30 cinque card si sono
+    # rivelate sbagliate proprio nel momento in cui qualcuno le ha prese in mano — una era
+    # aperta da VENTI giorni su lavoro gia' fatto e reso inutile da una decisione successiva.
+    # Non blocca (un gate che blocca su un sospetto statistico viene aggirato al terzo falso
+    # allarme): stampa E scrive sulla card, cosi' chi ci lavora se lo trova davanti.
+    if [ -r "$ROOT/kanban/precheck.sh" ] && [ -z "${RDA_NO_PRECHECK:-}" ]; then
+      # shellcheck source=/dev/null
+      . "$ROOT/kanban/precheck.sh"
+      _pc_out="$(precheck "$f")"
+      if [ -n "$_pc_out" ]; then
+        echo "⚠️  PRIMA DI PARTIRE, guarda questi avvisi su $id:" >&2
+        printf '%s\n' "$_pc_out" | sed 's/^/    /' >&2
+        { echo; echo "## Avvisi del precheck, $(date '+%Y-%m-%d %H:%M %Z')"; echo
+          printf '%s' "$_pc_out" | sed 's/^/- /'; } >> "$f"
+      fi
+    fi
     # DISCIPLINE gate, not a security boundary: --by is honor-system — any caller can pass
     # `--by roberto`. There is deliberately no blocking check here (that would break the
     # documented "do all the todos" autonomous flow). Instead, every kb start ATTEMPT — even

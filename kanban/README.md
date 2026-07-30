@@ -30,6 +30,32 @@ kb repo <name>                       # per-repo dashboard ON TOP of the board: g
                                      #   that repo's cards grouped doing / todo / done
 ```
 
+## Il precheck — le tre domande da fare a una card PRIMA di eseguirla
+
+`kb start` interroga la card prima di aprirla, e stampa cio' che trova **anche sulla card**:
+
+| Domanda | Quando avvisa |
+|---|---|
+| **E' ancora valida?** | la card ha piu' di 7 giorni |
+| **La sta gia' facendo un'altra card?** | un'altra card aperta condivide 2+ parole significative |
+| **E' gia' stata fatta?** | una delle 30 card chiuse piu' recenti le somiglia |
+
+**Non blocca**, di proposito: un gate che blocca su un sospetto statistico viene aggirato al
+terzo falso allarme. Si spegne con `RDA_NO_PRECHECK=1`.
+
+**La proprieta' che lo rende utile e' il SILENZIO**: su una card nuova e senza parentele non
+stampa niente. Un avviso che compare sempre e' rumore che si impara a saltare, e il giorno che
+dice il vero nessuno lo legge. Meta' delle asserzioni di `test/test-kb-precheck.sh` verificano
+proprio che taccia.
+
+*Scar, 2026-07-30: cinque card si sono rivelate sbagliate nel momento in cui qualcuno le ha
+prese in mano. Una — le azioni MCAPS — e' rimasta aperta **venti giorni** su lavoro gia' fatto
+il giorno 11 e reso irrilevante da una decisione del giorno 13 (56 risorse Azure distrutte, fra
+cui esattamente quelle che la card doveva mettere in sicurezza). Le altre quattro: una card che
+chiedeva cio' che le sue sorelle dovevano fare, due card sullo stesso problema, quattro card
+sullo stesso lavoro. I freni scritti quel mattino fermano la NASCITA delle card; nessuno
+guardava una card nel momento in cui la prendi in mano.*
+
 ## The two gates (no rubber-stamping)
 - **`todo → doing`** is a **human gate on the LIST, not on each card** (Roberto's decision,
   2026-07-30). `kb queue` photographs the repo's `todo` cards at session start; `kb next` walks

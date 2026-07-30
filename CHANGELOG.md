@@ -5,6 +5,33 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 
 ## [v2.25.0] - 2026-07-30
 
+### Added
+
+- **Il precheck: le tre domande da fare a una card PRIMA di eseguirla.** `kb start` ora chiede,
+  e stampa cio' che trova **anche sulla card**: *e' ancora valida?* (piu' di 7 giorni), *la sta
+  gia' facendo un'altra card?* (2+ parole significative in comune con una card aperta), *e' gia'
+  stata fatta?* (idem con le 30 chiuse piu' recenti).
+  - **Non blocca**, di proposito: un gate che blocca su un sospetto statistico viene aggirato al
+    terzo falso allarme. Si spegne con `RDA_NO_PRECHECK=1`.
+  - **La proprieta' che lo rende utile e' il SILENZIO**: su una card nuova e senza parentele non
+    stampa niente. Un avviso che compare sempre e' rumore che si impara a saltare, e il giorno
+    che dice il vero nessuno lo legge. Meta' delle asserzioni di `test/test-kb-precheck.sh`
+    verificano proprio che taccia, e che non blocchi.
+  - Vive in `kanban/precheck.sh` (97 righe) invece che dentro `kb.sh`, che e' gia' a 1680.
+
+  *Scar misurato, non ipotizzato: il 2026-07-30 **cinque** card si sono rivelate sbagliate nel
+  momento in cui qualcuno le ha prese in mano. Le azioni MCAPS erano aperte da **venti giorni**
+  su lavoro gia' fatto il giorno 11 e reso irrilevante da una decisione del giorno 13 — 56
+  risorse Azure distrutte, fra cui esattamente Redis, Event Hubs e le sottoreti che la card
+  doveva mettere in sicurezza. Le altre quattro: una card la cui acceptance chiedeva cio' che le
+  sue sorelle dovevano fare, due card sullo stesso problema, quattro card sullo stesso lavoro.
+  I freni scritti quel mattino fermano la NASCITA delle card e ne limitano il numero in corso;
+  nessuno guardava una card nel momento in cui la prendi in mano — che e' l'unico momento in cui
+  quelle domande hanno senso. Una card e' la fotografia di un problema NEL GIORNO in cui e' stata
+  scritta: piu' invecchia, meno assomiglia al presente, e la pila non aveva memoria di questo.*
+
+## [v2.25.0] - 2026-07-30
+
 ### Fixed
 
 - **Il SessionStart hook renderizzava tutto il board per stampare tre numeri.**
