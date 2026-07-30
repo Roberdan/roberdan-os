@@ -65,13 +65,40 @@ BUS_HOME="${RDA_BUS_HOME:-${RDA_HOME:-$HOME/.roberdan-os}/bus}"
 # The stamp turns it into an edge — ring once per change — with a 10-minute
 # reminder while mail is still pending, because a doorbell that rings exactly
 # once during a long turn is a doorbell that gets missed.
+# `stat` is the one command here whose SYNTAX differs by platform, and the naive
+# `stat -f ... || stat -c ...` was wrong in a way that only Linux shows: on GNU
+# coreutils `-f` is not "format", it is "report on the FILESYSTEM", and it exits 0.
+# So the fallback never fired, every file reported the same filesystem instead of
+# its own mtime, and the signature stopped tracking the thing it exists to track.
+# Measured, not reasoned: this suite passed on macOS and failed on ubuntu-latest
+# with "the hook rang twice for the same unchanged state".
+#
+# The flavour is decided ONCE, by asking `stat` to do the GNU thing on a path that
+# certainly exists, and the answer is a variable rather than a per-file `||` chain.
+if stat -c '%Y' . >/dev/null 2>&1; then
+  _stat_one() { stat -c '%Y %s %n' "$1" 2>/dev/null; }   # GNU / Linux
+else
+  _stat_one() { stat -f '%m %z %N' "$1" 2>/dev/null; }   # BSD / macOS
+fi
+
+# Same reasoning for the digest: `shasum` is Perl's and ships on macOS, `sha1sum`
+# is coreutils' and ships on Linux, and `cksum` is in POSIX. Any of the three is
+# fine — the signature only has to be STABLE and to change when the input does.
+if command -v shasum >/dev/null 2>&1;      then _digest() { shasum; }
+elif command -v sha1sum >/dev/null 2>&1;   then _digest() { sha1sum; }
+else                                            _digest() { cksum; }
+fi
+
 sig_of() {
   local f out=""
   for f in "$BUS_HOME/$repo"/*.jsonl "$BUS_HOME/$repo"/.cursor/*/*; do
     [ -e "$f" ] || continue
-    out="$out $(stat -f '%m %z %N' "$f" 2>/dev/null || stat -c '%Y %s %n' "$f" 2>/dev/null || echo "$f")"
+    out="$out $(_stat_one "$f" || echo "$f")"
   done
-  printf '%s' "$out" | shasum 2>/dev/null | cut -c1-16
+  # A signature that came out empty must not be mistaken for "nothing changed":
+  # an empty sig would compare equal to the empty first line of a missing stamp.
+  # The literal marker makes that state distinguishable, and it rings once.
+  printf '%s' "${out:-no-files}" | _digest | cut -c1-16
 }
 sig="$(sig_of)"
 

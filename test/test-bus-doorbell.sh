@@ -80,7 +80,24 @@ echo "another one" | bash "$BUS" send --repo "$REPO" --card d1 \
 first="$(payload s4 | bash "$HOOK" 2>/dev/null)"
 [ -n "$first" ] || fail "the hook did not ring for a NEW message"
 second="$(payload s4 | bash "$HOOK" 2>/dev/null)"
-[ -z "$second" ] || fail "the hook rang twice for the same unchanged state — it is a level, not an edge"
+if [ -n "$second" ]; then
+  # TEMPORARY (2026-07-30): this assertion passes on macOS and failed on
+  # ubuntu-latest, and three hypotheses about why were wrong. Rather than guess a
+  # fourth, print the state the hook decides on. Remove once the cause is fixed.
+  echo "--- diagnostica: perche' ha suonato due volte ---" >&2
+  echo "stamp dir: $TMPDIR/rda-bus-doorbell" >&2
+  ls -la "$TMPDIR/rda-bus-doorbell" 2>&1 >&2 || true
+  for s in "$TMPDIR/rda-bus-doorbell"/*; do
+    [ -e "$s" ] || continue
+    echo "stamp $s:" >&2; cat -A "$s" >&2 2>/dev/null || true
+  done
+  echo "file che entrano nella firma:" >&2
+  ls -la "$RDA_BUS_HOME/$REPO"/*.jsonl "$RDA_BUS_HOME/$REPO"/.cursor/*/* 2>&1 >&2 || true
+  echo "stat -c disponibile? $(stat -c '%Y' . 2>/dev/null || echo no)" >&2
+  echo "stat -f su un file: $(stat -f '%m %z %N' "$RDA_BUS_HOME/$REPO/d1.jsonl" 2>&1 | head -1)" >&2
+  echo "esito stat -f: $?" >&2
+  fail "the hook rang twice for the same unchanged state — it is a level, not an edge"
+fi
 # A different session has its own stamp: it has not been told yet.
 other="$(payload s5 | bash "$HOOK" 2>/dev/null)"
 [ -n "$other" ] || fail "a second session inherited the first session's silence"
