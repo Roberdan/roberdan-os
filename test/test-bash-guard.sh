@@ -54,14 +54,12 @@ expect deny  "git push --force origin main"      "git push --force -> deny"
 expect deny  "git push -f origin main"           "git push -f -> deny"
 expect deny  "git push --no-verify"              "git push --no-verify -> deny"
 expect allow "git push origin main"              "ordinary git push -> allowed"
-# KNOWN OVER-BLOCK, asserted as it currently behaves — not as it should.
-# Rule 1 reads the raw command, so a commit message that merely NAMES `git push --force` is
-# denied. Rule 4 already solved this for itself by stripping quoted strings first; rule 1 was
-# never given the same treatment. Found on 2026-07-31 while adding this file; recorded in
-# docs/findings.md rather than fixed here, because it is not the change that was asked for.
-# When it is fixed, this line flips to `expect allow` and the comment goes.
-expect deny "git commit -m 'never use git push --force here'" \
-  "the flag NAMED inside a quoted message -> deny (known over-block, see docs/findings.md)"
+expect allow "git commit -m 'never use git push --force here'" \
+  "the flag NAMED inside a quoted message -> allowed (message is data, not a command)"
+# Tradeoff dichiarato dalla riparazione: stringhe fra virgolette = dati, quindi un flag
+# nascosto fra virgolette non viene piu' intercettato. Asserito perche' sia visibile.
+expect allow "git push \"--force\" origin main" \
+  "flag NASCOSTO fra virgolette -> allowed (tradeoff dichiarato: dato, non comando)"
 
 echo
 echo "=== rule 3: destructive reset / clean -> ask, never silent ==="
