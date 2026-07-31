@@ -280,6 +280,13 @@ leggere — ed è così che un fallimento vero viene scambiato per rumore.
 **Diventa una card** quando un flaky fa perdere tempo una seconda volta, o quando fallisce in
 una finestra in cui serviva fidarsi del verde. Oggi il costo è un rilancio.
 
+**Seconda occorrenza, 31 luglio 2026 — la condizione dichiarata sopra si è verificata.**
+`test-fork-merge` è fallito sulla run `30641426340` (commit `99ee81d`, un commit di sola
+documentazione che non tocca nulla di ciò che quel test prova). Misurato nei due sensi:
+in locale `bash test/test-fork-merge.sh` → **PASS, exit 0**; rilanciato lo stesso job in CI
+**senza cambiare una riga** → **success**. Roberto è stato informato con le due opzioni
+(farne una card, o lasciarlo); la promozione resta sua.
+
 ## 11. `kb pending` non vede una card ferma in `doing` in attesa di Roberto
 
 **Come è emerso** (31 luglio 2026): `handoff/latest.md` nomina una quarta decisione in attesa
