@@ -38,8 +38,13 @@
 # (richiesta esplicita di Roberto). Il cancello piu' importante del sistema dipendeva dal
 # fatto che qualcuno si ricordasse di convocarlo. Resta in piedi la nota di due bump fa:
 # validate.sh va spezzato, e chi ci mette mano dopo di me lo spezza.
+# 2026-07-31, ottava: +N test-bus.sh per l'impronta sulla coda della factory. Il mutante
+# `factory-drop` — un bus che avvia un agente scrivendo un file che launchd raccoglie alle
+# 01:00, senza eseguire niente — era sopravvissuto all'intera batteria con la suite verde.
+# La canary guarda l'ESECUZIONE, l'impronta kanban guarda lo STATO DELLE CARD: quella
+# superficie non la guardava nessuno.
 1741 kanban/kb.sh
-1364 test/test-bus.sh
+1388 test/test-bus.sh
 1131 test/test-bus-mutants.sh
 774 bus/bus.sh
 637 bin/sync.sh

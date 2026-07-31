@@ -264,6 +264,27 @@ assert_kanban_untouched() {
   [ "$(kanban_fingerprint)" = "$kb_baseline" ] \
     || fail "the bus CHANGED kanban state without executing anything - card transitions are a human gate ($1)"
 }
+
+# THE THIRD SURFACE: THE FACTORY QUEUE.
+# The canary watches EXECUTION and the kanban fingerprint watches CARD STATE, and
+# a file dropped into $RDA_HOME/factory/queue is neither: it executes nothing, it
+# touches no card, and `com.roberdan.rda-factory` picks it up at 01:00 and starts a
+# live `claude -p --dangerously-skip-permissions` from it. One printf, no watcher.
+# That is mutant `factory-drop`, and it SURVIVED the whole battery on 2026-07-30
+# with the suite green (findings #1). `-L` because the fixture above deliberately
+# makes the queue a symlink - a plain find lists it without descending, so a job
+# file inside is 100% invisible, which is the same fail-open this hash exists to
+# refuse. Empty is a legitimate state here (an empty queue is the normal one), so
+# unlike the kanban hash it must NOT bail on empty input.
+factory_fingerprint() {
+  local files; files="$(find -L "$RDA_HOME/factory" -type f 2>/dev/null | sort)"
+  { printf '%s\n' "$files" \
+      | while IFS= read -r f; do [ -n "$f" ] || continue; printf '%s ' "$f"; shasum "$f" | awk '{print $1}'; done; } | shasum | awk '{print $1}'
+}
+assert_factory_queue_untouched() {
+  [ "$(factory_fingerprint)" = "$fq_baseline" ] \
+    || fail "the bus WROTE the factory queue - one file there is a live agent session at 01:00, and it executes nothing to get there ($1)"
+}
 # ASSERT, THEN re-baseline. Re-baselining alone quietly ADOPTS whatever damage
 # happened since the last one: a mutant that wrote a card during check 11 was
 # absorbed by the next fixture's baseline and survived the whole suite. So every
@@ -272,6 +293,7 @@ assert_kanban_untouched() {
 kb_fixture() { assert_kanban_untouched "$1"; }
 kb_rebaseline() { kb_baseline="$(kanban_fingerprint)"; }
 kb_rebaseline
+fq_baseline="$(factory_fingerprint)"
 
 # ===========================================================================
 # THE CANARY IS NOT A CHECK, IT IS THE FLOOR OF THE WHOLE RUN.
@@ -1069,6 +1091,7 @@ done
 #     ones nobody enumerated. Six refusal branches were caught by exactly this
 #     line after five hand-maintained tables had missed them.
 assert_never_executed "whole run"
+assert_factory_queue_untouched "whole run"
 
 # 43. DELIVERY IS COMPLETE AT A SIZE NOBODY EYEBALLED. Every other delivery [PINNED]
 #     assertion here uses batches of one to three, so a CAP - the single most
@@ -1360,5 +1383,6 @@ quiet="$(busrun count --repo norepo-at-all 2>&1)" || fail "count failed on a rep
 #     only a floor if nothing runs underneath it.
 assert_never_executed "final (after every bus invocation)"
 assert_kanban_untouched "final (after every bus invocation)"
+assert_factory_queue_untouched "final (after every bus invocation)"
 
 echo "PASS: test-bus.sh"
