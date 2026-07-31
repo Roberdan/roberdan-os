@@ -4,6 +4,22 @@
 > la card MirrorHR `260713-093430`, il dettaglio (T7 in pausa, base fidata `Development@cc2e04b`,
 > ultima PR verificata #567) sta lì: `git show a33c804:handoff/latest.md`.
 
+## Aggiornamento 31 luglio (mattina) — quattro cose fatte, nessuna nuova decisione
+
+- **`kanban/.coda-*` ora è ignorato** nel repo pubblico: lo scatto della coda elencava id di card
+  del board privato ed era untracked ma committabile. `git check-ignore -v` lo conferma.
+- **Il board era rimasto solo su disco**: 21 file (sei card chiuse il 30/7, `precheck.sh`) non
+  erano nel repo card privato. Committati e pushati (`6f62275` → `roberdan-os-cards`). Il
+  `git add -A` che l'ha fatto ha anche tracciato due volte `precheck.sh` — corretto subito,
+  ora escluso in `kanban/.gitignore`.
+- **I due thread bus aperti sono chiusi** (`260728-164449`, `260729-150321`, come `@architect`;
+  il log resta leggibile). Contenevano tre rilievi che vivevano solo lì: uno era già riparato in
+  `kanban/kb.sh:159-176`, gli altri due sono ora **findings #9 e #10**.
+- **Finding #11**: la quarta decisione (`260729-073336`, VirtualBPM) non compare in `kb pending`
+  perché è in `doing`. La tabella qui sotto resta valida; la lista di `kb pending` no.
+- CI di `roberdan-os` verde **oggi** (run `30611347980`, commit `b660f9f`). Quella di
+  VirtualBPMFy27 è verde di ieri sera, non riverificata.
+
 ## In una riga
 
 Tutto stabile e verificato — **`roberdan-os v2.26.0`**, **`VirtualBPMFy27 v4.10.2`**, CI verde
