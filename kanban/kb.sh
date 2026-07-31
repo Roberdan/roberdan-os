@@ -999,6 +999,26 @@ _pending() {
   fi
   total=$((total+n))
 
+  # 1b) Card in doing ferme su una decisione sua: `blocked_reason:` lo dice a chiare lettere, ma
+  #     questa lista leggeva solo todo/ — il sistema sapeva di aspettarlo e non glielo diceva.
+  echo
+  echo "### Card ferme in doing — aspettano una tua decisione"
+  n=0
+  for bd in "${boards[@]}"; do
+    for f in "$bd/doing"/*.md; do
+      [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue ;; esac
+      # `|| true`: grep -m1 esce 1 se la chiave manca e sotto set -e tronca l'intero report
+      # alla prima card in doing senza blocked_reason — cioe' nel caso normale.
+      _p_br="$(_field "$f" blocked_reason || true)"
+      [ -n "$_p_br" ] || continue
+      n=$((n+1))
+      printf '  • %s (%s) — %s\n      ferma perche: %s\n' \
+        "$(basename "$f" .md)" "$(_repo_tag "$f")" "$(_field "$f" title)" "$_p_br"
+    done
+  done
+  [ "$n" -eq 0 ] && echo "  (nessuna)"
+  total=$((total+n))
+
   # 2) Learning candidates awaiting your approval (approved: false in quarantine) — flip
   #    approved: true on the ones worth keeping, then `bash ontology/curate.sh` promotes them.
   echo

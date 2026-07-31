@@ -86,4 +86,37 @@ report_with_registry_pr="$(PATH="$TMP/bin:$PATH" bash "$KB" pending)"
 grep -q "external-no-board#777 — registry-only repo PR" <<<"$report_with_registry_pr" \
   || fail "pending did not include PRs from registry repo without kanban/"
 
+# 7) Una card GIA' in doing, ferma su una decisione di Roberto (blocked_reason:), deve
+#    comparire. Prima leggeva solo todo/: una card bloccata su di lui non compariva da nessuna
+#    parte, ed e' il caso peggiore — il sistema sa di aspettarlo e non glielo dice (findings #11).
+cat > "$RDA_KANBAN/doing/D-BLOCKED.md" <<'EOF'
+---
+title: ferma su una decisione
+repo: roberdan-os
+status: doing
+blocked_reason: "serve che Roberto scelga fra A e B"
+---
+EOF
+report_blocked="$(bash "$KB" pending)"
+grep -q "D-BLOCKED" <<<"$report_blocked" \
+  || fail "una card in doing con blocked_reason non compare in kb pending"
+grep -q "serve che Roberto scelga fra A e B" <<<"$report_blocked" \
+  || fail "kb pending mostra la card bloccata ma non DICE perche' e' ferma"
+
+# 8) Il contropeso: una card in doing SENZA blocked_reason sta lavorando, non aspetta lui,
+#    e non deve comparire. Senza questo il rimedio diventa un secondo muro da smistare.
+cat > "$RDA_KANBAN/doing/D-WORKING.md" <<'EOF'
+---
+title: in lavorazione, non aspetta nessuno
+repo: roberdan-os
+status: doing
+---
+EOF
+report_working="$(bash "$KB" pending)"
+# NB: assertion NEGATIVA. `grep -q ... && fail` sotto `set -e` esce 1 in silenzio quando grep
+# non trova (cioe' nel caso GIUSTO): il test fallirebbe proprio quando il codice e' corretto.
+if grep -q "D-WORKING" <<<"$report_working"; then
+  fail "una card in doing SENZA blocked_reason non deve comparire in kb pending"
+fi
+
 echo "PASS: approval inbox (kb pending, --count, approved-excluded, digest writes + exits 0, PR bot-filter + registry-only PR scan)"
