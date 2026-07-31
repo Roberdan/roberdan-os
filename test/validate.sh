@@ -390,6 +390,13 @@ if _suite test-copilot-adapter; then ok "copilot adapter verified (see bash test
 section "autofmt hook — stdin JSON input contract"
 if _suite test-autofmt; then ok "autofmt receives files via stdin JSON (see bash test/test-autofmt.sh)"; else err "test-autofmt — see bash test/test-autofmt.sh"; fi
 
+# --- 8b2) hooks/bash-guard.sh decisions (every rule fires, and none over-blocks) ---
+# Added 2026-07-31. Until then the guard that blocks force-push, `reset --hard` and a source
+# file swept into a docs commit had no test at all: each of those scars could have been put
+# back with the whole suite green.
+section "bash guard — deny/ask/allow decisions per rule"
+if _suite test-bash-guard; then ok "invisible-character prefilter, force-push, reset/clean and docs-staging rules all fire, and the allow cases are not over-blocked"; else _suite_out test-bash-guard; err "test-bash-guard — see bash test/test-bash-guard.sh"; fi
+
 # --- 8c) loop receipts emitter (schema, append-only, opt-in placement, no pollution) ---
 section "loop receipts — loop/receipt.sh emitter contract"
 if _suite test-receipts; then ok "receipt emitter green (see bash test/test-receipts.sh)"; else err "test-receipts — see bash test/test-receipts.sh"; fi
