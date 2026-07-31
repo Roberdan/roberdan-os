@@ -34,14 +34,18 @@
 # @thor" su OGNI chiusura, anche quando thor era sospeso: una frase generata dal sistema che
 # nessuno controllava e che resta per sempre nell'archivio. Sei righe perche' il registro
 # smetta di dire il falso.
-1706 kanban/kb.sh
+# 2026-07-31, settima: +3 validate.sh + kb.sh per far verificare @thor DA SOLO su kb finish
+# (richiesta esplicita di Roberto). Il cancello piu' importante del sistema dipendeva dal
+# fatto che qualcuno si ricordasse di convocarlo. Resta in piedi la nota di due bump fa:
+# validate.sh va spezzato, e chi ci mette mano dopo di me lo spezza.
+1741 kanban/kb.sh
 1364 test/test-bus.sh
 1131 test/test-bus-mutants.sh
 774 bus/bus.sh
 637 bin/sync.sh
 601 test/test-federated-kb.sh
-619 test/validate.sh
-574 test/test-factory-kb.sh
+622 test/validate.sh
+578 test/test-factory-kb.sh
 438 eval/test-eval-pipeline.sh
-442 test/test-kb-views.sh
+446 test/test-kb-views.sh
 344 eval/report.sh

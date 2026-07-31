@@ -29,6 +29,10 @@ err()     { printf "  FAIL: %s\n" "$1"; FAIL=1; }
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 export RDA_KANBAN="$TMP/board"
+# Le chiusure di questa suite NON devono convocare @thor davvero: la verifica headless
+# lancia un processo `claude` per card, costa minuti e denaro, e qui le card sono finte.
+# Il percorso automatico ha il suo test dedicato (test-kb-autothor.sh).
+export RDA_KB_AUTOTHOR=0
 export RDA_KANBAN_REGISTRY="$TMP/registry"
 mkdir -p "$RDA_KANBAN"/{todo,doing,done}
 : > "$RDA_KANBAN_REGISTRY"
