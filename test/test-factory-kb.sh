@@ -137,6 +137,10 @@ fi
 
 section "kb gate: doing->done needs @thor + evidence"
 RDA_KANBAN="$KB" bash kanban/kb.sh start probe --by roberto >/dev/null 2>&1
+# Le chiusure di questa suite NON devono convocare @thor davvero: la verifica headless
+# lancia un processo `claude` per card, costa minuti e denaro, e qui le card sono finte.
+# Il percorso automatico ha il suo test dedicato (test-kb-autothor.sh).
+export RDA_KB_AUTOTHOR=0
 [ -e "$KB/doing/probe.md" ] || err "setup: probe card did not reach doing/ via a valid start"
 if RDA_KANBAN="$KB" bash kanban/kb.sh finish probe >/dev/null 2>&1; then
   err "kb finish without --thor was ACCEPTED (should be refused)"

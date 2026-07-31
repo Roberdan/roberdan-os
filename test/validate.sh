@@ -87,7 +87,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-federated-kb test-leak-check test-directory-dump-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
-          test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources; do
+          test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources test-kb-autothor; do
   _spawn "$_s"
 done
 unset _s
@@ -428,6 +428,9 @@ if _suite test-metaloop; then ok "meta-loop promotes end-to-end (see bash test/t
 # buffer actually reaches the agent through the card watch.sh writes (wired, not just present).
 section "evolve rejected-proposal buffer (test/test-evolve-declined.sh)"
 if _suite test-evolve-declined; then ok "declined buffer matches rewordings, spares novelties, reaches the card"; else err "test-evolve-declined — see bash test/test-evolve-declined.sh"; fi
+
+section "kb autothor — @thor verifica da solo, e uno SKIP non diventa un PASS"
+if _suite test-kb-autothor; then ok "PASS chiude e scrive l'evidenza di thor, FAIL e SKIP lasciano la card in doing, --by non convoca thor"; else _suite_out test-kb-autothor; err "test-kb-autothor — il cancello doing->done non si comporta come dichiarato"; fi
 
 section "evolve sources — le fonti sorvegliate sono leggibili via curl, non solo raggiungibili"
 if _suite test-evolve-sources; then ok "$(_suite_out test-evolve-sources | grep -cE "^  (ok|SKIP)") fonti controllate (SKIP dichiarato se manca la rete)"; else _suite_out test-evolve-sources; err "test-evolve-sources — una fonte apre card che nessun agente puo' leggere"; fi

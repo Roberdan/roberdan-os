@@ -1640,7 +1640,7 @@ case "$cmd" in
     ev=""; keep_wt=""; verifier=""
     while [ $# -gt 0 ]; do
       case "$1" in
-        --thor) ev="${2:-}"; verifier="${verifier:-thor}"; shift 2 ;;
+        --thor) ev="${2:-}"; shift 2 ;;
         # CHI ha verificato e' un dato, non un presupposto. Prima kb stampava e scriveva
         # "verified by @thor" su OGNI chiusura, anche quando @thor era sospeso e aveva
         # verificato qualcun altro: la frase la generava il sistema, nessuno la controllava,
@@ -1660,6 +1660,38 @@ case "$cmd" in
       exit 1
     fi
     if ! _verify_evidence "$ev"; then exit 1; fi
+
+    # @thor VERIFICA DA SOLO. Prima toccava a chi chiudeva ricordarsi di convocarlo, e il
+    # sistema stampava "verified by @thor" comunque: il cancello piu' importante del sistema
+    # dipendeva dalla buona volonta' di chi lo attraversava. Roberto, 2026-07-31: "fai in modo
+    # che thor vada avanti a validare le card anche senza che io debba dirgli niente."
+    # Si riusa verify_card() della factory (kanban/thor-verify.sh), non se ne scrive una
+    # seconda: due implementazioni dello stesso cancello divergono, e la meno usata diventa la
+    # piu' permissiva.
+    # --by salta la verifica automatica: sta dicendo esplicitamente CHI ha verificato, e
+    # quella dichiarazione resta sulla card. RDA_KB_AUTOTHOR=0 la spegne (test isolati).
+    if [ -z "$verifier" ] && [ "${RDA_KB_AUTOTHOR:-1}" != "0" ]; then
+      echo "kb: @thor sta verificando $id contro i criteri della card (puo' richiedere qualche minuto)..." >&2
+      tv="$(bash "$ROOT/kanban/thor-verify.sh" "$id" "$(_field "$f" worktree || true)" 2>/dev/null || true)"
+      [ -n "$tv" ] || tv="SKIP	kanban/thor-verify.sh non ha risposto"
+      case "$tv" in
+        PASS*)
+          verifier="thor"; ev="$ev | @thor: ${tv#PASS	}"
+          echo "kb: @thor PASS" >&2 ;;
+        FAIL*)
+          echo "REFUSED: @thor ha verificato e dice NO — ${tv#FAIL	}" >&2
+          echo "  La card resta in doing. Sistema quello che manca, oppure chiudi con --by <chi>" >&2
+          echo "  se a verificare e' stato qualcun altro e sai perche' thor sbaglia." >&2
+          exit 1 ;;
+        *)
+          # SKIP non e' un verdetto: qui il sistema NON puo' dire "verified by @thor", perche'
+          # thor non ha verificato niente. Si rifiuta e si chiede a chi chiude di dire il vero.
+          echo "REFUSED: @thor non ha potuto verificare — ${tv#SKIP	}" >&2
+          echo "  kb non scrive 'verified by @thor' su una verifica che non e' avvenuta." >&2
+          echo "  Chiudi con --by <chi> dicendo chi ha verificato davvero." >&2
+          exit 1 ;;
+      esac
+    fi
     # Closing a card means nothing is left behind: the worktree must be committed AND merged, or
     # the close is refused. Checked BEFORE any state is written, so a refusal leaves the card
     # exactly where it was — in doing, with its worktree intact.
@@ -1676,6 +1708,9 @@ case "$cmd" in
     fi
     _set_status "$f" done
     fin_epoch="$(date +%s)"
+    # Qui verifier e' vuoto solo con RDA_KB_AUTOTHOR=0 e senza --by: l'unico percorso in cui
+    # kb torna al vecchio presupposto, ed e' una scelta esplicita di chi chiama (test isolati).
+    verifier="${verifier:-thor}"
     { echo "verified_by: $verifier"; echo "verified_evidence: $ev"; echo "verified_at: $(date +%Y-%m-%d)"
       echo "finished_at: $(date '+%Y-%m-%d %H:%M:%S %Z')"; echo "finished_epoch: $fin_epoch"; } >> "$f"
     # Freeze the spend now: the transcripts it is computed from grow forever, so a closed card
