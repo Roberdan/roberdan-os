@@ -78,7 +78,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-federated-kb test-leak-check test-directory-dump-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
-          test-bus-doorbell; do
+          test-bus-doorbell test-bash-guard; do
   _spawn "$_s"
 done
 unset _s
@@ -390,10 +390,8 @@ if _suite test-copilot-adapter; then ok "copilot adapter verified (see bash test
 section "autofmt hook — stdin JSON input contract"
 if _suite test-autofmt; then ok "autofmt receives files via stdin JSON (see bash test/test-autofmt.sh)"; else err "test-autofmt — see bash test/test-autofmt.sh"; fi
 
-# --- 8b2) hooks/bash-guard.sh decisions (every rule fires, and none over-blocks) ---
-# Added 2026-07-31. Until then the guard that blocks force-push, `reset --hard` and a source
-# file swept into a docs commit had no test at all: each of those scars could have been put
-# back with the whole suite green.
+# --- 8b2) bash-guard decisions. Until 2026-07-31 the guard blocking force-push, `reset --hard`
+# and source-in-a-docs-commit had NO test: each scar could have returned with the suite green.
 section "bash guard — deny/ask/allow decisions per rule"
 if _suite test-bash-guard; then ok "invisible-character prefilter, force-push, reset/clean and docs-staging rules all fire, and the allow cases are not over-blocked"; else _suite_out test-bash-guard; err "test-bash-guard — see bash test/test-bash-guard.sh"; fi
 

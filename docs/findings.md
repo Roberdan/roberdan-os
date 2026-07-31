@@ -373,6 +373,26 @@ La versione leggibile esiste: `https://docs.warp.dev/changelog/2026.md` (oppure
 produce una card Warp che nessuno riesce a lavorare. Il rischio speculare vale per le altre
 due sorgenti: nessuno verifica che l'URL sorvegliato sia ancora quello leggibile.
 
+## 16. In `validate.sh` una suite attesa ma mai lanciata blocca il gate per 15 minuti
+
+**Come è emerso** (31 luglio 2026): agganciando `test-bash-guard`. `validate.sh` lancia le
+suite in parallelo con `_spawn` (riga 74-83) e poi le attende con `_suite`, che aspetta il file
+`.rc` prodotto dal lancio. Ho scritto la riga `_suite test-bash-guard` senza aggiungere il nome
+alla lista di `_spawn`: il gate si è fermato lì per **15 minuti** prima di dichiarare *"did not
+finish within 15 minutes (hung)"*. Due esecuzioni buttate prima di capirlo.
+
+**Perché conta.** I due elenchi devono restare allineati e niente lo controlla: chi aggiunge un
+test tocca il posto giusto (`_suite`) e dimentica quello non ovvio (`_spawn`). Il fallimento è
+il peggiore per un gate — non è rumoroso, è *lento*: chi lo lancia in CI vede una build che non
+finisce e la rilancia.
+
+**Riparazione probabile**: un controllo statico all'avvio di `validate.sh` — ogni nome passato a
+`_suite` deve comparire nella lista di `_spawn`, altrimenti esci subito dicendo quale manca.
+Poche righe, ma `validate.sh` è già in baseline oltre soglia, quindi è una decisione di spesa,
+non un dettaglio.
+
+**Diventa una card** se succede una seconda volta a chiunque.
+
 ---
 
 _Aggiornato: 2026-07-31._
