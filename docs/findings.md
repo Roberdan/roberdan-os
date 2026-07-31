@@ -253,6 +253,33 @@ riga dice di non fare.
 **La riparazione**: `kb finish` deve prendere chi verifica come dato (`--by`), non
 presupporlo, e stampare quello.
 
+## 9. Una PR si merga anche col check rosso, e niente lo impedisce
+
+**Come è emerso** (29 luglio 2026, dichiarato sul bus dalla sessione che l'ha fatto, card
+`260729-150321`): PR #30 è stata mergiata con il check di CI **già rosso**, e `main` è rimasta
+rossa da `768a2e3` fino a `4970979`. Nessun passaggio — né umano né meccanico — chiede a una PR
+di essere verde prima del merge.
+
+**Perché conta.** È esattamente la forma del falso "done" che il canone vieta a parole: il merge
+è l'atto che dichiara "questa cosa è a posto", e oggi può avvenire su prova rossa. Il rilievo è
+emerso perché chi l'ha fatto l'ha scritto, non perché qualcosa l'abbia fermato.
+
+**Diventa una card** se accade una seconda volta, oppure appena si merga qualcosa di più di una
+sessione singola. La riparazione probabile: branch protection "require status checks" su `main`,
+che è però gate umano (tocca la protezione del branch).
+
+## 10. Due test falliscono a caso in CI e passano rilanciandoli
+
+**Come è emerso** (29 luglio 2026, stesso thread bus): `test-fork-merge` è fallito su una PR,
+passato in locale e passato **rilanciando lo stesso job senza toccare una riga**; `test-bus` è
+stato visto flaky lo stesso giorno.
+
+**Perché conta.** Un gate che a volte mente in una direzione insegna a rilanciare invece che a
+leggere — ed è così che un fallimento vero viene scambiato per rumore.
+
+**Diventa una card** quando un flaky fa perdere tempo una seconda volta, o quando fallisce in
+una finestra in cui serviva fidarsi del verde. Oggi il costo è un rilancio.
+
 ---
 
-_Aggiornato: 2026-07-30._
+_Aggiornato: 2026-07-31._
