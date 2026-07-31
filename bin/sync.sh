@@ -104,12 +104,9 @@ yaml_dq() { printf '"%s"' "$(printf '%s' "${1:-}" | sed -e 's/\\/\\\\/g' -e 's/"
 #   parent session model when the id is unavailable (graceful — see CustomAgentConfig).
 # Canon coarse model tiers -> a concrete Copilot model id. An unavailable id degrades to
 # the session model (documented safety net), so a future rename never hard-breaks an agent.
-# Copilot's own id scheme is NOT Anthropic's: dots for the 4.x line (claude-opus-4.8),
-# no separator for the 5 line (claude-opus-5, where Anthropic writes claude-opus-5 too but
-# claude-opus-4-8 with dashes). Verified 2026-07-31 against what this machine's Copilot CLI
-# actually emits, not against the docs: ~/.copilot/session-state/*/events.jsonl carries
-# "model":"claude-opus-5" (29637 events), "claude-sonnet-5", "claude-opus-4.8",
-# "claude-sonnet-4.6". Haiku's newest remains 4.5, so that row is current, not stale.
+# Copilot's id scheme is NOT Anthropic's: dots on the 4.x line (claude-opus-4.8), none on the
+# 5 line. Verified 2026-07-31 by running `copilot -p ... --model <id>`, which rejects an
+# unknown id outright: opus-5 and sonnet-5 both accepted. Haiku's newest is still 4.5.
 copilot_model() {
   case "$1" in
     opus)   echo "claude-opus-5" ;;
