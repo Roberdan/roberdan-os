@@ -28,7 +28,11 @@ ok()      { printf "  ok: %s\n" "$1"; }
 _PARDIR="$(mktemp -d "${TMPDIR:-/tmp}/rda-validate.XXXXXX")"
 trap 'rm -rf "$_PARDIR"' EXIT INT TERM
 
+# Launched names land here; _suite refuses any name missing from it. On 2026-07-31 a _suite
+# without its _spawn stalled the gate 15 minutes — twice, since a stall reads as a slow suite.
+_SPAWNED=""
 _spawn() {
+  _SPAWNED="$_SPAWNED $1"
   # Write the exit code LAST and atomically: _suite treats the .rc file as the
   # signal that the .out file is complete, so a half-written .out must never be
   # reachable through a present .rc.
@@ -49,6 +53,7 @@ _spawn() {
 # is a change to what the tests exercise, and it does not belong in a commit
 # about wall clock.
 _spawn_serial_group() {
+  _SPAWNED="$_SPAWNED $*"
   ( for _g in "$@"; do
       bash "test/$_g.sh" > "$_PARDIR/$_g.out" 2>&1
       printf '%s' "$?" > "$_PARDIR/$_g.rc.part" && mv "$_PARDIR/$_g.rc.part" "$_PARDIR/$_g.rc"
@@ -57,6 +62,10 @@ _spawn_serial_group() {
 
 _suite() {
   local rc_file="$_PARDIR/$1.rc" waited=0
+  # Never wait for something nobody launched: a bug in this file, not a slow suite.
+  case " $_SPAWNED " in *" $1 "*) ;;
+    *) printf '  FAIL: %s is awaited by _suite but was never handed to _spawn — add it to the launch list in this file\n' "$1"; return 1 ;;
+  esac
   while [ ! -f "$rc_file" ]; do
     sleep 0.2
     waited=$((waited+1))
@@ -78,7 +87,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-federated-kb test-leak-check test-directory-dump-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
-          test-bus-doorbell test-bash-guard; do
+          test-bus-doorbell test-bash-guard test-validate-wiring; do
   _spawn "$_s"
 done
 unset _s
