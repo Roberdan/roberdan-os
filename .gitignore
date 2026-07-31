@@ -8,6 +8,11 @@ kanban/todo/
 kanban/doing/
 kanban/done/
 
+# The per-repo authorized-queue snapshot written by `kb queue` — session state, not canon:
+# it names card ids from the private board. Wildcard, not the single filename, so a queue
+# for a new repo cannot arrive untracked-but-committable the way .coda-roberdan-os.md did.
+kanban/.coda-*
+
 # The nested private card repo. `kanban/` holds 69 cards with real names and
 # clients; the card DIRECTORIES above are excluded because this remote is
 # PUBLIC. The nested repo that versions them lives in loco (kb.sh:43-61
