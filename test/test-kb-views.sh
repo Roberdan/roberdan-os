@@ -10,6 +10,10 @@
 # environment-dependent (launchctl/plist/factory dir vary by machine) — it is
 # only asserted to exit 0 and never crash.
 set -u
+# Le chiusure di questa suite NON devono convocare @thor davvero: la verifica headless
+# lancia un processo `claude` per card, costa minuti e denaro, e qui le card sono finte.
+# Il percorso automatico ha il suo test dedicato (test-kb-autothor.sh).
+export RDA_KB_AUTOTHOR=0
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
