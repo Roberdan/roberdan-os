@@ -60,6 +60,27 @@ card S1
 out="$(bash "$KBC" finish S1 --thor "$EV" 2>&1 | grep -v '^kb: ' || true)"
 if in_doing S1 && ! in_done S1; then ok "SKIP: la card resta in doing (non si chiude su una verifica mai avvenuta)"; else err "SKIP trattato come un PASS: la card si e' chiusa"; fi
 
+# --- 3b. UN TIMEOUT NON E' UN VERDETTO. verify_card() torna FAIL sia per "ho guardato e dico
+#     no" sia per "non sono arrivato in fondo" (timeout, output illeggibile). Il 2026-07-31 una
+#     verifica uscita in timeout e' arrivata a chi chiudeva come "@thor dice NO": stessa
+#     sostituzione che il caso 3 rifiuta, nell'altro verso. Qui si prova la traduzione fatta da
+#     kanban/thor-verify.sh, chiamandolo con un verify_card finto.
+FAKELIB="$TMP/fakerepo"; mkdir -p "$FAKELIB/kanban" "$FAKELIB/factory"
+cp "$ROOT/kanban/thor-verify.sh" "$FAKELIB/kanban/"
+printf 'verify_card() { printf "FAIL\\tunparseable thor-verify output (exit=124) — see /tmp/x.log\\n"; }\n' > "$FAKELIB/factory/lib.sh"
+tvout="$(CLAUDE=/bin/echo bash "$FAKELIB/kanban/thor-verify.sh" QUALSIASI 2>/dev/null || true)"
+case "$tvout" in
+  SKIP*) ok "un timeout di @thor viene tradotto in SKIP, non in un verdetto" ;;
+  FAIL*) err "un timeout viene ancora riportato come 'thor dice NO': $tvout" ;;
+  *)     err "esito inatteso dal traduttore: $tvout" ;;
+esac
+printf 'verify_card() { printf "FAIL\\til criterio 2 non e soddisfatto\\n"; }\n' > "$FAKELIB/factory/lib.sh"
+tvout2="$(CLAUDE=/bin/echo bash "$FAKELIB/kanban/thor-verify.sh" QUALSIASI 2>/dev/null || true)"
+case "$tvout2" in
+  FAIL*) ok "e un FAIL vero resta un FAIL (la traduzione non ingoia i verdetti)" ;;
+  *)     err "un verdetto FAIL vero e' stato trasformato in: $tvout2" ;;
+esac
+
 # --- 4. --by resta la via esplicita: chi dichiara chi ha verificato non convoca thor ---------
 printf '#!/usr/bin/env bash\nprintf "FAIL\\tnon dovrei nemmeno essere chiamato\\n"\n' > "$REPO/kanban/thor-verify.sh"
 card B1
