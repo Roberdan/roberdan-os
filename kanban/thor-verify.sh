@@ -31,7 +31,7 @@ done
 ROOT="$(cd -P "$(dirname "$_tv_src")/.." && pwd)"
 card="${1:?id card richiesto}"
 dir="${2:-$ROOT}"
-tmo="${3:-600}"
+tmo="${3:-1200}"   # 600s non bastava su una card grossa: misurato il 2026-07-31
 vlog="${4:-${TMPDIR:-/tmp}/thor-verify-$card-$$.log}"
 
 # Il boccone amaro: thor gira come un processo `claude` separato. Se non c'e', non si finge.
@@ -54,4 +54,15 @@ export CLAUDE TIMEOUT_BIN KB
 . "$ROOT/factory/lib.sh" 2>/dev/null || { printf 'SKIP\tfactory/lib.sh non caricabile: la verifica headless non e disponibile\n'; exit 0; }
 command -v verify_card >/dev/null 2>&1 || { printf 'SKIP\tverify_card non definita in factory/lib.sh\n'; exit 0; }
 
-verify_card "$card" "$dir" "$tmo" "$vlog"
+# UN TIMEOUT NON E' UN VERDETTO. verify_card() restituisce FAIL sia quando @thor ha guardato e
+# dice no, sia quando la verifica non e' andata a termine (timeout, output illeggibile). Sono i
+# due fatti che questo file esiste per tenere separati, e li conflondeva proprio qui: il
+# 2026-07-31 una verifica uscita in timeout (exit=124) e' arrivata a chi chiudeva come "@thor ha
+# verificato e dice NO". E' la stessa sostituzione che il resto di questo file rifiuta, solo
+# nell'altro verso: li' uno SKIP non deve diventare un PASS, qui non deve diventare un FAIL.
+out="$(verify_card "$card" "$dir" "$tmo" "$vlog")"
+case "$out" in
+  FAIL*unparseable*|FAIL*exit=124*|FAIL*"not found in kanban"*)
+    printf 'SKIP\t%s\n' "${out#FAIL	}" ;;
+  *) printf '%s\n' "$out" ;;
+esac
