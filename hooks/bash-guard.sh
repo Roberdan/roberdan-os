@@ -12,7 +12,13 @@ ask()  { jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",pe
 
 # Truncate the heredoc body (data, not commands) to avoid false positives on commit messages.
 cmd_head="${cmd%%<<*}"
-norm="$(printf '%s' "$cmd_head" | tr -s ' \t\n' ' ' | sed 's/^ //;s/ $//')"
+# Quoted strings are DATA, not command tokens. Rule 4 already stripped them for itself; rules
+# 1 and 3 read the raw text and so denied `git commit -m '...never use --force...'` — a guard
+# that blocks the innocent gets switched off by the first person it annoys, and a switched-off
+# guard is worth exactly as much as no guard. Declared tradeoff: a flag hidden inside quotes
+# (`git push "--force"`) is no longer caught. This is a discipline gate against slips, not an
+# adversary — and evading it takes more deliberate effort than just not using the flag.
+norm="$(printf '%s' "$cmd_head" | sed "s/'[^']*'//g; s/\"[^\"]*\"//g" | tr -s ' \t\n' ' ' | sed 's/^ //;s/ $//')"
 
 # 0) Invisible / bidi / control characters in the command tokens → refuse before classifying.
 #    Every rule below decides by READING the command as text. A zero-width joiner or a
@@ -26,8 +32,7 @@ norm="$(printf '%s' "$cmd_head" | tr -s ' \t\n' ' ' | sed 's/^ //;s/ $//')"
 #    artifact, it looks like the space it is, and it breaks the command openly instead of
 #    disguising it. Matched as raw UTF-8 bytes under LC_ALL=C because BSD grep on macOS has
 #    neither -P nor named Unicode classes.
-head_nostr="$(printf '%s' "$cmd_head" | sed "s/'[^']*'//g; s/\"[^\"]*\"//g")"
-if printf '%s' "$head_nostr" | LC_ALL=C grep -qE $'[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]|\xc2[\x80-\x9f\xad]|\xe2\x80[\x8b-\x8f\xaa-\xae]|\xe2\x81[\xa0-\xa4\xa6-\xa9]|\xef\xbb\xbf'; then
+if printf '%s' "$norm" | LC_ALL=C grep -qE $'[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]|\xc2[\x80-\x9f\xad]|\xe2\x80[\x8b-\x8f\xaa-\xae]|\xe2\x81[\xa0-\xa4\xa6-\xa9]|\xef\xbb\xbf'; then
   deny "This command carries invisible or direction-overriding characters (zero-width, bidi or control codes) outside any quoted string: what you would read is not what the shell would run. Refused rather than classified — retype it as plain text."
 fi
 
