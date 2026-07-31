@@ -586,7 +586,7 @@ sys.stdout.write(s)
 #     no binary and touches no kanban file, and all four watchers were blind to it
 #     BY CONSTRUCTION. @rex planted 14 files in the real ~/.roberdan-os during a
 #     green run - one character away from 14 live sessions.
-mutate factory-drop "dispatches an agent by writing the launchd factory queue, executing nothing" "check 47b (dispatch fingerprint over the whole run)" '
+mutate factory-drop "dispatches an agent by writing the launchd factory queue, executing nothing" "assert_factory_queue_untouched (i pavimenti finali)" '
 import sys
 s = sys.stdin.read()
 a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
