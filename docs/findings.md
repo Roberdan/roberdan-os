@@ -287,6 +287,11 @@ in locale `bash test/test-fork-merge.sh` → **PASS, exit 0**; rilanciato lo ste
 **senza cambiare una riga** → **success**. Roberto è stato informato con le due opzioni
 (farne una card, o lasciarlo); la promozione resta sua.
 
+**Decisione di Roberto, 31 luglio 2026: si lascia così — nessuna card.** Il costo accettato è
+un rilancio quando capita. Chi trova questo test rosso: **prima rilancia**, e solo se fallisce
+di nuovo sullo stesso commit cerca la causa. Non riproporre la card senza un fatto nuovo (un
+rosso che *non* passa al rilancio, o un rosso in una finestra in cui serviva fidarsi del verde).
+
 ## 11. `kb pending` non vede una card ferma in `doing` in attesa di Roberto
 
 **Come è emerso** (31 luglio 2026): `handoff/latest.md` nomina una quarta decisione in attesa
