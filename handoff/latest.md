@@ -6,12 +6,16 @@
 
 ## Le quattro decisioni del 31 luglio — Roberto ha risposto
 
-1. **gbrain, reindicizzare**: **SÌ**. Card `260730-102956` in `doing`, cicli lanciati alle 10:00
-   del 31/7. Stato durevole in `~/.roberdan-os/jobs/gbrain-cycles/` — si riprende con
-   `bash ~/.roberdan-os/jobs/gbrain-cycles/run.sh`, che **salta le sorgenti già fatte**.
-   Terminal condition: `gbrain doctor` senza `[FAIL] cycle_freshness`, **non** "lo script è uscito".
-   Due scarti da sapere: le sorgenti sono **13**, la card ne diceva 12; e c'è un
-   `[FAIL] sync_freshness` separato che il ciclo potrebbe non chiudere.
+1. **gbrain, reindicizzare**: **SÌ → FATTO**, card `260730-102956` **chiusa** il 31/7.
+   **13 sorgenti su 13**, dalle 10:00 alle 17:02 locali, **zero fallimenti**. Il `doctor` non
+   ha **nessun `[FAIL]`**: `cycle_freshness` è sceso a `[WARN]` e `sync_freshness`, che era
+   rosso, è `[OK]`. Prova indipendente dal log: `last_full_cycle_at` scritto nel DB per tutte
+   e 13 (`psql -d gbrain_local -tAc "select id, config->>'last_full_cycle_at' from sources"`).
+   Evidenza: `~/.roberdan-os/evidence/260730-102956-cicli.txt`.
+   Tre cose da sapere: le sorgenti erano **13, non 12** come diceva il titolo; il `[WARN]`
+   `cycle_freshness` **si riaccende da solo** dopo poche ore (la soglia è bassa — per tenerlo
+   spento serve `gbrain autopilot`, oggi limitato al weekend); il runner riutilizzabile è
+   `~/.roberdan-os/jobs/gbrain-cycles/run.sh` e **salta ciò che è già fatto**.
 2. **MirrorHR accelerometro/EDA** (`260709-114214`): **NO** → archiviata in `done/` come annullata.
 3. **MirrorHR P1 Safety Recovery** (`260713-093430`): **rimuovere** → archiviata. I due difetti
    safety-critical restano chiusi e verificati; i gate di rilascio T9/T9b **non sono più tracciati
