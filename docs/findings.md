@@ -7,9 +7,17 @@ sapeva distinguerle dal lavoro che aveva chiesto lui.
 
 Ordinate per rischio.
 
+**Stato al 31 luglio 2026, sera.** Roberto ha letto la lista e ha deciso: sei rilievi riparati
+(1, 8, 11, 14, 15, 16 — ognuno con la sua card chiusa e la sua prova di mutazione), tre chiusi
+da una decisione e non da una riparazione (4, 10, 12), uno rinviato di proposito (13), cinque
+lasciati aperti con la condizione scritta che li farebbe diventare card (2, 3, 5, 6, 7, 9).
+Ogni riga qui sotto dice a che punto e'.
+
 ---
 
 ## 1. Il bus può avviare un agente scrivendo nella coda della factory, e nessun test lo prende
+
+**RIPARATO il 31 luglio 2026**, card `260731-182457-2`. `assert_factory_queue_untouched` e' accanto agli altri due pavimenti, con `find -L` perche' la fixture rende la coda un symlink. Prova eseguita: il mutante `factory-drop` applicato a `bus.sh` fa uscire `test-bus.sh` con exit 1 e la riga *the bus WROTE the factory queue*. Prima passava.
 
 **Come è emerso** (30 luglio 2026): la batteria di mutazione `test/test-bus-mutants.sh`,
 eseguita per intero per la prima volta. 32 mutanti catturati, **1 sopravvissuto**:
@@ -238,6 +246,8 @@ casi esistenti, una volta.
 
 ## 8. `kb finish` dichiara "verified by @thor" anche quando non è vero
 
+**RIPARATO il 31 luglio 2026**, card `260731-182457-1`. `kb finish --by <chi>` prende chi verifica come dato: l'output e il campo `verified_by` riportano quello. Dal giorno dopo e' andato oltre: `kb finish` **convoca @thor da solo** (card `260731-185913`), quindi la frase e' vera perche' la verifica avviene, non perche' qualcuno l'ha digitata.
+
 **Come è emerso** (30 luglio 2026): @thor era sospeso per decisione di Roberto, e ogni card
 chiusa quel giorno è stata verificata da Claude. `kb finish` ha comunque stampato
 *"done/<id> verified by @thor"* su tutte.
@@ -294,6 +304,8 @@ rosso che *non* passa al rilancio, o un rosso in una finestra in cui serviva fid
 
 ## 11. `kb pending` non vede una card ferma in `doing` in attesa di Roberto
 
+**RIPARATO il 31 luglio 2026**, card `260731-182457`. `kb pending` ha una sezione *Card ferme in doing* che stampa anche il perche'. Le card che stanno lavorando non compaiono, ed e' asserito in negativo. Difetto collaterale trovato dal test: `_field` sotto `set -e` troncava l'intero report alla prima card in doing normale.
+
 **Come è emerso** (31 luglio 2026): `handoff/latest.md` nomina una quarta decisione in attesa
 (`260729-073336`, VirtualBPMFy27 — *vuoi che Copilot CLI legga i dati di VirtualBPM?*).
 `kb pending --tutti` ne elenca 12 e quella non c'è: la card è **in `doing`** con
@@ -324,6 +336,8 @@ Fino ad allora la riga è qui.
 
 ## 13. `bin/sync.sh` genera ancora i wrapper per Codex e Hermes, che non si usano più
 
+**RINVIATO di proposito, 31 luglio 2026.** Roberto ha deciso: non ora. Si toglie la prossima volta che si mette mano a `bin/sync.sh`, non prima.
+
 **Come è emerso** (31 luglio 2026): togliendo Codex e Hermes dal watcher `evolve/watch.sh`,
 per istruzione esplicita di Roberto. Il watcher ora sorveglia tre sorgenti; `bin/sync.sh`
 continua invece a emettere `platforms/hermes/` (funzione `emit_hermes`, ~50 righe di README
@@ -339,6 +353,8 @@ prossima revisione di `bin/sync.sh`. Non toccato qui perché Roberto ha chiesto 
 due sorgenti **dal watcher**: ridurre l'ambito di un'istruzione è più sicuro che allargarlo.
 
 ## 14. La regola anti-force-push del bash-guard blocca anche chi la *nomina* in un messaggio di commit
+
+**RIPARATO il 31 luglio 2026**, card `260731-182445`. Lo strip delle virgolette e' dentro `norm`, quindi vale per tutte le regole che leggono la testa del comando — riparata la classe, non l'istanza. Tradeoff dichiarato e asserito nel test: un flag nascosto fra virgolette non viene piu' intercettato.
 
 **Come è emerso** (31 luglio 2026): scrivendo `test/test-bash-guard.sh`, il primo test che il
 guard abbia mai avuto. Un `git commit -m 'never use git push --force here'` viene **negato**:
@@ -358,6 +374,8 @@ diventa rossa e va aggiornata di proposito.
 
 ## 15. Il changelog di Warp non è più leggibile all'URL che il watcher sorveglia
 
+**RIPARATO il 31 luglio 2026**, card `260731-182445-1`, e l'ambito era piu' largo del previsto: **due sorgenti su tre** erano cieche, non una — anche la pagina docs di Claude Code (0 marcatori di rilascio via curl). `test/test-evolve-sources.sh` ora legge gli URL da `watch.sh` e verifica che il corpo scaricato contenga note di rilascio vere.
+
 **Come è emerso** (31 luglio 2026): scrivendo `proposals/2026-07-31-warp.md`.
 `https://docs.warp.dev/getting-started/changelog` — l'URL nella lista sorgenti di
 `evolve/watch.sh` — ora reindirizza a `/changelog/`, e quella pagina costruisce le voci nel
@@ -374,6 +392,8 @@ produce una card Warp che nessuno riesce a lavorare. Il rischio speculare vale p
 due sorgenti: nessuno verifica che l'URL sorvegliato sia ancora quello leggibile.
 
 ## 16. In `validate.sh` una suite attesa ma mai lanciata blocca il gate per 15 minuti
+
+**RIPARATO il 31 luglio 2026**, card `260731-182446`. `_suite` rifiuta un nome mai passato a `_spawn` e lo dice in meno di un secondo. `test/test-validate-wiring.sh` estrae le funzioni vere da `validate.sh` invece di riscriverle.
 
 **Come è emerso** (31 luglio 2026): agganciando `test-bash-guard`. `validate.sh` lancia le
 suite in parallelo con `_spawn` (riga 74-83) e poi le attende con `_suite`, che aspetta il file
