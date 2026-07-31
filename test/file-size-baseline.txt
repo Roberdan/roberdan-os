@@ -26,7 +26,11 @@
 # quella suite mette apposta un curl finto sul PATH e il controllo diventava una bugia verde.
 # Quindi il file cresce ancora, e la nota sopra resta in piedi: il prossimo che tocca
 # validate.sh lo spezza, non lo allarga.
-1680 kanban/kb.sh
+# 2026-07-31, quinta: +20 kb.sh per la sezione 'card ferme in doing' di `kb pending`. Una card
+# bloccata su una decisione di Roberto non compariva in nessuna lista: il sistema sapeva di
+# aspettarlo e non glielo diceva, e una decisione non vista aspetta per sempre. Venti righe
+# perche' la lista con cui decide sia completa.
+1700 kanban/kb.sh
 1364 test/test-bus.sh
 1131 test/test-bus-mutants.sh
 774 bus/bus.sh
