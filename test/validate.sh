@@ -87,7 +87,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-federated-kb test-leak-check test-directory-dump-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
-          test-bus-doorbell test-bash-guard test-validate-wiring; do
+          test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources; do
   _spawn "$_s"
 done
 unset _s
@@ -428,6 +428,9 @@ if _suite test-metaloop; then ok "meta-loop promotes end-to-end (see bash test/t
 # buffer actually reaches the agent through the card watch.sh writes (wired, not just present).
 section "evolve rejected-proposal buffer (test/test-evolve-declined.sh)"
 if _suite test-evolve-declined; then ok "declined buffer matches rewordings, spares novelties, reaches the card"; else err "test-evolve-declined — see bash test/test-evolve-declined.sh"; fi
+
+section "evolve sources — le fonti sorvegliate sono leggibili via curl, non solo raggiungibili"
+if _suite test-evolve-sources; then ok "$(_suite_out test-evolve-sources | grep -cE "^  (ok|SKIP)") fonti controllate (SKIP dichiarato se manca la rete)"; else _suite_out test-evolve-sources; err "test-evolve-sources — una fonte apre card che nessun agente puo' leggere"; fi
 
 section "evolve watcher backpressure (test/test-evolve-watch.sh)"
 if _suite test-evolve-watch; then ok "a changelog change while a card is still open refreshes it instead of adding a sibling, and the watcher never moves a card between columns"; else _suite_out test-evolve-watch; err "test-evolve-watch — see bash test/test-evolve-watch.sh"; fi

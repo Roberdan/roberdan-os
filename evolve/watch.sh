@@ -46,11 +46,20 @@ _open_card_for() {
 # Sources: name → changelog URL (versioned). Expandable.
 # codex and hermes-agent dropped 2026-07-31 (Roberto: tools no longer in use). A watcher
 # that files cards about a tool nobody runs spends his gate on nothing.
+# L'URL sorvegliato deve essere anche quello LEGGIBILE da chi raccoglie la card. Il watcher
+# rileva il delta — e quella parte reggeva — e apre una card che dice a un agente "vai a
+# leggere questa fonte": se la pagina si costruisce nel browser, quell'agente riceve menu e
+# script. E' il modo silenzioso di rompersi, ed e' quello che test/test-evolve-sources.sh ora
+# impedisce. Misurato il 2026-07-31, marcatori di rilascio distinti trovati via curl:
+#   claude-code  docs.anthropic.com/en/release-notes/... =   0  ->  raw CHANGELOG.md = 101
+#   warp         /getting-started/changelog             =   2  ->  /changelog/2026.md =  70
+#   copilot      /changelog/label/copilot/              =  17  (gia' leggibile, invariato)
+# Due sorgenti su tre erano cieche, non una.
 sources_names=(claude-code copilot warp)
 sources_urls=(
-  "https://docs.anthropic.com/en/release-notes/claude-code"
+  "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md"
   "https://github.blog/changelog/label/copilot/"
-  "https://docs.warp.dev/getting-started/changelog"
+  "https://docs.warp.dev/changelog/2026.md"
 )
 
 now="$(date +%Y-%m-%d)"
