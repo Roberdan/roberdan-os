@@ -295,6 +295,21 @@ che aspetta lui e non compare lì aspetta per sempre — ed è il caso peggiore,
 **Diventa una card** se una seconda decisione bloccata sfugge allo stesso modo. La riparazione
 probabile: `kb pending` legge anche `doing` quando la card porta un `blocked_reason`.
 
+## 12. I gate di rilascio di MirrorHR non sono più tracciati da nessuna card
+
+**Come è emerso** (31 luglio 2026): Roberto ha deciso di rimuovere la card `260713-093430`
+(*P1 Safety Recovery*). I due difetti safety-critical di T8 sono chiusi e verificati — questo
+non cambia. Ciò che esce dal board sono i gate di T9/T9b, che l'acceptance della card stessa
+chiamava **"non-code gates, not waivable"**: fatturazione GitHub Actions, **due notti reali**
+di monitoraggio, approvazione umana dei testi EN/IT/AR, evidenza su dispositivo accoppiato.
+
+**Perché conta.** Non sono stati derogati né soddisfatti: sono usciti dal tracciamento. È una
+decisione presa da Roberto con la conseguenza scritta davanti (registrata qui il giorno stesso),
+non una dimenticanza — ma da oggi nessun sistema li ricorda.
+
+**Diventa una card** nel momento in cui si decide di rilasciare quella versione di MirrorHR.
+Fino ad allora la riga è qui.
+
 ---
 
 _Aggiornato: 2026-07-31._

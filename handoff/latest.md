@@ -4,6 +4,23 @@
 > la card MirrorHR `260713-093430`, il dettaglio (T7 in pausa, base fidata `Development@cc2e04b`,
 > ultima PR verificata #567) sta lì: `git show a33c804:handoff/latest.md`.
 
+## Le quattro decisioni del 31 luglio — Roberto ha risposto
+
+1. **gbrain, reindicizzare**: **SÌ**. Card `260730-102956` in `doing`, cicli lanciati alle 10:00
+   del 31/7. Stato durevole in `~/.roberdan-os/jobs/gbrain-cycles/` — si riprende con
+   `bash ~/.roberdan-os/jobs/gbrain-cycles/run.sh`, che **salta le sorgenti già fatte**.
+   Terminal condition: `gbrain doctor` senza `[FAIL] cycle_freshness`, **non** "lo script è uscito".
+   Due scarti da sapere: le sorgenti sono **13**, la card ne diceva 12; e c'è un
+   `[FAIL] sync_freshness` separato che il ciclo potrebbe non chiudere.
+2. **MirrorHR accelerometro/EDA** (`260709-114214`): **NO** → archiviata in `done/` come annullata.
+3. **MirrorHR P1 Safety Recovery** (`260713-093430`): **rimuovere** → archiviata. I due difetti
+   safety-critical restano chiusi e verificati; i gate di rilascio T9/T9b **non sono più tracciati
+   da nessuna card** — scritto sulla card e in `docs/findings.md` #12.
+4. **VirtualBPMFy27** (`260729-073336`): **un'altra sessione ci sta già lavorando**. Commit
+   `a0f012c` del 31/7 09:47 sul branch `card/260729-073336`: adattatore MCP, schema, 395 righe
+   di test, ADR 0015 — 1028 righe. Roberto: *"lascia fare a quella sessione"*. **Non entrare in
+   quel repo.**
+
 ## Aggiornamento 31 luglio (mattina) — quattro cose fatte, nessuna nuova decisione
 
 - **`kanban/.coda-*` ora è ignorato** nel repo pubblico: lo scatto della coda elencava id di card
