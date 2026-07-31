@@ -30,7 +30,11 @@
 # bloccata su una decisione di Roberto non compariva in nessuna lista: il sistema sapeva di
 # aspettarlo e non glielo diceva, e una decisione non vista aspetta per sempre. Venti righe
 # perche' la lista con cui decide sia completa.
-1700 kanban/kb.sh
+# 2026-07-31, sesta: +6 kb.sh per --by su `kb finish`. Il registro affermava "verified by
+# @thor" su OGNI chiusura, anche quando thor era sospeso: una frase generata dal sistema che
+# nessuno controllava e che resta per sempre nell'archivio. Sei righe perche' il registro
+# smetta di dire il falso.
+1706 kanban/kb.sh
 1364 test/test-bus.sh
 1131 test/test-bus-mutants.sh
 774 bus/bus.sh

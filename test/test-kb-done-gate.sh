@@ -117,6 +117,27 @@ if grep -q "^verified_evidence:" "$RDA_KANBAN/done/a2.md" 2>/dev/null; then
   ok "verified_evidence is persisted on the card"
 else err "verified_evidence missing from the closed card"; fi
 
+# --- chi verifica e' un DATO, non un presupposto (findings #8) ---------------------
+# Prima kb stampava e scriveva "verified by @thor" su ogni chiusura, anche quando @thor era
+# sospeso e aveva verificato qualcun altro. La frase la generava il sistema, nessuno la
+# controllava, e restava per sempre nell'archivio.
+card V-BY
+out_by="$($KB finish V-BY --thor "test/test-kb-done-gate.sh eseguito: 14 passed, exit 0" --by claude 2>&1 | grep -v '^kb: ' | tail -1)"
+case "$out_by" in
+  *"verified by @claude"*) ok "chiudendo con --by claude, l'output dice claude" ;;
+  *) err "l'output non nomina chi ha verificato davvero: $out_by" ;;
+esac
+case "$out_by" in
+  *thor*) err "l'output nomina ancora thor quando a verificare e' stato claude" ;;
+  *) ok "e non nomina thor" ;;
+esac
+if grep -q '^verified_by: claude' "$RDA_KANBAN/done/V-BY.md"; then
+  ok "la card archiviata registra verified_by: claude"
+else err "la card archiviata non registra chi ha verificato: $(grep '^verified_by' "$RDA_KANBAN/done/V-BY.md")"; fi
+if grep -q '^verified_by: thor' "$RDA_KANBAN/done/V-BY.md"; then
+  err "la card archiviata afferma ancora thor"
+else ok "e non afferma thor"; fi
+
 printf "\n"
 [ "$FAIL" -eq 0 ] && { echo "kb done-gate: ALL PASS"; exit 0; }
 echo "kb done-gate: FAILURES"; exit 1

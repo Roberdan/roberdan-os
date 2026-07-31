@@ -520,7 +520,7 @@ usage() {
   echo '  kb add "<title>" --repo <r> [dod] [acc]  new card in todo (repo = ~/GitHub dir-name, or "personal")'
   echo '  kb edit <id>                  edit a card (fill dod/acceptance)'
   echo '  kb start <id> --by roberto [--no-worktree "<why>"]   GATE: todo->doing (+ crea il worktree della card)'
-  echo '  kb finish <id> --thor "<ev>" [--keep-worktree "<why>"]  GATE: doing->done (worktree pulito, poi rimosso)'
+  echo '  kb finish <id> --thor "<ev>" [--by <chi>] [--keep-worktree "<why>"]  GATE: doing->done (worktree pulito, poi rimosso)'
   echo '  kb block <id> "<reason>"      mark a card blocked, move back to todo/'
   echo ' detail (everything ever done, on demand):'
   echo '  kb history                    ALL work: done/ cards + every archived goal, newest first'
@@ -1637,10 +1637,16 @@ case "$cmd" in
 
   finish)
     id="${1:?id required}"; shift || true
-    ev=""; keep_wt=""
+    ev=""; keep_wt=""; verifier=""
     while [ $# -gt 0 ]; do
       case "$1" in
-        --thor) ev="${2:-}"; shift 2 ;;
+        --thor) ev="${2:-}"; verifier="${verifier:-thor}"; shift 2 ;;
+        # CHI ha verificato e' un dato, non un presupposto. Prima kb stampava e scriveva
+        # "verified by @thor" su OGNI chiusura, anche quando @thor era sospeso e aveva
+        # verificato qualcun altro: la frase la generava il sistema, nessuno la controllava,
+        # e restava per sempre nell'archivio. Un registro che afferma il falso non e' un
+        # registro. Chi non e' thor lo dice con --by. (findings #8)
+        --by) verifier="${2:-}"; shift 2 ;;
         # The escape hatch from the clean-worktree gate — it costs a written reason, stamped on
         # the card, so "I left a mess behind" is a decision on the record and not the default.
         --keep-worktree) keep_wt="${2:-}"; shift 2 ;;
@@ -1670,7 +1676,7 @@ case "$cmd" in
     fi
     _set_status "$f" done
     fin_epoch="$(date +%s)"
-    { echo 'verified_by: thor'; echo "verified_evidence: $ev"; echo "verified_at: $(date +%Y-%m-%d)"
+    { echo "verified_by: $verifier"; echo "verified_evidence: $ev"; echo "verified_at: $(date +%Y-%m-%d)"
       echo "finished_at: $(date '+%Y-%m-%d %H:%M:%S %Z')"; echo "finished_epoch: $fin_epoch"; } >> "$f"
     # Freeze the spend now: the transcripts it is computed from grow forever, so a closed card
     # that recomputed on every `kb dash` would get slower and slower for an answer that cannot
@@ -1679,7 +1685,7 @@ case "$cmd" in
     [ -n "$sp" ] && echo "spend: $sp" >> "$f"
     [ "$wt_removed" = "1" ] && echo "worktree_removed_at: $(date '+%Y-%m-%d %H:%M %Z')" >> "$f"
     [ -n "$keep_wt" ] && [ -n "$wt" ] && echo "worktree_kept_why: \"$keep_wt\"" >> "$f"
-    mv "$f" "$KB/done/"; echo "done/$id verified by @thor ($ev)"
+    mv "$f" "$KB/done/"; echo "done/$id verified by @$verifier ($ev)"
     ;;
 
   edit)
