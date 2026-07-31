@@ -44,12 +44,12 @@ _open_card_for() {
 }
 
 # Sources: name → changelog URL (versioned). Expandable.
-sources_names=(claude-code copilot codex hermes-agent warp)
+# codex and hermes-agent dropped 2026-07-31 (Roberto: tools no longer in use). A watcher
+# that files cards about a tool nobody runs spends his gate on nothing.
+sources_names=(claude-code copilot warp)
 sources_urls=(
   "https://docs.anthropic.com/en/release-notes/claude-code"
   "https://github.blog/changelog/label/copilot/"
-  "https://github.com/openai/codex/releases"
-  "https://github.com/NousResearch/hermes-agent/releases"
   "https://docs.warp.dev/getting-started/changelog"
 )
 

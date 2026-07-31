@@ -322,6 +322,57 @@ non una dimenticanza — ma da oggi nessun sistema li ricorda.
 **Diventa una card** nel momento in cui si decide di rilasciare quella versione di MirrorHR.
 Fino ad allora la riga è qui.
 
+## 13. `bin/sync.sh` genera ancora i wrapper per Codex e Hermes, che non si usano più
+
+**Come è emerso** (31 luglio 2026): togliendo Codex e Hermes dal watcher `evolve/watch.sh`,
+per istruzione esplicita di Roberto. Il watcher ora sorveglia tre sorgenti; `bin/sync.sh`
+continua invece a emettere `platforms/hermes/` (funzione `emit_hermes`, ~50 righe di README
+verificate contro hermes-agent v0.18.0) e il ramo Codex.
+
+**Perché conta poco oggi e potrebbe contare domani.** Non rompe niente: sono file generati in
+una cartella gitignorata, installati solo se il tool esiste. Il costo è manutenzione
+silenziosa — quelle righe vengono lette, aggiornate e verificate a ogni revisione
+dell'adapter, per due strumenti che nessuno lancia.
+
+**Diventa una card** se qualcuno spende di nuovo tempo a verificare quei wrapper, o alla
+prossima revisione di `bin/sync.sh`. Non toccato qui perché Roberto ha chiesto di togliere le
+due sorgenti **dal watcher**: ridurre l'ambito di un'istruzione è più sicuro che allargarlo.
+
+## 14. La regola anti-force-push del bash-guard blocca anche chi la *nomina* in un messaggio di commit
+
+**Come è emerso** (31 luglio 2026): scrivendo `test/test-bash-guard.sh`, il primo test che il
+guard abbia mai avuto. Un `git commit -m 'never use git push --force here'` viene **negato**:
+la regola 1 legge il comando grezzo, mentre la regola 4 (docs + `git add -A`) lo stesso
+problema l'aveva già risolto per sé, togliendo prima le stringhe fra virgolette.
+
+**Perché conta.** Un guard che blocca l'innocuo viene disattivato dalla prima persona che
+infastidisce, e un guard disattivato vale quanto un guard assente. La regola 1 protegge da uno
+scar vero (il force-push del 6 luglio): è la meno rimovibile di tutte.
+
+**Riparazione probabile**: applicare alla regola 1 lo stesso `cmd_nostr` che la regola 4 usa
+già — due righe. Non fatta qui perché non è la modifica chiesta. Il test la asserisce **come
+si comporta oggi**, etichettata come over-block noto, così il giorno che si ripara la riga
+diventa rossa e va aggiornata di proposito.
+
+**Diventa una card** se blocca un commit vero a qualcuno.
+
+## 15. Il changelog di Warp non è più leggibile all'URL che il watcher sorveglia
+
+**Come è emerso** (31 luglio 2026): scrivendo `proposals/2026-07-31-warp.md`.
+`https://docs.warp.dev/getting-started/changelog` — l'URL nella lista sorgenti di
+`evolve/watch.sh` — ora reindirizza a `/changelog/`, e quella pagina costruisce le voci nel
+browser: un `curl` restituisce menu e script, **zero note di rilascio**.
+
+**Perché conta.** Il watcher continua a funzionare — l'impronta cambia, la card nasce — ma
+l'agente che raccoglie quella card non riesce a leggere la fonte che gli viene indicata. È il
+caso peggiore di una fonte rotta: silenzioso, perché la parte che regge è il rilevamento.
+La versione leggibile esiste: `https://docs.warp.dev/changelog/2026.md` (oppure
+`_llms-txt/changelog.txt`).
+
+**Diventa una card** — o meglio, una riga sola in `watch.sh` — se un secondo giro settimanale
+produce una card Warp che nessuno riesce a lavorare. Il rischio speculare vale per le altre
+due sorgenti: nessuno verifica che l'URL sorvegliato sia ancora quello leggibile.
+
 ---
 
 _Aggiornato: 2026-07-31._
