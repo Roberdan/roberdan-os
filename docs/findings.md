@@ -280,6 +280,21 @@ leggere — ed è così che un fallimento vero viene scambiato per rumore.
 **Diventa una card** quando un flaky fa perdere tempo una seconda volta, o quando fallisce in
 una finestra in cui serviva fidarsi del verde. Oggi il costo è un rilancio.
 
+## 11. `kb pending` non vede una card ferma in `doing` in attesa di Roberto
+
+**Come è emerso** (31 luglio 2026): `handoff/latest.md` nomina una quarta decisione in attesa
+(`260729-073336`, VirtualBPMFy27 — *vuoi che Copilot CLI legga i dati di VirtualBPM?*).
+`kb pending --tutti` ne elenca 12 e quella non c'è: la card è **in `doing`** con
+`blocked_reason: "IN ATTESA DI ROBERTO, non di lavoro"`, e `kb pending` guarda solo `todo`.
+Si somma un secondo scarto: quel board vive dentro `VirtualBPMFy27/kanban/`, non in questo.
+
+**Perché conta.** `kb pending` è la lista con cui Roberto decide di cosa occuparsi. Una card
+che aspetta lui e non compare lì aspetta per sempre — ed è il caso peggiore, perché
+`blocked_reason` dice a chiare lettere che aspetta lui.
+
+**Diventa una card** se una seconda decisione bloccata sfugge allo stesso modo. La riparazione
+probabile: `kb pending` legge anche `doing` quando la card porta un `blocked_reason`.
+
 ---
 
 _Aggiornato: 2026-07-31._
