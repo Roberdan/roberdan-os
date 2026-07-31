@@ -46,13 +46,16 @@ emitted_agents=$(find "$AGENTS" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | t
 if [ -f "$AGENTS/thor.md" ]; then
   grep -qE '^description: "' "$AGENTS/thor.md" && ok "thor description is a required quoted scalar" || err "thor description missing/unquoted"
   grep -qE '^tools: \[read, search, execute\]$' "$AGENTS/thor.md" && ok "thor tools mapped (Read,Grep,Glob,Bash -> read,search,execute deduped)" || err "thor tools mapping wrong: $(grep -m1 '^tools:' "$AGENTS/thor.md")"
-  grep -qE '^model: claude-sonnet' "$AGENTS/thor.md" && ok "thor model mapped (sonnet -> claude-sonnet-*)" || err "thor model mapping wrong: $(grep -m1 '^model:' "$AGENTS/thor.md")"
+  # Pin the EXACT id, not the family. `claude-sonnet-*` stayed green for three months while
+  # the map still said 4.5 and Copilot had moved on — a prefix match cannot see staleness,
+  # which is the only failure this row has ever had.
+  grep -qE '^model: claude-sonnet-5$' "$AGENTS/thor.md" && ok "thor model mapped (sonnet -> claude-sonnet-5)" || err "thor model mapping wrong: $(grep -m1 '^model:' "$AGENTS/thor.md")"
 else
   err "expected $AGENTS/thor.md to be generated"
 fi
 if [ -f "$AGENTS/baccio.md" ]; then
   grep -qE '^tools: \[read, edit, execute, search, web\]$' "$AGENTS/baccio.md" && ok "baccio tools mapped (incl. Write->edit, WebSearch/WebFetch->web)" || err "baccio tools mapping wrong: $(grep -m1 '^tools:' "$AGENTS/baccio.md")"
-  grep -qE '^model: claude-opus' "$AGENTS/baccio.md" && ok "baccio model mapped (opus -> claude-opus-*)" || err "baccio model mapping wrong"
+  grep -qE '^model: claude-opus-5$' "$AGENTS/baccio.md" && ok "baccio model mapped (opus -> claude-opus-5)" || err "baccio model mapping wrong: $(grep -m1 '^model:' "$AGENTS/baccio.md")"
 fi
 
 # extension generated, baked ROOT, valid syntax, deterministic

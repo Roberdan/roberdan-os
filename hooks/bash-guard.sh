@@ -14,6 +14,23 @@ ask()  { jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",pe
 cmd_head="${cmd%%<<*}"
 norm="$(printf '%s' "$cmd_head" | tr -s ' \t\n' ' ' | sed 's/^ //;s/ $//')"
 
+# 0) Invisible / bidi / control characters in the command tokens → refuse before classifying.
+#    Every rule below decides by READING the command as text. A zero-width joiner or a
+#    right-to-left override makes the text a human (and this guard) reads differ from the
+#    bytes the shell runs, so a verdict can be correct about the text and wrong about the
+#    execution. Fail closed: a guard that cannot trust its own input must not hand one out.
+#    (Same class hardened upstream in Claude Code v2.1.216, 2026-07-20.)
+#    Scope is deliberate on both axes: the command HEAD only (a heredoc body is data), and
+#    OUTSIDE quoted strings — so the accented Italian that fills this repo's commit messages
+#    is untouched. NBSP (U+00A0) is deliberately NOT in the set: it is a common paste
+#    artifact, it looks like the space it is, and it breaks the command openly instead of
+#    disguising it. Matched as raw UTF-8 bytes under LC_ALL=C because BSD grep on macOS has
+#    neither -P nor named Unicode classes.
+head_nostr="$(printf '%s' "$cmd_head" | sed "s/'[^']*'//g; s/\"[^\"]*\"//g")"
+if printf '%s' "$head_nostr" | LC_ALL=C grep -qE $'[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]|\xc2[\x80-\x9f\xad]|\xe2\x80[\x8b-\x8f\xaa-\xae]|\xe2\x81[\xa0-\xa4\xa6-\xa9]|\xef\xbb\xbf'; then
+  deny "This command carries invisible or direction-overriding characters (zero-width, bidi or control codes) outside any quoted string: what you would read is not what the shell would run. Refused rather than classified — retype it as plain text."
+fi
+
 # 1) Dangerous pushes: --force / -f / --no-verify → always forbidden (irreversible action).
 if printf '%s' "$norm" | grep -qE 'git[[:space:]]+push.*(--no-verify|(^|[[:space:]])-f([[:space:]]|$)|--force)'; then
   deny "--no-verify / --force on git push are forbidden. Fix the cause (failed hook, conflict), don't bypass it. Human gate #2 for force-push on main."
