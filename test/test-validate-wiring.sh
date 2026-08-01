@@ -11,23 +11,25 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 V="$ROOT/test/validate.sh"
+ENG="$ROOT/test/lib-suites.sh"   # il motore vive qui dal 2026-08-01
 fails=0
 ok()  { printf '  ok   — %s\n' "$1"; }
 err() { printf '  FAIL — %s\n' "$1"; fails=$((fails+1)); }
 
 [ -f "$V" ] || { echo "  FAIL: $V non esiste"; exit 1; }
+[ -f "$ENG" ] || { echo "  FAIL: $ENG non esiste — il motore e' stato spostato di nuovo?"; exit 1; }
 
 # Extract the launcher/collector block: from the _PARDIR assignment down to _suite_out.
 # If validate.sh is ever restructured this extraction fails LOUDLY rather than silently
 # testing nothing — that is the point of asserting on the extracted text first.
-harness="$(awk '/^_PARDIR=/{f=1} f{print} /^_suite_out\(\)/{exit}' "$V")"
+harness="$(awk '/^_PARDIR=/{f=1} f{print} /^_suite_out\(\)/{exit}' "$ENG")"
 for needed in '_spawn()' '_suite()' '_SPAWNED'; do
   case "$harness" in
     *"$needed"*) ;;
-    *) err "estrazione fallita: '$needed' non trovato in validate.sh — il test non sta provando niente"; echo "test-validate-wiring: FAIL"; exit 1 ;;
+    *) err "estrazione fallita: '$needed' non trovato in lib-suites.sh — il test non sta provando niente"; echo "test-validate-wiring: FAIL"; exit 1 ;;
   esac
 done
-ok "funzioni _spawn/_suite estratte da validate.sh (non riscritte)"
+ok "funzioni _spawn/_suite estratte da lib-suites.sh (non riscritte)"
 
 run_case() { # run_case <script-body> -> prints "<seconds> <output>"
   local out start end
