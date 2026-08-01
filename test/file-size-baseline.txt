@@ -1,6 +1,6 @@
 # Baseline delle 300 righe — file scritti a mano gia' oltre soglia il 2026-07-30.
 # Congelati, non condannati: passano cosi' come sono, ma non possono CRESCERE.
-# file in baseline: 11
+# file in baseline: 10
 # Un file NON in questa lista che supera le 300 righe fa fallire test/test-file-size-ratchet.sh.
 # Si accorcia una riga togliendola; si allarga solo con una decisione visibile in un diff.
 # 2026-07-30, decisione visibile come il file stesso chiede: +39 kb.sh, +62 test-kb-views.sh
@@ -21,6 +21,10 @@
 # difetto che e' costato 40 minuti in due esecuzioni buttate; il controllo risponde in meno di
 # un secondo. Detto chiaro: validate.sh e' cresciuto due volte oggi, ed e' il segnale che va
 # spezzato (lancio/raccolta sono un file a se'), non allargato una terza volta.
+# 2026-08-01: FATTO, ed e' uscito dalla lista. validate.sh e' passato da 623 a 256 righe:
+# gli 8 controlli scritti dentro sono diventati test/test-*.sh lanciabili da soli, e il
+# motore (lancio parallelo + raccolta) sta in test/lib-suites.sh. Il rapporto che legge un
+# umano e' rimasto IDENTICO riga per riga, verificato con un diff fra prima e dopo.
 # 2026-07-31, quarta e ULTIMA di giornata: +3 validate.sh per agganciare test-evolve-sources.
 # Ho provato a metterlo dentro test-evolve-watch.sh per non toccare questo file: non si puo',
 # quella suite mette apposta un curl finto sul PATH e il controllo diventava una bugia verde.
@@ -49,7 +53,6 @@
 774 bus/bus.sh
 637 bin/sync.sh
 601 test/test-federated-kb.sh
-622 test/validate.sh
 578 test/test-factory-kb.sh
 438 eval/test-eval-pipeline.sh
 446 test/test-kb-views.sh
