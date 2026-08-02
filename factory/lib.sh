@@ -53,6 +53,37 @@ note_card() {
 # no rubber-stamping. Same invocation conventions as run_task (timeout wrapper, billing-safe
 # env, logging). Echoes "PASS<TAB>evidence" or "FAIL<TAB>reason" on stdout — never anything
 # else, so callers can split on the first tab.
+# --- come si legge il verdetto di @thor ---------------------------------------
+# Funzione a se' e non tre righe dentro verify_card(), per una ragione sola: test/test-thor-
+# verdict.sh la chiama DAVVERO. Finche' era codice in linea, il test poteva solo riscriversela
+# uguale — e una copia passa verde mentre l'originale e' rotto (rules/best-practices.md § No
+# False Done, punto 3). Provato: con la logica copiata, tre mutanti su cinque sopravvivevano.
+#
+# thor_read_verdict <file-di-log>  ->  stampa "PASS<TAB>evidenza" | "FAIL<TAB>motivo" | niente
+#
+# TOLLERANTE SULLA FORMA, INFLESSIBILE SUL CONTENUTO.
+# Tollerante perche' il 2026-08-02 ha rifiutato un PASS VERO: @thor aveva scritto
+# `**VERDICT: PASS** — <evidenza>` e l'espressione pretendeva `VERDICT: PASS — ` esatto, quindi
+# il `**` non combaciava. Il verdetto c'era; il gate ha detto "verifica non avvenuta". Rilanciato
+# identico e' passato, che e' la lezione peggiore che un cancello possa insegnare.
+# Inflessibile perche' il difetto opposto e' molto peggio: un lettore generoso che vede la parola
+# PASS in una frase di passaggio chiuderebbe card mai verificate. Serve la parola VERDICT, e
+# vince sempre l'ULTIMA occorrenza — cosi' @thor puo' nominarne una discutendo senza cambiare la
+# propria conclusione.
+thor_read_verdict() {
+  local vlog="$1" v ev
+  [ -f "$vlog" ] || return 0
+  v="$(sed -E 's/\*+//g' "$vlog" 2>/dev/null \
+       | grep -oE 'VERDICT:[[:space:]]*(PASS|FAIL)([[:space:]]*[—-][[:space:]]*.*)?' \
+       | tail -1 || true)"
+  [ -n "$v" ] || return 0
+  ev="$(printf '%s' "$v" | sed -E 's/^VERDICT:[[:space:]]*(PASS|FAIL)[[:space:]]*[—-]?[[:space:]]*//')"
+  case "$v" in
+    VERDICT:*PASS*) printf 'PASS\t%s' "$ev" ;;
+    VERDICT:*FAIL*) printf 'FAIL\t%s' "$ev" ;;
+  esac
+}
+
 verify_card() {
   local cid="$1" dir="$2" tmo="$3" vlog="$4" cf="" dod="" acc="" vprompt="" vrc=0 verdict=""
   for c in todo doing "done"; do [ -e "$KB/$c/$cid.md" ] && cf="$KB/$c/$cid.md"; done
@@ -67,7 +98,13 @@ quality validator, zero tolerance for incomplete work, fresh context, evidence-o
 rubber-stamping. Given these acceptance criteria — Definition of Done: \"$dod\" / Acceptance:
 \"$acc\" — and this repo state, verify with concrete evidence (files, commits, test output)
 whether they are met. Output exactly \`VERDICT: PASS — <evidence>\` or \`VERDICT: FAIL —
-<reason>\` as the last line."
+<reason>\` as the last line.
+
+NON RINVIARE. Non aspettare job in background, notifiche o esiti che arriveranno dopo: il tuo
+turno e la tua verifica finiscono insieme. Se un controllo non lo puoi completare adesso, quello
+e un FAIL con scritto perche, non un motivo per non dare il verdetto. Qualunque cosa succeda,
+l ultima riga che scrivi e il verdetto: un turno che finisce senza verdetto viene letto come
+verifica non avvenuta e la card resta aperta."
 
   set +e
   # cd into $dir first: --add-dir only grants filesystem ACCESS, it does not change the
@@ -90,16 +127,21 @@ whether they are met. Output exactly \`VERDICT: PASS — <evidence>\` or \`VERDI
   set -e
   { echo; echo "=== factory: thor-verify exit=$vrc at $(date) ==="; } >> "$vlog"
 
-  verdict="$(grep -oE 'VERDICT: (PASS|FAIL) — .*' "$vlog" 2>/dev/null | tail -1 || true)"
+  verdict="$(thor_read_verdict "$vlog")"
   if [ "$vrc" -ne 0 ] || [ -z "$verdict" ]; then
-    printf 'FAIL\tunparseable thor-verify output (exit=%s) — see %s\n' "$vrc" "$vlog"
+    # Due cose diverse, e vanno dette diverse: un verdetto illeggibile e un turno finito SENZA
+    # verdetto non hanno la stessa causa ne' la stessa riparazione. Il 2026-08-02 il secondo caso
+    # e' successo davvero: @thor ha scritto "aspetto l'esito del test completo, non blocco su
+    # questo" e ha chiuso il turno. Confonderli manda a cercare un difetto di formato dove il
+    # problema e' che il verificatore si e' fermato a meta'.
+    if [ "$vrc" -ne 0 ]; then
+      printf 'FAIL\tthor-verify non e arrivato in fondo (exit=%s) — see %s\n' "$vrc" "$vlog"
+    else
+      printf 'FAIL\t@thor ha finito il turno SENZA scrivere un verdetto (exit=0) — see %s\n' "$vlog"
+    fi
     return 0
   fi
-  case "$verdict" in
-    "VERDICT: PASS"*) printf 'PASS\t%s\n' "${verdict#VERDICT: PASS — }" ;;
-    "VERDICT: FAIL"*) printf 'FAIL\t%s\n' "${verdict#VERDICT: FAIL — }" ;;
-    *) printf 'FAIL\tunparseable verdict line: %s\n' "$verdict" ;;
-  esac
+  printf '%s\n' "$verdict"
 }
 
 # --- Node 1: atomic claim + repo locks (mkdir; bash 3.2 macOS, no flock) -------
