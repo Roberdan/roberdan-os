@@ -25,6 +25,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
           test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources test-kb-autothor \
+          test-goal-gate \
           test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage; do
   _spawn "$_s"
@@ -161,6 +162,11 @@ if _suite test-autofmt; then ok "autofmt receives files via stdin JSON (see bash
 # and source-in-a-docs-commit had NO test: each scar could have returned with the suite green.
 section "bash guard — deny/ask/allow decisions per rule"
 if _suite test-bash-guard; then ok "invisible-character prefilter, force-push, reset/clean and docs-staging rules all fire, and the allow cases are not over-blocked"; else _suite_out test-bash-guard; err "test-bash-guard — see bash test/test-bash-guard.sh"; fi
+
+# --- 8b3) goal-gate: l'unico hook che BLOCCA. Meta' delle asserzioni verificano che LASCI
+# PASSARE — un cancello che non si apre piu' e' peggio di uno che non si chiude mai.
+section "goal-gate — un turno non si chiude con la coda autorizzata ancora piena"
+if _suite test-goal-gate; then ok "blocca finche' restano card autorizzate, e molla su coda finita, nessuna coda, interruttore, stallo e tetto"; else _suite_out test-goal-gate; err "test-goal-gate — see bash test/test-goal-gate.sh"; fi
 
 # --- 8c) loop receipts emitter (schema, append-only, opt-in placement, no pollution) ---
 section "loop receipts — loop/receipt.sh emitter contract"

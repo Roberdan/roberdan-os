@@ -1174,6 +1174,18 @@ _queue() {
       [ -f "$qf" ] && { rm -f "$qf"; echo "coda revocata per '$repo' — si torna all'approvazione per singola card."; } \
                    || echo "nessuna coda attiva per '$repo'."
       return 0 ;;
+    # --restanti: SOLO il numero, niente altro. Esiste perche' hooks/goal-gate.sh deve sapere
+    # quante card restano SENZA riscriversi la risoluzione di repo/KB/coda: due copie della
+    # stessa logica divergono, e quella dentro l'hook divergerebbe in silenzio, perche' il
+    # cancello di uscita non lo legge nessuno finche' non sbaglia. Una fonte sola, questa.
+    *" --restanti "*|*" --remaining "*)
+      [ -f "$qf" ] || { echo 0; return 0; }
+      local nrest=0 qid
+      while read -r qid; do
+        case "$qid" in ''|\#*) continue ;; esac
+        { [ -e "$KB/todo/$qid.md" ] || [ -e "$KB/doing/$qid.md" ]; } && nrest=$((nrest+1))
+      done < "$qf"
+      echo "$nrest"; return 0 ;;
   esac
 
   local rinnova=0

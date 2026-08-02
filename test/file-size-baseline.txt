@@ -47,11 +47,20 @@
 # 01:00, senza eseguire niente — era sopravvissuto all'intera batteria con la suite verde.
 # La canary guarda l'ESECUZIONE, l'impronta kanban guarda lo STATO DELLE CARD: quella
 # superficie non la guardava nessuno.
-1741 kanban/kb.sh
+# 2026-08-02, nona: +12 kb.sh e +1 sync.sh per hooks/goal-gate.sh. Le 12 righe sono
+# `kb queue --restanti`, che stampa solo il numero di card autorizzate ancora aperte.
+# L'alternativa era che l'hook si riscrivesse la risoluzione di repo, KB e file-coda: due copie
+# della stessa logica, e quella dentro l'hook divergerebbe in SILENZIO, perche' un cancello di
+# uscita nessuno lo legge finche' non sbaglia. La riga in sync.sh aggancia l'hook allo Stop.
+# Perche' valgono: misurato sulla sessione VirtualBPM del 31 luglio-2 agosto, 46,5 ore di
+# sessione e 4,4 ore di lavoro. Le tre pause piu' lunghe (3h, 7h20, 14h36) sono cominciate tutte
+# subito dopo che l'agente aveva scritto da solo cosa avrebbe fatto dopo, e sono finite tutte
+# perche' Roberto ha scritto "vai". Tredici righe contro il 90% del tempo.
+1753 kanban/kb.sh
 1388 test/test-bus.sh
 1131 test/test-bus-mutants.sh
 774 bus/bus.sh
-637 bin/sync.sh
+638 bin/sync.sh
 601 test/test-federated-kb.sh
 578 test/test-factory-kb.sh
 438 eval/test-eval-pipeline.sh
