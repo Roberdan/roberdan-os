@@ -3,6 +3,119 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.27.0] - 2026-08-02
+
+Il filo di questa versione e' uno solo: **i gate che dicevano verde senza guardare.** Cinque dei
+nove `fix` qui sotto sono controlli che passavano mentre la cosa che dovevano proteggere era
+rotta — e ognuno e' stato chiuso con una prova di mutazione, cioe' rimettendo il difetto e
+guardando il test diventare rosso. Il resto e' il costo di quella scoperta: `validate.sh`
+riscritto per poter lanciare un controllo alla volta, e sette rilievi nuovi scritti dove si
+guarda invece che aperti come card.
+
+### Added
+
+- **`@thor` verifica da solo su `kb finish`.** Richiesta esplicita di Roberto il 31 luglio: prima
+  l'evidenza scritta in `--thor` era una stringa che nessuno controllava, e chi chiudeva la card
+  era anche chi decideva cosa dimostrare. Ora `kb finish` **convoca** thor, che legge la card e i
+  suoi criteri e verifica per conto proprio.
+  - **Uno SKIP non diventa mai un PASS**, ed e' la meta' importante: un verdetto che non c'e'
+    lascia la card in `doing`. Stessa logica per un FAIL. `--by <chi>` resta la via manuale e non
+    convoca nessuno, cosi' resta distinguibile chi ha verificato davvero.
+  - Misurato oggi su quattro card di fila: in una thor ha rifatto la prova di mutazione **su una
+    skill diversa** da quella citata nell'evidenza, invece di rileggere il commit.
+  - Limite dichiarato, invariato: `--by` e `--thor` sul percorso manuale restano gate di
+    disciplina, non confini di sicurezza.
+
+- **Il watcher `evolve` smette di sorvegliare due fonti che non esistevano piu'** (codex e
+  hermes-agent). Una fonte morta non fa rumore: produce un'impronta stabile per sempre, cioe'
+  *"nessuna novita'"*, che e' esattamente cio' che si vede anche quando va tutto bene.
+
+- **La mappa dei modelli Copilot era ferma a due generazioni fa**, e `bash-guard.sh` non aveva un
+  test proprio. Ora ha `test/test-bash-guard.sh`, lanciabile da solo.
+
+### Fixed
+
+- **Il gate `tool-coverage` diceva PASS mentre 7 delle 9 skill del canon erano irraggiungibili in
+  Claude Code.** L'elenco da verificare era scritto a mano e fermo a 3 nomi, con la motivazione
+  (vera) che `ship` e `review` collidevano con le omonime di gstack.
+  - Misurato da `/doctor` il 2 agosto: **2** skill puntavano alle versioni di gstack, **3** erano
+    copie statiche congelate di un `sync.sh` vecchio, **7** erano spente in `skillOverrides`.
+    Nessuna di queste condizioni poteva far fallire il gate, perche' il gate non le guardava.
+  - Ora l'elenco e' **derivato** da `skills/*/skill.md`, uguale per claude e copilot: una skill
+    nuova entra nel gate da sola. Le asserzioni di cablaggio passano da 11 a 18.
+  - **Una derivazione vuota e' un FAIL esplicito**, non un PASS silenzioso — altrimenti il difetto
+    tornerebbe travestito da bug dello script.
+  - Prova di mutazione, tre casi, tutti rossi e tutti ripristinati: symlink rimosso, symlink
+    sostituito da una skill estranea, cartella `skills/` vuota.
+
+  *E' il punto 3 di `rules/best-practices.md` § No False Done, e questa volta con la variante
+  peggiore: la restrizione era **documentata nel commento**, quindi sembrava una scelta e non una
+  dimenticanza. Un limite dichiarato non smette di essere un buco.*
+
+- **Un timeout di `thor-verify` arrivava come un NO.** Un verdetto che non e' stato dato non e' un
+  verdetto negativo: ora si distingue.
+
+- **In `validate.sh` una suite attesa ma mai lanciata bloccava il gate per 15 minuti.** I due
+  elenchi (`_spawn` e `_suite`) dovevano restare allineati a mano e niente lo controllava. Il
+  fallimento non era rumoroso, era *lento* — la firma che in CI si scambia per una build appesa.
+  Ora `_suite` rifiuta un nome mai lanciato e lo dice in meno di un secondo.
+
+- **`bash-guard`: le stringhe fra virgolette sono dati, non comandi.** Un comando che *nomina* una
+  operazione pericolosa dentro una stringa veniva bloccato come se la eseguisse.
+
+- **Due fonti su tre del watcher `evolve` erano cieche**: l'URL sorvegliato veniva rilevato ma
+  restituiva menu e script invece delle note di rilascio. Il rilevamento reggeva, la lettura no.
+
+- **Una card ferma su una decisione di Roberto non compariva in `kb pending`** — cioe' proprio
+  nella lista che esiste per dirgli cosa aspetta lui.
+
+- **`kb finish` presupponeva chi avesse verificato invece di registrarlo.** Ora e' un dato sulla
+  card.
+
+- **`test-bus` non guardava la coda della factory**, che e' la terza superficie che il bus puo'
+  toccare. Il mutante `factory-drop` passava verde; ora esce con exit 1.
+
+### Changed
+
+- **`validate.sh` da 623 a 256 righe, e ogni controllo si lancia da solo.** Prima leggere l'esito
+  di un singolo controllo costava tre minuti e mezzo di suite intera. Otto controlli sono usciti
+  in file propri; `test/test-validate-wiring.sh` estrae le funzioni vere dal gate invece di
+  riscriverle, cosi' non possono divergere.
+
+- **`rules/best-practices.md` da 225 a 212 righe.** Il file dichiara un budget di 200 e tre delle
+  sue sezioni erano puntatori alla skill `engineering-reference` scritti come cronaca: quando il
+  contenuto e' stato spostato, con che data, quanto costava prima. Via anche le tre righe
+  generiche di § Security & Privacy (valida gli input, escape XSS, HTTPS/OAuth), che il modello
+  segue gia'. **Nessuna cicatrice tolta**, verificate una per una. Il file e' caricato in ogni
+  progetto via il symlink `~/.claude/rules/best-practices.md`, quindi ogni riga qui si paga
+  ovunque.
+
+- **Lo snapshot della coda non puo' piu' finire nel repo pubblico** (`.gitignore`).
+
+### Docs
+
+- **`docs/findings.md`: dai 16 rilievi ai 23.** I primi 16 hanno ora lo stato scritto accanto dopo
+  le decisioni di Roberto del 31 luglio — sei riparati con la loro card e la loro prova di
+  mutazione, tre chiusi da una decisione e non da una riparazione, uno rinviato di proposito,
+  cinque lasciati aperti con la condizione che li farebbe diventare card.
+- **Sette rilievi nuovi (17-23)** dal giro `/doctor` del 2 agosto: due coppie di skill che
+  dichiarano lo stesso `name` (chi vince dipende dall'ordine di lettura della cartella), due
+  cartelle senza frontmatter che non si caricano mai, `engineering-reference` cablata e invocata
+  zero volte da quando esiste, il controllo di `kb finish --thor` che ha rifiutato un PASS vero e
+  al secondo tentativo identico l'ha accettato, l'hook Orca ancora a 10s su `Stop`, i 43 rifiuti
+  della modalita' auto concentrati sui comandi Bash composti, e un lock di `test-bus` non
+  rilasciato che ha fatto uscire rosso un test innocente.
+- I tre giri `evolve` del 31 luglio e 1 agosto, con una riga corretta dopo che `@thor` l'ha
+  presa: diceva il falso sul buffer delle proposte rifiutate.
+
+### Non nel repo, ma parte dello stesso lavoro
+
+La riparazione che ha reso utile il gate nuovo vive fuori da git, in `~/.claude/`: le 9 skill del
+canon ripuntate ai wrapper generati (erano 2 su 9 corrette), 7 riaccese, 11 skill gstack ferme da
+uno-tre mesi spente, e il timeout dell'hook Orca sceso da 10s a 3s sui tre eventi che bloccano il
+turno a ogni giro. Il gate di questa versione e' cio' che impedisce a quella riparazione di
+marcire in silenzio la prossima volta che gstack si aggiorna.
+
 ## [v2.26.0] - 2026-07-30
 
 ### Added
