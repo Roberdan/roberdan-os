@@ -25,7 +25,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
           test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources test-kb-autothor \
-          test-goal-gate test-gh-shim test-bus-lock test-thor-verdict \
+          test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks \
           test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage; do
   _spawn "$_s"
@@ -183,6 +183,11 @@ if _suite test-bus-lock; then ok "riusa il lucchetto di un processo morto, rifiu
 # verifica RIUSCITA, e tutte e due le volte rilanciare identico e' bastato: la lezione peggiore.
 section "verdetto di @thor — tollerante sulla forma, inflessibile sul contenuto"
 if _suite test-thor-verdict; then ok "legge il verdetto anche in grassetto o con altri separatori, non ne inventa dove non c'e', e dice diverso un turno finito senza verdetto da un processo morto"; else _suite_out test-thor-verdict; err "test-thor-verdict — see bash test/test-thor-verdict.sh"; fi
+
+# --- 8b7) il controllo git installato deve sopravvivere alla cartella da cui lo si installa.
+# Il canone impone un worktree per card: incidere quel percorso = bloccare ogni commit dopo.
+section "install-git-hooks — incide il checkout principale, non il worktree che sparira"
+if _suite test-install-git-hooks; then ok "dal worktree incide il principale, il commit regge dopo la rimozione, il salto resta condizionato e fuori da un repo non esplode"; else _suite_out test-install-git-hooks; err "test-install-git-hooks — see bash test/test-install-git-hooks.sh"; fi
 
 # --- 8c) loop receipts emitter (schema, append-only, opt-in placement, no pollution) ---
 section "loop receipts — loop/receipt.sh emitter contract"
