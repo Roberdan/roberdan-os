@@ -42,10 +42,12 @@ probe_sweep() {
 # twenty minutes and each saw the other's probes appear mid-measurement, which
 # can fail either run for a reason that is not in either diff.
 LOCKDIR="${TMPDIR:-/tmp}/rda-bus-mutants.lock"
-if ! mkdir "$LOCKDIR" 2>/dev/null; then
-  echo "REFUSED: another mutant run holds $LOCKDIR." >&2
+. "$(dirname "${BASH_SOURCE[0]}")/lib-lock.sh"
+if ! bus_lock_acquire "$LOCKDIR"; then
+  echo "REFUSED: another mutant run holds $LOCKDIR (pid $(bus_lock_owner "$LOCKDIR"), vivo)." >&2
   echo "  This harness writes probes into the real \$HOME and the suite now watches it," >&2
-  echo "  so two runs at once corrupt each other's evidence. Wait, or remove the dir if stale." >&2
+  echo "  so two runs at once corrupt each other's evidence. Un lucchetto ORFANO viene" >&2
+  echo "  riusato da solo: se sei qui, il proprietario e' vivo. Aspetta, non cancellare." >&2
   exit 2
 fi
 trap 'rm -rf "$WORK" "$LOCKDIR"; probe_sweep' EXIT
