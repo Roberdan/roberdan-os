@@ -427,6 +427,103 @@ non un dettaglio.
 
 **Diventa una card** se succede una seconda volta a chiunque.
 
+## 17. Due skill con lo stesso `name` in `~/.claude/skills`: chi vince cambia da macchina a macchina
+
+**Come è emerso** (2 agosto 2026): durante `/doctor`. Le cartelle `_gstack-command` e `gstack`
+dichiarano entrambe `name: gstack`; `connect-chrome` e `open-gstack-browser` dichiarano entrambe
+`name: open-gstack-browser`. In ogni coppia una vince e l'altra sparisce senza dire niente, e
+quale vince dipende dall'ordine in cui il sistema legge la cartella — cioè non è stabile.
+
+**Perché conta.** Nessuna delle due è nostra: sono duplicati di gstack, probabilmente un rinomino
+lasciato a metà. Ma è la stessa famiglia di difetto che il 2 agosto teneva `ship` e `review` del
+canon irraggiungibili: **un nome di skill non è unico e nessuno lo verifica**. Mitigato spegnendo
+entrambe le coppie in `skillOverrides`; un aggiornamento di gstack le ricrea.
+
+**Diventa una card** se una skill del canon torna a collidere con un nome di un altro sistema —
+allora serve un controllo sui nomi duplicati, non un altro giro di interruttori.
+
+## 18. Due cartelle in `~/.claude/skills` non si caricano mai, e niente lo segnala
+
+**Come è emerso** (2 agosto 2026): durante `/doctor`. `dev-cleanup` e `roberto-mode` hanno un
+`SKILL.md` che comincia direttamente con il titolo: nessun frontmatter, quindi nessun `name` e
+nessuna `description`. Senza quelli non sono skill — sono file markdown in una cartella.
+
+**Perché conta.** Zero danno oggi (sono spente comunque), ma è di nuovo *"sembra cablato e non ha
+mai girato"*: chi apre la cartella vede una skill, il sistema no. `roberto-mode` in particolare
+porta il nome del cuore del canon.
+
+**Diventa una card** se qualcuno prova a invocarne una e si chiede perché non risponde.
+
+## 19. `engineering-reference` è stata estratta il 14 luglio e invocata zero volte da allora
+
+**Come è emerso** (2 agosto 2026): `skillUsage` in `~/.claude.json` — `usageCount: 0`, nessun
+`lastUsedAt`. La skill è cablata correttamente (symlink al canon, mai spenta).
+
+**Perché conta.** L'estrazione ha fatto metà del lavoro: il contenuto è uscito dal contesto sempre
+caricato, ma niente lo richiama indietro quando servirebbe. Nei nostri termini è
+`rules/best-practices.md § Wired End-to-End` — c'è, è raggiungibile, non è raggiunto. Il rischio
+non è lo spreco: è che una regola di esecuzione che credevamo attiva non lo sia da tre settimane.
+
+**Diventa una card** se un lavoro sbaglia una convenzione che sta scritta solo lì.
+
+## 20. Il controllo di `kb finish --thor` ha rifiutato un PASS vero, e al secondo tentativo l'ha accettato
+
+**Come è emerso** (2 agosto 2026): chiudendo la card `260802-120141-2`. `@thor` ha verificato e
+scritto `**VERDICT: PASS**` seguito, sulla stessa riga, dalla motivazione. `kb` ha risposto
+*"unparseable thor-verify output (exit=0)"* e ha rifiutato. Rilanciato identico, ha scritto PASS.
+
+**Perché conta.** È il gate più importante del sistema e ha un esito che dipende da come thor
+formatta la frase. Sbaglia nella direzione sicura — rifiuta invece di approvare — ma insegna la
+cosa peggiore: che davanti a un rifiuto convenga rilanciare. Un gate che a volte cede al secondo
+tentativo non è un gate.
+
+**Diventa una card** alla prossima volta che capita, oppure subito se qualcuno chiude una card
+con `--by` dopo un rifiuto di parsing invece di rilanciare.
+
+## 21. L'hook di Orca resta a 10 secondi su `Stop`
+
+**Come è emerso** (2 agosto 2026): riparando la card `260802-120124`. Il timeout è sceso a 3s sui
+tre eventi che bloccano il turno a ogni giro (`PreToolUse`, `PostToolUse`, `UserPromptSubmit`),
+dove i transcript mostravano 5 timeout su 7 esecuzioni. Su `Stop` è rimasto a 10, con 2 timeout
+misurati su 458 esecuzioni.
+
+**Perché conta.** Lo 0,4% non giustifica il rischio di stringere anche lì — `Stop` è dove girano
+il checkpoint e il gate di completamento, ed è l'evento con più hook attaccati.
+
+**Diventa una card** se il tasso di timeout su `Stop` supera l'1% in una finestra di sessioni.
+
+## 22. I rifiuti della modalità auto si concentrano sui comandi Bash composti con `cd`
+
+**Come è emerso** (2 agosto 2026): 43 rifiuti in 50 sessioni su 8 progetti. 28 su 43 vengono dal
+classificatore (`automode-blocked`, `automode-unavailable`), e i più frequenti sono comandi che
+iniziano con `cd <path> && …` o contengono un a-capo.
+
+**Perché conta.** Nessun pattern supera i 2 rifiuti, quindi non c'è niente da pre-approvare: non è
+un problema di permessi ma di *forma del comando*. Un comando composto su più righe è più difficile
+da classificare di tre comandi semplici, e il costo lo paga ogni turno.
+
+**Diventa una card** se qualcuno misura che scrivere comandi semplici invece che composti riduce i
+rifiuti — finché è un'ipotesi, è una riga qui.
+
+## 23. Una verifica di thor interrotta lascia il lock di `test-bus` e fa fallire il gate successivo
+
+**Come è emerso** (2 agosto 2026): subito dopo il rilievo 20. La verifica di `@thor` finita in
+*"unparseable output"* ha lasciato `rda-bus-mutants.lock` in `$TMPDIR`. Il `validate.sh` lanciato
+16 minuti dopo è uscito **FAIL** su `test-bus`, con il messaggio *"another bus suite or mutant run
+holds the lock"* — mentre nessun processo bus, validate o thor era vivo (`ps` verificato).
+
+**Perché conta.** Il lock esiste per una ragione giusta e documentata: due suite bus insieme si
+corrompono le prove a vicenda. Ma non viene rilasciato quando il processo muore male, e il
+risultato è un **rosso su un test innocente** — la firma esatta del fallimento che il lock doveva
+impedire, solo al contrario. Chi lo incontra impara a cancellare i lock, cioè a disarmare la
+protezione.
+
+**Riparazione probabile**: scrivere il PID nel lock e considerarlo stale quando quel PID non
+esiste più, oppure un `trap` di uscita nella suite. Poche righe.
+
+**Diventa una card** alla seconda volta, o subito se qualcuno cancella il lock senza controllare
+prima che nessun processo lo tenga davvero.
+
 ---
 
-_Aggiornato: 2026-07-31._
+_Aggiornato: 2026-08-02._
