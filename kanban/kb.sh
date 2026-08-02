@@ -1263,7 +1263,7 @@ _next() {
   return 0
 }
 
-# --- kb cover — the plan→card gate (rules/best-practices.md § Carded End-to-End) -------------
+# --- kb cover — the plan→card gate (skills/engineering-reference § Carded End-to-End) --------
 # Every gate in this system operates DOWNSTREAM of the card: kb, @thor, the merge-gate and CI all
 # verify a card. A requirement that never BECOMES a card is invisible to all four simultaneously.
 # The plan→card translation is the only link in the chain with no gate — and it is exactly where
