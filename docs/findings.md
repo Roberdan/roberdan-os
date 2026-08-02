@@ -21,15 +21,13 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 
 ---
 
-## Aperti — 3 su 10
+## Aperti — 0 su 10
 
-| # | Cosa si rompe | Riparare costa | Se non facciamo niente | Diventa una card quando | Nato |
-|---|---|---|---|---|---|
-| 9 | Una PR si merga anche col controllo rosso: nessuna protezione del ramo lo impedisce | 1 comando | Un `main` rotto entra senza che niente si opponga | **Decisa dal twin: accendere, versione stretta** (solo "i controlli devono passare", admin esclusi, push diretto libero). Bloccata dal classificatore di sicurezza il 2 ago — è il gate umano #1, la esegue Roberto a mano | 30 lug |
-| 2 | `install-git-hooks.sh` lanciato da un worktree incide nel controllo il percorso del worktree: quando la cartella sparisce, **ogni commit si blocca** | ~5 righe: risolvere sempre al checkout principale | Si ripete a ogni card. Rimedio da 1 riga, ma solo se sai qual è | Alla terza volta, o quando capita a Roberto invece che a un agente | 30 lug |
+**Nessuno.** Il 2 agosto 2026 la lista e' passata da 19 rilievi aperti a zero: 13 chiusi da una
+decisione, 6 riparati con la loro card e la loro prova di mutazione. Restano solo i due rinviati
+qui sotto, che per la regola non contano nel tetto.
 
-
-| 24 | `bin/install-hooks.sh` dice *"idempotent, a second run is a no-op"* e su questa macchina **raddoppierebbe 10 controlli automatici**: confronta le stringhe esatte, e la configurazione viva usa forme equivalenti ma diverse (`$HOME` contro percorso assoluto, con e senza `bash` iniziale) | ~10 righe: normalizzare prima di confrontare | Chi lancia `--apply` fidandosi di quella riga fa girare ogni controllo due volte | Prima di usare lo script su una macchina che ha già controlli installati | 2 ago |
+Il posto e' vuoto e va tenuto vuoto: il tetto e' 10, e chi scrive l'undicesimo ne cancella uno.
 
 ## Rinviati con motivo scritto — non contano nel tetto
 
@@ -71,6 +69,25 @@ Orca sui tre eventi che bloccano il turno, e la diet di `rules/best-practices.md
   chi lo tiene: proprietario morto = si riusa, vivo = il rifiuto è vero. La logica sta in
   `test/lib-lock.sh`, un file solo per i due chiamanti. 10 asserzioni, 4 delle quali verificano
   che un lucchetto **vivo** venga rispettato. Mutazione 4 su 4 rossa.
+
+- **#2 — `install-git-hooks.sh` incideva il percorso del worktree.** Ora `ROOT` si chiede a git
+  (`--git-common-dir`) invece di dedurlo dalla posizione dello script: dal worktree risolve al
+  checkout principale, che e' quello che sopravvive. Il salto resta **condizionato**: se laggiu'
+  non c'e' questo repo si resta dov'eravamo. Provato su cloni usa-e-getta, nei due sensi.
+  Riparato anche un difetto trovato dal test nella stessa funzione: fuori da un repo lo script
+  moriva con l'errore grezzo di git ed exit 128. 5 asserzioni, mutazione 3 su 3 rossa.
+- **#9 — una PR si mergeva anche col controllo rosso.** Protezione del ramo accesa il 2 agosto
+  nella versione stretta decisa dal twin: i controlli devono passare, **gli admin sono esclusi e
+  il push diretto resta libero**, cosi' Roberto lavora come prima. Force-push e cancellazione del
+  ramo bloccati.
+- **#24 — `install-hooks.sh` diceva "idempotent" e avrebbe raddoppiato 10 controlli.** Ora
+  `norm()` riconosce `$HOME`, la tilde e il `bash` iniziale come la stessa cosa, e **non**
+  appiattisce redirezioni, argomenti o script diversi. 12 asserzioni, 5 delle quali verificano
+  proprio che non appiattisca. Mutazione 5 su 5 rossa.
+  - *Due falsi verdi trovati nel test mentre lo scrivevo: l'estrazione della funzione prendeva
+    troppo codice, l'import esplodeva, e l'helper leggeva l'errore come "sono diversi" — cinque
+    asserzioni passavano verdi per un import rotto. Seconda volta in un giorno che scrivo un test
+    che si autoassolve.*
 
 **Chiusi da una decisione, non da una riparazione:**
 
