@@ -103,13 +103,6 @@ Concrete failure modes this rule exists to catch (all seen in this repo or its w
 (a coverage gate, a grep-for-caller test, a link check) rather than relying on a human to notice.
 An unwired feature that ships green is worse than one that fails loudly.
 
-## Carded End-to-End (skill, not canon)
-
-A requirement that lives in a plan but never becomes a card is not planned. The control is the
-`kb cover <plan.md>` gate inside `test/validate.sh`, not this paragraph — so the discipline and its
-scar moved to the **`engineering-reference` skill** (2026-07-30), loaded when you translate a plan
-into cards.
-
 ## Context & Token Economy
 
 Context is a finite resource with diminishing returns ("context rot"): every always-loaded token
@@ -151,12 +144,6 @@ Code best practices, current 2026.)
 | "it works, trust me" | Run tests, attach output |
 | "refactor later" | Now or tracked issue |
 
-## Documentation & Documentation Budget (skill, not canon)
-
-Docstring/CHANGELOG conventions and the meta-documentation budget (one living plan, one living
-handoff, dated artifacts to `docs/archive/`, no build artifacts in git) moved to the
-**`engineering-reference` skill** (2026-07-30). They apply while writing docs, not before.
-
 ## Parallel work — worktree + PR, never concurrent commits on one checkout
 
 **When work is parallelized inside a single repo, each parallel stream gets its own `git worktree`
@@ -195,9 +182,6 @@ other's files — duplicate frontmatter keys, interleaved commits, a near-collis
 
 ## Security & Privacy
 
-Input: validate client + server, allowlists, sanitize. XSS: escape, CSP, DOMPurify.
-Secrets: env vars, `.env` gitignored. Auth: OAuth 2.0 / OIDC, RBAC server-side.
-Transport: HTTPS, HSTS, secure cookies, TLS 1.2+. Privacy: GDPR, data minimization, consent.
 Inclusive language: gender-neutral, allowlist / blocklist, primary / replica, person-first.
 
 **Agent supply chain.** Skills, MCP servers and plugins are an active attack surface (Snyk
@@ -214,12 +198,15 @@ malicious MCP servers can inject via tool *descriptions* alone). Rules:
 ## Execution Defaults
 **Browser:** Playwright = Microsoft Edge (`msedge`) only; no Chrome/Chromium fallback. If Edge is unavailable, stop and report the blocker; override only for Roberto-requested cross-browser tests. **Writing:** Tables > prose; commands > descriptions; comments WHY-only; conventional commits; PR = summary + test plan.
 
-## Execution reference (skill, not canon)
+## Moved to the `engineering-reference` skill (loaded on demand, not canon)
 
-Code style per language · test & mock boundaries · API conventions · the local CI sequence before
-push · merge discipline · how to resolve review comments · repo settings & git hooks — all of it
-lives in the **`engineering-reference` skill**, loaded on demand.
+None of the below changes what you **decide** — it tells you **how** to do a thing you already
+chose to do. That is the canon's own test for what belongs in a skill.
 
-It was always-loaded until 2026-07-14 and paid tokens on every turn of every session, while none of
-it changes what you **decide** — it tells you **how** to do a thing you already chose to do. That is
-the canon's own test for what belongs in a skill.
+- **Execution reference** — code style per language · test & mock boundaries · API conventions ·
+  the local CI sequence before push · merge discipline · how to resolve review comments · repo
+  settings & git hooks.
+- **Carded End-to-End** — a requirement that lives in a plan but never becomes a card is not
+  planned. The control is the `kb cover <plan.md>` gate in `test/validate.sh`, never prose.
+- **Documentation & documentation budget** — docstring/CHANGELOG conventions; one living plan, one
+  living handoff, dated artifacts to `docs/archive/`, no build artifacts in git.
