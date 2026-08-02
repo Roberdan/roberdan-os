@@ -3,6 +3,98 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.28.0] - 2026-08-02
+
+Il filo: **una sessione che si ferma da sola, e i cancelli che rifiutavano il lavoro fatto.**
+Misurato su una sessione vera (VirtualBPM, 31 lug → 2 ago): **46,5 ore di sessione, 4,4 ore di
+lavoro**. Il 90% era silenzio, e non per un gate — prima di ogni pausa l'agente aveva scritto da
+solo cosa avrebbe fatto dopo, e la pausa finiva perché Roberto scriveva "vai".
+
+### Added
+
+- **`hooks/goal-gate.sh` — il primo hook di questo repo che BLOCCA.** Un turno non può chiudersi
+  finché `kb queue --restanti` è maggiore di zero: l'agente viene rimandato dentro con `kb next`.
+  È il meccanismo che il comando integrato `/goal` installa a mano per una sessione sola, tranne
+  che qui è **il default** e la condizione non è una frase in prosa ma la lista che Roberto ha
+  già autorizzato il 2026-07-30.
+  - *Le tre pause più lunghe della sessione misurata, con l'ultima frase dell'agente prima del
+    silenzio: «Non mi serve niente da te … e vado sulla #2» → 3 h. «La #2 parte subito dopo» →
+    7 h 20. «Non aspetto niente da te» → 14 h 36. Un turno finisce quando l'agente SCRIVE: "poi
+    faccio la #2" non è un piano che il sistema tiene, è l'ultima frase prima del silenzio. Gli
+    altri due hook su `Stop` guardano il repo (file non committati, PR aperte, worktree orfani) e
+    dichiarano **entrambi di non bloccare mai**. Nessuno guardava la lavagna.*
+  - **I freni sono metà del lavoro**, perché un cancello che non si riapre più è peggio di uno
+    che non si chiude mai: coda finita · coda che non si accorcia da 2 giri · tetto di 12
+    ripartenze · nessuna coda autorizzata (il gate `todo→doing` di Roberto resta in piedi) ·
+    `RDA_NO_GOAL_GATE=1` o `~/.roberdan-os/goal-gate.off`. **8 asserzioni su 14 verificano che
+    LASCI PASSARE.** Mutazione 4 su 4 rossa.
+  - Aggiunto `kb queue --restanti` (solo il numero) perché l'hook non riscriva la risoluzione di
+    repo/KB/coda: due copie divergono, e quella dentro un cancello di uscita diverge in silenzio.
+
+- **`bin/gh-shim.sh` — l'account GitHub si sceglie dal repo.** Installato come `~/.local/bin/gh`,
+  che nel PATH precede Homebrew: **si digita `gh` normale**, niente da ricordarsi. Una cartella
+  di configurazione per account, scelta dal proprietario del `remote`; `-R proprietario/nome`
+  vince sul cwd. Niente più stato globale da contendere: due sessioni su due repo diversi usano
+  due account nello stesso istante.
+  - *Rilievo 3, aperto dal 30 luglio. `gh auth switch` scrive l'account attivo in una
+    configurazione globale: due PR non create, un merge rifiutato, un 401 con credenziali valide,
+    e un push che diceva "Repository not found" su un repo che esisteva — GitHub risponde 404 e
+    non 403 a chi non è autorizzato, quindi l'errore diceva il contrario della verità. Il più
+    caro dei quattro è il merge rifiutato: la sessione lo ha raccontato come fatto.*
+  - Verificato prima di scrivere codice che `gh` 2.97 non abbia una strada nativa: non ce l'ha.
+  - **Fallisce APERTO**: fuori da un repo, remote non GitHub, proprietario non in mappa (nessuna
+    wildcard), cartella non pronta, interruttore, `GH_CONFIG_DIR`/`GH_TOKEN` già scelti → lancia
+    il `gh` vero invariato. **10 asserzioni su 15 verificano proprio questo.** Mutazione 5 su 5.
+
+### Fixed
+
+- **Il gate di `@thor` rifiutava verifiche RIUSCITE, e rilanciare identico bastava** (rilievo 20,
+  due volte in un giorno, due cause diverse). La lettura pretendeva `VERDICT: PASS — ` esatto e
+  il grassetto di @thor non combaciava; e @thor poteva finire il turno scrivendo *"aspetto
+  l'esito del test completo, non blocco su questo"* senza dare il verdetto. Ora: lettura
+  tollerante sulla **forma** e inflessibile sul **contenuto** (serve la parola `VERDICT`, vince
+  l'ultima occorrenza); i due fallimenti hanno messaggi distinti; e il prompt vieta a @thor di
+  rinviare — che è la riparazione alla radice.
+  - *Un cancello che cede al secondo tentativo insegna che davanti a un rifiuto conviene
+    ritentare. È la lezione peggiore che un gate possa dare.*
+  - **Difetto commesso dentro la riparazione, e vale più della riparazione:** la prima versione
+    del test riscriveva la logica di lettura a mano, e **3 mutanti su 5 applicati al codice vero
+    passavano verdi** perché il test non lo stava toccando. § No False Done punto 3, dentro il
+    file scritto per impedirlo. Risolto estraendo `thor_read_verdict()` in `factory/lib.sh` e
+    facendola chiamare dal test: 5 su 5 rosse.
+
+- **Un lucchetto non rilasciato faceva uscire rosso un test innocente** (rilievo 23, due volte).
+  `mkdir` come lucchetto è giusto — atomico, e su bash 3.2 di macOS `flock` non c'è — ma veniva
+  rilasciato solo da un `trap EXIT`, che non gira se il processo viene ucciso. Ora contiene il
+  PID: proprietario morto = orfano e si riusa, vivo = il rifiuto è vero. Logica in
+  `test/lib-lock.sh`, un file solo per i due chiamanti.
+  - *Il rosso non era sul difetto, era su un innocente: chi lo incontra impara a cancellare i
+    lucchetti a mano, cioè a disarmare la protezione. L'ho fatto io, due volte, in un giorno.*
+  - Un lucchetto **senza** PID non è orfano subito: aspetta e rilegge, perché fra il `mkdir` e la
+    scrittura del PID c'è una finestra in cui un lucchetto legittimo sembra abbandonato.
+
+### Changed
+
+- **`docs/findings.md` da 583 righe a ~100, da 19 rilievi aperti a 3.** Ora è una tabella che sta
+  in una schermata: cosa si rompe · quanto costa · cosa succede se non facciamo niente · la
+  condizione che lo fa diventare card · la data.
+  - **La regola nuova l'ha decisa il twin**, e ha rifiutato quella che avevo proposto io
+    ("si ripara entro pochi giorni o si cancella"): *"mi ridà una coda da smaltire con una
+    scadenza addosso — è il 30 luglio con un altro nome"*. La sua: **tetto duro di 10 rilievi
+    aperti**, chi scrive l'undicesimo ne cancella uno prima; 14 giorni senza che la condizione
+    scatti e si cancella; **promuovere richiede Roberto, cancellare non richiede nessuno**. Il
+    difetto non era che i rilievi vivessero troppo: era che solo Roberto poteva toglierli.
+  - Il twin ha corretto tre delle collocazioni proposte e ne ha decisi quattro nel merito.
+    Chiusi 13 rilievi, tutti con il motivo scritto.
+  - Il controllo privacy ha **bloccato il primo commit**: la citazione del twin faceva quattro
+    nomi di clienti, che vivono solo in `~/.roberdan-os/private/`. Il gate ha funzionato su una
+    frase scritta da un agente, che è il motivo per cui esiste.
+
+- Corretta la descrizione della skill `sync`: prometteva *"mechanized by post-task-sync hook"*, e
+  `post-task-sync` dichiara di **non** toccare il vault ed è spento salvo `RDA_AUTOSYNC=1`.
+- `README.md`: la tabella dei componenti nomina `goal-gate` e `gh-shim`, e dice quali hook **non**
+  sono installati invece di lasciarlo intendere.
+
 ## [v2.27.0] - 2026-08-02
 
 Il filo di questa versione e' uno solo: **i gate che dicevano verde senza guardare.** Cinque dei
