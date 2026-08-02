@@ -24,35 +24,46 @@ err() { printf "  FAIL: %s\n" "$1"; FAIL=1; }
 ok()  { printf "  ok: %s\n" "$1"; }
 REMEDIATE="run: bash bin/sync.sh --install"
 
-# claude: solo le 3 skill roberdan-os che si sa NON collidere con un altro sistema di skill
-# (gstack ne vende 'review' e 'ship' con lo stesso nome — documentato, apposta non asserito).
-if [ -d "$HOME/.claude" ]; then
-  for s in auto-checkpoint sync verify-done; do
-    _lnk="$HOME/.claude/skills/$s/SKILL.md"
+# L'elenco delle skill del canon e' DERIVATO da skills/*/skill.md, non scritto a mano: una skill
+# nuova entra nel gate da sola invece di aspettare che qualcuno si ricordi di aggiungerla qui.
+#
+# Fino al 2026-08-02 per claude erano elencate a mano solo 3 su 9, con la motivazione che 'ship' e
+# 'review' collidevano con le omonime di gstack. Effetto misurato dal /doctor di quel giorno: il
+# gate diceva PASS mentre 7 skill su 9 non erano raggiungibili in Claude Code — 2 puntavano alle
+# skill di gstack, 3 erano copie statiche congelate di un sync.sh vecchio, 7 erano spente in
+# skillOverrides. Un gate che si puo' soddisfare senza fare il lavoro e' peggio di nessun gate:
+# rules/best-practices.md § No False Done, punto 3. La collisione e' stata risolta ripuntando i
+# symlink al canon, quindi la restrizione non ha piu' ragione di esistere.
+CANON_SKILLS="$(cd "$ROOT/skills" 2>/dev/null && for d in */; do [ -f "$d/skill.md" ] && printf '%s ' "${d%/}"; done)"
+# Se la derivazione si rompe l'elenco resta vuoto e il gate passerebbe senza asserire NIENTE —
+# esattamente il difetto che questo file esiste per impedire. Quindi vuoto = FAIL, non skip.
+[ -n "${CANON_SKILLS// /}" ] || err "nessuna skill trovata in $ROOT/skills/ — la derivazione dell'elenco e' rotta e il gate non starebbe verificando nulla"
+
+# Un solo controllo per tutti i tool: stessa forma di cablaggio (symlink dentro platforms/),
+# stesso elenco derivato, cosi' claude e copilot non possono divergere in silenzio.
+check_skills_wired() { # <label> <skills-dir>
+  local label="$1" dir="$2" s _lnk
+  for s in $CANON_SKILLS; do
+    _lnk="$dir/$s/SKILL.md"
     if [ -e "$_lnk" ] && readlink "$_lnk" 2>/dev/null | grep -q "roberdan-os/platforms/"; then
-      ok "claude skill '$s' wired (symlink resolves into roberdan-os platforms/)"
+      ok "$label skill '$s' wired (symlink resolves into roberdan-os platforms/)"
     elif [ -e "$_lnk" ]; then
-      err "claude skill '$s' exists but is NOT the roberdan-os symlink (foreign same-name skill?) — $REMEDIATE"
+      err "$label skill '$s' exists but is NOT the roberdan-os symlink (foreign same-name skill?) — $REMEDIATE"
     else
-      err "claude skill '$s' missing at $_lnk — $REMEDIATE"
+      err "$label skill '$s' missing at $_lnk — $REMEDIATE"
     fi
   done
+}
+
+if [ -d "$HOME/.claude" ]; then
+  check_skills_wired claude "$HOME/.claude/skills"
 else
   printf "  skip: claude not installed (no ~/.claude)\n"
 fi
 
-# copilot: tutte e 8 le skill roberdan-os + gbrain dentro il suo mcp-config.json.
+# copilot: le stesse skill del canon + gbrain dentro il suo mcp-config.json.
 if [ -d "$HOME/.copilot" ]; then
-  for s in auto-checkpoint focus-group premortem problem-validation review ship sync verify-done; do
-    _lnk="$HOME/.copilot/skills/$s/SKILL.md"
-    if [ -e "$_lnk" ] && readlink "$_lnk" 2>/dev/null | grep -q "roberdan-os/platforms/"; then
-      ok "copilot skill '$s' wired (symlink resolves into roberdan-os platforms/)"
-    elif [ -e "$_lnk" ]; then
-      err "copilot skill '$s' exists but is NOT the roberdan-os symlink (foreign same-name skill?) — $REMEDIATE"
-    else
-      err "copilot skill '$s' missing at $_lnk — $REMEDIATE"
-    fi
-  done
+  check_skills_wired copilot "$HOME/.copilot/skills"
   if [ -f "$HOME/.copilot/mcp-config.json" ]; then
     if grep -q "gbrain" "$HOME/.copilot/mcp-config.json" 2>/dev/null; then
       ok "copilot mcp-config.json has gbrain"
