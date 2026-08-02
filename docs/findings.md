@@ -21,11 +21,10 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 
 ---
 
-## Aperti — 6 su 10
+## Aperti — 5 su 10
 
 | # | Cosa si rompe | Riparare costa | Se non facciamo niente | Diventa una card quando | Nato |
 |---|---|---|---|---|---|
-| 3 | I due account GitHub (`Roberdan` e `roberdan_microsoft`) si rubano il posto: `gh auth switch` scrive uno stato **globale**, quindi una sessione cambia account e l'altra si ritrova sotto quello sbagliato | ~30 righe: un wrapper che sceglie l'account dal `remote` del repo, più il test | Continua. Già visti: 2 PR non create, 1 merge rifiutato, un 401 con credenziali valide, un push che diceva *"Repository not found"* su un repo che esisteva | **Già decisa dal twin il 2 ago: si ripara adesso.** Vincolo: deve funzionare digitando `gh` normale. Se in un'ora non è l'unica strada, ci si ferma e si torna da Roberto | 30 lug |
 | 9 | Una PR si merga anche col controllo rosso: nessuna protezione del ramo lo impedisce | 1 comando | Un `main` rotto entra senza che niente si opponga | **Decisa dal twin: accendere, versione stretta** (solo "i controlli devono passare", admin esclusi, push diretto libero). Bloccata dal classificatore di sicurezza il 2 ago — è il gate umano #1, la esegue Roberto a mano | 30 lug |
 | 2 | `install-git-hooks.sh` lanciato da un worktree incide nel controllo il percorso del worktree: quando la cartella sparisce, **ogni commit si blocca** | ~5 righe: risolvere sempre al checkout principale | Si ripete a ogni card. Rimedio da 1 riga, ma solo se sai qual è | Alla terza volta, o quando capita a Roberto invece che a un agente | 30 lug |
 | 20 | Il controllo di qualità (`kb finish --thor`) ha **rifiutato un PASS vero** per come thor aveva formattato la frase, e al secondo tentativo identico l'ha accettato | ~10 righe sul lettore del verdetto | Insegna la cosa peggiore: che davanti a un rifiuto conviene rilanciare. Un cancello che a volte cede al secondo tentativo non è un cancello | Alla seconda volta, o subito se qualcuno chiude una card con `--by` dopo un rifiuto di lettura invece di rilanciare | 2 ago |
@@ -46,6 +45,18 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 **Riparati con card e prova di mutazione:** 1, 8, 11, 14, 15, 16, più — nello stesso giorno — il
 gate `tool-coverage` che diceva verde su 7 skill del canone irraggiungibili, il timeout dell'hook
 Orca sui tre eventi che bloccano il turno, e la diet di `rules/best-practices.md`.
+
+- **#3 — i due account GitHub che si rubavano il posto.** `bin/gh-shim.sh`, installato come
+  `~/.local/bin/gh` (nel PATH viene prima di Homebrew): **si digita `gh` normale** e l'account si
+  sceglie dal proprietario del remote, con una cartella di configurazione per account. Niente più
+  stato globale, quindi niente da contendere: due sessioni su due repo diversi usano due account
+  nello stesso istante. `-R proprietario/nome` vince sul cwd. **Fallisce APERTO** in ogni caso
+  ignoto — fuori da un repo, remote non GitHub, proprietario non in mappa, cartella non pronta,
+  interruttore, `GH_CONFIG_DIR` o `GH_TOKEN` già scelti dal chiamante: lancia il `gh` vero
+  invariato. Verificato dal vivo: in `roberdan-os` risponde `Roberdan` mentre l'account globale
+  attivo era `roberdan_microsoft`, e da dentro un repo Microsoft `gh pr list -R Roberdan/roberdan-os`
+  trova la PR 35 di un repo privato che prima rispondeva *"Repository not found"*.
+  15 asserzioni (10 sul fallire aperto), mutazione 5 su 5 rossa.
 
 **Chiusi da una decisione, non da una riparazione:**
 

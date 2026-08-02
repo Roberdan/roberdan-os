@@ -25,7 +25,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
           test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources test-kb-autothor \
-          test-goal-gate \
+          test-goal-gate test-gh-shim \
           test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage; do
   _spawn "$_s"
@@ -167,6 +167,12 @@ if _suite test-bash-guard; then ok "invisible-character prefilter, force-push, r
 # PASSARE — un cancello che non si apre piu' e' peggio di uno che non si chiude mai.
 section "goal-gate — un turno non si chiude con la coda autorizzata ancora piena"
 if _suite test-goal-gate; then ok "blocca finche' restano card autorizzate, e molla su coda finita, nessuna coda, interruttore, stallo e tetto"; else _suite_out test-goal-gate; err "test-goal-gate — see bash test/test-goal-gate.sh"; fi
+
+# --- 8b4) gh-shim: l'account GitHub si sceglie dal repo, non da uno stato globale conteso.
+# La maggioranza delle asserzioni verifica che FALLISCA APERTO: uno shim su un comando usato
+# cento volte al giorno non puo' essere l'anello che si spezza.
+section "gh-shim — l'account si sceglie dal repo, e nei casi ignoti non tocca niente"
+if _suite test-gh-shim; then ok "sceglie la cartella dal remote, il -R vince sul cwd, gli argomenti passano interi, e in ogni caso ignoto lancia il gh vero invariato"; else _suite_out test-gh-shim; err "test-gh-shim — see bash test/test-gh-shim.sh"; fi
 
 # --- 8c) loop receipts emitter (schema, append-only, opt-in placement, no pollution) ---
 section "loop receipts — loop/receipt.sh emitter contract"
