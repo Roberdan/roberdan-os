@@ -3,6 +3,53 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.28.1] - 2026-08-02
+
+**La lista dei rilievi aperti e' a zero.** Da 19 la mattina: 13 chiusi da una decisione, 6
+riparati con la loro card e la loro prova di mutazione. E' la prima volta che succede.
+
+### Fixed
+
+- **`install-git-hooks.sh` incideva nel controllo il percorso della cartella da cui lo si
+  lanciava** (rilievo 2, dal 30 luglio). Il canone impone **un worktree per card**, quindi
+  lanciarlo da li' e' il caso normale — e quel percorso e' garantito sparire. E' successo:
+  rimosso `worktrees/roberdan-os/260730-092839`, **ogni commit in roberdan-os si e' bloccato**.
+  Ora `ROOT` si chiede a git (`--git-common-dir`) invece di dedurlo dalla posizione dello script.
+  Il salto resta **condizionato**: se nel checkout principale non c'e' questo repo si resta
+  dov'eravamo, invece di incidere un percorso peggiore di quello che si sta riparando.
+  - Riparato anche, perche' sta nella stessa funzione e l'ha trovato il test scritto per altro:
+    fuori da un repo git lo script moriva con l'errore grezzo di git ed exit 128.
+
+- **`install-hooks.sh` dichiarava di essere idempotente e avrebbe raddoppiato dieci controlli**
+  (rilievo 24). Il dedup confrontava la stringa grezza, e la configurazione viva usa forme
+  equivalenti ma diverse da quelle che il generatore produce oggi (`bash $HOME/…` contro il
+  percorso assoluto, con e senza `bash` iniziale). Il dry-run annunciava *"would add 11"* quando
+  dieci erano gia' installati: `--apply` avrebbe fatto girare **due checkpoint, due gate di
+  pre-completamento, due formattatori** a ogni evento. E chi lo lancia lo fa fidandosi di quella
+  riga.
+  - `norm()` normalizza **solo** cio' che e' davvero la stessa cosa. `X` e `X 2>/dev/null || true`
+    restano due comandi diversi: hanno comportamenti diversi davanti a un errore. Cinque
+    asserzioni su dodici verificano proprio che **non** appiattisca — un dedup troppo generoso
+    saprebbe di idempotenza e sarebbe invece un controllo che sparisce senza dirlo.
+
+### Changed
+
+- **Protezione del ramo accesa su `main`** (rilievo 9), nella versione stretta decisa dal twin:
+  i controlli devono passare prima di un merge, **gli admin sono esclusi e il push diretto resta
+  libero** — Roberto lavora come prima. Force-push e cancellazione del ramo bloccati. E' il gate
+  umano #1 e l'ha esercitato lui.
+
+### La cosa che mi porto dietro
+
+**Due volte in un giorno ho scritto un test che si autoassolve.** In `test-thor-verdict.sh` la
+logica era riscritta a mano invece di chiamare quella vera, e 3 mutanti su 5 applicati al codice
+passavano verdi. In `test-install-hooks-dedup.sh` l'estrazione della funzione prendeva troppo
+codice, l'import esplodeva, e l'helper leggeva l'errore come *"sono diversi"*: cinque asserzioni
+verdi per un import rotto. Tutte e due le volte l'ho scoperto **solo** rifacendo la prova di
+mutazione — nessuna delle due sarebbe emersa da una suite verde. E' § No False Done punto 3, e la
+lezione non e' "stare piu' attenti": e' che **un test che non chiama il codice vero non e' un
+test**, e l'unico modo di accorgersene e' rimettere il difetto e guardare.
+
 ## [v2.28.0] - 2026-08-02
 
 Il filo: **una sessione che si ferma da sola, e i cancelli che rifiutavano il lavoro fatto.**
