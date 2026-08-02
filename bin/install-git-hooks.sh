@@ -18,7 +18,32 @@
 # hook installed only in the repo that never had the problem is a lock on the wrong door,
 # so the check has to be able to travel to the repo that holds real data.
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# ROOT deve essere il CHECKOUT PRINCIPALE, mai il worktree da cui si lancia.
+#
+# Rilievo 2, 30 luglio 2026: questo script era stato eseguito da dentro
+# `worktrees/roberdan-os/260730-092839`, quindi il percorso inciso nel controllo generato era
+# quello. Quando quel worktree e' stato rimosso — la fine normale di una card — **ogni commit in
+# roberdan-os si e' bloccato**: `pre-commit: BLOCCATO — .../260730-092839/hooks/pre-commit non
+# esiste`. Il canone impone un worktree per card, quindi lanciarlo da li' e' il caso NORMALE, e
+# il percorso che vi si incide e' garantito sparire.
+#
+# `--git-common-dir` e' la domanda giusta: in un worktree risponde `<principale>/.git`, nel
+# checkout principale risponde `.git`. La cartella che lo contiene e' il checkout che sopravvive.
+# Si CHIEDE a git dov'e' la casa, non la si deduce dalla posizione dello script — la stessa
+# ragione per cui piu' sotto si usa `--git-path hooks` invece di ricostruire `.git/hooks`.
+_script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$_script_root"
+_common="$(git -C "$_script_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+if [ -n "$_common" ] && [ -d "$_common" ]; then
+  _main="$(dirname "$_common")"
+  # Solo se laggiu' c'e' davvero questo repo: su un layout inatteso si resta dov'eravamo, invece
+  # di incidere un percorso peggiore di quello che stiamo riparando.
+  if [ -d "$_main/hooks" ] && [ -f "$_main/hooks/pre-commit" ]; then
+    ROOT="$_main"
+  fi
+fi
+[ "$ROOT" = "$_script_root" ] || \
+  echo "install-git-hooks: lanciato da un worktree — incido il checkout principale $ROOT (il worktree sparira')"
 
 
 if [ "${1:-}" = "--into" ]; then
@@ -66,7 +91,14 @@ fi
 # file or directory" — quindi in un worktree il hook non veniva installato, e il canone
 # impone un worktree per card: cioe' non veniva installato in nessun posto dove il
 # lavoro avviene davvero. Si chiede a git DOVE guarda, non si ricostruisce il percorso.
-HOOKDIR="$(git -C "$ROOT" rev-parse --git-path hooks)"
+# Fuori da un repo git questa riga moriva con l'errore grezzo di git ed exit 128 — vero prima di
+# questa card, trovato dal test scritto per un'altra ragione. Un installatore che esce 128 con
+# "fatal: not a git repository" fa cercare un problema di git a chi ha solo sbagliato cartella.
+if ! HOOKDIR="$(git -C "$ROOT" rev-parse --git-path hooks 2>/dev/null)"; then
+  echo "install-git-hooks: $ROOT non e' un repo git — non c'e' nessun posto dove installare." >&2
+  echo "  Lancialo da dentro il repo, oppure usa --into <percorso-del-repo>." >&2
+  exit 1
+fi
 case "$HOOKDIR" in /*) ;; *) HOOKDIR="$ROOT/$HOOKDIR" ;; esac
 
 install_hook() {
