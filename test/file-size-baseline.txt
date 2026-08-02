@@ -56,9 +56,17 @@
 # sessione e 4,4 ore di lavoro. Le tre pause piu' lunghe (3h, 7h20, 14h36) sono cominciate tutte
 # subito dopo che l'agente aveva scritto da solo cosa avrebbe fatto dopo, e sono finite tutte
 # perche' Roberto ha scritto "vai". Tredici righe contro il 90% del tempo.
+# 2026-08-02, decima: +2 test-bus.sh e +2 test-bus-mutants.sh per il lucchetto con dentro il
+# PID (rilievo 23). Due righe per file: la source di test/lib-lock.sh e il proprietario nel
+# messaggio di rifiuto. La logica sta in un file nuovo da 60 righe, non dentro questi due —
+# altrimenti sarebbe la stessa cosa scritta due volte, e la copia sbagliata resterebbe quella
+# che nessuno legge finche' non rompe. Perche' valgono: due volte in un giorno un lucchetto non
+# rilasciato (una verifica di @thor uccisa a meta') ha fatto uscire validate.sh ROSSO SU
+# test-bus, che non c'entrava niente. Un rosso su un innocente insegna a cancellare i lucchetti
+# a mano, cioe' a disarmare la protezione.
 1753 kanban/kb.sh
-1388 test/test-bus.sh
-1131 test/test-bus-mutants.sh
+1390 test/test-bus.sh
+1133 test/test-bus-mutants.sh
 774 bus/bus.sh
 638 bin/sync.sh
 601 test/test-federated-kb.sh
