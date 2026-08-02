@@ -524,6 +524,51 @@ esiste più, oppure un `trap` di uscita nella suite. Poche righe.
 **Diventa una card** alla seconda volta, o subito se qualcuno cancella il lock senza controllare
 prima che nessun processo lo tenga davvero.
 
+## 24. `bin/install-hooks.sh` sulla macchina di Roberto raddoppierebbe dieci hook
+
+**Come è emerso** (2 agosto 2026): installando `goal-gate.sh`. Il dry-run di `install-hooks.sh`
+annuncia *"would add 11 hook command(s)"* — ma dieci di quelli **ci sono già**. Il dedup confronta
+la stringa esatta del comando, e la configurazione viva usa forme equivalenti ma diverse da quelle
+che il generatore produce oggi:
+
+| in `~/.claude/settings.json` | generato da `sync.sh` |
+|---|---|
+| `bash $HOME/GitHub/roberdan-os/hooks/auto-checkpoint.sh` | `bash /Users/Roberdan/GitHub/…/auto-checkpoint.sh` |
+| `bash ~/GitHub/roberdan-os/hooks/context-inject.sh …` | `bash /Users/Roberdan/GitHub/…/context-inject.sh …` |
+| `bash /Users/…/hooks/verify-done.sh` | `/Users/…/hooks/verify-done.sh` (senza `bash`) |
+
+**Perché conta.** Il file dichiara di essere *"non-destructive by construction"* e *"idempotent:
+a second run is a no-op"*. Su questa macchina non lo è: `--apply` farebbe girare ogni hook due
+volte a ogni evento — due checkpoint, due gate di pre-completamento, due formattatori. E chi lo
+lancia lo fa proprio credendo alla riga che dice che è idempotente. Per installare il cancello
+nuovo ho evitato lo script e fatto una modifica mirata.
+
+**Riparazione probabile**: normalizzare prima del confronto (espandere `~` e `$HOME`, togliere il
+`bash ` iniziale) invece di confrontare le stringhe grezze.
+
+**Diventa una card** se qualcuno lancia `--apply` su una macchina già configurata, o prima di
+usare lo script su una macchina nuova che ha già hook a mano.
+
+## 25. Due hook che il canone dà per installati non sono nella configurazione viva
+
+**Come è emerso** (2 agosto 2026): stesso confronto del rilievo 24. `bin/sync.sh` genera undici
+hook; in `~/.claude/settings.json` ne mancano due: **`hooks/main-guard.sh`** e
+**`hooks/post-task-sync.sh`**.
+
+**Perché conta.** `post-task-sync.sh` è citato in `AGENTS.md` come il meccanismo che tiene
+allineati vault, twin e documenti — *"mechanized by post-task-sync hook"*. Il canone lo promette
+al presente e sulla macchina non gira. `main-guard.sh` è una protezione: una protezione non
+installata è peggio di una assente, perché il canone la conta come attiva. È la stessa famiglia
+del gate `tool-coverage` riparato oggi — la differenza è che lì c'era un gate che poteva
+accorgersene, e per gli hook non c'è.
+
+**Riparazione probabile**: un controllo in `test/validate.sh` che confronti gli hook generati con
+quelli davvero installati, normalizzando come al rilievo 24. Sarebbe lo stesso controllo che
+riparerebbe tutti e due.
+
+**Diventa una card** subito se `post-task-sync` serviva davvero — cioè se il vault è andato fuori
+sincrono senza che nessuno se ne accorgesse.
+
 ---
 
 _Aggiornato: 2026-08-02._
