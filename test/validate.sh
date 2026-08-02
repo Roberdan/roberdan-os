@@ -25,7 +25,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
           test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources test-kb-autothor \
-          test-goal-gate test-gh-shim \
+          test-goal-gate test-gh-shim test-bus-lock \
           test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage; do
   _spawn "$_s"
@@ -173,6 +173,11 @@ if _suite test-goal-gate; then ok "blocca finche' restano card autorizzate, e mo
 # cento volte al giorno non puo' essere l'anello che si spezza.
 section "gh-shim — l'account si sceglie dal repo, e nei casi ignoti non tocca niente"
 if _suite test-gh-shim; then ok "sceglie la cartella dal remote, il -R vince sul cwd, gli argomenti passano interi, e in ogni caso ignoto lancia il gh vero invariato"; else _suite_out test-gh-shim; err "test-gh-shim — see bash test/test-gh-shim.sh"; fi
+
+# --- 8b5) il lucchetto delle suite bus: un orfano si riusa, un vivo si rispetta. Due volte in
+# un giorno un lucchetto non rilasciato ha fatto uscire ROSSO un test innocente.
+section "lucchetto bus — un orfano si riusa, un proprietario vivo si rispetta"
+if _suite test-bus-lock; then ok "riusa il lucchetto di un processo morto, rifiuta quello di uno vivo, e aspetta prima di dichiarare orfano un lucchetto senza PID"; else _suite_out test-bus-lock; err "test-bus-lock — see bash test/test-bus-lock.sh"; fi
 
 # --- 8c) loop receipts emitter (schema, append-only, opt-in placement, no pollution) ---
 section "loop receipts — loop/receipt.sh emitter contract"

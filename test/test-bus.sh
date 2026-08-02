@@ -23,12 +23,14 @@ RDA_BUS_LOCKDIR="${TMPDIR:-/tmp}/rda-bus-mutants.lock"
 # dir, so it declares ownership rather than deadlocking against itself. The flag
 # is set by the harness, never by a mutant: a mutant edits bus.sh, it does not
 # get to choose the suite's environment.
+. "$(dirname "${BASH_SOURCE[0]}")/lib-lock.sh"
 if [ "${RDA_BUS_LOCK_HELD:-}" = "1" ]; then
   RDA_BUS_LOCKDIR=""
-elif ! mkdir "$RDA_BUS_LOCKDIR" 2>/dev/null; then
-  echo "REFUSED: another bus suite or mutant run holds $RDA_BUS_LOCKDIR." >&2
+elif ! bus_lock_acquire "$RDA_BUS_LOCKDIR"; then
+  echo "REFUSED: another bus suite or mutant run holds $RDA_BUS_LOCKDIR (pid $(bus_lock_owner "$RDA_BUS_LOCKDIR"), vivo)." >&2
   echo "  Both watch the real \$HOME, so two at once corrupt each other's evidence" >&2
-  echo "  and fail the innocent one. Wait, or remove the dir if it is stale." >&2
+  echo "  and fail the innocent one. Un lucchetto ORFANO viene riusato da solo:" >&2
+  echo "  se sei qui, il proprietario e' vivo davvero. Aspetta, non cancellare la cartella." >&2
   exit 2
 fi
 trap '_rda_on_exit' EXIT
