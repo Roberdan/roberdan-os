@@ -21,15 +21,13 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 
 ---
 
-## Aperti — 5 su 10
+## Aperti — 3 su 10
 
 | # | Cosa si rompe | Riparare costa | Se non facciamo niente | Diventa una card quando | Nato |
 |---|---|---|---|---|---|
 | 9 | Una PR si merga anche col controllo rosso: nessuna protezione del ramo lo impedisce | 1 comando | Un `main` rotto entra senza che niente si opponga | **Decisa dal twin: accendere, versione stretta** (solo "i controlli devono passare", admin esclusi, push diretto libero). Bloccata dal classificatore di sicurezza il 2 ago — è il gate umano #1, la esegue Roberto a mano | 30 lug |
 | 2 | `install-git-hooks.sh` lanciato da un worktree incide nel controllo il percorso del worktree: quando la cartella sparisce, **ogni commit si blocca** | ~5 righe: risolvere sempre al checkout principale | Si ripete a ogni card. Rimedio da 1 riga, ma solo se sai qual è | Alla terza volta, o quando capita a Roberto invece che a un agente | 30 lug |
-| **20** | **SECONDA VOLTA, 2 ago — la condizione è scattata: ora è materia da card, e promuovere è di Roberto.** `kb finish --thor` ha rifiutato due volte una verifica riuscita, per **due cause diverse**. La prima: thor aveva scritto `**VERDICT: PASS**` con la motivazione sulla stessa riga, e il lettore non l'ha capito. La seconda: thor ha scritto *"aspetto l'esito del test completo prima di scrivere il verdetto finale — non blocco su questo, arriverà una notifica"* e **ha finito il turno senza verdetto**. Cioè la stessa malattia per cui esiste `goal-gate.sh`, dentro il verificatore — e `goal-gate` non copre i sotto-agenti | ~10 righe sul lettore, **più** la domanda vera: chi impedisce a thor di fermarsi a metà | Entrambe le volte ho rilanciato identico ed è passato. È la lezione peggiore possibile: davanti a un rifiuto conviene ritentare. Un cancello che cede al secondo tentativo non è un cancello | **Già scattata.** Aspetta il sì di Roberto | 2 ago |
 
-| **23** | **SECONDA VOLTA, 2 ago — condizione scattata.** La verifica di thor finita male (riga sopra) ha lasciato di nuovo il lucchetto di `test-bus` in `$TMPDIR`. Le due volte sono la stessa catena: thor muore male → lucchetto orfano → il controllo dopo esce rosso su un test innocente | ~5 righe: scrivere il PID nel lucchetto e considerarlo morto se il processo non c'è | Chi lo incontra impara a cancellare i lucchetti, cioè a disarmare la protezione. L'ho già fatto due volte io oggi | **Già scattata.** Aspetta il sì di Roberto | 2 ago |
 
 | 24 | `bin/install-hooks.sh` dice *"idempotent, a second run is a no-op"* e su questa macchina **raddoppierebbe 10 controlli automatici**: confronta le stringhe esatte, e la configurazione viva usa forme equivalenti ma diverse (`$HOME` contro percorso assoluto, con e senza `bash` iniziale) | ~10 righe: normalizzare prima di confrontare | Chi lancia `--apply` fidandosi di quella riga fa girare ogni controllo due volte | Prima di usare lo script su una macchina che ha già controlli installati | 2 ago |
 
@@ -59,6 +57,20 @@ Orca sui tre eventi che bloccano il turno, e la diet di `rules/best-practices.md
   attivo era `roberdan_microsoft`, e da dentro un repo Microsoft `gh pr list -R Roberdan/roberdan-os`
   trova la PR 35 di un repo privato che prima rispondeva *"Repository not found"*.
   15 asserzioni (10 sul fallire aperto), mutazione 5 su 5 rossa.
+
+- **#20 — il gate rifiutava verifiche RIUSCITE.** Due cause: la lettura pretendeva
+  `VERDICT: PASS — ` esatto e il grassetto di @thor non combaciava; e @thor poteva finire il
+  turno scrivendo *"aspetto l'esito del test completo"* senza dare il verdetto. Entrambe si
+  risolvevano rilanciando identico — la lezione peggiore. Ora la lettura tollera la forma
+  (grassetto, trattino semplice, nessun separatore) e resta inflessibile sul contenuto; i due
+  fallimenti hanno messaggi diversi; il prompt vieta a @thor di rinviare. **Difetto trovato
+  dentro la riparazione:** la prima versione del test riscriveva la logica a mano, e 3 mutanti su
+  5 passavano verdi perché il test non toccava il codice vero — risolto estraendo
+  `thor_read_verdict()` e facendola chiamare dal test. 16 asserzioni, mutazione 5 su 5 rossa.
+- **#23 — il lucchetto orfano che faceva uscire rosso un test innocente.** Ora contiene il PID di
+  chi lo tiene: proprietario morto = si riusa, vivo = il rifiuto è vero. La logica sta in
+  `test/lib-lock.sh`, un file solo per i due chiamanti. 10 asserzioni, 4 delle quali verificano
+  che un lucchetto **vivo** venga rispettato. Mutazione 4 su 4 rossa.
 
 **Chiusi da una decisione, non da una riparazione:**
 
