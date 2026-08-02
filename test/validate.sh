@@ -25,7 +25,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
           test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources test-kb-autothor \
-          test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks \
+          test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup \
           test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage; do
   _spawn "$_s"
@@ -188,6 +188,11 @@ if _suite test-thor-verdict; then ok "legge il verdetto anche in grassetto o con
 # Il canone impone un worktree per card: incidere quel percorso = bloccare ogni commit dopo.
 section "install-git-hooks — incide il checkout principale, non il worktree che sparira"
 if _suite test-install-git-hooks; then ok "dal worktree incide il principale, il commit regge dopo la rimozione, il salto resta condizionato e fuori da un repo non esplode"; else _suite_out test-install-git-hooks; err "test-install-git-hooks — see bash test/test-install-git-hooks.sh"; fi
+
+# --- 8b8) install-hooks dichiara di essere idempotente: deve esserlo anche quando la stessa
+# cosa e' scritta in due modi. Raddoppiare i controlli e' peggio che non installarli.
+section "install-hooks — due scritture dello stesso comando sono lo stesso comando"
+if _suite test-install-hooks-dedup; then ok "riconosce \$HOME, la tilde e il bash iniziale come la stessa cosa, e NON appiattisce redirezioni, argomenti o script diversi"; else _suite_out test-install-hooks-dedup; err "test-install-hooks-dedup — see bash test/test-install-hooks-dedup.sh"; fi
 
 # --- 8c) loop receipts emitter (schema, append-only, opt-in placement, no pollution) ---
 section "loop receipts — loop/receipt.sh emitter contract"
