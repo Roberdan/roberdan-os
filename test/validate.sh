@@ -25,7 +25,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
           test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources test-kb-autothor \
-          test-goal-gate test-gh-shim test-bus-lock \
+          test-goal-gate test-gh-shim test-bus-lock test-thor-verdict \
           test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage; do
   _spawn "$_s"
@@ -178,6 +178,11 @@ if _suite test-gh-shim; then ok "sceglie la cartella dal remote, il -R vince sul
 # un giorno un lucchetto non rilasciato ha fatto uscire ROSSO un test innocente.
 section "lucchetto bus — un orfano si riusa, un proprietario vivo si rispetta"
 if _suite test-bus-lock; then ok "riusa il lucchetto di un processo morto, rifiuta quello di uno vivo, e aspetta prima di dichiarare orfano un lucchetto senza PID"; else _suite_out test-bus-lock; err "test-bus-lock — see bash test/test-bus-lock.sh"; fi
+
+# --- 8b6) come si legge il verdetto di @thor. Due volte in un giorno il gate ha rifiutato una
+# verifica RIUSCITA, e tutte e due le volte rilanciare identico e' bastato: la lezione peggiore.
+section "verdetto di @thor — tollerante sulla forma, inflessibile sul contenuto"
+if _suite test-thor-verdict; then ok "legge il verdetto anche in grassetto o con altri separatori, non ne inventa dove non c'e', e dice diverso un turno finito senza verdetto da un processo morto"; else _suite_out test-thor-verdict; err "test-thor-verdict — see bash test/test-thor-verdict.sh"; fi
 
 # --- 8c) loop receipts emitter (schema, append-only, opt-in placement, no pollution) ---
 section "loop receipts — loop/receipt.sh emitter contract"
