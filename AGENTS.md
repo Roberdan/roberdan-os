@@ -240,6 +240,29 @@ Canonical cross-tool contract — every agent that reads this file honors it.
   runs `kb pause --auto` every turn — refreshes mechanical state, **preserves the human
   next-step note**; an unannounced crash loses at most the current turn.
 
+## Don't stop while the authorized queue is full (default, no opt-in)
+
+**A turn cannot close while the repo's authorized queue still has open cards.**
+[`hooks/goal-gate.sh`](hooks/goal-gate.sh) — the only hook here that BLOCKS (`exit 2`) — checks
+`kb queue --restanti` on every `Stop` and sends the agent back in with `kb next`. It is the
+mechanism the built-in `/goal` installs by hand for one session, except it is on by default and
+its condition is not a sentence but **the list Roberto already authorized on 2026-07-30**.
+
+*Measured, not assumed (VirtualBPM, 31 Jul → 2 Aug): 46.5 h of session, **4.4 h of actual work**.
+Before each pause the agent had itself written what it would do next — "Non mi serve niente da te
+… e vado sulla #2" (3 h of silence), "La #2 parte subito dopo" (7 h 20), "Non aspetto niente da
+te" (14 h 36). Every pause ended because Roberto typed "vai". Nothing was blocked: a turn ends
+when the agent WRITES, and the other two `Stop` hooks both declare they never block. Neither ever
+looked at the board — the one place the work is written.*
+
+**Terminal conditions** (it lets go, and says which one fired): queue finished · queue not
+shrinking for 2 rounds (a human gate, or something wedged — `kb block` it and say why) ·
+`RDA_GOAL_GATE_MAX` restarts spent (default 12) · no authorized queue at all — Roberto's
+`todo→doing` gate still holds · `RDA_NO_GOAL_GATE=1` or `~/.roberdan-os/goal-gate.off`.
+
+**Half of [`test/test-goal-gate.sh`](test/test-goal-gate.sh) asserts that it LETS GO**: a gate
+that can no longer open is worse than one that never closes.
+
 ---
 
 ## Human gates
