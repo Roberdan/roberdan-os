@@ -549,25 +549,34 @@ nuovo ho evitato lo script e fatto una modifica mirata.
 **Diventa una card** se qualcuno lancia `--apply` su una macchina già configurata, o prima di
 usare lo script su una macchina nuova che ha già hook a mano.
 
-## 25. Due hook che il canone dà per installati non sono nella configurazione viva
+## 25. Due programmi che il manuale dà per attivi: uno è spento apposta, l'altro fermerebbe Roberto
 
-**Come è emerso** (2 agosto 2026): stesso confronto del rilievo 24. `bin/sync.sh` genera undici
-hook; in `~/.claude/settings.json` ne mancano due: **`hooks/main-guard.sh`** e
-**`hooks/post-task-sync.sh`**.
+**CORRETTO il 2 agosto 2026, poche ore dopo averlo scritto.** La prima versione di questo rilievo
+diceva "non sono installati, vanno installati". Aperti i due file, è falso in tutti e due i casi,
+e in due modi diversi. Lo lascio scritto perché l'errore è istruttivo: **ho dedotto il difetto dal
+confronto di due liste invece che dal contenuto dei file.**
 
-**Perché conta.** `post-task-sync.sh` è citato in `AGENTS.md` come il meccanismo che tiene
-allineati vault, twin e documenti — *"mechanized by post-task-sync hook"*. Il canone lo promette
-al presente e sulla macchina non gira. `main-guard.sh` è una protezione: una protezione non
-installata è peggio di una assente, perché il canone la conta come attiva. È la stessa famiglia
-del gate `tool-coverage` riparato oggi — la differenza è che lì c'era un gate che poteva
-accorgersene, e per gli hook non c'è.
+**`post-task-sync.sh`** — non è una svista: il file dichiara `OPT-IN: active only with
+RDA_AUTOSYNC=1`, quindi anche installato non farebbe niente finché Roberto non lo accende.
+E rigenera i wrapper per-piattaforma; **non tocca il vault**, dice lui stesso: *"It does NOT sync
+the vault or Convergio — that's the /sync skill's job."*
+Ma `AGENTS.md` scrive, al presente, che l'allineamento vault/twin/documenti è
+*"mechanized by post-task-sync hook"*. **Il difetto è quella frase, non il programma**: il canone
+promette un automatismo che nessuno ha mai scritto. Chi legge il canone crede che il vault si
+allinei da solo.
 
-**Riparazione probabile**: un controllo in `test/validate.sh` che confronti gli hook generati con
-quelli davvero installati, normalizzando come al rilievo 24. Sarebbe lo stesso controllo che
-riparerebbe tutti e due.
+**`main-guard.sh`** — blocca ogni scrittura quando il ramo attivo è `main`. Installarlo non è una
+riparazione, è un **cambio di come si lavora**: da quel momento nessuna modifica diretta sul ramo
+principale, nemmeno una riga di documentazione, senza passare da un ramo separato. Il canone lo
+prescrive già a parole (§ Parallel work), ma oggi la disciplina è volontaria e per una sessione
+sola alla volta è anche esplicitamente permessa. Accenderlo è una decisione di Roberto.
 
-**Diventa una card** subito se `post-task-sync` serviva davvero — cioè se il vault è andato fuori
-sincrono senza che nessuno se ne accorgesse.
+**Cosa resta vero del rilievo originale**: nessuno dei due è nella configurazione viva, e niente
+se ne accorgerebbe. Il controllo che manca è sempre lo stesso del rilievo 24 — confrontare i
+programmi generati con quelli davvero attivi.
+
+**Diventa una card**: la frase sbagliata in `AGENTS.md` va corretta comunque (dieci minuti).
+`main-guard` solo se Roberto decide di volerlo.
 
 ---
 
