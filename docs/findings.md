@@ -86,7 +86,21 @@ configurazione privata, mentre quella globale resta all'altra. Funziona, ma è u
 d'ambiente che va ricordata a mano — cioè il tipo di rimedio che dipende dalla disciplina di
 chi lo usa, e che questo file esiste per non fingere che basti.
 
-**La riparazione**: `bin/` dovrebbe esporre un piccolo wrapper che sceglie l'account dal
+**RIPARATO in parte il 2026-08-02** — il sintomo peggiore, non la causa. Il push del repo delle
+card falliva da giorni con *"Repository not found"*, e la diagnosi naturale era "il repo non
+esiste": falsa. Esisteva, privato, dal 28 luglio. Falliva perche' l'account `gh` attivo era
+`roberdan_microsoft`, che su un repo privato di `Roberdan` non vede nulla — e GitHub a un utente
+non autorizzato risponde *404*, non *403*, apposta per non rivelare che il repo c'e'. Quindi
+l'errore diceva letteralmente il contrario della verita'.
+
+La riparazione: il remote di `kanban/` e' passato da HTTPS a **SSH**, come gia' faceva il repo
+padre. Le chiavi SSH non passano per lo stato globale di `gh`, quindi il push funziona
+qualunque sia l'account attivo. Provato con l'account sbagliato ancora attivo: fetch e push ok.
+
+Resta aperta la causa: `gh auth switch` scrive uno stato globale conteso, e ogni comando `gh`
+(non `git`) puo' ancora finire sull'account sbagliato.
+
+**La riparazione della causa**: `bin/` dovrebbe esporre un piccolo wrapper che sceglie l'account dal
 `remote` del repo in cui sei, invece di lasciare che sia uno stato globale conteso. Il repo
 sa già a chi appartiene: `git remote get-url origin`.
 
