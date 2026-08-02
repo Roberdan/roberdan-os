@@ -25,6 +25,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
           test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources test-kb-autothor \
+          test-kb-autothor-board \
           test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup \
           test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage; do
@@ -221,6 +222,9 @@ if _suite test-evolve-declined; then ok "declined buffer matches rewordings, spa
 
 section "kb autothor — @thor verifica da solo, e uno SKIP non diventa un PASS"
 if _suite test-kb-autothor; then ok "PASS chiude e scrive l'evidenza di thor, FAIL e SKIP lasciano la card in doing, --by non convoca thor"; else _suite_out test-kb-autothor; err "test-kb-autothor — il cancello doing->done non si comporta come dichiarato"; fi
+
+section "kb autothor — la card viene cercata sul board dove vive, anche in un repo federato"
+if _suite test-kb-autothor-board; then ok "una card di un repo federato viene trovata da @thor, e togliere RDA_KANBAN dalla chiamata la rende di nuovo introvabile"; else _suite_out test-kb-autothor-board; err "test-kb-autothor-board — @thor cerca la card sul board sbagliato: per i repo federati il cancello rifiuta per indirizzo, non per merito"; fi
 
 section "evolve sources — le fonti sorvegliate sono leggibili via curl, non solo raggiungibili"
 if _suite test-evolve-sources; then ok "$(_suite_out test-evolve-sources | grep -cE "^  (ok|SKIP)") fonti controllate (SKIP dichiarato se manca la rete)"; else _suite_out test-evolve-sources; err "test-evolve-sources — una fonte apre card che nessun agente puo' leggere"; fi

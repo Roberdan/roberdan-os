@@ -1673,18 +1673,18 @@ case "$cmd" in
     fi
     if ! _verify_evidence "$ev"; then exit 1; fi
 
-    # @thor VERIFICA DA SOLO. Prima toccava a chi chiudeva ricordarsi di convocarlo, e il
-    # sistema stampava "verified by @thor" comunque: il cancello piu' importante del sistema
-    # dipendeva dalla buona volonta' di chi lo attraversava. Roberto, 2026-07-31: "fai in modo
-    # che thor vada avanti a validare le card anche senza che io debba dirgli niente."
-    # Si riusa verify_card() della factory (kanban/thor-verify.sh), non se ne scrive una
-    # seconda: due implementazioni dello stesso cancello divergono, e la meno usata diventa la
-    # piu' permissiva.
-    # --by salta la verifica automatica: sta dicendo esplicitamente CHI ha verificato, e
-    # quella dichiarazione resta sulla card. RDA_KB_AUTOTHOR=0 la spegne (test isolati).
+    # @thor VERIFICA DA SOLO. Prima toccava a chi chiudeva ricordarsi di convocarlo e il sistema
+    # stampava "verified by @thor" comunque: il cancello piu' importante dipendeva dalla buona
+    # volonta' di chi lo attraversava. Roberto, 2026-07-31: "fai in modo che thor vada avanti a
+    # validare le card anche senza che io debba dirgli niente." Si riusa verify_card() della
+    # factory, non se ne scrive una seconda: due implementazioni divergono e la meno usata
+    # diventa la piu' permissiva. IL BOARD SI DICE, NON SI DEDUCE: senza RDA_KANBAN thor-verify
+    # cerca in roberdan-os/kanban e per ogni repo federato rispondeva "not found" -> SKIP ->
+    # REFUSED, rifiutando per indirizzo e non per merito (test-kb-autothor-board.sh). --by salta
+    # la verifica: dichiara CHI ha verificato. RDA_KB_AUTOTHOR=0 la spegne (test isolati).
     if [ -z "$verifier" ] && [ "${RDA_KB_AUTOTHOR:-1}" != "0" ]; then
       echo "kb: @thor sta verificando $id contro i criteri della card (puo' richiedere qualche minuto)..." >&2
-      tv="$(bash "$ROOT/kanban/thor-verify.sh" "$id" "$(_field "$f" worktree || true)" 2>/dev/null || true)"
+      tv="$(RDA_KANBAN="$KB" bash "$ROOT/kanban/thor-verify.sh" "$id" "$(_field "$f" worktree || true)" 2>/dev/null || true)"
       [ -n "$tv" ] || tv="SKIP	kanban/thor-verify.sh non ha risposto"
       case "$tv" in
         PASS*)
