@@ -35,9 +35,35 @@ SNIPPET="$TMP/platforms/claude/settings-hooks.json"
 
 # 2) Merge in python3 (readable, precise dedup) — prints a summary of what changes.
 python3 - "$SETTINGS" "$SNIPPET" "$APPLY" <<'PY'
-import json, sys, os, time
+import json, re, sys, os, time
 
 settings_path, snippet_path, apply = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
+
+HOME = os.path.expanduser("~")
+
+def norm(cmd):
+    """Due scritture dello STESSO comando devono confrontarsi uguali.
+
+    Rilievo 24, 2026-08-02: il dedup confrontava la stringa grezza, e la configurazione viva di
+    Roberto usa forme equivalenti ma diverse da quelle che il generatore produce oggi —
+    `bash $HOME/...` contro `bash /Users/Roberdan/...`, `bash ~/...` contro il percorso assoluto,
+    `bash X` contro `X`. Risultato: il dry-run annunciava "would add 11 hook command(s)" quando
+    dieci di quelli erano GIA' installati, e `--apply` avrebbe fatto girare ogni controllo DUE
+    VOLTE a ogni evento — due checkpoint, due gate di pre-completamento, due formattatori. Il
+    file dichiara di essere "non-destructive by construction" e "idempotent: a second run is a
+    no-op": su questa macchina non lo era, e chi lo lancia lo fa proprio credendo a quella riga.
+
+    Normalizza SOLO cio' che e' davvero la stessa cosa. NON tocca redirezioni, `|| true`,
+    argomenti o ordine: `X` e `X 2>/dev/null || true` restano due comandi diversi, perche' lo
+    sono — hanno due comportamenti diversi davanti a un errore. Un dedup troppo generoso
+    saprebbe di idempotenza e sarebbe invece un controllo che sparisce senza dirlo.
+    """
+    c = cmd.strip()
+    c = c.replace("${HOME}", HOME).replace("$HOME", HOME)
+    c = re.sub(r'(?<![\w/~])~/', HOME + "/", c)      # `~/x` solo a inizio percorso, non dentro
+    c = re.sub(r'^(?:bash|sh|/bin/sh|/bin/bash)\s+', '', c)
+    c = re.sub(r'\s+', ' ', c)
+    return c
 
 snippet = json.load(open(snippet_path))["hooks"]
 settings = {}
@@ -47,7 +73,7 @@ if os.path.exists(settings_path):
 hooks = settings.setdefault("hooks", {})
 
 def cmds(entry):
-    return {h.get("command", "") for h in entry.get("hooks", [])}
+    return {norm(h.get("command", "")) for h in entry.get("hooks", [])}
 
 added = []
 for event, entries in snippet.items():
@@ -61,7 +87,7 @@ for event, entries in snippet.items():
             continue  # every command in this entry already wired somewhere
         # add only the not-yet-present commands (keep the entry's matcher if any)
         keep = {k: v for k, v in entry.items() if k != "hooks"}
-        keep["hooks"] = [h for h in entry["hooks"] if h.get("command") in new_cmds]
+        keep["hooks"] = [h for h in entry["hooks"] if norm(h.get("command", "")) in new_cmds]
         existing.append(keep)
         added.extend(sorted(new_cmds))
 
