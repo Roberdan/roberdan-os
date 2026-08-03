@@ -21,11 +21,24 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 
 ---
 
-## Aperti — 0 su 10
+## Aperti — 1 su 10
 
-**Nessuno.** Il 2 agosto 2026 la lista e' passata da 19 rilievi aperti a zero: 13 chiusi da una
-decisione, 6 riparati con la loro card e la loro prova di mutazione. Restano solo i due rinviati
-qui sotto, che per la regola non contano nel tetto.
+| # | Cosa | Prova |
+|---|---|---|
+| 26 | `test/validate.sh` non e' ermetico rispetto all'ambiente ereditato: se gira dentro una sessione @thor annidata, `RDA_IN_THOR_VERIFY` (recursion-guard) e `RDA_KANBAN` (registro reale al posto della fixture) lo fanno fallire su codice sano | Il 3 agosto il gate interno di `kb finish` ha dato `test-goal-gate` rosso su `main`, dove lo stesso test e' verde da solo e la suite completa e' ALL GREEN in due run indipendenti. `env -u RDA_IN_THOR_VERIFY -u RDA_KANBAN bash test/validate.sh` -> ALL GREEN. **Un falso rosso e' peggio di nessun test: erode la fiducia in tutti i gate.** `validate.sh` dovrebbe ripulire da se' le variabili che governano il suo stesso comportamento |
+
+Il 2 agosto 2026 la lista e' passata da 19 rilievi aperti a zero: 13 chiusi da una
+decisione, 6 riparati con la loro card e la loro prova di mutazione. Il 26 e' nato dopo.
+Restano poi i due rinviati qui sotto, che per la regola non contano nel tetto.
+
+**Pagato il 3 agosto, non rinviato:** il gate @thor sulla card `260802-212646` aveva trovato che
+l'asse "riga di commento" di `test-kb-repo-path-agree` era un paper-pass (interrogava `"#"`, che
+nessuna riga del registro ha mai come basename: verde per costruzione, non per merito). Riparato
+dalla card `260803-043240`, PR #39, provato nelle due direzioni. Terzo caso in due giorni della
+stessa famiglia — un test che si autoassolve — e ogni volta scoperto solo rifacendo la mutazione.
+Una seconda imprecisione della stessa verifica, "tre suite fanno grep sulla frase canonica di
+`verify_card`" (ne fa grep solo `test-kb-autothor-board`), era narrazione, non difetto: corretta
+qui e basta.
 
 Il posto e' vuoto e va tenuto vuoto: il tetto e' 10, e chi scrive l'undicesimo ne cancella uno.
 
@@ -135,4 +148,4 @@ Orca sui tre eventi che bloccano il turno, e la diet di `rules/best-practices.md
 commit — correttamente: quei nomi vivono solo in `~/.roberdan-os/private/`, mai in git. Il gate ha
 funzionato su una frase che stavo scrivendo io.)*
 
-_Aggiornato: 2026-08-02._
+_Aggiornato: 2026-08-03._
