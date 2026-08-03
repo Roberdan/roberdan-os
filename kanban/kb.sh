@@ -1069,10 +1069,10 @@ _pending() {
 }
 
 # resolve a repo name to its path: a registry entry basenamed <name>, else ~/GitHub/<name>.
-_repo_path() {
-  local name="$1" r
+_repo_path() {   # nome vuoto -> niente: $HOME/GitHub/ esiste, e -d rispondeva la cartella padre
+  local name="$1" r; [ -n "$name" ] || return 1   # copie in accordo: test-kb-repo-path-agree.sh
   if [ -f "$REGISTRY" ]; then
-    while IFS= read -r r; do [ -n "$r" ] && [ "$(basename "$r")" = "$name" ] && { printf '%s' "$r"; return 0; }; done < "$REGISTRY"
+    while IFS= read -r r; do case "$r" in ""|\#*) continue ;; esac; [ "$(basename "$r")" = "$name" ] && { printf '%s' "$r"; return 0; }; done < "$REGISTRY"
   fi
   [ -d "$HOME/GitHub/$name" ] && printf '%s' "$HOME/GitHub/$name"
 }
