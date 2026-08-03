@@ -25,7 +25,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
           test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources test-kb-autothor \
-          test-kb-autothor-board \
+          test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree \
           test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup \
           test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage; do
@@ -225,6 +225,8 @@ if _suite test-kb-autothor; then ok "PASS chiude e scrive l'evidenza di thor, FA
 
 section "kb autothor — la card viene cercata sul board dove vive, anche in un repo federato"
 if _suite test-kb-autothor-board; then ok "una card di un repo federato viene trovata da @thor, e togliere RDA_KANBAN dalla chiamata la rende di nuovo introvabile"; else _suite_out test-kb-autothor-board; err "test-kb-autothor-board — @thor cerca la card sul board sbagliato: per i repo federati il cancello rifiuta per indirizzo, non per merito"; fi
+if _suite test-kb-autothor-dir; then ok "@thor guarda il checkout del repo che la card nomina, e rimettere il fallback a \$ROOT lo rimanda nel checkout sbagliato"; else _suite_out test-kb-autothor-dir; err "test-kb-autothor-dir — @thor verifica una card contro una cartella dedotta: il cancello APPROVA per indirizzo, su codice che non c'entra"; fi
+if _suite test-kb-repo-path-agree; then ok "le copie di _repo_path rispondono identico (nome vuoto compreso: prima due davano \$HOME/GitHub/)"; else _suite_out test-kb-repo-path-agree; err "test-kb-repo-path-agree — due implementazioni della stessa risoluzione divergono: una risponde una cartella che l'altra rifiuta"; fi
 
 section "evolve sources — le fonti sorvegliate sono leggibili via curl, non solo raggiungibili"
 if _suite test-evolve-sources; then ok "$(_suite_out test-evolve-sources | grep -cE "^  (ok|SKIP)") fonti controllate (SKIP dichiarato se manca la rete)"; else _suite_out test-evolve-sources; err "test-evolve-sources — una fonte apre card che nessun agente puo' leggere"; fi

@@ -23,9 +23,12 @@ WT_HOME="${RDA_WORKTREES:-$HOME/GitHub/worktrees}"
 # (Same resolution as kb.sh's _repo_path — kept here so this script stands alone.)
 _repo_path() {
   local name="$1" r
+  [ -n "$name" ] || return 1   # vedi kb.sh: senza questa riga un nome vuoto -> $HOME/GitHub/
   if [ -f "$REGISTRY" ]; then
     while IFS= read -r r; do
-      [ -n "$r" ] && [ "$(basename "$r")" = "$name" ] && { printf '%s' "$r"; return 0; }
+      [ -n "$r" ] || continue
+      case "$r" in \#*) continue ;; esac   # una riga di commento non e' un repo
+      [ "$(basename "$r")" = "$name" ] && { printf '%s' "$r"; return 0; }
     done < "$REGISTRY"
   fi
   [ -d "$HOME/GitHub/$name" ] && printf '%s' "$HOME/GitHub/$name"
