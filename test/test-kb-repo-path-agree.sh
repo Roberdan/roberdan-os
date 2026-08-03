@@ -31,7 +31,8 @@ export RDA_KANBAN_REGISTRY="$TMP/reg"
 # riproduce quello che i due script fanno all'avvio, altrimenti l'estrazione non e' fedele.
 # shellcheck disable=SC2034  # la leggono le funzioni estratte da kb.sh/worktree.sh via eval
 REGISTRY="$TMP/reg"
-{ echo "# un commento"; echo ""; printf '%s\n' "$REGISTERED"; } > "$RDA_KANBAN_REGISTRY"
+COMMENT_LINE="# un commento"
+{ printf '%s\n' "$COMMENT_LINE"; echo ""; printf '%s\n' "$REGISTERED"; } > "$RDA_KANBAN_REGISTRY"
 
 # Le implementazioni, estratte dai file veri e chiamate con lo stesso nome.
 # kb.sh e worktree.sh definiscono `_repo_path`; thor-verify.sh definisce `_tv_repo_path`
@@ -72,8 +73,12 @@ _agree "un repo nel registro si risolve al suo percorso" "$(basename "$REGISTERE
 _agree "un nome che nessuno conosce non si risolve" "repo-inesistente-xyz" ""
 _agree "un nome vuoto non si risolve" "" ""
 
-# Un commento nel registro non e' un repo che si chiama "#".
-_agree "una riga di commento nel registro non diventa un repo" "#" ""
+# Una riga di commento nel registro non e' un repo.
+# Va interrogata col basename REALE della riga ("commento", da "# un commento"): e' quello
+# che le implementazioni confrontano. Interrogare "#" non prova nulla — nessuna riga ha mai
+# quel basename, quindi l'asserzione resterebbe verde anche togliendo il comment-skip.
+_agree "una riga di commento nel registro non diventa un repo" \
+  "$(basename "$COMMENT_LINE")" ""
 
 echo
 if [ "$fails" -eq 0 ]; then echo "test-kb-repo-path-agree: PASS"; exit 0; fi
