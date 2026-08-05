@@ -7,7 +7,7 @@
 # Opus/Sonnet) is left completely untouched.
 #
 # Usage:
-#   copilot-local                       # uses default local model (RDA_LOCAL_MODEL or qwen3-coder:30b)
+#   copilot-local                       # RDA_LOCAL_MODEL, else first PULLED model from PREFERRED
 #   copilot-local --model qwen3.6:35b   # pick another pulled Ollama model
 #   copilot-local -p "refactor this"    # any copilot args pass straight through
 #
@@ -15,11 +15,20 @@
 #   - Ollama running on localhost:11434 with an OpenAI-compatible /v1 endpoint
 #   - a model that supports TOOL CALLING + STREAMING (Copilot BYOK hard requirement);
 #     qwen3-coder:30b passes both and exposes a 256k context window.
+#     qwen3.6:35b verified 2026-08-05: streamed tool_calls OK on /v1/chat/completions.
 # Docs: https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-byok-models
 set -euo pipefail
 
 OLLAMA_HOST="${OLLAMA_HOST:-http://localhost:11434}"
-MODEL="${RDA_LOCAL_MODEL:-qwen3-coder:30b}"
+
+# Preference order for the AUTO-PICK when nothing is specified. First one actually
+# PULLED wins. Hardcoding a single default silently broke this script once: the default
+# named a model that was never pulled on this machine, so the offline escape hatch was
+# dead until someone ran it. Embedding-only models (bge-m3, nomic-embed-text) are never
+# auto-picked — they cannot chat and are here for gbrain.
+PREFERRED="qwen3-coder:30b qwen3.6:35b qwen3:30b qwen3:14b"
+
+MODEL="${RDA_LOCAL_MODEL:-}"
 
 # Allow `--model X` as the first pair without swallowing the rest of copilot's args.
 if [ "${1:-}" = "--model" ] && [ -n "${2:-}" ]; then
@@ -32,11 +41,30 @@ if ! curl -sf "${OLLAMA_HOST}/v1/models" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Preflight: model actually pulled?
-if ! curl -sf "${OLLAMA_HOST}/v1/models" | grep -q "\"id\":\"${MODEL}\""; then
+# Resolve the model: explicit choice wins; otherwise auto-pick the first PREFERRED one
+# that is actually pulled, so the hatch keeps working when models come and go.
+PULLED="$(curl -sf "${OLLAMA_HOST}/v1/models" | grep -o '"id":"[^"]*"' | sed 's/"id":"//;s/"$//')"
+
+if [ -z "${MODEL}" ]; then
+  for candidate in ${PREFERRED}; do
+    if printf '%s\n' "${PULLED}" | grep -qx "${candidate}"; then MODEL="${candidate}"; break; fi
+  done
+fi
+
+if [ -z "${MODEL}" ]; then
+  echo "copilot-local: nessun modello locale utilizzabile. Nessuno di questi e' scaricato:" >&2
+  for c in ${PREFERRED}; do echo "  - ${c}" >&2; done
+  echo "               Scaricane uno con 'ollama pull qwen3-coder:30b', oppure scegline uno" >&2
+  echo "               a mano con --model / RDA_LOCAL_MODEL. Presenti ora in Ollama:" >&2
+  printf '%s\n' "${PULLED}" | sed 's/^/  - /' >&2
+  exit 1
+fi
+
+# Preflight: model actually pulled? (only bites on an explicit --model / RDA_LOCAL_MODEL)
+if ! printf '%s\n' "${PULLED}" | grep -qx "${MODEL}"; then
   echo "copilot-local: modello '${MODEL}' non presente in Ollama. Scaricalo con 'ollama pull ${MODEL}'." >&2
   echo "               Disponibili:" >&2
-  curl -sf "${OLLAMA_HOST}/v1/models" | grep -o '"id":"[^"]*"' | sed 's/"id":"/  - /;s/"$//' >&2 || true
+  printf '%s\n' "${PULLED}" | sed 's/^/  - /' >&2
   exit 1
 fi
 
