@@ -207,4 +207,13 @@ else
     "$C_OK" "$C_OFF" "$MISSING_OPTIONAL"
 fi
 
+# Installed-and-present is not the same as working. toolchain-doctor.sh checks
+# the agent toolchain for failures that produce no error message at all. It is
+# reported, never fatal here: this script's exit code keeps its documented
+# meaning (required dependencies only). Skipped in json mode so the machine-
+# readable output stays a single valid object.
+if [ "$MODE" != json ] && [ -x "$ROOT/bin/toolchain-doctor.sh" ]; then
+  "$ROOT/bin/toolchain-doctor.sh" --quiet || true
+fi
+
 [ "$MISSING_REQUIRED" -eq 0 ]
