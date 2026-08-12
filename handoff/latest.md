@@ -1,121 +1,108 @@
-# Handoff — 2026-07-30 (sera)
+# Handoff — 2026-08-12 (sera) · VirtualBPM: la MBR
 
-> Sostituisce l'handoff MirrorHR del 2026-07-13, conservato in git a **`a33c804`**. Se riprendi
-> la card MirrorHR `260713-093430`, il dettaglio (T7 in pausa, base fidata `Development@cc2e04b`,
-> ultima PR verificata #567) sta lì: `git show a33c804:handoff/latest.md`.
+> Sostituisce l'handoff del 2026-07-30, conservato in git a **`99ee81d`**. Se ti serve il
+> contesto di gbrain/MirrorHR/le quattro decisioni del 31 luglio:
+> `git show 99ee81d:handoff/latest.md`. Le tre card `todo` di roberdan-os
+> (`260808-0206*`, evolve claude-code/copilot/warp) sono **ferme e non autorizzate**: non
+> sono state toccate in questa sessione.
 
-## Le quattro decisioni del 31 luglio — Roberto ha risposto
+## Il filo: cosa ha chiesto Roberto
 
-1. **gbrain, reindicizzare**: **SÌ → FATTO**, card `260730-102956` **chiusa** il 31/7.
-   **13 sorgenti su 13**, dalle 10:00 alle 17:02 locali, **zero fallimenti**. Il `doctor` non
-   ha **nessun `[FAIL]`**: `cycle_freshness` è sceso a `[WARN]` e `sync_freshness`, che era
-   rosso, è `[OK]`. Prova indipendente dal log: `last_full_cycle_at` scritto nel DB per tutte
-   e 13 (`psql -d gbrain_local -tAc "select id, config->>'last_full_cycle_at' from sources"`).
-   Evidenza: `~/.roberdan-os/evidence/260730-102956-cicli.txt`.
-   Tre cose da sapere: le sorgenti erano **13, non 12** come diceva il titolo; il `[WARN]`
-   `cycle_freshness` **si riaccende da solo** dopo poche ore (la soglia è bassa — per tenerlo
-   spento serve `gbrain autopilot`, oggi limitato al weekend); il runner riutilizzabile è
-   `~/.roberdan-os/jobs/gbrain-cycles/run.sh` e **salta ciò che è già fatto**.
-2. **MirrorHR accelerometro/EDA** (`260709-114214`): **NO** → archiviata in `done/` come annullata.
-3. **MirrorHR P1 Safety Recovery** (`260713-093430`): **rimuovere** → archiviata. I due difetti
-   safety-critical restano chiusi e verificati; i gate di rilascio T9/T9b **non sono più tracciati
-   da nessuna card** — scritto sulla card e in `docs/findings.md` #12.
-4. **VirtualBPMFy27** (`260729-073336`): **un'altra sessione ci sta già lavorando**. Commit
-   `a0f012c` del 31/7 09:47 sul branch `card/260729-073336`: adattatore MCP, schema, 395 righe
-   di test, ADR 0015 — 1028 righe. Roberto: *"lascia fare a quella sessione"*. **Non entrare in
-   quel repo.**
+Analizzare il deck executive che manda al **presidente** (`HLS Update 8_10.pptx`) e aggiungere
+a VirtualBPM una feature — **wired come "MBR" nel menu** — che aggreghi i dati dalle fonti
+disponibili, li complementi con la parte qualitativa, e rigeneri **«esattamente, ma intendo
+proprio esattamente»** quel deck per la monthly business review.
 
-## Aggiornamento 31 luglio (mattina) — quattro cose fatte, nessuna nuova decisione
+La parola «esattamente», ripetuta due volte, è ciò che ha deciso il design.
 
-- **`kanban/.coda-*` ora è ignorato** nel repo pubblico: lo scatto della coda elencava id di card
-  del board privato ed era untracked ma committabile. `git check-ignore -v` lo conferma.
-- **Il board era rimasto solo su disco**: 21 file (sei card chiuse il 30/7, `precheck.sh`) non
-  erano nel repo card privato. Committati e pushati (`6f62275` → `roberdan-os-cards`). Il
-  `git add -A` che l'ha fatto ha anche tracciato due volte `precheck.sh` — corretto subito,
-  ora escluso in `kanban/.gitignore`.
-- **I due thread bus aperti sono chiusi** (`260728-164449`, `260729-150321`, come `@architect`;
-  il log resta leggibile). Contenevano tre rilievi che vivevano solo lì: uno era già riparato in
-  `kanban/kb.sh:159-176`, gli altri due sono ora **findings #9 e #10**.
-- **Finding #11**: la quarta decisione (`260729-073336`, VirtualBPM) non compare in `kb pending`
-  perché è in `doing`. La tabella qui sotto resta valida; la lista di `kb pending` no.
-- CI di `roberdan-os` verde **oggi** (run `30611347980`, commit `b660f9f`). Quella di
-  VirtualBPMFy27 è verde di ieri sera, non riverificata.
+## Stato: FATTO e validato DONE da @thor. NON mergiato.
 
-## In una riga
+**Repo `VirtualBPMFy27`, branch `feat/mbr-deck`, 3 commit sopra `main` (`10cff93`):**
 
-Tutto stabile e verificato — **`roberdan-os v2.26.0`**, **`VirtualBPMFy27 v4.10.2`**, CI verde
-su entrambi, board a **zero card eseguibili**. Le tre rimaste aspettano una decisione di
-Roberto, non del lavoro.
-
-## Cosa fare all'apertura della prossima sessione
-
-**Probabilmente niente.** Non c'è una coda da smaltire: `kb next` risponde `LISTA FINITA` su
-entrambi i progetti, e nessuna sessione ha aggiunto card. Se Roberto non chiede altro, la cosa
-utile è **chiedergli una delle tre decisioni qui sotto**, non cercare lavoro.
-
-## Le tre decisioni che aspettano lui — e nient'altro
-
-| Card | La domanda |
+| commit | cosa |
 |---|---|
-| `260730-102956` (gbrain) | reindicizzare 12 sorgenti costa **ore di GPU** sul Mac. Vale? |
-| `260709-114214` (MirrorHR) | segnali accelerometro/EDA da Apple Watch: decisione di **prodotto e hardware**, marcata gate umano |
-| `260713-093430` (MirrorHR) | i due difetti safety-critical sono **chiusi** (verificato: 25 chiavi arabe presenti, via VoiceOver sul Watch presente). Restano gate non-codice: fatturazione GitHub, **due notti reali** di monitoraggio, approvazione umana EN/IT/AR |
+| `1fa49ee` | la feature (35 file, 3293 righe) |
+| `b88aead` | la decisione sulle 14 slide, con la motivazione |
+| `013aa24` | le due gambe dell'export: da promesse a prove |
 
-Più una su VirtualBPM (`260729-073336`): *vuoi che Copilot CLI legga i dati di VirtualBPM
-attraverso gli undici strumenti tipati?*
+Totale `main..HEAD`: 38 file, +3708/-54. **Working tree pulito, niente pushato, nessuna PR.**
 
-## Le regole nuove di oggi — leggere PRIMA di lavorare
+**Verde (rifatto da @thor, non solo dichiarato da me):** sequenziale 2764 test OK skipped=35 ·
+sharded `tools/run_tests.py` OK, 8 shard/75 moduli · `tools/virtualbpm_doctor.py` 9/9,
+0 advisories.
 
-Il mattino del 2026-07-30 il board aveva **33 card in attesa di Roberto**, sette in `doing` di
-cui **quattro sullo stesso lavoro**, e **zero card in corso sul progetto principale**. Sei freni,
-tutti con un test che li verifica **nei due sensi**:
+## La decisione di design (leggi ADR 0019 prima di toccare qualunque cosa)
 
-1. **Una card in corso per progetto** — `kb start` rifiuta il secondo fronte (`RDA_KB_ALLOW_PARALLEL=1` per l'eccezione)
-2. **Un finding NON diventa una card** — va in `docs/findings.md`, solo Roberto lo promuove. *Ribalta di proposito il gate 2 del loop-protocol.*
-3. **Card ferme da oltre 72 ore chiamate per nome** nel dashboard, col numero di commit
-4. **Una condizione verificabile per card** — `kb add` rifiuta `;`, ` e `, `1)`, `2)`. Ratchet: le vecchie non si toccano
-5. **`kb pending` mostra un progetto alla volta** (`--tutti` apre tutto). Il conteggio non è ristretto dalla vista
-6. **Il precheck** (`kanban/precheck.sh`) — `kb start` chiede: *serve ancora? la fa già un'altra? è già stata fatta?* Non blocca, e **su una card pulita tace**
+Il deck porta 5 temi corporate, 103 layout, ~16 MB di loghi cliente e cornici think-cell:
+**nessun renderer scritto da zero può essere «esattamente» quel deck**, e ogni mese si
+allontanerebbe. Quindi VirtualBPM **non ridisegna**: apre il `.pptx` di Roberto come
+**template legato** (`~/.virtualbpm/mbr-template.pptx`, fuori dal repo perché porta nomi di
+clienti reali) e riscrive **in loco 47 forme dichiarate** preservando la formattazione dei run.
+Rigenera solo le slide **8-11** — pipeline e i tre roadmap di capacità — che erano già output
+di VirtualBPM incollato a mano ogni mese.
 
-E il gate `todo → doing` è **sulla LISTA, non sulla card**: `kb queue` fotografa all'inizio
-sessione, `kb next` percorre senza chiedere. **Ciò che nasce dopo lo scatto non parte** — è
-l'unica proprietà che lo rende un gate spostato e non rimosso.
+`docs/adr/0019-mbr-deck-from-a-bound-template.md` è l'argomento completo.
 
-## Gate umani ancora aperti
+## Le due lezioni che questa sessione ha pagato care
 
-1. **Ticket a GitHub Support** per `roberdan-os`: testo pronto in `~/Desktop/TICKET-GITHUB-SUPPORT.md`.
-   La storia è stata riscritta e verificata, ma i vecchi commit **restano serviti per codice**
-   finché GitHub non fa pulizia. Verifica: `gh api repos/Roberdan/roberdan-os/commits/84b8c74` → 404.
-2. **`MirrorBuddy`** (pubblico): 5 indirizzi aziendali nella storia, uno di una persona che non
-   è Roberto. Consigliato: sostituire il nome nell'albero attuale, **non** riscrivere la storia.
-3. **gbrain**: chiave `ZEROENTROPY_API_KEY` (81 fallimenti del reranker in 7 giorni).
+1. **Un file statico dimenticato non degrada: spegne l'app.** `web/mbr.js` e `web/css/mbr.css`
+   non erano nell'allowlist di `vbp_server/static.py` → 404 → `window.VirtualBPMMbr` undefined
+   → la destrutturazione in cima a `virtualbpm.js` buttava giù l'**intero** frontend, e lo smoke
+   riportava un generico "hydration timed out" che sembrava carico macchina. Diagnosi che ha
+   funzionato: `git stash push -u`, un test browser, albero pulito passa ⇒ è mio.
+2. **@thor ha bocciato la feature una prima volta, e aveva ragione.** Avevo scritto «provate le
+   tre gambe del guardrail» avendole verificate **a mano con curl**. Lui ha tolto il controllo
+   di `confirmed` dall'export, poi quello di revisione stale, e **tutti i 2753 test sono
+   rimasti verdi** entrambe le volte: i test MBR provavano solo le funzioni Python nude, mai
+   una richiesta HTTP, e il contratto generico saltava l'export perché la rotta è classificata
+   read-only. Chiuso con `tests/test_mbr_http.py` (rig registrato in `RIG_REGISTRY`) e
+   `READ_ONLY_CONFIRMATIONS`. **«Funziona oggi» e «un refactor non può romperlo in silenzio»
+   sono due affermazioni diverse.**
 
-## Limiti dichiarati, non nascosti
+## Aperto — sono gate di Roberto, non miei
 
-- **`@thor` è sospeso** per decisione di Roberto. Ogni card chiusa oggi dice nell'evidenza che
-  la verifica è di Claude, non di thor — perché `kb finish` stampa "verified by @thor" comunque
-  (registrato in `docs/findings.md` come difetto).
-- **Due volte oggi ho dichiarato qualcosa che non reggeva**, e in entrambi i casi mi ha
-  contraddetto qualcosa di meccanico, non io: (a) una card chiusa citando un test che provava
-  un'altra cosa — trovato dall'altra sessione, corretto per mutazione; (b) *"l'errore non può
-  succedere"* su un guasto comparso un'ora dopo — corretto sulla card e nei findings. **Entrambe
-  sono scritte, non nascoste.** È il motivo per cui i gate valgono più delle rassicurazioni.
-- Evidenza delle chiusure su file in `~/.roberdan-os/evidence/`.
-- La CI di `VirtualBPMFy27` si legge solo con l'account `roberdan_microsoft`; quella di
-  `roberdan-os` con `Roberdan`. **Non usare `gh auth switch`**: le due sessioni se lo strappano.
-  Usa `GH_CONFIG_DIR=~/.roberdan-os/gh-roberdan` (registrato nei findings).
+1. **Merge / PR.** `feat/mbr-deck` non è pushato. Roberto ha chiesto (a) apri la PR,
+   (b) crea le card, (c) entrambe — **e non ha ancora risposto**. È la prima cosa da chiedergli
+   al risveglio.
+2. **`docs/findings.md` #24 non ha una card.** `tools/render_portfolio_pptx.py` è stato
+   modificato per servire l'MBR (selezione layout su tutti i master invece dell'indice fisso 6,
+   rimozione placeholder ereditati) ma è **condiviso con l'export portfolio pre-esistente** e
+   nessun test copre il comportamento cambiato. La suite è verde per coincidenza: nel template
+   di default il layout a zero placeholder coincide ancora con l'indice 6. Deliberatamente
+   **non sanato** nel PR dell'MBR (@thor concorda). Senza card, muore lì.
+3. **39 blocchi su 47 si scrivono ancora a mano** — il limite onesto rispetto ad «aggregare
+   dati dalle fonti disponibili». Ho verificato due candidati e sono correttamente manuali:
+   - `state.billable.value` (il totale del portafoglio billable): **non derivabile**. Il campo
+     `customerValue` dello
+     snapshot **non è denaro**, contiene `"4 = Defined"`, `"3 = Aspirational"` — una scala di
+     maturità. Sommarla come dollari sarebbe stato un errore grave con l'autorità di un calcolo.
+   - I **12 numeri di intake della slide 7**: il blocco `fde` ha `openCount` e `stageUpdates`,
+     ma **non** la ripartizione Americas/EMEA/Asia né gli split align/ISE-led/billable-track.
+     Oggi la fonte non c'è. Restano una digitazione mensile che una lettura della casella
+     intake FDE toglierebbe: **è la card successiva naturale, non aperta.**
 
-## Job che partono da soli
+## Decisioni prese e ancora attive
 
-Spenti oggi perché si svegliavano per non fare niente, o per fare danno: `rda-evolve` (creava
-5 card vuote a ogni giro), `rda-factory` (coda vuota dal 2 luglio), `rda-learn` (le cartelle non
-esistono). Riaccendere: `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/<nome>.plist`.
+- **14 slide, non 12** (accettato da Roberto l'11/08): la capacità impagina, Americas ed EMEA
+  riempiono due pagine. Forzare una pagina per regione significherebbe righe illeggibili o
+  engagement caduti dal fondo. Un salto pagina si vede, una riga mancante no.
+- **Cinque cifre sono suggerimenti, non derivazioni**: le caselle FDE contano la popolazione
+  dell'**intake**, non il portfolio ADO. Derivarle le avrebbe **ridefinite** sotto un'etichetta
+  immutata.
+- **`narrativeRevision` è obbligatorio all'export** (buco trovato dopo la bocciatura, non
+  segnalato da @thor): era `if expected is not None`, quindi chi taceva spegneva l'unica
+  guardia della rotta — e il silenzio è ciò che produce un client vecchio.
+- **Entrambe le POST muta-stato pretendono `confirmed: true`**: l'esenzione
+  `UNCONFIRMED_MUTATION_ROUTES` non è stata chiesta.
 
-`com.gbrain.autopilot` riconfigurato: **sabato e domenica alle 01:00, solo con il Mac alla
-corrente, massimo 6 ore**. Prima era `KeepAlive`, cioè sempre — ed è per questo che era stato
-lasciato mai avviato.
+## Per far ripartire il lavoro
 
-Nel runtime di Claude Code sono stati messi i tetti che non erano mai stati impostati:
-**profondità di delega a 1** (era 3: un agente poteva creare agenti che creavano agenti), 40
-agenti per sessione, 8 in parallelo, 50 ricerche web. Valgono dalla sessione successiva a quella
-in cui sono stati scritti.
+```sh
+cd ~/GitHub/VirtualBPMFy27 && git switch feat/mbr-deck
+cp "HLS Update 8_10.pptx" ~/.virtualbpm/mbr-template.pptx   # se il template non c'è più
+./virtualbpm.sh start          # poi voce "MBR" nel menu
+python3 tools/run_tests.py     # 65 s, è ciò che gira in CI
+```
+
+**Prossima azione singola:** chiedere a Roberto (a) PR, (b) card per finding #24 + intake FDE,
+o (c) entrambe. Nient'altro è in sospeso su questo filo.
