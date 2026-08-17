@@ -181,3 +181,27 @@ _Aggiornato: 2026-08-03._
   importante delle tre** ed è l'unica cieca. *Condizione che lo renderebbe una card:* il 429
   persiste su una corsa schedulata — allora la fonte va spostata sull'endpoint API e il "skip"
   deve diventare visibile a Roberto, non solo una riga di log.
+
+- **#29 — `docs/findings.md` è invisibile a gbrain, e il sync lo dichiara verde lo stesso.**
+  Durante `/sync-gbrain` del 17 agosto: `Deleted un-syncable page: docs/findings`, senza dire
+  perché. Verificato in tre modi dopo il sync: `gbrain get docs/findings` → `page_not_found`;
+  ricerca sul contenuto **nuovo** → niente; ricerca sul contenuto **vecchio** ("la macchina è
+  diventata il cliente di sé stessa", nel file dal 2 agosto) → niente. Il file è tracciato
+  (`git ls-files docs/` lo elenca) e gli altri documenti sotto `docs/` sono indicizzati
+  regolarmente (`docs/privacy-leak-check`, `docs/adr/0001-self-improving`,
+  `docs/investigations/2026-07-28-gbrain-bash-code-graph`). Tre run di sync successive, tutte
+  `OK code synced (page_count=210)`. **Causa non trovata.** È il registro dei rilievi aperti — il
+  posto che il loop-protocol indica come destinazione di tutto ciò che si scopre lavorando — ed è
+  l'unico documento del repo che una domanda semantica non può raggiungere. *Condizione che lo
+  renderebbe una card:* subito, se si conferma che vale anche da un'altra macchina — un registro
+  che nessun agente può trovare non è un registro.
+
+- **#30 — l'embedder era spento e tutto continuava a dire OK.** `ollama` non era in esecuzione
+  (`curl localhost:11434` → connection refused), quindi `gbrain put` falliva con
+  `[embed(ollama:bge-m3)] Failed after 3 attempts` e il round-trip scrivi-e-ritrova era rotto.
+  Nonostante questo `gstack-gbrain-sync` chiudeva **`3 ok, 0 error, 0 skipped`** e il preview
+  citava l'arretrato (`~14,3 M caratteri pending gbrain embed --stale`) come una riga informativa,
+  non come un guasto. Risolto avviando il server; round-trip riverificato subito dopo. Resta
+  l'arretrato di 14,3 M caratteri mai incorporati: tutto quello scritto mentre l'embedder era giù
+  è nel database ma non è cercabile. *Condizione che lo renderebbe una card:* se l'embedder si
+  rispegne senza che nulla lo dica — allora serve che il sync fallisca, non che riporti verde.
