@@ -195,6 +195,15 @@ _Aggiornato: 2026-08-03._
   l'unico documento del repo che una domanda semantica non può raggiungere. *Condizione che lo
   renderebbe una card:* subito, se si conferma che vale anche da un'altra macchina — un registro
   che nessun agente può trovare non è un registro.
+  **Cosa ho escluso** (17 agosto, sul sorgente di gbrain 0.43.0.0): non è il classificatore —
+  `unsyncableReason("docs/findings.md")` restituisce `null` sia con strategia `markdown` sia con
+  `auto` (provato con `bun -e` su `src/core/sync.ts`); non è la lista dei metafile
+  (`SYNC_SKIP_FILES` = schema/index/log/README/RESOLVER — e infatti `README` risulta
+  correttamente assente); non è l'assenza dal remoto (`git cat-file -e origin/main:docs/findings.md`
+  esiste, esattamente come `docs/privacy-leak-check.md` che invece è indicizzato); non è
+  l'embedder (il problema resta con ollama acceso e round-trip verificato). Il meccanismo è il
+  ciclo di pulizia del sync, che cancella le pagine il cui file non ritrova nella camminata:
+  **perché quel file non venga camminato resta ignoto.**
 
 - **#30 — l'embedder era spento e tutto continuava a dire OK.** `ollama` non era in esecuzione
   (`curl localhost:11434` → connection refused), quindi `gbrain put` falliva con
