@@ -2,7 +2,11 @@
 <!-- evolve watcher — settimanale (sabato 02:00). Vedi evolve/evolve-protocol.md.
      Install: cp in ~/Library/LaunchAgents/ + launchctl load. Path repo da adattare se diverso.
      Catch-up: con StartCalendarInterval, se il Mac è spento/dormiente all'ora prevista launchd
-     esegue il job al boot/wake successivo (a differenza di cron, che lo salta). -->
+     esegue il job al boot/wake successivo (a differenza di cron, che lo salta).
+     2026-08-17: il log stava in /tmp e macOS lo svuota a ogni riavvio, quindi una corsa di
+     recupero partita prima che la rete fosse su non lasciava traccia di essere fallita.
+     Log spostato in ~/.roberdan-os/logs/ (sopravvive al riavvio); watch.sh ritenta tre volte
+     ogni fonte ed esce !=0 se una resta muta, così LastExitStatus lo dice anche senza log. -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -19,8 +23,8 @@
     <key>Hour</key><integer>2</integer>
     <key>Minute</key><integer>0</integer>
   </dict>
-  <key>StandardOutPath</key><string>/tmp/rda-evolve.log</string>
-  <key>StandardErrorPath</key><string>/tmp/rda-evolve.log</string>
+  <key>StandardOutPath</key><string>/Users/Roberdan/.roberdan-os/logs/rda-evolve.log</string>
+  <key>StandardErrorPath</key><string>/Users/Roberdan/.roberdan-os/logs/rda-evolve.log</string>
   <key>RunAtLoad</key><false/>
 </dict>
 </plist>
