@@ -55,9 +55,14 @@ _open_card_for() {
 #   warp         /getting-started/changelog             =   2  ->  /changelog/2026.md =  70
 #   copilot      /changelog/label/copilot/              =  17  (gia' leggibile, invariato)
 # Due sorgenti su tre erano cieche, non una.
+# 2026-08-17: la terza si e' accecata in un modo nuovo. raw.githubusercontent.com risponde 429
+# (rate limit condiviso per IP) da questa macchina, ripetutamente e non solo di passaggio: il
+# watcher stampava "claude-code unreachable, skip" e usciva 0, cioe' verde. La fonte piu'
+# importante delle tre era l'unica muta. jsdelivr serve lo STESSO file dal CDN, senza header e
+# senza rate limit — misurato: 513.823 byte, 365 marcatori di versione, identico al raw.
 sources_names=(claude-code copilot warp)
 sources_urls=(
-  "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md"
+  "https://cdn.jsdelivr.net/gh/anthropics/claude-code@main/CHANGELOG.md"
   "https://github.blog/changelog/label/copilot/"
   "https://docs.warp.dev/changelog/2026.md"
 )
@@ -66,11 +71,24 @@ now="$(date +%Y-%m-%d)"
 new_count=0        # changelog deltas detected
 created=0          # cards actually added to the board
 coalesced=0        # deltas folded into a card that was already open
+unreachable=()     # sources that did not answer THIS run
 
 for i in "${!sources_names[@]}"; do
   name="${sources_names[$i]}"; url="${sources_urls[$i]}"
-  body="$(curl -fsSL --max-time 20 "$url" 2>/dev/null || true)"
-  [ -n "$body" ] || { echo "watch: $name unreachable, skip" >&2; continue; }
+  # Tre tentativi con attesa crescente, non uno. Il job scatta anche al boot di recupero (il
+  # Mac era spento all'ora prevista) e li' la rete puo' non essere ancora su: un colpo solo
+  # trasforma "ho guardato troppo presto" in "nessuna novita'", che e' il difetto stesso che
+  # questa funzione deve impedire. 0s + 5s + 15s copre la finestra di risalita del Wi-Fi.
+  body=""
+  for _try in 1 2 3; do
+    body="$(curl -fsSL --max-time 20 "$url" 2>/dev/null || true)"
+    [ -n "$body" ] && break
+    [ "$_try" -lt 3 ] && sleep $(( _try * 5 + (_try - 1) * 5 ))
+  done
+  # Una fonte muta non e' una fonte senza novita'. Fino al 2026-08-17 le due cose erano
+  # indistinguibili: `skip` su stderr e uscita 0. Ora la corsa se ne ricorda e lo dice
+  # nel codice di uscita, che launchd conserva in LastExitStatus anche senza log.
+  [ -n "$body" ] || { unreachable+=("$name"); echo "watch: $name unreachable, skip" >&2; continue; }
 
   # Content fingerprint: a change = possible novelty. The capability-diff is done
   # by an agent on the draft; here we only detect the delta.
@@ -147,3 +165,23 @@ for i in "${!sources_names[@]}"; do
 done
 
 echo "watch: $new_count novelt(ies) → $created new card(s), $coalesced folded into cards already open, in $kb_todo (run \`kb\` to see them)" >&2
+
+# --- LA CORSA LASCIA UNA TRACCIA DUREVOLE -------------------------------------
+# Scar del 2026-08-17: la corsa di sabato 15 non e' mai partita e NIENTE lo diceva. Le card
+# erano ferme all'8 agosto, il log stava in /tmp e macOS lo aveva svuotato al riavvio, e un
+# watcher morto era indistinguibile da un watcher senza novita'. Lo stato vive dove vive
+# `seen` (fuori da /tmp, sopravvive al riavvio) e `kb` lo puo' leggere senza rete.
+{
+  printf 'last_run=%s\n' "$(date +%Y-%m-%dT%H:%M:%S%z)"
+  printf 'sources=%s\n' "${#sources_names[@]}"
+  printf 'unreachable=%s\n' "$(IFS=,; echo "${unreachable[*]:-}")"
+  printf 'novelties=%s new_cards=%s coalesced=%s\n' "$new_count" "$created" "$coalesced"
+} > "$state_dir/last-run"
+
+# Una fonte irraggiungibile esce !=0. launchd conserva LastExitStatus per il job anche quando
+# il log non esiste piu', quindi `launchctl list com.roberdan.rda-evolve` diventa il rilevatore
+# che prima non c'era. Le card gia' scritte restano: l'uscita segnala, non annulla il lavoro.
+if [ "${#unreachable[@]}" -gt 0 ]; then
+  echo "watch: FONTI MUTE: ${unreachable[*]} — non e' 'nessuna novita', e' 'non ho potuto guardare'" >&2
+  exit 1
+fi
