@@ -149,3 +149,35 @@ commit — correttamente: quei nomi vivono solo in `~/.roberdan-os/private/`, ma
 funzionato su una frase che stavo scrivendo io.)*
 
 _Aggiornato: 2026-08-03._
+
+---
+
+## Rilievi del 17 agosto 2026 (durante `/gstack-upgrade`)
+
+- **#26 — `gstack-update-check --force` ha taciuto mentre c'era un aggiornamento.** Il controllo
+  non ha stampato nulla (stdout+stderr catturati) con il repo `~/.claude/skills/gstack` 2 commit
+  indietro e VERSION 1.66.1.0 contro 1.67.1.0 su `origin/main`. Se non avessi confrontato a mano
+  con `git rev-list HEAD..origin/main`, la sessione si sarebbe chiusa con "sei già aggiornato" —
+  un falso done prodotto dal *silenzio* di uno strumento di terze parti. Causa non distinguibile
+  con i dati raccolti: cache `~/.gstack/last-update-check` stantia oppure errore di rete
+  inghiottito. *Condizione che lo renderebbe una card:* se si ripete a cache pulita — allora
+  Roberto non viene mai avvisato degli aggiornamenti e il canale va sostituito con un confronto
+  git diretto.
+
+- **#27 — il watcher `evolve/watch.sh` ha saltato la corsa di sabato 15 agosto, in silenzio.**
+  Le card `kanban/todo/260808-*.md` erano ferme all'8 agosto (`stat` sui file); copilot e warp
+  *erano* cambiati nel frattempo (verificato: la corsa manuale di oggi ha coalizzato entrambi).
+  Il job launchd `com.roberdan.rda-evolve` è caricato e schedulato sabato 02:00, ma la corsa
+  mancata non ha lasciato traccia: `StandardOutPath=/tmp/rda-evolve.log` e `/tmp` si svuota al
+  riavvio (boot: dom 16 agosto 16:43). *Condizione che lo renderebbe una card:* un secondo sabato
+  saltato — allora il log va fuori da `/tmp` e serve un rilevatore di "ultima corsa più vecchia
+  di N giorni", perché oggi un watcher morto è indistinguibile da un watcher senza novità.
+
+- **#28 — la fonte `claude-code` del watcher è irraggiungibile e viene saltata senza allarme.**
+  `https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md` risponde **429**
+  (rate limit) da questa macchina, ripetutamente; `watch.sh` stampa `claude-code unreachable,
+  skip` e prosegue con exit 0. L'API GitHub sullo stesso file risponde 200
+  (`api.github.com/repos/anthropics/claude-code/contents/CHANGELOG.md`). È la fonte **più
+  importante delle tre** ed è l'unica cieca. *Condizione che lo renderebbe una card:* il 429
+  persiste su una corsa schedulata — allora la fonte va spostata sull'endpoint API e il "skip"
+  deve diventare visibile a Roberto, non solo una riga di log.
