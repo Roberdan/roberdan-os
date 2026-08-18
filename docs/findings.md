@@ -214,3 +214,15 @@ _Aggiornato: 2026-08-03._
   l'arretrato di 14,3 M caratteri mai incorporati: tutto quello scritto mentre l'embedder era giù
   è nel database ma non è cercabile. *Condizione che lo renderebbe una card:* se l'embedder si
   rispegne senza che nulla lo dica — allora serve che il sync fallisca, non che riporti verde.
+  **CORREZIONE, 18 agosto: l'arretrato non esiste.** Avevo letto "~14,3 M caratteri pending
+  `gbrain embed --stale`" come contenuto perso e stavo per programmare un recupero notturno.
+  Misurato invece di creduto: `gbrain embed --stale --dry-run` vede **1** pezzo, non 4.021. I
+  4.021 compaiono solo con `--include-null-signature`, e ogni corsa stampa
+  `invalidated 3986 chunk(s) embedded under a prior model signature`, li rifà, uno fallisce
+  perché troppo lungo per il contesto di bge-m3, e il conteggio torna a 3.987: un ciclo che non
+  converge mai. Il contenuto è raggiungibile — cercando `profile settings` nella sorgente
+  mirrorbuddy **il primo risultato è proprio la pagina che "fallisce"**. Quindi: nessun
+  contenuto perso, nessun recupero da fare, e il job notturno che avevo installato è stato
+  disinstallato. *Condizione che lo renderebbe una card:* se una ricerca non trova qualcosa che
+  sai di aver scritto — quello sarebbe contenuto davvero mancante, e questa riga andrebbe
+  riaperta.
