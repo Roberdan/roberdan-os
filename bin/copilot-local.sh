@@ -8,17 +8,21 @@
 #
 # Usage:
 #   copilot-local                       # RDA_LOCAL_MODEL, else first PULLED model from PREFERRED
-#   copilot-local --model qwen3.6:35b-mlx   # pick another pulled Ollama model
+#   copilot-local --model qwen3.8:27b-mlx   # pick another pulled Ollama model
 #   copilot-local -p "refactor this"    # any copilot args pass straight through
 #
 # Requirements (verified 2026-07-17 on Apple M5 Max):
 #   - Ollama running on localhost:11434 with an OpenAI-compatible /v1 endpoint
 #   - a model that supports TOOL CALLING + STREAMING (Copilot BYOK hard requirement);
 #     qwen3-coder:30b passes both and exposes a 256k context window.
-#     qwen3.6:35b-mlx verified 2026-08-05: streamed tool_calls OK on /v1/chat/completions.
-#     Preferred over the GGUF q4 build on Apple Silicon: at a 7830-token prompt it sustains
-#     86 tok/s of generation vs 43 (the GGUF loses 57% under context load, the MLX 21%) and
-#     resides in 21GB instead of 29GB. Prompt throughput is a tie (913 vs 876 tok/s).
+#     qwen3.8:27b-mlx verified 2026-08-18: streamed tool_calls OK on /v1/chat/completions
+#     (curl -N, stream:true -> tool_calls con arguments {"city":"Milano"}). Sostituisce
+#     qwen3.6:35b-mlx, disinstallato lo stesso giorno. Confronto misurato sui quattro usi
+#     reali: 3.8 vince estrazione fatti (tutte le date, 3.6 ne lasciava 3 vuote), spiegazione
+#     in italiano e chiamata strumenti (8s contro 19s); 3.6 vinceva solo l'aderenza al
+#     formato su una domanda di lettura bash. 18GB invece di 21GB, stesso contesto 256k.
+#     Il 3.6 sprecava il 95% dei token in ragionamento interno (1065 parole per risponderne 58);
+#     il 3.8 il 75%.
 # Docs: https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-byok-models
 set -euo pipefail
 
@@ -29,7 +33,7 @@ OLLAMA_HOST="${OLLAMA_HOST:-http://localhost:11434}"
 # named a model that was never pulled on this machine, so the offline escape hatch was
 # dead until someone ran it. Embedding-only models (bge-m3, nomic-embed-text) are never
 # auto-picked — they cannot chat and are here for gbrain.
-PREFERRED="qwen3-coder:30b qwen3.6:35b-mlx qwen3:30b qwen3:14b"
+PREFERRED="qwen3-coder:30b qwen3.8:27b-mlx qwen3:30b qwen3:14b"
 
 MODEL="${RDA_LOCAL_MODEL:-}"
 
