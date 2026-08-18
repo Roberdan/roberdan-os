@@ -3,6 +3,122 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.29.0] - 2026-08-18
+
+**Tre canali di aggiornamento che tacevano quando fallivano.** Il controllo di gstack non
+stampava nulla con due commit di ritardo; il sorvegliante dei changelog dava per "nessuna
+novita'" una fonte che rispondeva 429 da nove giorni; il motore di embedding era spento dal
+riavvio e il sync chiudeva lo stesso con `3 ok, 0 error`. Nessuno dei tre era rotto in modo
+visibile: erano tutti verdi. Chiusa anche una collisione di nomi che spegneva `/ship` e
+`/review` a ogni aggiornamento di gstack, e sostituito il modello locale dopo un confronto
+misurato invece che dichiarato.
+
+### Fixed
+
+- **`evolve/watch.sh` scambiava "non ho potuto guardare" per "niente di nuovo"** (rilievi 27 e
+  28). Tre difetti che si sommavano nello stesso silenzio. La fonte di Claude Code —
+  `raw.githubusercontent.com` — rispondeva **429** da questa macchina in modo persistente, non di
+  passaggio: lo script stampava `claude-code unreachable, skip` **e usciva 0**. Spostata sul CDN
+  jsdelivr, che serve lo stesso file: misurati 513.823 byte e 382 marcatori di versione, identici
+  al raw. Alla prima corsa ha trovato subito le novita' accumulate dall'8 agosto.
+  - **Un solo tentativo per fonte** diventava un difetto al boot di recupero (il Mac spento
+    all'ora prevista): launchd fa partire il job appena si accende, e li' la rete puo' non essere
+    ancora su. Ora tre tentativi, 0s + 5s + 15s.
+  - **Una fonte muta esce !=0.** launchd conserva `LastExitStatus` per il job anche quando il log
+    non esiste piu', quindi `launchctl list` diventa il rilevatore che prima non c'era. Provato
+    nei due versi in un worktree usa e getta: con la fonte mutata a un URL invalido `exit=1` e
+    `unreachable=claude-code`; sullo script vero `exit=0` e campo vuoto.
+  - **Il log stava in `/tmp`**, che macOS svuota a ogni riavvio: la corsa di sabato 15 agosto non
+    e' mai partita e non ne restava traccia — le card erano ferme all'8 mentre copilot e warp
+    *erano* cambiati. Log e traccia durevole ora in `~/.roberdan-os/`.
+
+- **`bin/toolchain-doctor`** (dal 16 agosto). `doctor.sh` risponde "e' installato". Nessuno dei
+  quattro guasti di quel giorno era di installazione: erano tutti installati, giravano, e non
+  facevano niente. Esempio: gstack collega `bin/` ma non `lib/`, quindi 13 binari morivano
+  all'import e le scritture di learnings, decisioni e telemetria sparivano senza errore.
+
+- **`copilot-local` sceglieva un modello mai scaricato** (dal 16 agosto). Il default era cablato
+  su `qwen3-coder:30b`, assente su questa macchina: la via di fuga offline era morta e non lo
+  sapeva nessuno finche' non la si usava. Ora il modello si risolve a runtime prendendo il primo
+  della lista `PREFERRED` davvero presente in Ollama. I modelli di solo-embedding non sono mai
+  auto-selezionabili: non sanno chattare.
+
+- **Il cancello di `@thor` rifiutava per indirizzo, non per merito.** `kb finish` chiamava
+  `thor-verify.sh` senza `RDA_KANBAN`, e quello script calcolava il proprio board da dove sta il
+  file — cioe' sempre `roberdan-os/kanban`. Per ogni card di un repo federato la risposta era
+  "card not found" → SKIP → REFUSED. **Dal 31 luglio la verifica automatica che Roberto aveva
+  chiesto non e' mai scattata fuori da questo repo.**
+  - E il commit che lo riparava ha portato `kanban/kb.sh` da `100755` a `100644`. `~/.local/bin/kb`
+    e' un symlink a quel file: dal merge in poi **ogni** comando `kb`, su qualunque repo, moriva
+    con `Permission denied`. Lo strumento che gestisce le card e' stato reso inavviabile dal
+    commit che riparava le card.
+  - `thor-verify` ora risolve la directory dal campo `repo:` della card, non da dove e' partito:
+    un verdetto sincero emesso su codice estraneo resta un verdetto sbagliato. Se il repo non e'
+    risolvibile esce SKIP e `kb finish` **rifiuta** di chiudere.
+
+- **Un'asserzione che restava verde per costruzione.** Il test di accordo su `_repo_path`
+  interrogava la funzione con la stringa `"#"`. Nessuna riga del registro ha `#` come basename,
+  quindi quell'asse rispondeva `""` sempre: restava verde anche togliendo il salto-commenti a una
+  delle tre copie, cioe' **proprio nel caso per cui esiste**. Ora interroga il basename reale.
+
+### Changed
+
+- **Modello locale predefinito: `qwen3.6:35b-mlx` → `qwen3.8:27b-mlx`.** Confronto misurato sui
+  quattro usi reali che ha qui, stesse domande, stesso momento. Il 3.8 vince tre prove su quattro:
+  estrazione di fatti (tutte le date compilate; il 3.6 ne lasciava tre vuote e fondeva due fatti in
+  una riga malformata), spiegazione in italiano (diagnosi corretta contro un consiglio sbagliato),
+  chiamata di strumenti (8s contro 19s, streaming verificato con `curl -N` e `stream:true` —
+  requisito duro di `copilot-local`). Il 3.6 vinceva solo l'aderenza al formato su una domanda di
+  lettura bash. 18GB invece di 21GB, stesso contesto 256k. Il vecchio bruciava il **95%** dei token
+  in ragionamento interno (1065 parole per risponderne 58); il nuovo il 75%. Il 3.6 e' stato
+  disinstallato su decisione di Roberto.
+  - Scoperto strada facendo: **due dei quattro tier di gbrain puntavano a `qwen3.6:35b` senza
+    `-mlx`**, un modello mai installato su questa macchina. Non ha mai dato errore.
+
+- **`AGENTS.md` accoglie i due blocchi di gstack** (decisione di Roberto, 18 agosto): `Skill
+  routing` e `GBrain Search Guidance`. Il collegamento `CLAUDE.md → AGENTS.md` resta un symlink —
+  il metodo di scrittura di gstack (file temporaneo + rinomina) lo avrebbe sostituito con un file
+  normale, sdoppiando canone Claude e canone universale. La guida dichiara anche il limite
+  **misurato** di questo repo: i chunk bash restano con `symbol_name: null`, quindi `code-def` e
+  `code-callers` rispondono `count: 0` per ogni funzione di shell, per quanti cicli si lancino.
+
+- **Collisione di nomi con gstack, chiusa alla radice.** gstack e roberdan-os definiscono entrambi
+  `ship` e `review`. L'installer di gstack sovrascrive senza avvisare, `bin/sync.sh --install`
+  invece salta se la cartella esiste: gstack vinceva sempre, in silenzio, a ogni aggiornamento, e
+  `test/test-tool-coverage.sh` diventava rosso. Risolto con l'interruttore nativo di gstack
+  (`skill_prefix: true`): le sue 52 skill diventano `/gstack-*`, i nomi corti restano a
+  roberdan-os. Sopravvive agli aggiornamenti — il suo `setup` rilegge la preferenza salvata e
+  salta il prompt. Non erano in gara: `/gstack-ship` porta dal codice al PR e si ferma li',
+  `/ship` copre il tratto dopo (CI, merge-commit only, gate umani).
+
+- **Ollama parte all'accensione del Mac.** Non era negli elementi di login e non aveva un job suo:
+  al riavvio del 16 agosto e' rimasto spento, e i due lavori notturni di gbrain (03:00 e 04:00)
+  hanno girato a vuoto senza dirlo. E' la causa prima del rilievo 30.
+
+### Findings
+
+Cinque rilievi nuovi in [`docs/findings.md`](docs/findings.md) (26-30), ciascuno con la condizione
+che lo renderebbe una card. Uno merita di essere letto anche da chi non tocchera' mai questo repo:
+
+- **Il rilievo 30 e' stato aperto e poi corretto lo stesso giorno.** Avevo letto
+  `~14,3 M caratteri pending gbrain embed --stale` come contenuto perso e stavo per programmare un
+  recupero notturno di sei ore. Misurato invece di creduto: `--stale` da solo vede **1** pezzo. I
+  4.021 compaiono solo con `--include-null-signature`, e ogni corsa stampa
+  `invalidated 3986 chunk(s) embedded under a prior model signature`, li rifa', uno fallisce perche'
+  troppo lungo per il contesto di bge-m3, e il conteggio torna a 3.987: un ciclo che non converge
+  mai. Il contenuto e' raggiungibile — cercando `profile settings` **il primo risultato e' proprio
+  la pagina che "fallisce"**. Il job notturno era gia' installato ed e' stato disinstallato.
+  - Lo stesso job, provato in ambiente pulito (`env -i … bash -lc`, come parte davvero da launchd),
+    usciva **127**: `gbrain` non si trovava, perche' `bash -lc` carica `~/.bash_profile` e
+    `~/.bun/bin` sta nel PATH di zsh. Sarebbe partito alle 02:00, finito in mezzo secondo, e avrebbe
+    scritto un rapporto che *sembrava* un rapporto — lo stesso difetto che questa versione chiude in
+    tre posti diversi.
+
+- **Il rilievo 29 resta aperto e senza spiegazione.** `docs/findings.md` — il registro dei rilievi
+  stesso — non e' raggiungibile da una ricerca semantica. Escluse quattro cause con prova
+  (classificatore, lista dei metafile, assenza dal remoto, embedder). Il meccanismo e' il ciclo di
+  pulizia del sync; **perche' quel file non venga camminato non lo sappiamo.**
+
 ## [v2.28.1] - 2026-08-02
 
 **La lista dei rilievi aperti e' a zero.** Da 19 la mattina: 13 chiusi da una decisione, 6
