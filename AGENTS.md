@@ -177,6 +177,10 @@ tool and this protocol are versioned.
   **Same honest limit as `--by`:** `--thor` is a discipline gate, not a security boundary — the
   evidence string isn't verified by the CLI on the manual path (the factory path runs a real
   headless verification). The audit trail is the evidence itself, reviewable on the card.
+  **`@thor` unavailable ≠ `@thor` says no:** when the verifier cannot run at all (spend limit,
+  expired token, quota), `kb` reports `SKIP` and leaves the card in `doing` rather than recording
+  a refusal nobody pronounced — close it with `--by <chi> --thor "<evidence>"`, naming who really
+  verified. See `kanban/README.md § doing → done`.
 - Only `todo`+`doing` are "hot" (small, loaded at session start via the `SessionStart` context-inject
   hook, which calls the lean **`kb view`**); `done` is the audit archive, read **on demand** so it
   can grow without burning tokens. Bare **`kb`** (a human typed it) adds the dashboard: start time
