@@ -3,6 +3,55 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.30.0] - 2026-08-20
+
+**Un verificatore spento parlava a nome di @thor, e i segreti si copiavano dentro il repo.**
+Quando `claude` esce per credito finito non ha guardato niente — ma `kb` lo riportava come
+"@thor ha verificato e dice NO", cioe' scriveva sulla card un giudizio che nessuno aveva
+pronunciato. Nella stessa sessione una copia di backup di un file di credenziali e' finita nel
+working tree, non coperta da `.gitignore`, a un `git add .` dal commit. Aggiunto il learning che
+tiene insieme quattro difetti gia' visti: il check era verde perche' misurava la cosa sbagliata.
+
+### Fixed
+
+- **`SKIP` invece di `FAIL` quando @thor non e' eseguibile.** Misurato su MirrorBuddy, card
+  `260820-122649`: log con `You've hit your monthly spend limit`, exit 1, zero righe di verifica,
+  e chi chiudeva leggeva `REFUSED: @thor ha verificato e dice NO`. E' la malattia che
+  `kanban/thor-verify.sh` esiste per curare, nel verso peggiore — un registro che afferma il
+  falso, e che nessuno puo' smentire sei mesi dopo. `thor_unavailable_reason()`
+  (`factory/lib.sh`) riconosce credito, quota, token scaduto e sessione assente dal log;
+  `verify_card` lo dice con parole sue e `thor-verify.sh` lo traduce in `SKIP`, che `kb` gia'
+  gestisce chiedendo chi ha verificato davvero. Provato **end-to-end con un finto `claude`**, non
+  con un grep sul sorgente, e con la mutazione: tolta la traduzione, il test torna rosso.
+  Distinzione opposta coperta con la stessa cura — una bocciatura vera non deve essere scambiata
+  per uno strumento spento, o il cancello si apre da solo.
+- **I messaggi di `kb finish` mostrano entrambe le forme.** L'evidenza sta sempre in `--thor`,
+  anche quando a verificare non e' stato thor: `--by` sembra l'alternativa, cosi' si prova
+  `--by <chi> '<ev>'`, l'evidenza cade posizionale e kb rifiuta uguale (tre tentativi persi il
+  2026-08-20 contro un messaggio che non nominava la coppia). A **saldo zero di righe**:
+  `kanban/kb.sh` e' oltre soglia e il ratchet non lascia allargarlo.
+
+### Added
+
+- **Regola: il backup di un file con credenziali non si scrive dentro il repo**
+  (`rules/best-practices.md` § Security & Privacy). `.gitignore` copriva `.env*` ma non `*.bak`,
+  quindi `cp .env.production.local .env.production.local.bak` produceva un file di URL di
+  database, chiavi Stripe e Supabase vive che `git status` elencava come untracked. La copia va
+  **fuori dal working tree** (`~/.<repo>-env-backups/`, `chmod 600`) e si verifica con
+  `git check-ignore`. Allargare `.gitignore` non e' la riparazione: protegge questo repo, su
+  questa macchina, per i pattern che qualcuno ha immaginato.
+- **`behavior/roberto-mode.md` § "The check has to fail when the thing is broken".** Quattro casi
+  con la stessa forma — suite verdi sul corpus invece che sullo store deployato, riga di
+  migration invece della funzione, righe fisiche invece di prosa — e i due corollari: un check
+  verde sul bersaglio sbagliato e' **peggio** di nessun check perche' chiude l'indagine, e uno
+  strumento che non parte non e' un verdetto. Ripreso in `agents/thor.md`, che e' chi deve
+  applicarlo.
+
+### Changed
+
+- `kanban/README.md`, `AGENTS.md`, `docs/USAGE.md`: documentati i tre esiti del gate
+  `doing → done` (`PASS` / `FAIL` / `SKIP`) e la forma `--by <chi> --thor "<evidenza>"`.
+
 ## [v2.29.0] - 2026-08-18
 
 **Tre canali di aggiornamento che tacevano quando fallivano.** Il controllo di gstack non

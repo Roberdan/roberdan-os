@@ -195,6 +195,20 @@ malicious MCP servers can inject via tool *descriptions* alone). Rules:
   privilege tools (read-mail ≠ send-mail), draft-not-send as a *security* boundary, secrets
   physically unreachable from where generated code runs.
 
+**Never write a backup of a secret-bearing file inside the repo.** Before editing anything that
+holds credentials (`.env*`, `*.pem`, service-account JSON, a `vercel env pull` dump), the copy
+goes **outside the working tree** — `~/.<repo>-env-backups/`, `chmod 600` — never `.env.bak`,
+`.env.local.old`, `.env.copy` next to the original. Reason, measured on MirrorBuddy 2026-08-20:
+`.gitignore` covered `.env*` but not `*.bak`, so `cp .env.production.local .env.production.local.bak`
+produced a file full of live database URLs, Stripe and Supabase keys that `git status` listed as
+untracked — one `git add .` from being committed. The original was ignored, the backup was not,
+and nothing warned. Two consequences:
+
+- After creating any such copy, **verify** it: `git check-ignore -q <file>` must succeed, or the
+  file does not belong there.
+- Widening `.gitignore` is not the fix. An ignore rule protects this repo, on this machine, for
+  the patterns someone thought of; keeping the file outside the tree protects it everywhere.
+
 ## Execution Defaults
 **Browser:** Playwright = Microsoft Edge (`msedge`) only; no Chrome/Chromium fallback. If Edge is unavailable, stop and report the blocker; override only for Roberto-requested cross-browser tests. **Writing:** Tables > prose; commands > descriptions; comments WHY-only; conventional commits; PR = summary + test plan.
 

@@ -15,6 +15,7 @@ kb show <id>                        # print a card
 kb add "<title>" --repo <r> [dod] [acc]  # new card in todo/ (repo required; fill dod/acceptance, or `kb edit <id>` after)
 kb start <id> --by roberto          # GATE: todo -> doing, needs Roberto's approval
 kb finish <id> --thor "<ev>"        # GATE: doing -> done, needs @thor + evidence (never a rubber-stamp)
+kb finish <id> --by <chi> --thor "<ev>"   # ...when @thor could not run: name the real verifier
 kb block <id> "<reason>"            # mark a card blocked, move it back to todo/
 kb pending                          # the APPROVAL INBOX: everything waiting on you (todo cards,
                                     #   learning to approve, open PRs) in one place; --count = fast total

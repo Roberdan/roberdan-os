@@ -87,6 +87,62 @@ VERDICT: PASS — il gate ora fallisce sulla mutazione')"
 [ "$(esito "$r")" = PASS ] && ok "cita un FAIL nel ragionamento, conclude PASS -> vince l ultimo" \
                            || err "ha preso il verdetto sbagliato: '$r'"
 
+printf '\n=== STRUMENTO SPENTO != VERDETTO NEGATIVO (misurato il 2026-08-20) ===\n'
+# Il caso vero: MirrorBuddy card 260820-122649, `claude` uscito 1 con "You've hit your monthly
+# spend limit" e zero righe di verifica. Arrivava a chi chiudeva come "@thor ha verificato e
+# dice NO": il registro avrebbe detto che qualcuno aveva guardato e bocciato, e nessuno aveva
+# guardato niente.
+for testo in \
+  "You've hit your monthly spend limit · raise it at claude.ai/settings/usage" \
+  "Error: usage limit reached for this organization" \
+  "quota exceeded" \
+  "invalid api key" \
+  "You are not logged in. Please run \`claude login\`"; do
+  vlog="$(mktemp)"; printf '%s\n' "$testo" > "$vlog"
+  [ -n "$(thor_unavailable_reason "$vlog")" ] \
+    && ok "riconosciuto come strumento non disponibile: \"${testo:0:40}...\"" \
+    || err "NON riconosciuto, diventerebbe un NO di @thor: \"$testo\""
+  rm -f "$vlog"
+done
+# E il verso opposto, che conta di piu': una verifica che boccia davvero non deve essere
+# scambiata per uno strumento spento, o il cancello si apre da solo.
+for testo in \
+  "VERDICT: FAIL — il test non copre il caso vuoto" \
+  "the acceptance criteria are not met: no migration was applied" \
+  "TypeError: cannot read property of undefined"; do
+  vlog="$(mktemp)"; printf '%s\n' "$testo" > "$vlog"
+  [ -z "$(thor_unavailable_reason "$vlog")" ] \
+    && ok "resta un fallimento vero: \"${testo:0:40}...\"" \
+    || err "scambiato per strumento spento — il cancello si aprirebbe: \"$testo\""
+  rm -f "$vlog"
+done
+
+printf '\n=== la catena intera: claude che esce 1 per credito finito -> SKIP, non FAIL ===\n'
+# End-to-end sullo script vero, con un finto `claude`: e' l'unico modo di provare che la
+# traduzione FAIL->SKIP avviene davvero. Un grep sul sorgente direbbe solo che la parola c'e'.
+tvtmp="$(mktemp -d)"
+mkdir -p "$tvtmp/kb/doing" "$tvtmp/bin" "$tvtmp/repo"
+cat > "$tvtmp/kb/doing/990101-000000.md" <<'CARD'
+# card di prova
+repo: nonesiste
+dod: qualcosa
+acceptance: qualcos altro
+CARD
+cat > "$tvtmp/bin/claude" <<'STUB'
+#!/usr/bin/env bash
+echo "You've hit your monthly spend limit · raise it at claude.ai/settings/usage"
+exit 1
+STUB
+chmod +x "$tvtmp/bin/claude"
+tvout="$(CLAUDE="$tvtmp/bin/claude" RDA_KANBAN="$tvtmp/kb" RDA_IN_THOR_VERIFY=0 \
+  bash "$ROOT/kanban/thor-verify.sh" 990101-000000 "$tvtmp/repo" 60 "$tvtmp/verify.log" 2>/dev/null || true)"
+case "$tvout" in
+  SKIP*) ok "credito finito -> SKIP (kb chiedera' chi ha verificato, senza inventare un NO)" ;;
+  FAIL*) err "credito finito ancora letto come un NO di @thor: '$tvout'" ;;
+  *)     err "risposta inattesa da thor-verify.sh: '$tvout'" ;;
+esac
+rm -rf "$tvtmp"
+
 printf '\n=== i due fallimenti si dicono DIVERSI (era lo stesso messaggio per tutti e due) ===\n'
 grep -q "SENZA scrivere un verdetto" "$LIB" \
   && ok "turno finito senza verdetto: messaggio suo" \

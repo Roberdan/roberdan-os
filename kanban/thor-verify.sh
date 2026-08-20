@@ -120,7 +120,11 @@ fi
 # nell'altro verso: li' uno SKIP non deve diventare un PASS, qui non deve diventare un FAIL.
 out="$(verify_card "$card" "$dir" "$tmo" "$vlog")"
 case "$out" in
-  FAIL*unparseable*|FAIL*exit=124*|FAIL*"not found in kanban"*)
+  # "non e eseguibile ora" = credito finito, token scaduto, quota esaurita: il processo e' uscito
+  # senza guardare niente. Misurato il 2026-08-20 (MirrorBuddy 260820-122649, "hit your monthly
+  # spend limit"): arrivava a chi chiudeva come un NO di @thor, ed e' il modo esatto in cui un
+  # registro comincia ad affermare il falso.
+  FAIL*"non e eseguibile ora"*|FAIL*unparseable*|FAIL*exit=124*|FAIL*"not found in kanban"*)
     printf 'SKIP\t%s\n' "${out#FAIL	}" ;;
   *) printf '%s\n' "$out" ;;
 esac
