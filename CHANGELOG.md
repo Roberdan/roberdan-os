@@ -39,6 +39,17 @@ delicato del sistema era sostituito da un altro, senza un warning.
 - `test/test-skill-name-collision.sh` (agganciata a `test/validate.sh`): 7 casi — namespace,
   idempotenza, ritiro della copia oscurata, guarigione al nome piano, mai-overwrite di un
   `rdos-<name>/` altrui, e la directory simlinkata che e' il caso reale di `~/.copilot`.
+- Documentazione: `docs/USAGE.md` guadagna una sezione "Skill name collisions" (perche' il `name:`
+  e' l'identita' vera, cosa fa `rdos-<name>`, e il limite noto: una skill *project-scope* dentro un
+  altro repo e' invisibile all'installer e vince legittimamente in casa sua). `README.md` e
+  l'invariante 1 di `ARCHITECTURE.md` lo dicono in una riga, dove l'installer e' gia' descritto.
+
+### Nota per chi aggiorna
+
+Le skill del canone oscurate da un altro sistema ora si invocano `/rdos-review` e `/rdos-ship`.
+Il nome piano torna da solo se quel sistema viene disinstallato. `verify-done` resta oscurata
+*dentro* i repo che ne committano una propria in project scope: e' cross-scope, l'installer non
+puo' vederla; altrove funziona.
 
 ## [v2.30.0] - 2026-08-20
 
