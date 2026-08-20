@@ -33,6 +33,7 @@ mkdir -p "$TMP/fakebin"
 cat > "$TMP/fakebin/gh" <<'FAKE'
 #!/bin/sh
 echo "DIR=${GH_CONFIG_DIR:-<nessuna>}"
+echo "SET=${RDA_GH_SHIM_SET:-<nessuna>}"
 echo "ARGS=$*"
 FAKE
 chmod +x "$TMP/fakebin/gh"
@@ -55,6 +56,7 @@ run() { # <cwd> <args...>
   (cd "$cwd" && PATH="$TMP/fakebin:$PATH" RDA_GH_MAP="$TMP/map.conf" bash "$SHIM" "$@" 2>&1)
 }
 _dir()  { printf '%s' "$1" | sed -n 's/^DIR=//p'; }
+_set()  { printf '%s' "$1" | sed -n 's/^SET=//p'; }
 _args() { printf '%s' "$1" | sed -n 's/^ARGS=//p'; }
 
 printf '\n=== (a) sceglie la cartella dal proprietario del remote ===\n'
@@ -126,6 +128,29 @@ o="$(cd "$R1" && PATH="$TMP/selfbin:$TMP/fakebin:$PATH" RDA_GH_MAP="$TMP/map.con
                   || err "RICORSIONE: lo shim ha chiamato se stesso"
 [ "$(_dir "$o")" = "$TMP/cfg-roberdan" ] && ok "e sceglie comunque la cartella giusta" \
                                          || err "tramite symlink ha scelto '$(_dir "$o")'"
+
+printf '\n=== (c) la firma: lo shim non eredita se stesso ===\n'
+# Il difetto trovato il 20 agosto 2026: la sessione parte con `gh copilot`, lo shim decide, e
+# ogni processo figlio nasce con GH_CONFIG_DIR gia' messa. Senza firma lo shim la scambiava per
+# la volonta' del chiamante e si arrendeva, restando sull'account del PRIMO repo per sempre.
+o="$(run "$R1" api user)"
+[ "$(_set "$o")" = "$TMP/cfg-roberdan" ] && ok "quando decide, firma la propria scelta" \
+                                         || err "non ha firmato: SET='$(_set "$o")'"
+
+o="$(cd "$R2" && PATH="$TMP/fakebin:$PATH" RDA_GH_MAP="$TMP/map.conf" \
+     GH_CONFIG_DIR="$TMP/cfg-roberdan" RDA_GH_SHIM_SET="$TMP/cfg-roberdan" bash "$SHIM" api user 2>&1)"
+[ "$(_dir "$o")" = "$TMP/cfg-microsoft" ] && ok "residuo PROPRIO in un altro repo -> ridecide (non eredita)" \
+                                          || err "ha ereditato se stesso: '$(_dir "$o")'"
+
+o="$(cd "$NOREPO" && PATH="$TMP/fakebin:$PATH" RDA_GH_MAP="$TMP/map.conf" \
+     GH_CONFIG_DIR="$TMP/cfg-roberdan" RDA_GH_SHIM_SET="$TMP/cfg-roberdan" bash "$SHIM" api user 2>&1)"
+[ "$(_dir "$o")" = "<nessuna>" ] && ok "residuo PROPRIO fuori da un repo -> si toglie di mezzo" \
+                                 || err "fuori da un repo ha tenuto il residuo '$(_dir "$o")'"
+
+o="$(cd "$R2" && PATH="$TMP/fakebin:$PATH" RDA_GH_MAP="$TMP/map.conf" \
+     GH_CONFIG_DIR="$TMP/scelta-mia" RDA_GH_SHIM_SET="$TMP/cfg-roberdan" bash "$SHIM" api user 2>&1)"
+[ "$(_dir "$o")" = "$TMP/scelta-mia" ] && ok "firma che NON combacia -> e' del chiamante, si rispetta" \
+                                       || err "ha scavalcato una scelta non sua: '$(_dir "$o")'"
 
 [ "$FAIL" -eq 0 ] && { echo "test-gh-shim: PASS"; exit 0; }
 echo "test-gh-shim: FAIL"; exit 1
