@@ -3,6 +3,43 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.31.0] - 2026-08-20
+
+**Tre skill del canone non si caricavano da nessuna parte, e nessuno lo diceva.**
+`bin/sync.sh` rilevava le collisioni sul nome della CARTELLA, ma Claude e Copilot risolvono una
+skill dal `name:` del frontmatter. gstack installa `gstack-review/` che dichiara `name: review`:
+la cartella `review/` risultava libera, la nostra veniva installata accanto, e l'host ne teneva
+UNA sola — la nostra spariva in silenzio. `review`, `ship` e `verify-done` erano oscurate cosi'.
+Il costo vero non e' la skill mancante: e' che invocando `/ship` rispondeva quello di gstack, che
+si ferma alla PR e fa squash/rebase, mentre il nostro impone merge-commit only, vieta il
+force-push e ferma il merge su `main` che tocca protezioni o release-infra. Il cancello piu'
+delicato del sistema era sostituito da un altro, senza un warning.
+
+### Fixed
+
+- `bin/sync.sh` (via `bin/lib-skills-install.sh`): la collisione si rileva sul `name:` dichiarato.
+  Quando un altro sistema occupa il nome, la nostra skill si installa come `rdos-<name>/` col
+  frontmatter riscritto — nessuno dei due sparisce, entrambi restano invocabili. Una copia gia'
+  oscurata viene ritirata; se il sistema estraneo sparisce, la run successiva torna al nome piano.
+  La scansione usa `find -L`: gstack simlinka le DIRECTORY dentro `~/.copilot/skills`, e un find
+  normale non ci entra — cioe' era cieco proprio dove la collisione era reale.
+
+### Changed
+
+- `bin/lib-skills-install.sh` (nuovo): l'installazione delle skill esce da `bin/sync.sh`, che era
+  gia' oltre le 300 righe della baseline. Il file scende da 638 a 622 righe: la baseline dice che
+  un file oltre soglia si spezza, non si allarga, ed e' la stessa strada gia' fatta da
+  `validate.sh` con `test/lib-suites.sh`.
+- `test/test-tool-coverage.sh`: il cablaggio di una skill ha due forme valide (symlink al nome
+  piano, o wrapper `rdos-<name>` col marker). Rifiuta ancora la skill assente o un'omonima non
+  nostra.
+
+### Added
+
+- `test/test-skill-name-collision.sh` (agganciata a `test/validate.sh`): 7 casi — namespace,
+  idempotenza, ritiro della copia oscurata, guarigione al nome piano, mai-overwrite di un
+  `rdos-<name>/` altrui, e la directory simlinkata che e' il caso reale di `~/.copilot`.
+
 ## [v2.30.0] - 2026-08-20
 
 **Un verificatore spento parlava a nome di @thor, e i segreti si copiavano dentro il repo.**
