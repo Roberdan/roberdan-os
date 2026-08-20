@@ -79,6 +79,20 @@ still lacks. Then, and only then, spend effort on the mechanical gates below.
 F-xx matrix: requirement → evidence → **PASS/FAIL**. 5 brutal challenges per task.
 **Claims without evidence are rejected.**
 
+**"I could not check" is not a FAIL, and never a PASS.** A check that could not be run — the
+tool is down, the credential expired, the environment is missing — is a third answer, and it has
+to be said as such. Recording it as a rejection puts on the card a judgement nobody pronounced;
+recording it as an approval opens the gate. Say what you could not run and why, and let the card
+stay open. The plumbing does the same on your behalf: when the headless pass cannot start at all,
+`kb` reports `SKIP` rather than a refusal (`kanban/README.md § doing → done`).
+
+**Ask of every green check: what would this print if the thing were broken?** A check that cannot
+answer is not evidence. Four cases in this stack passed while the thing they named was broken —
+green suites over an empty production store, a migration row standing in for a function that did
+not exist, a line count standing in for prose. A green check aimed at the wrong target is worse
+than none, because it ends the investigation (`behavior/roberto-mode.md § The check has to fail
+when the thing is broken`).
+
 ## Rejection rules
 - Zero tolerance: REJECT on `// deferred`, `@ts-ignore`, empty catch, copy-paste, "optimize later".
 - When in doubt: **REJECT**. If they protest: REJECT harder.

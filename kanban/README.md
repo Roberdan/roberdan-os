@@ -18,7 +18,7 @@ kb show <id>                         # show a card
 kb add "<title>" --repo <r> [dod] [acc]   # new card in todo/ (repo required)
 kb edit <id>                         # fill Definition of Done + Acceptance + repo
 kb start <id> --by roberto [--no-worktree "<why>"]      # GATE: todo->doing (+ the card's worktree)
-kb finish <id> --thor "<ev>" [--keep-worktree "<why>"]  # GATE: doing->done (worktree must be clean)
+kb finish <id> --thor "<ev>" [--by <chi>] [--keep-worktree "<why>"]  # GATE: doing->done (worktree must be clean)
 kb pause "<next step>"               # lean per-repo checkpoint handoff/resume.md (overwritten;
                                      #   a Stop hook runs `kb pause --auto` after every turn)
 kb resume [--done]                   # show checkpoint + live backlog | clear when resumed
@@ -66,6 +66,20 @@ guardava una card nel momento in cui la prendi in mano.*
   `test/test-kb-queue.sh`.
 - **`doing → done`** needs **`@thor`** (the done-gate agent) to validate against the card's
   **acceptance criteria**, with **evidence** (commit/test/output). No rubber-stamps.
+  - `kb finish` convokes @thor by itself (`RDA_KB_AUTOTHOR=0` disables it, for isolated tests).
+  - **Three outcomes, kept apart on purpose.** `PASS` closes the card and writes @thor's evidence
+    onto it. `FAIL` — @thor looked and says no — leaves the card in `doing`. `SKIP` — @thor could
+    **not** run at all — also leaves it in `doing`, but says something different: *nobody
+    verified*. `kb` never writes "verified by @thor" over a verification that did not happen.
+  - **A tool that cannot run is not a verdict.** A spent spend limit, an expired token, an
+    exhausted quota: `claude` exits non-zero without having read a line. Until 2026-08-20 that
+    surfaced as *"@thor ha verificato e dice NO"* (measured on MirrorBuddy card `260820-122649`,
+    log reading `You've hit your monthly spend limit`), which puts a false statement on the card
+    that nobody can spot months later. Those exits are now recognised and translated to `SKIP`
+    (`factory/lib.sh:thor_unavailable_reason`, asserted end-to-end in `test/test-thor-verdict.sh`).
+  - **When @thor is unavailable, say who verified instead:** `kb finish <id> --by <chi> --thor
+    "<evidence>"`. `--by` records the real verifier and skips the automatic @thor run; the
+    evidence still goes in `--thor`, always. Both are needed — `--by` alone is refused.
 
 ## `start` when you BEGIN, not retrospectively (so `doing` means something)
 **`kb start` goes at the *start* of the work, not at the end.** The point of `doing` is to show
@@ -76,7 +90,8 @@ same second, `doing` always 0). The correct rhythm on a non-trivial task:
 1. **Open + `start` the card first** (`kb add … && kb start <id> --by roberto`) → it appears in
    `doing`, so anyone glancing at the board sees what's being worked on.
 2. Do the work, committing per phase (update the card with evidence as you go).
-3. **`kb finish <id> --thor "<evidence>"`** only when @thor's acceptance is met.
+3. **`kb finish <id> --thor "<evidence>"`** only when @thor's acceptance is met (or
+   **`--by <chi> --thor "<evidence>"`** when @thor could not run and someone else verified).
 A card should *live* in `doing` for the duration of the work, not flicker through it.
 
 ## One worktree per card — and nothing left behind when it closes
