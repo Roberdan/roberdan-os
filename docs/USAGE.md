@@ -140,6 +140,31 @@ inside those two gates.
 - **Copilot CLI** — skills installed via `bin/sync.sh --install` (symlinked into
   `~/.copilot/skills/`); gbrain is already registered in its MCP config; `AGENTS.md`
   is read natively per-repo.
+
+### Skill name collisions (v2.31.0)
+
+Claude and Copilot resolve a skill by the `name:` in its frontmatter, **not** by its
+directory name. Another system can therefore install `gstack-review/` declaring
+`name: review` and silently win over the canon skill of the same name — no warning
+anywhere, you just get someone else's `/review`.
+
+`bin/sync.sh --install` reads the frontmatter of every installed skill. On a real name
+collision the canon skill installs namespaced as `rdos-<name>/` (invoke it as
+`/rdos-review`, `/rdos-ship`) and the shadowed plain-name copy is retired. If the
+foreign skill later disappears, the next run heals back to the plain name. Exactly one
+copy of each canon skill exists at any time.
+
+The namespaced form is a real file rather than a symlink, because a symlink cannot carry
+a different frontmatter name. Nothing drifts: it is still a thin pointer that reads the
+canonical logic from `skills/<name>/skill.md` in this repo at run time.
+
+Nothing that is not ours is ever written to or deleted — a skill counts as ours only if
+its `SKILL.md` is a symlink resolving inside this repo, or a regular file carrying the
+namespace marker.
+
+**Limit:** a *project-scope* skill (e.g. `.claude/skills/verify-done` committed inside
+another repo) is invisible to the installer and legitimately wins inside its own repo.
+That collision is not solvable here; the user-level skill still works everywhere else.
 - **codex / opencode** — global pointers installed by `bin/sync.sh --install` when
   the tool is present on the machine (skipped cleanly otherwise).
 - **Warp** — reads `AGENTS.md` natively (precedence: subdirectory > repo root >

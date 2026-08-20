@@ -54,6 +54,10 @@ Operator (or a schedule)
    extension (`hooks/copilot/extension.template.mjs`) that binds the provider-neutral `hooks/`
    to Copilot lifecycle APIs — operational near-parity, with the completion gate advisory
    (Copilot can't block an already-produced final response). See `bin/sync.sh`, CHANGELOG.
+   A skill's identity to the host is its frontmatter `name:`, not its directory: the installer
+   detects collisions on that name and installs the canon as `rdos-<name>` when another system
+   already owns it (v2.31.0, `bin/lib-skills-install.sh`). Nothing outside the canon is ever
+   written to or deleted.
 2. **Engine/identity split.** Forkers edit `identity/` only; engine files never embed identity.
    See [`docs/plan-2026-07-05-engine-identity-split.md`](docs/plan-2026-07-05-engine-identity-split.md).
 3. **Human gates are not advisory.** The seven gates in `AGENTS.md` are enforced by hooks and

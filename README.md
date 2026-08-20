@@ -39,7 +39,10 @@ it advertises. Stated plainly so you can trust the rest.
   `context-inject` (session primer), `auto-checkpoint` (pause/resume state + receipts every turn),
   a git `pre-commit` **leak gate** that actually blocks a commit containing a confidential term.
 - **`bin/install-hooks.sh` / `bin/sync.sh --install`** — idempotent, non-destructive install of the
-  hook set and skill wrappers into `~/.claude`.
+  hook set and skill wrappers into `~/.claude`. Skill collisions are detected on the frontmatter
+  `name:` (what the host actually resolves by), not on the directory name: a canon skill whose name
+  is already taken by another system installs as `rdos-<name>` and heals back to the plain name if
+  that system disappears (v2.31.0 — see `docs/USAGE.md`).
 - **Native Copilot adapter** (v2.16.0) — `bin/sync.sh --install` also generates, deterministically
   and collision-safe, **Copilot custom agents** (`~/.copilot/agents/`) and a **user-scoped extension**
   (`~/.copilot/extensions/roberdan-os/`) that binds the provider-neutral `hooks/` to Copilot's
@@ -113,7 +116,9 @@ bin/install-hooks.sh --apply        # merge the hook set into ~/.claude/settings
                                      # (idempotent, non-destructive, backs up first)
 bin/sync.sh --install               # symlink the skill wrappers into ~/.claude/skills
                                      # (also installs Copilot agents + extension + skills
-                                     #  into ~/.copilot when Copilot CLI is present)
+                                     #  into ~/.copilot when Copilot CLI is present;
+                                     #  a skill whose frontmatter name: is already taken
+                                     #  by another system installs as rdos-<name>)
 ```
 
 Check the result at any time — before installing, to see what you are missing, or after, to see
