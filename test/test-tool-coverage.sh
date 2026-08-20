@@ -41,16 +41,25 @@ CANON_SKILLS="$(cd "$ROOT/skills" 2>/dev/null && for d in */; do [ -f "$d/skill.
 
 # Un solo controllo per tutti i tool: stessa forma di cablaggio (symlink dentro platforms/),
 # stesso elenco derivato, cosi' claude e copilot non possono divergere in silenzio.
+#
+# Due forme valide, non una. Quando un altro sistema di skill occupa gia' il `name:` del
+# frontmatter (gstack installa `gstack-review/` che dichiara `name: review`), sync.sh installa
+# la nostra come `rdos-<name>/` con il nome riscritto: e' un file vero, non un symlink, perche'
+# un symlink non puo' portare un nome diverso. Il cablaggio e' cablaggio in entrambi i casi —
+# quello che questo gate deve rifiutare e' la skill ASSENTE o una omonima non nostra.
 check_skills_wired() { # <label> <skills-dir>
-  local label="$1" dir="$2" s _lnk
+  local label="$1" dir="$2" s _lnk _ns
   for s in $CANON_SKILLS; do
     _lnk="$dir/$s/SKILL.md"
+    _ns="$dir/rdos-$s/SKILL.md"
     if [ -e "$_lnk" ] && readlink "$_lnk" 2>/dev/null | grep -q "roberdan-os/platforms/"; then
       ok "$label skill '$s' wired (symlink resolves into roberdan-os platforms/)"
+    elif [ -f "$_ns" ] && grep -q "roberdan-os: namespaced install" "$_ns" 2>/dev/null; then
+      ok "$label skill '$s' wired as 'rdos-$s' (nome '$s' occupato da un altro sistema)"
     elif [ -e "$_lnk" ]; then
       err "$label skill '$s' exists but is NOT the roberdan-os symlink (foreign same-name skill?) — $REMEDIATE"
     else
-      err "$label skill '$s' missing at $_lnk — $REMEDIATE"
+      err "$label skill '$s' missing at $_lnk (ne' come rdos-$s) — $REMEDIATE"
     fi
   done
 }
