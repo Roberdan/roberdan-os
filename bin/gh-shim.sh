@@ -41,6 +41,17 @@ for _p in $PATH; do
   REAL="$_c"; break
 done
 IFS="$_ifs"
+# Ultima spiaggia: i posti noti, quando il PATH non contiene gh. Non e' teoria — git lancia i
+# credential helper con l'ambiente che ha, e un helper che esce 127 non "non aiuta": blocca il
+# push. Questo file promette di non essere mai l'anello che si rompe, e un PATH povero e' il
+# modo piu' banale di romperlo. Restano esclusi questo stesso file e i symlink che lo puntano.
+if [ -z "$REAL" ]; then
+  for _c in /opt/homebrew/bin/gh /usr/local/bin/gh /usr/bin/gh; do
+    [ -x "$_c" ] && [ ! -d "$_c" ] || continue
+    [ "$(cd "$(dirname "$_c")" 2>/dev/null && pwd -P)/gh" = "$_self_real" ] && continue
+    REAL="$_c"; break
+  done
+fi
 [ -n "$REAL" ] || { echo "gh-shim: non trovo il gh vero nel PATH" >&2; exit 127; }
 
 # --- interruttori: chi ha gia' scelto, ha scelto --------------------------------------------

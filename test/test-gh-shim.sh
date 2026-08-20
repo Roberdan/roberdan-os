@@ -27,6 +27,7 @@ ok()  { printf '  ok: %s\n' "$1"; }
 err() { printf '  FAIL: %s\n' "$1"; FAIL=1; }
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+mkdir -p "$TMP/vuotobin"   # un PATH che non contiene nessun gh
 
 # gh finto: stampa la cartella scelta e gli argomenti ricevuti.
 mkdir -p "$TMP/fakebin"
@@ -151,6 +152,21 @@ o="$(cd "$R2" && PATH="$TMP/fakebin:$PATH" RDA_GH_MAP="$TMP/map.conf" \
      GH_CONFIG_DIR="$TMP/scelta-mia" RDA_GH_SHIM_SET="$TMP/cfg-roberdan" bash "$SHIM" api user 2>&1)"
 [ "$(_dir "$o")" = "$TMP/scelta-mia" ] && ok "firma che NON combacia -> e' del chiamante, si rispetta" \
                                        || err "ha scavalcato una scelta non sua: '$(_dir "$o")'"
+
+printf '\n=== PATH povero: un helper che esce 127 blocca il push, quindi non deve succedere ===\n'
+# git lancia i credential helper con l'ambiente che ha, non con quello del terminale di Roberto.
+# `--version` e' offline: nessuna rete, nessun account, e basta a dire se il gh vero e' stato
+# trovato. Si usa il gh vero apposta: e' l'unico modo di provare che la ricerca fuori dal PATH
+# funziona davvero, e non che funziona un finto che abbiamo messo noi.
+_known=""
+for _c in /opt/homebrew/bin/gh /usr/local/bin/gh /usr/bin/gh; do [ -x "$_c" ] && { _known="$_c"; break; }; done
+if [ -z "$_known" ]; then
+  echo "  skip: nessun gh nei posti noti su questa macchina (il fallback non e' verificabile qui)"
+else
+  o="$(cd "$NOREPO" && PATH="$TMP/vuotobin:/usr/bin:/bin" RDA_GH_MAP="$TMP/map.conf" bash "$SHIM" --version 2>&1)"; rc=$?
+  [ "$rc" -eq 0 ] && ok "PATH senza gh -> lo trova nei posti noti (niente 127)" \
+                  || err "PATH senza gh -> uscito $rc: $(printf '%s' "$o" | head -1)"
+fi
 
 [ "$FAIL" -eq 0 ] && { echo "test-gh-shim: PASS"; exit 0; }
 echo "test-gh-shim: FAIL"; exit 1
