@@ -14,6 +14,12 @@
 # che ha ricevuto — ed è l'unico modo di asserire sia la cartella scelta SIA che gli argomenti
 # arrivino interi (il primo bug scritto in questo file: un `set -- $line` che riscriveva "$@").
 set -uo pipefail
+# Ermetico anche rispetto all'ambiente che ci ha lanciati. Se il chiamante ha gia' GH_CONFIG_DIR
+# — e ce l'ha ogni volta che questi test girano DENTRO una sessione avviata via `gh copilot`,
+# perche' lo shim l'ha esportata lui stesso al lancio — allora la prima regola dello shim ("chi
+# ha gia' scelto, ha scelto") scatta sempre e dodici asserzioni su tredici falliscono. Fallivano.
+# I due casi che vogliono queste variabili se le passano per comando, quindi qui si azzerano.
+unset GH_CONFIG_DIR GH_TOKEN GH_ENTERPRISE_TOKEN RDA_GH_SHIM_OFF
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SHIM="$ROOT/bin/gh-shim.sh"
 FAIL=0

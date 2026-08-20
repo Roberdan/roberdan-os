@@ -329,8 +329,8 @@ EOF
       # Copilot defaults infer=true / user-invocable=true otherwise).
       [ -n "$(fm "$a" disable-model-invocation)" ] && echo "disable-model-invocation: $(fm "$a" disable-model-invocation)"
       [ -n "$(fm "$a" user-invocable)" ] && echo "user-invocable: $(fm "$a" user-invocable)"
-      echo "metadata:"
-      echo "  source: roberdan-os"
+      # No `metadata:`: Copilot's agent frontmatter has no such field, so every session logged
+      # `agents/<name>.md: unknown field ignored: metadata` nine times. The body keeps the provenance.
       echo '---'
       echo ""
       echo "# $aname (roberdan-os canon agent)"
