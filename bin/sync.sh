@@ -13,7 +13,15 @@
 #                               automatically as the canon changes — no static copy to drift).
 #                               If <target>/<name>/ already exists (e.g. same-named skill
 #                               from another skill system such as gstack), SKIPs it explicitly —
-#                               never a silent overwrite. Installed into ~/.claude/skills/ always,
+#                               never a silent overwrite. Collisions are ALSO detected on the
+#                               frontmatter `name:` (which is what Claude/Copilot actually resolve
+#                               a skill by, not the directory name): when a foreign skill in the
+#                               same target dir already declares our name — gstack's
+#                               `gstack-review/` declares `name: review` — ours is installed as
+#                               `rdos-<name>/` with its frontmatter name rewritten, so neither
+#                               system is shadowed and both stay invocable. If the foreign skill
+#                               later disappears, the next run heals the namespaced install back
+#                               to the plain name. Installed into ~/.claude/skills/ always,
 #                               and into ~/.copilot/skills/ too when ~/.copilot is detected present.
 #                             - copilot mcp-config.json: read-only check, WARN if gbrain missing
 #                               (never modified — that file is owned by Copilot).
@@ -478,33 +486,9 @@ EOF
     echo "--->8---"
   fi
 
-  # Skills → symlink install (defensive: never overwrite, never delete). For each
-  # generated wrapper platforms/claude/skills/<name>/SKILL.md, if <target>/<name>/
-  # does not exist yet, create it and symlink SKILL.md to the repo's generated wrapper — so
-  # it stays in sync automatically whenever the canon changes (no static copy to drift).
-  # If <target>/<name>/ already exists (e.g. a same-named skill from another skill
-  # system such as gstack), SKIP it explicitly rather than silently overriding it.
-  # Generalized over a list of (label, target dir) pairs — the same
-  # source wrapper set (SKILL.md is a portable format) is symlinked into
-  # every detected tool's skills dir, instead of duplicating the loop per tool.
-  install_skills_set() {
-    local label="$1" target_dir="$2"
-    echo ""
-    echo "--- skills install ($label, symlink, into $target_dir) ---"
-    mkdir -p "$target_dir"
-    local w sname target
-    for w in $(list "$P/claude/skills" "SKILL.md" 2); do
-      sname="$(basename "$(dirname "$w")")"
-      target="$target_dir/$sname"
-      if [ -e "$target" ]; then
-        echo "SKIP $sname: già presente in $target/ (verifica manualmente se è una collisione con un altro sistema di skill, es. gstack)"
-        continue
-      fi
-      mkdir -p "$target"
-      ln -s "$w" "$target/SKILL.md"
-      echo "INSTALL $sname: symlink $target/SKILL.md -> $w"
-    done
-  }
+  # Skills install (symlink + gestione collisioni) — vive in bin/lib-skills-install.sh:
+  # sync.sh era gia' oltre le 300 righe della baseline, e un file oltre soglia si spezza.
+  . "$ROOT/bin/lib-skills-install.sh"
 
   SKILLS_DIR="${RDA_CLAUDE_SKILLS_DIR:-$CL/skills}"
   install_skills_set "claude" "$SKILLS_DIR"
