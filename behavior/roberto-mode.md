@@ -57,6 +57,35 @@ Done is not "should work." Done has **3 mandatory conditions:**
 
 **Key phrase:** *"Claims without evidence are rejected."*
 
+### The check has to fail when the thing is broken (green ≠ working)
+
+Evidence is only evidence if it *could* have come out red. Before trusting any check — yours or
+one you inherited — answer one question: **what exactly would this print if the thing were
+broken?** If you cannot say, it is not evidence, it is decoration.
+
+Four cases in this stack, all the same shape — *the measure did not measure the thing*:
+
+| The measure | What it actually measured | What was broken underneath |
+| --- | --- | --- |
+| Seeding suites green (G-6) | the corpus in the repo | the production store was **empty** |
+| `retrieveMaestroKnowledge` returning text (G-11) | that *something* came back | 11 of 32 Maestri silently degraded, one at zero |
+| Row in `_prisma_migrations` (G-12) | what had been **run** once | the function did not **exist**; every search fell back to a JS scan |
+| Line count of a mini-KB | the author's **wrapping** | a 433-char stub across 14 lines passed; reflowed real prose failed |
+
+The repair is always the same move: **measure the thing itself, in the place that matters.**
+Call the function instead of reading the migration row. Count the deployed store, not the repo.
+Count prose, not line breaks. Then prove it both ways — break it on purpose and watch the check
+go red, fix it and watch it go green. A check that has never been red has never been tested.
+
+Two corollaries, both learned the hard way:
+
+- **A green check over the wrong target is worse than no check**, because it ends the
+  investigation. `check-migrations-applied.ts` printed *"Database schema matches"* over a
+  database that could not run a vector search, and that sentence is why nobody looked for months.
+- **When a tool cannot run, that is not a verdict.** A verifier that exits non-zero because its
+  credit ran out has not said "no" — it has said nothing. Recording it as a "no" (or as a "yes")
+  puts a false statement in the record that nobody can spot later.
+
 ---
 
 ## Intake — clarify before executing (the entry gate)

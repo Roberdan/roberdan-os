@@ -1667,8 +1667,8 @@ case "$cmd" in
     done
     f="$KB/doing/$id.md"; [ -e "$f" ] || { echo "no doing card $id" >&2; exit 1; }
     if [ -z "$ev" ]; then
-      echo "REFUSED: doing->done needs @thor validation with EVIDENCE (not a rubber-stamp)." >&2
-      echo "  Run @thor vs the acceptance criteria, then: kb finish $id --thor '<commit/test/output>'" >&2
+      # Le due forme insieme: --by sembra l'alternativa a --thor, cosi' si prova `--by <chi> '<ev>'`,
+      printf 'REFUSED: doing->done needs @thor validation with EVIDENCE (not a rubber-stamp).\n  Run @thor vs the acceptance criteria, then: kb finish %s --thor "<commit/test/output>"\n  Se a verificare e stato qualcun altro:      kb finish %s --by <chi> --thor "<evidenza>"\n' "$id" "$id" >&2
       exit 1
     fi
     if ! _verify_evidence "$ev"; then exit 1; fi
@@ -1692,15 +1692,15 @@ case "$cmd" in
           echo "kb: @thor PASS" >&2 ;;
         FAIL*)
           echo "REFUSED: @thor ha verificato e dice NO — ${tv#FAIL	}" >&2
-          echo "  La card resta in doing. Sistema quello che manca, oppure chiudi con --by <chi>" >&2
-          echo "  se a verificare e' stato qualcun altro e sai perche' thor sbaglia." >&2
+          echo "  La card resta in doing. Sistema quello che manca, oppure — se a verificare e'" >&2
+          echo "  stato qualcun altro e sai perche' thor sbaglia — kb finish $id --by <chi> --thor '<ev>'" >&2
           exit 1 ;;
         *)
           # SKIP non e' un verdetto: qui il sistema NON puo' dire "verified by @thor", perche'
           # thor non ha verificato niente. Si rifiuta e si chiede a chi chiude di dire il vero.
           echo "REFUSED: @thor non ha potuto verificare — ${tv#SKIP	}" >&2
           echo "  kb non scrive 'verified by @thor' su una verifica che non e' avvenuta." >&2
-          echo "  Chiudi con --by <chi> dicendo chi ha verificato davvero." >&2
+          echo "  Chiudi dicendo chi ha verificato davvero: kb finish $id --by <chi> --thor '<ev>'" >&2
           exit 1 ;;
       esac
     fi
