@@ -84,8 +84,31 @@ thor_read_verdict() {
   esac
 }
 
+# --- quando @thor non e' eseguibile, e non quando ha detto no ------------------
+# Un limite di spesa esaurito, un token scaduto, una quota finita: il processo `claude` esce
+# diverso da zero senza aver guardato una riga di codice. Fino al 2026-08-20 quell'uscita
+# arrivava a chi chiudeva come "@thor ha verificato e dice NO" — misurato su MirrorBuddy, card
+# 260820-122649, log con "You've hit your monthly spend limit" e zero righe di verifica. E' la
+# malattia che thor-verify.sh esiste per curare, nel verso peggiore: il registro afferma che
+# qualcuno ha verificato e ha bocciato, quando nessuno ha verificato niente. Chi legge la card
+# sei mesi dopo non ha modo di accorgersene.
+#
+# La riparazione e' dire la causa, non indovinarla: si guarda il log per i marcatori che solo
+# uno strumento indisponibile produce. Se non ce ne sono, resta il messaggio generico — meglio
+# un "non e arrivato in fondo" onesto che una diagnosi inventata.
+#
+# thor_unavailable_reason <file-di-log>  ->  stampa la causa, o niente
+thor_unavailable_reason() {
+  local vlog="$1"
+  [ -f "$vlog" ] || return 0
+  # -i perche' la frase esatta cambia tra provider e tra versioni della CLI: si riconosce il
+  # fatto (credito/quota/sessione), non la formulazione di un particolare mese.
+  grep -oiE "hit your (monthly )?(spend|usage) limit|spend limit reached|usage limit reached|quota exceeded|insufficient (credit|quota)|rate limit(ed| exceeded)|invalid api key|authentication_error|not logged in|please run .?claude login" \
+    "$vlog" 2>/dev/null | tail -1 || true
+}
+
 verify_card() {
-  local cid="$1" dir="$2" tmo="$3" vlog="$4" cf="" dod="" acc="" vprompt="" vrc=0 verdict=""
+  local cid="$1" dir="$2" tmo="$3" vlog="$4" cf="" dod="" acc="" vprompt="" vrc=0 verdict="" _tv_unavail=""
   for c in todo doing "done"; do [ -e "$KB/$c/$cid.md" ] && cf="$KB/$c/$cid.md"; done
   if [ -z "$cf" ]; then
     printf 'FAIL\tcard %s not found in kanban/ for verification\n' "$cid"
@@ -135,7 +158,13 @@ verifica non avvenuta e la card resta aperta."
     # questo" e ha chiuso il turno. Confonderli manda a cercare un difetto di formato dove il
     # problema e' che il verificatore si e' fermato a meta'.
     if [ "$vrc" -ne 0 ]; then
-      printf 'FAIL\tthor-verify non e arrivato in fondo (exit=%s) — see %s\n' "$vrc" "$vlog"
+      _tv_unavail="$(thor_unavailable_reason "$vlog")"
+      if [ -n "$_tv_unavail" ]; then
+        # Frase distinta apposta: thor-verify.sh la traduce in SKIP, e SKIP non e' un verdetto.
+        printf 'FAIL\t@thor non e eseguibile ora: %s (exit=%s) — see %s\n' "$_tv_unavail" "$vrc" "$vlog"
+      else
+        printf 'FAIL\tthor-verify non e arrivato in fondo (exit=%s) — see %s\n' "$vrc" "$vlog"
+      fi
     else
       printf 'FAIL\t@thor ha finito il turno SENZA scrivere un verdetto (exit=0) — see %s\n' "$vlog"
     fi
