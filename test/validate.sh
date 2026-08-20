@@ -32,7 +32,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate 
   _spawn "$_s"
 done
 unset _s
-_spawn_serial_group test-sync-install test-copilot-adapter
+_spawn_serial_group test-sync-install test-copilot-adapter test-skill-name-collision
 
 # --- 1) Frontmatter lint (agenti, skill, card, schema federato) ---------------
 # Le quattro famiglie vivono in test/test-frontmatter.sh: il frontmatter e' il contratto fra un
@@ -150,6 +150,7 @@ if _suite test-fork-merge; then ok "merge-clean proof green (see bash test/test-
 # --- 8) sync.sh --install: skills symlink step (isolated, no real ~/.claude touched) ---
 section "sync.sh --install — skills symlink step (isolated via RDA_CLAUDE_SKILLS_DIR)"
 if _suite test-sync-install; then ok "install symlink/skip logic verified (see bash test/test-sync-install.sh)"; else err "test-sync-install — see bash test/test-sync-install.sh"; fi
+if _suite test-skill-name-collision; then ok "skill-name collision: rdos- namespace, retire, heal (see bash test/test-skill-name-collision.sh)"; else err "test-skill-name-collision — see bash test/test-skill-name-collision.sh"; fi
 
 # --- 8a) Copilot native adapter (agents + extension emission/install/load/guards) ---
 section "copilot native adapter — emission, collision-safe install, extension load + guard mapping"
