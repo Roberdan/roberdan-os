@@ -45,7 +45,26 @@ IFS="$_ifs"
 
 # --- interruttori: chi ha gia' scelto, ha scelto --------------------------------------------
 [ "${RDA_GH_SHIM_OFF:-0}" = "1" ] && exec "$REAL" "$@"
-[ -n "${GH_CONFIG_DIR:-}" ]       && exec "$REAL" "$@"   # il chiamante ha gia' deciso
+
+# GH_CONFIG_DIR gia' impostata sono DUE casi opposti, e confonderli era un difetto vero
+# (30 luglio -> 20 agosto 2026): Roberto apre la sessione con `gh copilot`, questo shim risolve
+# il repo e riparte con `exec env GH_CONFIG_DIR=...`, e da quel momento OGNI processo figlio —
+# la sessione dell'agente, e tutto cio' che ci gira dentro — nasce con la variabile gia' messa.
+# La regola "chi ha gia' scelto, ha scelto" scattava percio' sempre, e `gh` restava inchiodato
+# all'account del PRIMO repo per il resto della sessione: dentro un repo personale usava
+# l'account di lavoro, cioe' esattamente il rilievo 3 che questo file esiste per impedire.
+# La distinzione: quando decide, lo shim firma la propria scelta in RDA_GH_SHIM_SET. Se ritrova
+# la PROPRIA firma, quella variabile non e' la volonta' di nessuno — e' un residuo, si azzera e
+# si ridecide da capo. Una variabile senza firma, o con una firma che non combacia, e' invece la
+# scelta di un chiamante umano e resta intoccabile come prima.
+if [ -n "${GH_CONFIG_DIR:-}" ]; then
+  if [ "$GH_CONFIG_DIR" = "${RDA_GH_SHIM_SET:-}" ]; then
+    unset GH_CONFIG_DIR RDA_GH_SHIM_SET
+  else
+    exec "$REAL" "$@"   # il chiamante ha gia' deciso
+  fi
+fi
+
 [ -n "${GH_TOKEN:-}${GH_ENTERPRISE_TOKEN:-}" ] && exec "$REAL" "$@"  # token esplicito: non toccare
 
 # --- 1. `-R owner/nome` sulla riga di comando vince sul cwd ----------------------------------
@@ -79,4 +98,4 @@ done < "$MAP"
 case "$dir" in "~"/*) dir="$HOME/${dir#\~/}" ;; esac
 [ -f "$dir/hosts.yml" ] || exec "$REAL" "$@"     # cartella non pronta: fallisci APERTO
 
-exec env GH_CONFIG_DIR="$dir" "$REAL" "$@"
+exec env GH_CONFIG_DIR="$dir" RDA_GH_SHIM_SET="$dir" "$REAL" "$@"

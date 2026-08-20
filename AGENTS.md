@@ -195,6 +195,11 @@ Self-**proposing** system, never self-**applying** on behavior. → [`docs/adr/0
 
 - **Durable memory = vault** (cross-platform), not a per-tool silo → [`memory/memory-protocol.md`](memory/memory-protocol.md).
   Recall: `gbrain search` keyword first (semantic search drops scattered topics).
+  Corollary, and it is not optional: **do not call a host's native memory tool** (Copilot's
+  `store_memory`/`vote_memory`, or any equivalent). It writes into exactly the per-tool silo this
+  line rules out, and on Copilot CLI ≥ 1.0.81-3 it does not even do that — the server rejects every
+  write with `Instance id is required.` after the client logs `session settings are unavailable`,
+  so each call costs a turn and prints a failure to Roberto. Write to the vault instead.
 - **`learn/`** — capture (inbox, no lock) → batch distill → quarantine → [`learn/learn-protocol.md`](learn/learn-protocol.md).
 - **`ontology/`** — single-writer promotion into the vault + human-gated hygiene → [`ontology/ontology-protocol.md`](ontology/ontology-protocol.md).
 - **`evolve/`** — weekly Claude/Copilot/Codex changelog watcher → draft-only in `proposals/` → [`evolve/evolve-protocol.md`](evolve/evolve-protocol.md).
