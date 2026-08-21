@@ -3,6 +3,44 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.31.2] - 2026-08-21
+
+**Il fork gbrain non esiste piu' dal 2026-07-08, ma tre file continuavano a dirlo a chi installa.**
+Nessun cambiamento di comportamento: solo la documentazione che tornava a coincidere con la realta'
+gia' verificata da `bin/check-embedder.sh:4-8`.
+
+### Fixed
+
+- `README.md` (Prerequisites): la voce gbrain diceva di installare un **fork personale**
+  (`Roberdan/gbrain`) pinnato a `ollama:bge-m3`. Falso: dal 2026-07-08 gira l'**upstream ufficiale**
+  `garrytan/gbrain` e l'embedder e' scelto da *configurazione* (`embedding_dimensions: 1024` in
+  `~/.gbrain/config.json`), non da una patch. Era l'errore piu' costoso dei tre: e' l'istruzione di
+  installazione, quindi mandava chiunque a clonare un fork che non deve piu' esistere.
+- `README.md` (Honest limitations): "the gbrain fork" -> "gbrain".
+- `bin/doctor.sh:116`: l'hint di remediation del check `gbrain` rimandava al fork. Ora indica
+  l'upstream ufficiale e chiarisce che l'embedder e' impostato via config.
+- `bin/doctor.sh:125,130`: i due messaggi del check `ollama` dicevano "the gbrain **fork's**
+  pinned embedder", contraddicendo la riga 116 appena corretta nello stesso file. Ora
+  "gbrain's **configured** embedder". Trovate da @thor: il grep di accettazione cercava
+  `local fork` e non le beccava, perche' qui la formulazione era `gbrain fork's` — il
+  criterio era scritto su tre frasi scelte a mano invece che sul vincolo reale.
+- `docs/roberdan-os-paper-en.md` (Limitations): la voce descriveva una fragilita' **non piu'
+  esistente** (una patch a due righe da riapplicare dopo ogni upgrade dell'engine). Riscritta invece
+  che cancellata: il rischio residuo reale — *config drift* tra `config.json` e l'engine in
+  esecuzione — c'e' ancora, ed e' esattamente cio' che `bin/check-embedder.sh` verifica. Cancellarla
+  avrebbe lasciato il paper senza alcuna limitazione dichiarata mentre il repo continua a spedire il
+  durability check: meno onesto, non piu' onesto.
+- `docs/roberdan-os-paper-en.md` (Future work): l'item "cosi' un fork locale e il suo durability
+  check non sono piu' necessari" era ormai privo di oggetto. Riformulato sul residuo reale
+  (registrare `bge-m3`@1024 nativamente nella recipe ollama upstream).
+
+### Added
+
+- `docs/plan-2026-08-21-gbrain-dependency.md`: indice dell'iniziativa (P1-P8) su come roberdan-os
+  dipende da gbrain e gstack. Questa card e' **solo P1**. P2-P8 restano proposte non promosse:
+  solo Roberto promuove. Il piano documenta anche il modello a tre livelli
+  (canon / automation-core / full-recall) e la catena roberdan-os -> gstack -> gbrain.
+
 ## [v2.31.1] - 2026-08-21
 
 **Il watcher evolve aveva tre card ferme: Claude Code, Copilot e Warp sono cambiati, ma il canon non doveva auto-riscriversi.**
