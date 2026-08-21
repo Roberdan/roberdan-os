@@ -198,7 +198,7 @@ Optional, feature-gated (everything degrades cleanly without them):
 - `prettier` — without it, `autofmt` silently no-ops on JS/TS/MD/CSS (Python/Rust still format).
 - [gstack](https://github.com/garrytan/gstack) — backs the `problem-validation` skill (which
   orchestrates the self-contained `focus-group` + `premortem` skills; those two exist precisely
-  because gstack lacks them).
+  because gstack lacks them). It also owns the supported gbrain setup and sync workflows below.
 - [gbrain](https://github.com/garrytan/gbrain) — local-first semantic memory for recall. Roberto
   runs the **official upstream** (no fork since 2026-07-08): the embedder is chosen by
   configuration, not by a code patch — `ollama:bge-m3` with `embedding_dimensions: 1024` in
@@ -206,6 +206,126 @@ Optional, feature-gated (everything degrades cleanly without them):
   embedder; `bin/check-embedder.sh` verifies the setup is intact.
 
 Reading the canon needs none of these — they only power the automation (recall, factory, some skills).
+
+### Full-recall lifecycle: gstack + gbrain
+
+This is the optional zero-to-working path for semantic recall and code intelligence. The core
+roberdan-os install above remains valid without it.
+
+**1. Install gstack, then let its setup workflow configure gbrain.**
+
+```bash
+git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git \
+  ~/.claude/skills/gstack
+cd ~/.claude/skills/gstack && ./setup
+```
+
+In a supported agent session, run:
+
+```text
+/setup-gbrain
+```
+
+The workflow installs the official `garrytan/gbrain`, chooses the local PGLite, Supabase, or remote
+MCP engine with you, registers the MCP server, applies the per-repository trust policy, wires the
+initial source, and ends with a smoke test. It does not silently ingest every repository.
+
+For a standalone local install without the gstack workflow, install
+[Bun](https://bun.sh) and [Ollama](https://ollama.com), start Ollama, then run:
+
+```bash
+bun install -g github:garrytan/gbrain   # not the unrelated npm package named "gbrain"
+ollama pull bge-m3
+gbrain init --pglite \
+  --embedding-model ollama:bge-m3 \
+  --embedding-dimensions 1024
+gbrain doctor
+```
+
+The dimension is part of the durable configuration and must match the model. Do not use
+`gbrain config set embedding_dimensions 1024` as a substitute: schema-sizing fields resolve from
+the file/environment plane established by `init`, not from the database plane written by
+`config set`. In this repository, `bin/check-embedder.sh` verifies the model, dimensions, live
+Ollama response, and official-upstream remote.
+
+**2. Register and pin each worktree, then build its first index.**
+
+From the repository to index, run this in the agent:
+
+```text
+/sync-gbrain --full
+```
+
+`/sync-gbrain` creates a worktree-scoped native-code source when needed, writes its source ID to
+`.gbrain-source`, indexes the files on disk, and refreshes the bounded search-guidance block in
+`AGENTS.md`/`CLAUDE.md`. Sibling worktrees therefore do not share a stale code snapshot.
+
+For a standalone setup, the low-level commands below deliberately choose stricter, isolated
+routing:
+
+```bash
+cd ~/GitHub/my-repository
+SOURCE_ID="my-repository-main"
+gbrain sources add "$SOURCE_ID" --path "$PWD" --no-federated
+gbrain sources attach "$SOURCE_ID"      # writes .gbrain-source in this worktree
+gbrain sync --source "$SOURCE_ID"       # initial index without the gstack workflow
+```
+
+Use a distinct, stable source ID per worktree. `--no-federated` keeps that source out of
+unqualified federated searches by default; it is a routing control, not a proof that private data
+can never be selected or sent elsewhere. This is **not** equivalent to `/sync-gbrain`: gstack
+registers its code source as federated by design, making it eligible for authorized cross-source
+searches. Replace `--no-federated` with `--federated` only when that broader retrieval is intended.
+
+**3. Give routine freshness to launchd, not to a second manual loop.**
+
+After the first full sync, install gbrain's macOS autopilot once per machine:
+
+```bash
+gbrain autopilot --install
+gbrain autopilot --status
+```
+
+The launchd agent is the sole owner of ongoing scheduled refresh. Do **not** run `/sync-gbrain`
+concurrently with an active autopilot: both can touch the same source, and the gstack orchestrator
+refuses destructive source operations when it detects that race. The manual commands remain for
+bootstrap or recovery while autopilot is not active:
+
+| Agent command | Use |
+|---|---|
+| `/sync-gbrain` | incremental code, memory, and artifact refresh |
+| `/sync-gbrain --full` | clean full reindex |
+| `/sync-gbrain --dream` | rebuild the code call graph and run the dream cycle |
+
+If freshness is suspect, check `gbrain autopilot --status` first. A stale heartbeat or a failing
+last dispatch means launchd is installed but not healthy; `gbrain doctor --json` supplies the
+underlying engine/provider diagnosis.
+
+**4. Upgrade and verify each independently versioned component.**
+
+```bash
+gbrain self-upgrade --check-only
+gbrain self-upgrade
+```
+
+Upgrade gstack from an agent session with `/gstack-upgrade`; it does not upgrade gbrain. The
+following checks cover the installed binary, source routing, pin, scheduler, embedder, and an
+actual scoped query:
+
+```bash
+gbrain doctor --json
+gbrain sources list --json
+cat .gbrain-source
+gbrain autopilot --status
+bin/check-embedder.sh
+gbrain search "where is the completion gate implemented?"
+```
+
+Ownership is intentionally split: **roberdan-os** owns the behavioral canon and platform wrappers;
+**gstack** owns `/setup-gbrain`, `/sync-gbrain`, and only the content between
+`gstack-gbrain-search-guidance:start` / `gstack-gbrain-search-guidance:end`; **gbrain** owns
+storage, indexing, retrieval, and autopilot. Never hand-edit that generated block, and do not
+expect `roberdan-os/bin/sync.sh` to regenerate it.
 
 ## Honest limitations
 
