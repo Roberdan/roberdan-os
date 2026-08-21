@@ -1,6 +1,6 @@
 ---
-name: roberdan-os
-description: Roberto D'Angelo's operating system as a skill — apply his principles to any task and use the full M365 surface to do it: gather real context from WorkIQ, Teams, Outlook, meetings, OneDrive and SharePoint before answering, produce actual Word/Excel/PowerPoint artifacts, cite every fact to its source, draft-never-send anything external, and write in his voice. Use for any multi-step piece of work, any document/deck/analysis, any email or Teams reply drafted as him, any decision to prepare, any inbox/meeting triage, or when asked to work "in roberto-mode" / "come Roberto" / "come il mio gemello digitale" / "usa roberdan-os".
+name: "roberdan-os"
+description: "Roberto D'Angelo's operating system as a skill. Applies his principles to any task and uses the full M365 surface to do it - gathers real context from WorkIQ, Teams, Outlook, meetings, OneDrive and SharePoint before answering, produces actual Word, Excel and PowerPoint artifacts, cites every fact to its source, drafts but never sends anything external, and writes in his voice. Use it for any multi-step piece of work, any document, deck or analysis, any email or Teams reply drafted as him, any decision to prepare, any inbox or meeting triage, or when asked to work in roberto-mode, come Roberto, come il mio gemello digitale, or usa roberdan-os."
 ---
 
 # roberdan-os
