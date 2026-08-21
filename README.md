@@ -220,10 +220,11 @@ git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git \
 cd ~/.claude/skills/gstack && ./setup
 ```
 
-In a supported agent session, run:
+In a supported agent session, invoke the setup skill. The installed command name is client-specific:
 
 ```text
-/setup-gbrain
+Claude Code: /setup-gbrain
+Copilot CLI: /gstack-setup-gbrain
 ```
 
 The workflow installs the official `garrytan/gbrain`, chooses the local PGLite, Supabase, or remote
@@ -250,15 +251,17 @@ Ollama response, and official-upstream remote.
 
 **2. Register and pin each worktree, then build its first index.**
 
-From the repository to index, run this in the agent:
+From the repository to index, invoke the corresponding sync skill:
 
 ```text
-/sync-gbrain --full
+Claude Code: /sync-gbrain --full
+Copilot CLI: /gstack-sync-gbrain --full
 ```
 
-`/sync-gbrain` creates a worktree-scoped native-code source when needed, writes its source ID to
-`.gbrain-source`, indexes the files on disk, and refreshes the bounded search-guidance block in
-`AGENTS.md`/`CLAUDE.md`. Sibling worktrees therefore do not share a stale code snapshot.
+Both names invoke gstack's same `sync-gbrain` workflow. It creates a worktree-scoped native-code
+source when needed, writes its source ID to `.gbrain-source`, indexes the files on disk, and
+refreshes the bounded search-guidance block in `AGENTS.md`/`CLAUDE.md`. Sibling worktrees therefore
+do not share a stale code snapshot.
 
 For a standalone setup, the low-level commands below deliberately choose stricter, isolated
 routing:
@@ -322,7 +325,8 @@ gbrain search "where is the completion gate implemented?"
 ```
 
 Ownership is intentionally split: **roberdan-os** owns the behavioral canon and platform wrappers;
-**gstack** owns `/setup-gbrain`, `/sync-gbrain`, and only the content between
+**gstack** owns its `setup-gbrain` / `sync-gbrain` workflows (including Copilot's namespaced
+`gstack-setup-gbrain` / `gstack-sync-gbrain` installs), and only the content between
 `gstack-gbrain-search-guidance:start` / `gstack-gbrain-search-guidance:end`; **gbrain** owns
 storage, indexing, retrieval, and autopilot. Never hand-edit that generated block, and do not
 expect `roberdan-os/bin/sync.sh` to regenerate it.
