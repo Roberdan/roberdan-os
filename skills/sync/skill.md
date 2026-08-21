@@ -1,6 +1,6 @@
 ---
 name: sync
-description: Keep the 3 systems aligned — Obsidian vault (durable memory), Convergio twin plans, in-repo docs. Anti-drift. Read vault before asking. MANUAL — nothing mechanizes it: post-task-sync only regenerates the per-platform wrappers, is opt-in on RDA_AUTOSYNC=1, and is not installed.
+description: "Keep the 3 systems aligned — Obsidian vault (durable memory), Convergio twin plans, in-repo docs. Anti-drift. Read vault before asking. MANUAL — nothing mechanizes it: post-task-sync only regenerates the per-platform wrappers, is opt-in on RDA_AUTOSYNC=1, and is not installed."
 providers: [claude, copilot, codex]
 ---
 

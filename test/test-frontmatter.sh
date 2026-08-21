@@ -41,6 +41,39 @@ for s in $(find skills -maxdepth 2 -name 'skill.md' | LC_ALL=C sort); do
   [ -n "$miss" ] && err "$s missing:$miss" || ok "$s"
 done
 
+section "frontmatter — exported SKILL.md must PARSE, not merely contain the word (grep saw `description:`, the loader saw nothing)"
+# Scar 2026-08-21: cowork-skill/roberdan-os/SKILL.md had a description containing ": ",
+# which is not a valid YAML plain scalar. M365 Cowork refused the upload with "manca la
+# descrizione" while `grep -qE '^description:'` above was perfectly happy. Presence is not
+# validity — parse it the way the loader does.
+if ! command -v python3 >/dev/null 2>&1 || ! python3 -c 'import yaml' >/dev/null 2>&1; then
+  printf "  skip: python3 + pyyaml unavailable — cannot parse as a loader would\n"
+else
+  for s in $(find .github/skills cowork-skill claude-ai-skill skills -maxdepth 3 \
+              \( -name 'SKILL.md' -o -name 'skill.md' \) 2>/dev/null | LC_ALL=C sort); do
+    out="$(python3 - "$s" <<'PY'
+import sys, yaml
+p = sys.argv[1]
+text = open(p, encoding="utf-8").read()
+if not text.startswith("---"):
+    print("no frontmatter block"); sys.exit(0)
+block = text.split("---", 2)[1]
+try:
+    data = yaml.safe_load(block)
+except Exception as e:
+    print("yaml parse error: %s" % str(e).splitlines()[0]); sys.exit(0)
+if not isinstance(data, dict):
+    print("frontmatter is not a mapping"); sys.exit(0)
+for key in ("name", "description"):
+    value = data.get(key)
+    if not isinstance(value, str) or not value.strip():
+        print("%s missing or not a non-empty string after parsing" % key); sys.exit(0)
+PY
+)"
+    [ -n "$out" ] && err "$s — $out" || ok "$s parses"
+  done
+fi
+
 section "frontmatter — kanban cards, todo/doing only (title, repo, dod, acceptance, status, created)"
 # done/ e' l'archivio di controllo append-only — non si lintano (kanban/README.md): riempire
 # `repo:` a posteriori sulle card storiche non serve, il cancello vale sulle card attive.
