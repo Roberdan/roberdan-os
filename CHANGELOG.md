@@ -19,6 +19,11 @@ gia' verificata da `bin/check-embedder.sh:4-8`.
 - `README.md` (Honest limitations): "the gbrain fork" -> "gbrain".
 - `bin/doctor.sh:116`: l'hint di remediation del check `gbrain` rimandava al fork. Ora indica
   l'upstream ufficiale e chiarisce che l'embedder e' impostato via config.
+- `bin/doctor.sh:125,130`: i due messaggi del check `ollama` dicevano "the gbrain **fork's**
+  pinned embedder", contraddicendo la riga 116 appena corretta nello stesso file. Ora
+  "gbrain's **configured** embedder". Trovate da @thor: il grep di accettazione cercava
+  `local fork` e non le beccava, perche' qui la formulazione era `gbrain fork's` — il
+  criterio era scritto su tre frasi scelte a mano invece che sul vincolo reale.
 - `docs/roberdan-os-paper-en.md` (Limitations): la voce descriveva una fragilita' **non piu'
   esistente** (una patch a due righe da riapplicare dopo ogni upgrade dell'engine). Riscritta invece
   che cancellata: il rischio residuo reale — *config drift* tra `config.json` e l'engine in
