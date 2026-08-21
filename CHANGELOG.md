@@ -29,7 +29,9 @@ gia' verificata da `bin/check-embedder.sh:4-8`.
   che cancellata: il rischio residuo reale — *config drift* tra `config.json` e l'engine in
   esecuzione — c'e' ancora, ed e' esattamente cio' che `bin/check-embedder.sh` verifica. Cancellarla
   avrebbe lasciato il paper senza alcuna limitazione dichiarata mentre il repo continua a spedire il
-  durability check: meno onesto, non piu' onesto.
+  durability check: meno onesto, non piu' onesto. **La card diceva di cancellarla**, quindi la
+  deviazione e' stata portata a Roberto invece che decisa dall'agente: @thor ha rifiutato la
+  chiusura finche' non si e' pronunciato, e il 2026-08-21 ha approvato la riscrittura.
 - `docs/roberdan-os-paper-en.md` (Future work): l'item "cosi' un fork locale e il suo durability
   check non sono piu' necessari" era ormai privo di oggetto. Riformulato sul residuo reale
   (registrare `bge-m3`@1024 nativamente nella recipe ollama upstream).
