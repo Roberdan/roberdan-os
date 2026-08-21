@@ -75,6 +75,11 @@ function diag(where, e) {
 // main-guard (branch discipline) + autofmt; shell tools feed the bash-guard.
 const WRITE_TOOLS = new Set(["edit", "create", "write", "str_replace", "str_replace_editor", "multiedit", "notebookedit"]);
 const SHELL_TOOLS = new Set(["bash", "shell", "execute", "powershell"]);
+// Host-native memory tools. AGENTS.md forbids them: durable memory belongs in the local
+// vault (~/Obsidian), never in a vendor-hosted store. The vendor's own `memory.enabled`
+// setting is the primary switch, but it lives outside this repo and can be flipped back by
+// an update or a stray `/memory` toggle — so we deny here too, in something we control.
+const MEMORY_TOOLS = new Set(["store_memory", "vote_memory", "create_memory", "update_memory"]);
 
 // Hook inputs carry `toolArgs` as `unknown`, and the session-event schema marks it
 // `x-opaque-json`: the host may deliver it as an already-parsed object OR as a JSON
@@ -472,6 +477,17 @@ const hooks = {
         // even when a relative path is supplied and the extension's own cwd differs (a relative
         // path with a cwd mismatch would otherwise let main-guard resolve no repo and fail OPEN).
         const cwd = (input && input.workingDirectory) || process.cwd();
+        // Sensitive knowledge never leaves the machine: refuse host-native memory writes
+        // outright. This is a hard deny (not "ask") because there is no legitimate case —
+        // the durable store is the local vault, and a prompt would only invite a mistake.
+        if (MEMORY_TOOLS.has(name)) {
+            return {
+                permissionDecision: "deny",
+                permissionDecisionReason:
+                    `roberdan-os: '${name}' writes to a vendor-hosted memory store. Durable memory stays local — ` +
+                    `write a note under ~/Obsidian/Roberdan's Vault/agent-learnings/ instead (type: agent-learning).`,
+            };
+        }
         if (WRITE_TOOLS.has(name)) {
             const fp = writePathOf(args);
             return await applyGuard("main-guard.sh", { tool_input: { file_path: String(fp) } }, cwd);

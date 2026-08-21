@@ -3,6 +3,32 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.31.3] - 2026-08-21
+
+**La memoria durevole dell'agente finiva su un archivio ospitato da GitHub.** Roberto: *"non mi
+piace che le memorie vadano su github, voglio tutte le cose sensibili sempre e solo in locale"*.
+`AGENTS.md` gia' lo vietava, ma era una regola che il modello poteva violare — e l'ha fatto, tre
+volte, nella sessione del 2026-08-21. Ora e' un meccanismo, non una buona intenzione.
+
+### Added
+
+- `hooks/copilot/extension.template.mjs`: `MEMORY_TOOLS` + un **deny esplicito** in
+  `onPreToolUse` per `store_memory`, `vote_memory`, `create_memory`, `update_memory`. E' un
+  `deny` e non un `ask` perche' non esiste un caso legittimo: il durevole sta nel vault locale
+  (`~/Obsidian/Roberdan's Vault/agent-learnings/`), e un prompt inviterebbe solo all'errore.
+  Il diniego e' deciso **inline**, prima di `applyGuard`, quindi vale anche se gli script di
+  guard mancano o falliscono.
+- `test/test-copilot-adapter.sh`: quattro asserzioni sul diniego (deny, case-insensitive, e il
+  messaggio che indica il vault come alternativa).
+
+### Note
+
+- L'interruttore del fornitore (`~/.copilot/settings.json` -> `memory.enabled: false`) e' stato
+  impostato in parallelo, ma vive **fuori** da questo repo e puo' essere riacceso da un
+  aggiornamento o da un `/memory` distratto: per questo il deny locale esiste comunque.
+- Verificato che le **sessioni** non si sincronizzano in blocco: nel cloud store risultano solo
+  quelle con un `task_id`, cioe' condivise esplicitamente (`/delegate`, `/remote`, `/share`).
+
 ## [v2.31.2] - 2026-08-21
 
 **Il fork gbrain non esiste piu' dal 2026-07-08, ma tre file continuavano a dirlo a chi installa.**
