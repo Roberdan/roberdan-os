@@ -113,7 +113,7 @@ fi
 check_cmd optional shellcheck "the lint gate falls back to 'bash -n', which catches far less" "$PKG shellcheck"
 check_cmd optional prettier   "autofmt silently no-ops on JS/TS/MD/CSS (Python/Rust still format)" "npm i -g prettier"
 check_cmd optional gbrain     "semantic recall is unavailable; skills fall back to grep" \
-  "see README 'Prerequisites' — Roberto runs the fork github.com/Roberdan/gbrain"
+  "see README 'Prerequisites' — official upstream github.com/garrytan/gbrain (embedder set by config, no fork)"
 # `ollama --version` exits 0 even when nothing is listening, printing a warning
 # to stdout. Reporting that as "ok" would be a false green of exactly the kind
 # this script exists to remove, so the daemon is probed instead of the binary.
@@ -122,12 +122,12 @@ if have ollama; then
     emit optional ollama ok "daemon responding"
   else
     emit optional ollama missing "binary present, daemon not responding" \
-      "the gbrain fork's pinned embedder (ollama:bge-m3) cannot run; recall degrades to grep" \
+      "gbrain's configured embedder (ollama:bge-m3) cannot run; recall degrades to grep" \
       "ollama serve   (or start the Ollama app)"
   fi
 else
   emit optional ollama missing "not on PATH" \
-    "the gbrain fork's pinned embedder (ollama:bge-m3) cannot run" "$PKG ollama"
+    "gbrain's configured embedder (ollama:bge-m3) cannot run" "$PKG ollama"
 fi
 
 # An agent CLI is required in the sense that the canon needs a reader, but ANY

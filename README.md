@@ -200,8 +200,10 @@ Optional, feature-gated (everything degrades cleanly without them):
   orchestrates the self-contained `focus-group` + `premortem` skills; those two exist precisely
   because gstack lacks them).
 - [gbrain](https://github.com/garrytan/gbrain) — local-first semantic memory for recall. Roberto
-  runs a **personal patched fork** ([`github.com/Roberdan/gbrain`](https://github.com/Roberdan/gbrain))
-  pinned to `ollama:bge-m3`; needs [Ollama](https://ollama.com) for that embedder.
+  runs the **official upstream** (no fork since 2026-07-08): the embedder is chosen by
+  configuration, not by a code patch — `ollama:bge-m3` with `embedding_dimensions: 1024` in
+  `~/.gbrain/config.json`, which upstream honours. Needs [Ollama](https://ollama.com) for that
+  embedder; `bin/check-embedder.sh` verifies the setup is intact.
 
 Reading the canon needs none of these — they only power the automation (recall, factory, some skills).
 
@@ -215,7 +217,7 @@ Reading the canon needs none of these — they only power the automation (recall
   custom agents and the hooks are bound via the native adapter (v2.16.0), **except** the completion
   gate is advisory — Copilot can't block an already-produced final response. On **Codex** and other
   AGENTS.md tools the agents remain prose personas, not invokable.
-- **Full function depends on external, personal tooling** (the gbrain fork, gstack). Without them,
+- **Full function depends on external, personal tooling** (gbrain, gstack). Without them,
   recall and some skills degrade.
 - **`evolve` hasn't fired yet, and meta-loop auto-promotion is deliberately un-wired** (see the
   honest map). The `learn→ontology` promotion path itself is real and human-gated as of v2.10.0.
