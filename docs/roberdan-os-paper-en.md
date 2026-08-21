@@ -550,12 +550,14 @@ Run independently, premortem and focus-group **converged** on the same core insi
 
 ## 10. Limitations
 
-- **Local embedding, now with a durability check.** The embedder is local (`bge-m3` on GPU); the
-  patch lives in a local fork of gbrain and must be re-applied after an engine update — the running
-  binary is a separately-published package, a different artefact from the fork's git history, so an
-  upgrade could silently drop the patch (config would still claim `bge-m3`; the code would silently
-  stop recognising it). A read-only durability check (`bin/check-embedder.sh`) now verifies both
-  agree, to be run after any upgrade — mitigation, not elimination, of the risk.
+- **Local embedding, config-driven, with a durability check.** The embedder is local (`bge-m3` on
+  GPU) and is selected by *configuration*, not by a code patch: since 2026-07-08 the engine is the
+  official upstream, which honours the declared `embedding_dimensions: 1024`. The earlier fragility
+  — a two-line fork patch that had to be re-applied after every engine update — no longer applies.
+  What remains is ordinary configuration drift: an upgrade or a stray edit could still leave the
+  config and the running engine disagreeing. A read-only durability check (`bin/check-embedder.sh`)
+  verifies the declared config, the live embedding dimensions, and that no fork remote has crept
+  back — to be run after any upgrade. Mitigation, not elimination, of that residual risk.
 - **Built ≠ active-by-default (a recurring failure mode, not a one-time lesson).** Mistaking
   "committed to the repo" for "active in the live environment" surfaced repeatedly, in different
   shapes: skills needing manual installation into `~/.claude/skills/`; a factory dispatcher whose
@@ -641,8 +643,9 @@ Remaining technical work:
 - Automatic capture from session transcripts (today agent-driven).
 - Focus-group panels calibrated on real audiences with consent.
 - Longitudinal meta-loop metrics (how many promoted learnings survive review).
-- Propose the local-embedding patch upstream to gbrain (register `bge-m3`@1024 natively) so a
-  local fork and its durability check are no longer necessary.
+- Propose registering `bge-m3`@1024 natively in gbrain's ollama recipe upstream, so the embedder
+  needs no explicit `embedding_dimensions` in config at all. *(The local fork is already gone —
+  upstream honours the declared dimensions — but the durability check remains useful.)*
 
 ## 13. Conclusion
 
