@@ -227,6 +227,20 @@ A(r && r.permissionDecision === "deny", "bash force-push (toolArgs as JSON strin
 r = await pre({ toolName: "bash", toolArgs: "{not json" });
 A(r === undefined, "unparseable toolArgs -> no crash, no override");
 
+// Host-native memory tools: hard deny. Durable memory belongs in the local vault, never in
+// a vendor-hosted store. This must NOT depend on any guard script — it is decided inline,
+// so it holds even when the guards are missing or erroring.
+r = await pre({ toolName: "store_memory", toolArgs: JSON.stringify({ fact: "x", scope: "user" }) });
+A(r && r.permissionDecision === "deny", "store_memory -> deny (durable memory stays local)");
+r = await pre({ toolName: "vote_memory", toolArgs: "{}" });
+A(r && r.permissionDecision === "deny", "vote_memory -> deny");
+r = await pre({ toolName: "STORE_MEMORY", toolArgs: "{}" });
+A(r && r.permissionDecision === "deny", "memory deny is case-insensitive");
+A(
+    r && /vault/i.test(String(r.permissionDecisionReason || "")),
+    "memory denial names the local vault as the alternative"
+);
+
 console.log(JSON.stringify(out));
 JS
 
