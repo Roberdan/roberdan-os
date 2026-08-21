@@ -3,6 +3,27 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.31.1] - 2026-08-21
+
+**Il watcher evolve aveva tre card ferme: Claude Code, Copilot e Warp sono cambiati, ma il canon non doveva auto-riscriversi.**
+Questa release chiude l'analisi in modo tracciabile: ogni proposta cita fonte, versione/data,
+file che toccherebbe e separa cio' che e' stato solo documentato da cio' che Roberto deve ancora
+approvare.
+
+### Added
+
+- `proposals/2026-08-08-claude-code.md`: valutate le novita' Claude Code da v2.1.223 a v2.1.238,
+  inclusi `headersHelper`, self-hosted runner, cross-session messaging, native todo tools e
+  hardening sandbox/permission. Nessuna modifica al canon: le regole su plugin helper, bus e
+  factory restano decisioni Roberto.
+- `proposals/2026-08-08-copilot.md`: valutati Agent Plugins 1.0, nuove superfici Copilot CLI
+  (`/tasks`, `/plugin`, `/rewind`, `/memory`, `/remote`, `/fleet`, `/autopilot`), enterprise
+  managed settings JetBrains e aggiornamenti modello. Proposta una futura emissione plugin
+  Copilot opt-in, non applicata.
+- `proposals/2026-08-08-warp.md`: valutati `SKILLS_DIRS`, skill references repository-qualified,
+  orchestrazione Warp Agent CLI e fix su toolbelt/background commands. Proposta una futura regola
+  Warp per `SKILLS_DIRS`, non applicata.
+
 ## [v2.31.0] - 2026-08-20
 
 **Tre skill del canone non si caricavano da nessuna parte, e nessuno lo diceva.**
