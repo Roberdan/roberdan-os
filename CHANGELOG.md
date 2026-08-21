@@ -3,6 +3,46 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.32.0] - 2026-08-21
+
+**Il canone ora arriva anche nei due ambienti Cowork e il percorso full-recall e' installabile
+senza ricostruirlo da fonti sparse.** E' una minor release perche' aggiunge nuove superfici
+operative, non solo documentazione: Microsoft 365 Copilot Cowork e GitHub Copilot Cowork possono
+caricare il giudizio di roberdan-os come Agent Skill, mentre il README porta gstack e gbrain da
+assenti a operativi con ownership e freshness esplicite.
+
+Questa pubblicazione include anche l'hardening privacy gia' registrato come v2.31.3 ma mai
+taggato ne' pubblicato: i tool di memoria host restano negati meccanicamente e il durevole resta
+nel vault locale.
+
+### Added
+
+- `.github/skills/roberto-twin/`: il gemello digitale come Agent Skill portabile per GitHub
+  Copilot Cowork/coding agent, CLI e VS Code. Il core resta piccolo; engineering, voce, thinking
+  e costituzione si caricano on demand.
+- `cowork-skill/roberdan-os/`: export dedicato a Microsoft 365 Copilot Cowork. Sostituisce le
+  prove git/CI non disponibili su quella superficie con evidenza verificabile su documenti,
+  email, meeting, Teams e OneDrive, senza perdere voce, gate umani e ragionamento.
+
+### Changed
+
+- `README.md`: lifecycle zero-to-working di gstack + gbrain — upstream ufficiale, Ollama
+  `bge-m3` a 1024 dimensioni, source e pin per worktree, primo indice, autopilot launchd,
+  aggiornamenti indipendenti, diagnostica e ownership del blocco generato.
+- I comandi gbrain distinguono le superfici reali: `/setup-gbrain` e `/sync-gbrain` su Claude
+  Code; `/gstack-setup-gbrain` e `/gstack-sync-gbrain` nell'installazione namespaced di Copilot
+  CLI.
+
+### Fixed
+
+- Il frontmatter YAML delle skill esportate viene analizzato davvero nei test: descrizioni con
+  `: ` non quotato non possono piu' superare la validazione per poi essere rifiutate da Cowork.
+
+### Security
+
+- Incluso integralmente v2.31.3: l'estensione Copilot nega `store_memory`, `vote_memory`,
+  `create_memory` e `update_memory` prima dell'esecuzione, anche se il guard esterno manca.
+
 ## [v2.31.3] - 2026-08-21
 
 **La memoria durevole dell'agente finiva su un archivio ospitato da GitHub.** Roberto: *"non mi
