@@ -155,10 +155,37 @@ value isn't validated against the filesystem (the repo may not be cloned on this
 not exist yet), only checked for "present and not a placeholder."
 
 Where it shows up: `kb list`/`kb todo`/`kb doing`/`kb done` print `[id] (repo) title`; `kb history`
-prints `[id] (repo) title (verified <date>)`; the board (`kb`/`kb view`) appends `(repo)` next to
-the id whenever it fits the column width, otherwise it degrades to the bare id (never truncates
-the id itself — that's the key you pass to `show`/`start`/`finish`). Legacy cards with no `repo:`
-render as `(—)` instead of crashing.
+prints `[id] (repo) title (verified <date>)`. Legacy cards with no `repo:` render as `(-)` instead
+of crashing.
+
+### The board (`kb` / `kb view` / `kb all`) — one line per card, aligned
+
+The board is **stacked by column** (TO DO, then DOING, then DONE — newest 10), with a single
+summary line on top carrying the three counts (the same three `kb counts` prints; a test pins
+them equal). Every card gets **one line saying what it does / should do**:
+
+```
+TO DO (3) · DOING (1) · DONE (155 +21 arch)
+──────────────────────────────────────────────────────────────────────────────
+
+  TO DO (3)
+    260824-130724              (VirtualBPMFy27)  ADO comments: server-rendered HTML template…
+    260822-020005-copilot      (roberdan-os)     evolve: analyze copilot updates and propose…
+```
+
+- **The line is `title:`**, falling back to the first clause of `dod:` for legacy cards with no
+  title ("what it should do" is literally what `dod:` records). It is never blank.
+- **Columns are measured, not fixed:** id and `(repo)` are padded to the widest value actually
+  printed, so the three sections line up as one table. The **id is never truncated** — it is the
+  key you pass to `show`/`start`/`finish`; the summary is what gives way, cut with `…` to the
+  terminal width (`COLUMNS`, clamped to 60–160).
+- Padding is done **by character, not by byte**, so an accented title (`perché`) doesn't shift
+  the column to its right.
+- An empty column prints `(vuota)` — a blank gap is indistinguishable from a broken render.
+
+Why it isn't three side-by-side columns anymore: 34 chars only fit `id (repo)`, so the board was
+a wall of opaque timestamps and you had to `kb show` each one to learn what it was. The sentence
+that says what a card is doesn't fit next to two other columns.
 
 ## Federation — one board per repo, one aggregating `kb`
 
