@@ -23,6 +23,25 @@ kanban/.coda-*
 kanban/.git/
 kanban/.gitignore
 
+# Note generate da gbrain — SCRITTE DA UN TOOL, non a mano, e marcate `visibility: private`.
+# Il 2026-08-24 un `git add -A` ne ha portate due dentro un commit di questo repo, che e'
+# PUBBLICO: `people/roberto.md` (vincoli e decisioni di Roberto) e
+# `claude-code/hooks/bash-guard-sh.md` (dettaglio di hardening); una terza,
+# `projects/virtualbpmfy27.md`, aspettava non tracciata con numeri di PR, percentuali di
+# margine e il nome di un cliente. Non e' uscita perche' il push non era ancora stato dato.
+# Stessa classe di `.serena/` qui sotto: un tool esterno che scrive nella working tree e
+# arriva untracked-ma-committabile senza che nessuno l'abbia chiesto.
+#
+# Le cartelle qui sotto sono quelle che gbrain usa OGGI. Non sono la difesa — elencare
+# cartelle e' inseguire i nomi, e la prossima sync puo' inventarne un'altra. La difesa e'
+# test/private-marker-check.sh, che legge il marcatore DENTRO il file e quindi non ha
+# bisogno di sapere in anticipo dove atterra. Questo elenco toglie il rumore da `git status`;
+# il gate toglie il rischio.
+people/
+projects/
+orgs/
+claude-code/
+
 # OS / editor
 .DS_Store
 *.swp

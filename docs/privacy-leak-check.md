@@ -1,6 +1,17 @@
-# privacy-leak-check — the three-tier confidentiality gate
+# privacy-leak-check — the confidentiality gates
 
-Mechanics of the privacy gate summarized in `AGENTS.md § Privacy`. The gate is
+Mechanics of the privacy gates summarized in `AGENTS.md § Privacy`. There are **three**, and
+they exist because each one is blind to what the others catch. All three run in
+[`hooks/pre-commit`](../hooks/pre-commit) and in `test/validate.sh`:
+
+| gate | domanda che fa | cosa NON puo' vedere |
+|---|---|---|
+| [`leak-check.sh`](../test/leak-check.sh) | "e' il segreto che ho gia' scritto in lista?" (VOCABOLARIO) | un nome che non e' su nessuna lista |
+| [`directory-dump-check.sh`](../test/directory-dump-check.sh) | "questo file ha la forma di un estratto di rubrica?" (FORMA) | un file senza indirizzi ne' ruoli |
+| [`private-marker-check.sh`](../test/private-marker-check.sh) | "il file DICE DA SOLO di essere privato?" (DICHIARAZIONE) | un file che non dichiara niente |
+
+Il terzo e' l'ultimo arrivato, ed e' descritto sotto (§ private-marker-check). Il primo,
+storicamente il principale, e':
 [`test/leak-check.sh`](../test/leak-check.sh) (denylist in `private/.denylist`), with a
 three-tier fallback:
 
@@ -25,3 +36,61 @@ and commits the result. Until that commit lands, CI runs at tier 3 (no-op) exact
 Re-run the script (and re-commit) whenever `private/.denylist` changes — it rotates the salt
 every time. Bundle security also rests on the fact that its sources (committed canon) are
 already scrubbed.
+
+---
+
+## private-marker-check — il file che si dichiara privato
+
+**Il caso, 2026-08-24.** `git add -A` in questo repo — che e' **pubblico** — ha portato dentro
+un commit due file che nessuno aveva scritto a mano: `people/roberto.md` e
+`claude-code/hooks/bash-guard-sh.md`, generati da **gbrain**, ciascuno con una tabella di
+"fatti" con righe marcate `visibility: private`. Un terzo, `projects/virtualbpmfy27.md`,
+aspettava non tracciato con numeri di PR, percentuali di margine e il nome di un cliente.
+Nessuno aveva deciso di pubblicare niente: un tool ha scritto nella working tree e `-A` ha
+preso quello che ha trovato. Non e' arrivato su GitHub solo perche' il push non era ancora
+stato dato — cioe' per fortuna, non per un controllo.
+
+**Perche' gli altri due non potevano prenderlo.** `leak-check` e' una denylist: conosce i
+termini che qualcuno ha pensato di scrivere, e il testo di un fatto generato domani non e' su
+nessuna lista. `directory-dump-check` cerca la forma di una rubrica — indirizzi, ruoli — e li'
+non ce n'erano. Entrambi hanno risposto correttamente **no**.
+
+**La domanda che fa questo.** Non "quali sono i segreti" e nemmeno "che forma hanno", ma:
+*il file dichiara di essere privato?* Sono i file stessi a dirlo, in chiaro, in una colonna che
+il generatore compila. Leggere quella dichiarazione e' l'unica difesa che non ha bisogno di
+sapere in anticipo i contenuti.
+
+**Perche' il `.gitignore` da solo non basta.** Le cartelle `people/`, `projects/`,
+`claude-code/`, `orgs/` sono ignorate: e' giusto e toglie il rumore da `git status`. Ma
+elencare cartelle e' inseguire i nomi — la prossima sync puo' inventarne un'altra, e quel
+file arriverebbe di nuovo untracked-ma-committabile. **Il .gitignore ferma le cartelle di
+oggi; il gate ferma la classe.**
+
+**Cosa non fa, di proposito:**
+
+- non cancella e non modifica niente — i file restano sul disco, escono solo da git;
+- non stampa il contenuto dei fatti. Un guardiano che incolla il segreto nel proprio errore
+  ha spostato la fuga, non fermata;
+- **non blocca un file che dichiara `visibility: public`**. La dichiarazione si rispetta in
+  tutte e due le direzioni, altrimenti diventa un divieto di scrivere la parola "private" —
+  e il primo a saltare sarebbe questo documento;
+- non tocca la prosa scritta a mano che *parla* di privacy: legge il marcatore in una tabella
+  generata, non la parola nel testo.
+
+**Le deroghe stanno in un file, non nello script.** Al primo commit il gate ha bloccato il
+proprio test — che una nota finta col marcatore la costruisce per mestiere. L'eccezione esiste,
+in [`test/.private-marker-allow`](../test/.private-marker-allow): un percorso **esatto** per
+riga, niente glob (`test/*` sarebbe una porta aperta, non un'eccezione). Stessa scelta del
+`.directory-dump-baseline`: concedere una deroga deve costare una riga visibile in un diff,
+non una condizione sepolta nel codice. Oggi ne contiene due — il controllo e il suo test — e il
+test fallisce se diventano di piu'. Se il file da esentare e' **generato da un tool**, la
+risposta non e' una riga li': e' `git rm --cached` piu' la cartella nel `.gitignore`.
+
+**Limite onesto.** Vede solo i file che si dichiarano. Un tool che domani scrivesse dati
+riservati senza marcarli passerebbe — e per quello restano gli altri due gate e la revisione
+del diff. E come tutti gli hook, `--no-verify` lo salta: e' per questo che il messaggio
+d'errore dice sempre come uscirne, perche' un gate che non offre una via d'uscita insegna a
+scavalcarlo, e scavalcare questo vuol dire scavalcare anche il leak-check nello stesso hook.
+
+Meta' di [`test/test-private-marker.sh`](../test/test-private-marker.sh) verifica che il gate
+**lasci passare**: un guardiano che non puo' piu' aprirsi e' peggio di uno che non si chiude mai.

@@ -34,14 +34,30 @@ OUT="$TMP/outer"
 mkdir -p "$OUT/test" "$OUT/.git"
 git init -q "$OUT"
 git -C "$OUT" config user.name t; git -C "$OUT" config user.email t@t
-printf '#!/usr/bin/env bash\nexit 0\n' > "$OUT/test/leak-check.sh"
-# Anche la gamba anti-dump va stubbata, per la stessa ragione della leak-check: questo
-# test parla della board. Senza lo stub il hook BLOCCA ogni commit del fixture perche' il
-# controllo manca, e i casi qui sotto diventano verdi/rossi per un motivo che non c'entra
-# — cosa successa davvero: aggiunta la gamba, questa suite e' rimasta rotta.
-printf '#!/usr/bin/env bash\nexit 0\n' > "$OUT/test/directory-dump-check.sh"
+# OGNI gamba di controllo del hook va stubbata a "passa", per la stessa ragione: questo test
+# parla della board. Un controllo che manca fa BLOCCARE il hook (fallisce chiuso, ed e' giusto
+# cosi'), e allora i casi qui sotto diventano rossi per un motivo che non c'entra niente con
+# quello che affermano.
+#
+# E' successo DUE volte: aggiunta la gamba anti-dump (2026-07-30) e aggiunta la gamba
+# private-marker (2026-08-24), e tutte e due le volte questa suite e' rimasta rotta finche'
+# qualcuno non ha aggiunto a mano una riga qui. Alla seconda si smette di aggiungere righe:
+# le gambe vengono LETTE dal hook stesso, cosi' la terza si stubba da sola.
+_stub_legs() {
+  local leg
+  # ogni `_qualcosa_check="$ROOT/test/<file>.sh"` nel hook, piu' la leak-check che e' chiamata
+  # per nome diretto
+  { grep -oE '\$ROOT/test/[a-z-]+\.sh' "$ROOT/hooks/pre-commit" | sed 's|.*/||'
+    grep -oE 'bash test/[a-z-]+\.sh'    "$ROOT/hooks/pre-commit" | sed 's|.*/||'; } \
+  | sort -u | while IFS= read -r leg; do
+      [ -n "$leg" ] || continue
+      printf '#!/usr/bin/env bash\nexit 0\n' > "$OUT/test/$leg"
+      chmod +x "$OUT/test/$leg"
+    done
+}
+_stub_legs
 cp "$ROOT/hooks/pre-commit" "$OUT/.git/hooks/pre-commit"
-chmod +x "$OUT/.git/hooks/pre-commit" "$OUT/test/leak-check.sh" "$OUT/test/directory-dump-check.sh"
+chmod +x "$OUT/.git/hooks/pre-commit"
 echo seed > "$OUT/file.txt"
 git -C "$OUT" add -A >/dev/null 2>&1
 git -C "$OUT" commit -q -m seed >/dev/null 2>&1

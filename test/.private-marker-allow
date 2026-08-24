@@ -1,0 +1,12 @@
+# Percorsi esentati da test/private-marker-check.sh — uno per riga, esatti, niente glob.
+#
+# Un'eccezione qui e' una DECISIONE, e deve vedersi in un diff. Il gate legge un marcatore
+# che dice "questo contenuto e' privato": derogarci significa affermare che quel file, pur
+# contenendo il marcatore, non porta niente di riservato. Le due righe qui sotto sono i
+# file che il marcatore lo contengono per MESTIERE — il controllo stesso (lo cita nella sua
+# regexp e nella documentazione) e il test che lo dimostra (costruisce una nota finta).
+#
+# Prima di aggiungerne una terza: se il file e' generato da un tool, la risposta non e' una
+# riga qui, e' `git rm --cached` piu' la sua cartella nel .gitignore.
+test/private-marker-check.sh
+test/test-private-marker.sh

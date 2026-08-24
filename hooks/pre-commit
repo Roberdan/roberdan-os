@@ -38,6 +38,28 @@ if ! bash "$_dump_check" --staged; then
   exit 1
 fi
 
+# I due controlli sopra chiedono del VOCABOLARIO (una denylist) e della FORMA (un estratto
+# di rubrica). Nessuno dei due vede un file che DICE DA SOLO di essere privato — ed e' quello
+# che il 2026-08-24 `git add -A` ha messo in commit qui dentro, in un repo pubblico: note
+# generate da gbrain con righe marcate `visibility: private`. Non sono uscite solo perche' il
+# push non era ancora stato dato. Il .gitignore elenca le cartelle di oggi; questo legge il
+# marcatore dentro il file, quindi regge anche quando il generatore ne inventa una nuova.
+_priv_check="$ROOT/test/private-marker-check.sh"
+if [ ! -f "$_priv_check" ]; then
+  # Stessa regola dell'altro: fallire chiuso, ma dire la ragione VERA. Annunciare "contenuto
+  # privato" per un controllo che non e' mai partito insegna che il messaggio non vuol dire
+  # niente, e il giorno in cui e' vero viene scavalcato.
+  echo "" >&2
+  echo "pre-commit: BLOCCATO — manca $_priv_check, quindi non e' stato controllato niente." >&2
+  echo "Non e' un ritrovamento. Ripristina il file o reinstalla gli hook." >&2
+  exit 1
+fi
+if ! bash "$_priv_check" --staged; then
+  echo "" >&2
+  echo "pre-commit: BLOCCATO — file che si dichiarano privati in un repo pubblico (vedi sopra)." >&2
+  exit 1
+fi
+
 # --- the board is a repo INSIDE this one, and this repo cannot see it ---------------
 #
 # `kanban/` is a separate private git repo nested in this one (the cards carry real names
