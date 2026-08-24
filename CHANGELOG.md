@@ -3,6 +3,48 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.33.0] - 2026-08-24
+
+**Un terzo cancello di privacy: il file che si dichiara privato.** `git add -A` in questo repo
+— che e' **pubblico** — ha portato dentro un commit due note generate da **gbrain**
+(`people/roberto.md`, `claude-code/hooks/bash-guard-sh.md`), ciascuna con righe marcate
+`visibility: private`; una terza (`projects/virtualbpmfy27.md`) aspettava non tracciata con
+numeri di PR, percentuali di margine e il nome di un cliente. Nessuno aveva deciso di
+pubblicare niente: un tool ha scritto nella working tree e `-A` ha preso quello che ha trovato.
+**Non e' mai arrivato su GitHub** — verificato contro `origin/main`, che non ha e non ha mai
+avuto nessuno di quei file — ma solo perche' il push non era ancora stato dato: per fortuna,
+non per un controllo.
+
+- **Perche' gli altri due gate non potevano prenderlo.** `leak-check.sh` e' una denylist: sa i
+  termini che qualcuno ha pensato di scrivere, e il testo di un fatto generato domani non e' su
+  nessuna lista. `directory-dump-check.sh` cerca la FORMA di una rubrica (indirizzi, ruoli), e
+  li' non ce n'erano. Tutti e due hanno risposto correttamente **no**.
+- **`test/private-marker-check.sh`** fa la terza domanda: *il file dichiara di essere privato?*
+  Sono i file stessi a dirlo, in una colonna che il generatore compila. Gira in
+  `hooks/pre-commit` (che **blocca**) e in `test/validate.sh`.
+- **Il `.gitignore` non e' la difesa.** Copre `people/ projects/ orgs/ claude-code/`, cioe' le
+  cartelle di **oggi**, e serve a togliere il rumore da `git status`. Elencare cartelle e'
+  inseguire i nomi: la prossima sync puo' inventarne un'altra. Il gate legge il marcatore
+  **dentro** il file, quindi regge lo stesso.
+- **Non cancella niente**: i file restano sul disco, escono solo da git (`git rm --cached`).
+  Non ristampa il contenuto privato nel proprio errore — un guardiano che incolla il segreto
+  lo ha spostato, non fermato. E **non blocca un file marcato `public`**: la dichiarazione si
+  rispetta in tutte e due le direzioni, altrimenti diventa un divieto di scrivere la parola.
+- **Le deroghe stanno in un file, non nello script.** Al primo commit il gate ha bloccato il
+  proprio test, che una nota finta col marcatore la costruisce per mestiere: l'eccezione vive in
+  `test/.private-marker-allow`, un percorso **esatto** per riga e nessun glob (`test/*` sarebbe
+  una porta aperta). Stessa scelta del `.directory-dump-baseline` — una deroga deve costare una
+  riga visibile in un diff. Oggi sono due, e il test fallisce se diventano di piu'.
+- Meta' di `test/test-private-marker.sh` verifica che il gate **lasci passare** (repo pulito,
+  file `public`, prosa scritta a mano che parla di privacy): un guardiano che non puo' piu'
+  aprirsi viene disattivato, e disattivarlo qui spegne anche il leak-check nello stesso hook.
+- **`test-nested-board-notice` non si rompera' alla prossima gamba.** Quella suite stubba i
+  controlli del hook per parlare d'altro, ed era gia' rimasta rotta una volta per lo stesso
+  motivo (gamba anti-dump, 2026-07-30) e una seconda ora. Alla seconda si smette di aggiungere
+  righe a mano: le gambe vengono **lette dal hook stesso**, cosi' la terza si stubba da sola.
+- `AGENTS.md § Privacy` e `docs/privacy-leak-check.md` ora descrivono i **tre** cancelli e cosa
+  ciascuno NON puo' vedere, con la regola operativa: **mai `git add -A` in questo repo**.
+
 ## [v2.32.1] - 2026-08-24
 
 **La board di `kb` descrive ogni card con una frase completa, invece di una parete di timestamp.**

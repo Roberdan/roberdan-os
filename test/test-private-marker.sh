@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# test/test-private-marker.sh — il gate che rifiuta i file che si dichiarano privati.
+#
+# Meta' di queste asserzioni verificano che il gate LASCI PASSARE. Un guardiano che non puo'
+# piu' aprirsi e' peggio di uno che non si chiude mai: blocca commit onesti, e un gate che
+# blocca commit onesti viene disattivato — e disattivarlo qui vuol dire disattivare anche il
+# leak-check che sta nello stesso hook. E' la stessa lezione gia' scritta in
+# directory-dump-check.sh ("un guardiano rosso all'arrivo viene aggirato entro un giorno").
+#
+# Il caso vero che l'ha fatto nascere: 2026-08-24, `git add -A` in questo repo PUBBLICO ha
+# messo in commit due note generate da gbrain marcate `visibility: private`. Non sono uscite
+# solo perche' il push non era stato ancora dato.
+set -uo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CHECK="$ROOT/test/private-marker-check.sh"
+
+FAIL=0
+section() { printf "\n=== %s ===\n" "$1"; }
+ok()      { printf "  ok: %s\n" "$1"; }
+err()     { printf "  FAIL: %s\n" "$1"; FAIL=1; }
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# Un repo finto: il gate gira SEMPRE dentro il repo che sta controllando (usa
+# `git rev-parse --show-toplevel`), quindi va provato su un repo suo, mai su questo.
+R="$TMP/repo"; mkdir -p "$R"
+( cd "$R" && git init -q -b main && git config user.email t@example.com && git config user.name t ) >/dev/null 2>&1
+cp "$CHECK" "$R/private-marker-check.sh"
+
+_facts() { # $1=file  $2=visibility
+  mkdir -p "$(dirname "$1")"
+  cat > "$1" <<EOF
+---
+type: person
+title: Tizio
+---
+
+## Facts
+
+<!--- gbrain:facts:begin -->
+| # | claim | kind | confidence | visibility | notability | valid_from | valid_until | source | context |
+|---|-------|------|------------|------------|------------|------------|-------------|--------|---------|
+| 1 | un fatto qualsiasi | fact | 1.0 | $2 | high | 2026-08-24 |  | sync:import |  |
+<!--- gbrain:facts:end -->
+EOF
+}
+
+# ---------------------------------------------------------------------------
+section "un repo senza niente di generato passa (il gate nasce VERDE)"
+echo "canone normale" > "$R/README.md"
+( cd "$R" && git add README.md private-marker-check.sh && git commit -qm seed ) >/dev/null 2>&1
+if out="$( cd "$R" && bash ./private-marker-check.sh 2>&1 )"; then
+  ok "repo pulito: esce 0 e lo dice ($(printf '%s' "$out" | head -1))"
+else
+  err "il gate e' rosso su un repo pulito — got: $out"
+fi
+
+section "un file marcato visibility: private viene rifiutato"
+_facts "$R/people/tizio.md" private
+( cd "$R" && git add -f people/tizio.md ) >/dev/null 2>&1
+out="$( cd "$R" && bash ./private-marker-check.sh --staged 2>&1 )"; rc=$?
+if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q 'people/tizio.md'; then
+  ok "il file private in indice blocca il commit e viene nominato"
+else
+  err "un file marcato private non e' stato fermato (rc=$rc) — got: $out"
+fi
+
+# Il messaggio deve dire cosa fare, non solo che c'e' un problema: un errore che non porta
+# a un'azione produce `--no-verify`, che spegne anche il leak-check nello stesso hook.
+if printf '%s' "$out" | grep -q 'git rm --cached' && printf '%s' "$out" | grep -q '.gitignore'; then
+  ok "il messaggio dice come uscirne (git rm --cached + .gitignore)"
+else
+  err "il messaggio non indica una via d'uscita — got: $out"
+fi
+
+# ...e NON deve incollare il contenuto: un guardiano che stampa il segreto lo ha spostato.
+if ! printf '%s' "$out" | grep -q 'un fatto qualsiasi'; then
+  ok "il contenuto privato non viene ristampato nel messaggio d'errore"
+else
+  err "il gate ha incollato il fatto privato nel proprio output — got: $out"
+fi
+
+section "la dichiarazione si rispetta in ENTRAMBE le direzioni: public passa"
+( cd "$R" && git rm -q --cached people/tizio.md && rm -rf people ) >/dev/null 2>&1
+_facts "$R/docs/pubblico.md" public
+( cd "$R" && git add -f docs/pubblico.md ) >/dev/null 2>&1
+out="$( cd "$R" && bash ./private-marker-check.sh --staged 2>&1 )"; rc=$?
+if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q 'docs/pubblico.md'; then
+  ok "una tabella gbrain viene comunque segnalata (e' un contenitore di roba generata)"
+else
+  err "una tabella generata non e' stata notata affatto (rc=$rc) — got: $out"
+fi
+# ...ma il MOTIVO non deve essere "private": quello sarebbe il gate che ignora cio' che legge.
+if ! printf '%s' "$out" | grep -q 'marcate visibility: private'; then
+  ok "su un file public il motivo non e' 'private' — la dichiarazione viene letta davvero"
+else
+  err "un file public e' stato accusato di essere private — got: $out"
+fi
+
+section "un file scritto a mano che PARLA di privacy non viene toccato"
+# La differenza fra leggere un marcatore e cercare una parola. Questo file dice 'private'
+# in prosa: se il gate lo fermasse, diventerebbe un divieto di usare la parola, e il primo
+# a saltare sarebbe questo repo, che di privacy scrive in continuazione.
+cat > "$R/docs/prosa.md" <<'EOF'
+# Privacy
+
+Il dossier confidenziale vive solo in ~/.roberdan-os/private/ e non entra mai in git.
+La colonna visibility di una tabella puo' valere private oppure public.
+EOF
+( cd "$R" && git add -f docs/prosa.md ) >/dev/null 2>&1
+out="$( cd "$R" && bash ./private-marker-check.sh --staged 2>&1 )"
+if ! printf '%s' "$out" | grep -q 'docs/prosa.md'; then
+  ok "prosa che nomina 'private' non viene scambiata per un file generato"
+else
+  err "il gate ha fermato un documento scritto a mano che parla di privacy — got: $out"
+fi
+
+section "l'esenzione e' un file che si legge, e non e' una porta aperta"
+# Il gate ha bloccato il proprio test al primo giro: quel file costruisce una nota finta,
+# ed e' il suo mestiere. La deroga esiste, ma deve costare una riga visibile in un diff.
+_AL="$R/allow"
+# indice pulito: i fixture delle sezioni precedenti sono ancora in staging e verrebbero
+# contati qui, facendo fallire l'asserzione per un file che non c'entra.
+( cd "$R" && git rm -q --cached docs/pubblico.md docs/prosa.md ) >/dev/null 2>&1
+_facts "$R/people/tizio2.md" private
+( cd "$R" && git add -f people/tizio2.md ) >/dev/null 2>&1
+printf 'people/tizio2.md\n' > "$_AL"
+if ( cd "$R" && PRIVATE_MARKER_ALLOW="$_AL" bash ./private-marker-check.sh --staged >/dev/null 2>&1 ); then
+  ok "un percorso elencato nell'allow-file passa"
+else
+  err "l'allow-file non esenta il percorso che elenca"
+fi
+# ...ma un glob NON deve valere come esenzione, altrimenti `test/*` apre tutto.
+printf 'people/*\n' > "$_AL"
+if ! ( cd "$R" && PRIVATE_MARKER_ALLOW="$_AL" bash ./private-marker-check.sh --staged >/dev/null 2>&1 ); then
+  ok "un glob nell'allow-file non esenta niente (solo percorsi esatti)"
+else
+  err "un glob e' stato accettato come esenzione: l'allow-file e' una porta aperta"
+fi
+# ...e un allow-file assente non deve spegnere il gate.
+if ! ( cd "$R" && PRIVATE_MARKER_ALLOW="$R/non-esiste" bash ./private-marker-check.sh --staged >/dev/null 2>&1 ); then
+  ok "senza allow-file il gate controlla tutto (non fallisce aperto)"
+else
+  err "un allow-file mancante ha spento il gate"
+fi
+( cd "$R" && git rm -q --cached people/tizio2.md && rm -f people/tizio2.md ) >/dev/null 2>&1
+
+# Il gate reale di QUESTO repo non deve esentare piu' di quello che serve: due file, i suoi.
+_real_allow="$ROOT/test/.private-marker-allow"
+_n="$(grep -vcE '^[[:space:]]*(#|$)' "$_real_allow" 2>/dev/null || echo 0)"
+if [ -f "$_real_allow" ] && [ "$_n" -le 2 ]; then
+  ok "l'allow-file di questo repo elenca $_n percorsi (il controllo e il suo test)"
+else
+  err "l'allow-file di questo repo e' cresciuto a $_n percorsi: le deroghe vanno discusse"
+fi
+
+section "il gate e' agganciato dove serve (hook + validate), non solo scritto"
+if grep -q 'private-marker-check.sh' "$ROOT/hooks/pre-commit"; then
+  ok "hooks/pre-commit lo chiama"
+else
+  err "hooks/pre-commit non chiama il gate: esiste ma non protegge niente"
+fi
+if grep -q 'private-marker-check.sh' "$ROOT/test/validate.sh"; then
+  ok "test/validate.sh lo chiama"
+else
+  err "test/validate.sh non chiama il gate"
+fi
+# Fail-closed: se il file sparisce, l'hook deve BLOCCARE, non proseguire in silenzio.
+if grep -A2 '_priv_check="\$ROOT/test/private-marker-check.sh"' "$ROOT/hooks/pre-commit" | grep -q 'exit 1\|! -f'; then
+  ok "l'hook fallisce chiuso se il gate manca (non lo salta in silenzio)"
+else
+  err "l'hook non gestisce il caso 'gate mancante' — un check che non parte legge come verde"
+fi
+
+section "le cartelle che gbrain usa oggi sono ignorate da questo repo"
+for d in people/ projects/ claude-code/; do
+  if grep -qE "^$d\$" "$ROOT/.gitignore"; then
+    ok ".gitignore copre $d"
+  else
+    err ".gitignore non copre $d — un file generato li' torna committabile"
+  fi
+done
+
+if [ "$FAIL" -eq 0 ]; then printf "\ntest-private-marker: ✅ ALL GREEN\n"; else printf "\ntest-private-marker: ❌ FAIL (see above)\n"; fi
+exit "$FAIL"

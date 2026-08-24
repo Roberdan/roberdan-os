@@ -296,12 +296,27 @@ Autonomy ≠ black box. These **always** go through Roberto (direct message):
 
 The confidential dossier (clients, deals, people) lives **only** in
 `~/.roberdan-os/private/roberto-profile.md` (gitignored, local-only), read at runtime
-by `twin`. It never enters git nor any bundle. The gate is
-[`test/leak-check.sh`](test/leak-check.sh) — a three-tier fallback (local plain-text
-denylist → committed **salted hashes** checkable by CI without holding the terms →
-no-op warn on a bare clone). Full mechanics, activation steps and honest limits:
-[`docs/privacy-leak-check.md`](docs/privacy-leak-check.md). Bundles are built only from
-already-scrubbed committed canon.
+by `twin`. It never enters git nor any bundle. Bundles are built only from already-scrubbed
+committed canon.
+
+**Three gates, because each is blind to what the others catch.** All three run in
+`hooks/pre-commit` (which BLOCKS) and in `test/validate.sh`:
+
+1. [`test/leak-check.sh`](test/leak-check.sh) — **vocabolario**: a three-tier fallback (local
+   plain-text denylist → committed **salted hashes** checkable by CI without holding the terms
+   → no-op warn on a bare clone). Cannot see a name nobody put on the list.
+2. [`test/directory-dump-check.sh`](test/directory-dump-check.sh) — **forma**: does this file
+   look like a corporate directory extract? Asks about shape, so it needs no names in advance.
+3. [`test/private-marker-check.sh`](test/private-marker-check.sh) — **dichiarazione**: does the
+   file SAY IT IS PRIVATE? Born 2026-08-24, when `git add -A` put two gbrain-generated notes
+   marked `visibility: private` into a commit of this **public** repo; they stayed in only
+   because the push hadn't been given yet. The other two answered correctly *no*: no listed
+   term, no addresses. `.gitignore` covers the directories a generator uses **today**
+   (`people/ projects/ orgs/ claude-code/`); the gate reads the marker **inside** the file, so
+   it still holds when tomorrow's sync invents a new one. **Never use `git add -A` here.**
+
+Full mechanics, honest limits and what each gate deliberately does NOT do:
+[`docs/privacy-leak-check.md`](docs/privacy-leak-check.md).
 
 ---
 

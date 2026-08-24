@@ -21,7 +21,7 @@ ok()      { printf "  ok: %s\n" "$1"; }
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue \
           test-file-size-ratchet test-edge-only test-kb-precheck \
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
-          test-federated-kb test-leak-check test-directory-dump-check test-fork-merge test-autofmt \
+          test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
           test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources test-kb-autothor \
@@ -139,6 +139,10 @@ if _suite test-leak-check; then ok "leak-check tiers verified (see bash test/tes
 section "directory-dump-check — corporate rosters, which no denylist can name in advance"
 if bash test/directory-dump-check.sh >/dev/null 2>&1; then ok "0 directory dumps tracked"; else err "directory dump tracked — see bash test/directory-dump-check.sh"; fi
 if _suite test-directory-dump-check; then ok "ratchet verified: grandfathered passes, one more address fails"; else err "test-directory-dump-check — see bash test/test-directory-dump-check.sh"; fi
+
+section "private-marker-check — file generati che si dichiarano privati, in un repo pubblico"
+if bash test/private-marker-check.sh >/dev/null 2>&1; then ok "0 file marcati private tracciati"; else err "file private tracciato — see bash test/private-marker-check.sh"; fi
+if _suite test-private-marker; then ok "il gate blocca un file marcato private e lascia passare uno public"; else err "test-private-marker — see bash test/test-private-marker.sh"; fi
 # --- il hook pre-commit e installato E aggiornato -> test/test-precommit-hook.sh
 if _suite test-precommit-hook; then _suite_out test-precommit-hook | grep -vE '^test-precommit-hook:'; else _suite_out test-precommit-hook; err "test-precommit-hook — see bash test/test-precommit-hook.sh"; fi
 section "board annidata — un commit che non include le card lo dice"
