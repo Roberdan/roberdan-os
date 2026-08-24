@@ -294,10 +294,28 @@ Autonomy ≠ black box. These **always** go through Roberto (direct message):
 
 ## Privacy
 
-The confidential dossier (clients, deals, people) lives **only** in
-`~/.roberdan-os/private/roberto-profile.md` (gitignored, local-only), read at runtime
-by `twin`. It never enters git nor any bundle. Bundles are built only from already-scrubbed
-committed canon.
+Confidential material has **one home, and it is outside every git worktree**:
+`~/.roberdan-os/private/` (local-only, verified not inside any repo). Two things live there —
+the dossier `roberto-profile.md` (clients, deals, people), read at runtime by `twin`, and
+`brain/`, the **landing zone for gbrain's personal brain** (the `default` source: `people/`,
+`projects/`, `orgs/`). Neither ever enters git nor any bundle; bundles are built only from
+already-scrubbed committed canon.
+
+**`brain/` exists because of a root cause, not a preference.** On 2026-08-24 three
+gbrain notes marked `visibility: private` — client margins, an open PR, a client's name —
+were found in the working tree of this **public** repo, and one `git add -A` had put two of
+them in a commit. They were the **only copy** of those facts (`gbrain get` → `page_not_found`
+on all three), so they were homeless, not spilled: the `default` source had **no
+`local_path` at all**, so gbrain wrote relative to the CWD, which that day was a public repo.
+Now it has one. If `people/` or a new directory reappears here, that is a **bug to look at** —
+check `gbrain sources list` before anything else.
+
+**What is NOT the answer, and why it's worth writing down:** the first fix listed those
+directories in `.gitignore`. You ignore what has a right to be in the tree and shouldn't be
+versioned — build output, a cache. These had no right to be here at all, and ignoring them
+made them invisible in `git status` without making them any safer. **Visible and blocked beats
+hidden and blocked**, so the entries were removed and `test/test-private-marker.sh` now asserts
+they stay out.
 
 **Three gates, because each is blind to what the others catch.** All three run in
 `hooks/pre-commit` (which BLOCKS) and in `test/validate.sh`:
@@ -311,9 +329,11 @@ committed canon.
    file SAY IT IS PRIVATE? Born 2026-08-24, when `git add -A` put two gbrain-generated notes
    marked `visibility: private` into a commit of this **public** repo; they stayed in only
    because the push hadn't been given yet. The other two answered correctly *no*: no listed
-   term, no addresses. `.gitignore` covers the directories a generator uses **today**
-   (`people/ projects/ orgs/ claude-code/`); the gate reads the marker **inside** the file, so
-   it still holds when tomorrow's sync invents a new one. **Never use `git add -A` here.**
+   term, no addresses. It reads the marker **inside** the file, so it holds when tomorrow's
+   sync invents a directory nobody listed, and it scans **untracked** files too — untracked is
+   a generated note's normal state, and a gate that waits for `git add` learns too late.
+   Its error message names the destination (`~/.roberdan-os/private/brain`), because a file
+   that may be the only copy must be **moved, never deleted**. **Never use `git add -A` here.**
 
 Full mechanics, honest limits and what each gate deliberately does NOT do:
 [`docs/privacy-leak-check.md`](docs/privacy-leak-check.md).

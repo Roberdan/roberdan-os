@@ -23,24 +23,29 @@ kanban/.coda-*
 kanban/.git/
 kanban/.gitignore
 
-# Note generate da gbrain — SCRITTE DA UN TOOL, non a mano, e marcate `visibility: private`.
-# Il 2026-08-24 un `git add -A` ne ha portate due dentro un commit di questo repo, che e'
-# PUBBLICO: `people/roberto.md` (vincoli e decisioni di Roberto) e
-# `claude-code/hooks/bash-guard-sh.md` (dettaglio di hardening); una terza,
-# `projects/virtualbpmfy27.md`, aspettava non tracciata con numeri di PR, percentuali di
-# margine e il nome di un cliente. Non e' uscita perche' il push non era ancora stato dato.
-# Stessa classe di `.serena/` qui sotto: un tool esterno che scrive nella working tree e
-# arriva untracked-ma-committabile senza che nessuno l'abbia chiesto.
+# Note generate da gbrain — QUI NON CI DEVE ESSERE NIENTE DA IGNORARE.
 #
-# Le cartelle qui sotto sono quelle che gbrain usa OGGI. Non sono la difesa — elencare
-# cartelle e' inseguire i nomi, e la prossima sync puo' inventarne un'altra. La difesa e'
-# test/private-marker-check.sh, che legge il marcatore DENTRO il file e quindi non ha
-# bisogno di sapere in anticipo dove atterra. Questo elenco toglie il rumore da `git status`;
-# il gate toglie il rischio.
-people/
-projects/
-orgs/
-claude-code/
+# Il 2026-08-24 un `git add -A` ha portato dentro un commit di questo repo, che e' PUBBLICO,
+# due note scritte da gbrain e marcate `visibility: private`: `people/roberto.md` e
+# `claude-code/hooks/bash-guard-sh.md`; una terza, `projects/virtualbpmfy27.md`, aspettava
+# non tracciata con numeri di PR, percentuali di margine e il nome di un cliente.
+#
+# La prima risposta fu elencarle qui. Era sbagliata, e la ragione vale la pena scriverla.
+# **Si ignora quello che ha diritto di stare nell'albero** e non va versionato: un artefatto
+# di build, una cache. Quelle note nell'albero non ci dovevano stare per NIENTE. Ignorarle
+# le rendeva invisibili in `git status` senza renderle piu' sicure: sarebbero rimaste li' ad
+# accumularsi, e il giorno in cui il gate fosse stato aggirato con `--no-verify` non ci
+# sarebbe stato nessun segnale prima del push.
+#
+# La causa vera era una sola: la sorgente `default` di gbrain — il cervello personale
+# (`people/`, `projects/`, `orgs/`) — non aveva **nessun** `local_path`, quindi scriveva
+# relativa alla CWD, che quel giorno era un repo pubblico. Ora ce l'ha:
+#   ~/.roberdan-os/private/brain    (fuori da qualsiasi worktree git — verificato)
+#
+# Quindi qui sotto non c'e' un elenco di cartelle, di proposito. Se `people/` o una cartella
+# nuova ricompare in questo repo, e' un BUG da vedere — `git status` la mostra, e
+# test/private-marker-check.sh la blocca leggendo il marcatore dentro al file. Visibile e
+# bloccata batte nascosta e bloccata.
 
 # OS / editor
 .DS_Store

@@ -3,6 +3,50 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.34.0] - 2026-08-24
+
+**Le note private di gbrain hanno una casa, e non e' un repo.** Il gate del v2.33.0 fermava
+il sintomo. La causa era un'altra, e si e' vista guardando la configurazione: la sorgente
+`default` di gbrain — il cervello personale, slug `people/ projects/ orgs/` — non aveva
+**nessun `local_path`**. Un generatore senza destinazione dichiarata non rinuncia a scrivere:
+scrive relativo alla CWD, e quel giorno la CWD era questo repo, che e' pubblico.
+
+- **Non erano uno scarto: erano l'unica copia.** `gbrain get` rispondeva `page_not_found` su
+  tutti e tre gli slug. Per questo sono state **spostate**, non cancellate, e per questo il
+  messaggio del gate ora dice `mv`, mai `rm`.
+- **Casa: `~/.roberdan-os/private/brain/`**, e la sorgente `default` ci punta (354 pagine
+  intatte, verificato dopo la modifica; backup di `config.json` prima di toccarla). E' la
+  cartella gia' dichiarata per il riservato, ed e' **fuori da qualsiasi worktree git** —
+  verificato, non assunto. E' quella proprieta' a renderla irraggiungibile da un commit.
+- **Scartati, con la ragione scritta:** il vault Obsidian (sincronizza su cloud: esposizione
+  diversa, non risolta; ed e' riservato a `type: agent-learning`) e un repo git privato (un
+  `git add -A` in un repo resta un `git add -A`).
+
+### Changed — `.gitignore`: tolte le cartelle, messa la ragione
+
+- `people/ projects/ orgs/ claude-code/` **non** sono piu' ignorate. Si ignora cio' che ha
+  diritto di stare nell'albero e non va versionato — un artefatto di build, una cache. Quelle
+  li' non ci dovevano stare per niente, e ignorarle le rendeva invisibili in `git status`
+  senza renderle piu' sicure. **Visibile e bloccata batte nascosta e bloccata**: se `people/`
+  ricompare, e' un bug da guardare, e la prima cosa da controllare e' `gbrain sources list`.
+- `test/test-private-marker.sh` asserisce la scelta in **tutte e due** le direzioni: che
+  quelle cartelle restino fuori dal `.gitignore`, e che `.gitignore` e il messaggio del gate
+  dicano **dove** devono stare invece. Un divieto senza destinazione si aggira e basta.
+
+### Changed — il gate guarda anche i file non tracciati
+
+- `test/private-marker-check.sh` in modalita' repo aggiunge `git ls-files --others
+  --exclude-standard`: untracked e' lo stato **normale** di una nota generata, e un controllo
+  che aspetta `git add` se ne accorge sempre un passo troppo tardi. `--exclude-standard`
+  tiene buono il `.gitignore`, cosi' il rinforzo non diventa un falso positivo per chi ha una
+  cartella legittimamente ignorata — asserito in entrambi i versi.
+
+### Docs
+
+- `AGENTS.md` § Privacy, `memory/memory-protocol.md` (nuova riga "Private brain" nella
+  tabella *Where it lives*) e `docs/privacy-leak-check.md` (sezioni *Dove devono stare
+  invece* e *Perche' NON stanno nel .gitignore*, con la tabella delle alternative scartate).
+
 ## [v2.33.0] - 2026-08-24
 
 **Un terzo cancello di privacy: il file che si dichiara privato.** `git add -A` in questo repo

@@ -11,6 +11,18 @@ NOT live in per-tool silos. See [[ADR-0001]].
 | Staging | `~/.roberdan-os/learnings/inbox/*.md` | Per-session capture, no lock |
 | Index/recall | gbrain (semantic + keyword) | On-demand retrieval, never loaded whole into context |
 | Hot-core | `agent-learnings/_core.md` (≤20 lines) | The few truths loaded everywhere |
+| Private brain | **`~/.roberdan-os/private/brain/`** — gbrain source `default` (`people/ projects/ orgs/`) | Facts about clients, deals and open work, marked `visibility: private` |
+
+**Why the private brain is a separate row and not "just the vault".** The vault is an
+Obsidian vault: it syncs to a cloud, and `memory-protocol` reserves it for `type:
+agent-learning` — how to work, not who pays what. A client's margin percentage in a
+cloud-synced vault is a *different* exposure, not a fix. `~/.roberdan-os/private/` is
+local-only and sits outside every git worktree, which is the one property that makes an
+accidental `git add -A` unable to reach it. This became a rule on 2026-08-24, when the
+`default` source turned out to have **no `local_path` at all** and gbrain had been writing
+its notes relative to the CWD — which that day was a **public** repo. A generator with no
+declared destination does not decline to write; it writes wherever it happens to be
+standing. See [`docs/privacy-leak-check.md`](../docs/privacy-leak-check.md).
 
 `~/.claude/.../memory/` = **deprecated cache**. Content migrated to the vault; it is no
 longer the source-of-truth.

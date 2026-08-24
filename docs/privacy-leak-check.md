@@ -86,6 +86,51 @@ non una condizione sepolta nel codice. Oggi ne contiene due — il controllo e i
 test fallisce se diventano di piu'. Se il file da esentare e' **generato da un tool**, la
 risposta non e' una riga li': e' `git rm --cached` piu' la cartella nel `.gitignore`.
 
+### Dove devono stare invece — la causa, non il sintomo
+
+Il gate ferma; non risolve. La domanda vera e' **perche' quelle note erano li'**, e la
+risposta e' misurata, non dedotta: la sorgente `default` di gbrain — il cervello personale,
+quello con gli slug `people/ projects/ orgs/` — non aveva **nessun `local_path`**
+(`gbrain sources list`: *"default … never synced"*, nessun percorso sotto). Un generatore
+senza destinazione dichiarata non rinuncia a scrivere: scrive relativo alla CWD. Quel giorno
+la CWD era un repo pubblico.
+
+E non erano uno scarto di qualcosa di gia' salvato: `gbrain get people/roberto` rispondeva
+`page_not_found` per tutti e tre gli slug. Erano l'**unica copia**. Per questo il gate dice
+"spostali", mai "cancellali": un guardiano che suggerisce `rm` su un file che nessuno ha
+altrove trasforma un problema di privacy in una perdita di dati.
+
+**La casa e' `~/.roberdan-os/private/brain/`**, e ora la sorgente `default` ci punta.
+Le alternative scartate, con la ragione:
+
+| Candidata | Perche' no |
+|---|---|
+| Il vault Obsidian | E' gia' la sorgente `vault` con i suoi slug, e sincronizza su cloud. Una percentuale di margine in un vault sincronizzato e' un'esposizione **diversa**, non risolta. `memory-protocol` gli riserva `type: agent-learning`: come si lavora, non chi paga quanto. |
+| Un repo git privato | Toglie dal web pubblico e mette su un server di terzi, e soprattutto lascia possibile lo stesso identico errore: un `git add -A` in un repo resta un `git add -A`. |
+| Lasciarle qui, ignorate | Vedi sotto: e' quello che avevamo fatto per primo, ed era la risposta sbagliata. |
+
+`~/.roberdan-os/private/` invece era gia' la casa dichiarata del riservato (ci vive
+`roberto-profile.md`), ed e' **fuori da qualsiasi worktree git** — verificato, non assunto:
+`git -C ~/.roberdan-os rev-parse --show-toplevel` → *not a git repository*. E' quella
+proprieta', non una convenzione di nomi, a rendere irraggiungibile la cartella da qualunque
+commit.
+
+### Perche' NON stanno nel .gitignore
+
+La prima correzione elencava `people/ projects/ orgs/ claude-code/` nel `.gitignore`. E'
+stata tolta, e la ragione e' generale: **si ignora quello che ha diritto di stare
+nell'albero** e non va versionato — un artefatto di build, una cache. Quelle note nell'albero
+non ci dovevano stare per niente. Ignorarle le rendeva invisibili in `git status` senza
+renderle piu' sicure: sarebbero rimaste li' ad accumularsi in silenzio, e il giorno di un
+`--no-verify` non ci sarebbe stato nessun segnale prima del push. **Visibile e bloccata batte
+nascosta e bloccata.** Se `people/` ricompare qui, e' un bug da guardare — la prima cosa da
+controllare e' `gbrain sources list`.
+
+Per la stessa ragione il gate, in modalita' repo, guarda anche i file **non tracciati** (con
+`--exclude-standard`, cosi' il `.gitignore` resta rispettato dove serve davvero): untracked
+e' lo stato *normale* di una nota generata, e un controllo che aspetta `git add` per
+accorgersene lo scopre sempre un passo troppo tardi.
+
 **Limite onesto.** Vede solo i file che si dichiarano. Un tool che domani scrivesse dati
 riservati senza marcarli passerebbe — e per quello restano gli altri due gate e la revisione
 del diff. E come tutti gli hook, `--no-verify` lo salta: e' per questo che il messaggio
