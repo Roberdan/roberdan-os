@@ -3,6 +3,38 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.35.0] - 2026-08-24
+
+**La trappola che avrebbe disfatto il v2.34.0, chiusa prima che scattasse.** Il cervello
+privato sta fuori da git: e' quella proprieta' — non il nome della cartella, non il
+`.gitignore` — a renderlo irraggiungibile da qualunque `git add`. Ma `gbrain sources status`
+consiglia `gbrain sync --source default`, e quel comando li' dentro fallisce con *"Not inside
+a git repository"*. La correzione ovvia a quell'errore e' `git init`: la mossa sbagliata
+fatta per la ragione giusta. Un repo senza remote non si puo' pushare **oggi**; un
+`git remote add` un anno dopo non chiede il permesso a nessuno.
+
+- **Il comando giusto e' `gbrain import`**, che non vuole git ed e' **additivo**: misurato,
+  354 → 357 pagine, zero cancellate. E' la differenza che rendeva `sync` pericoloso qui —
+  `sync` riconcilia una directory con la sorgente, quindi 3 file davanti a 354 pagine sono
+  351 candidate alla cancellazione. Le tre note sono ora nel motore **e** sul disco.
+- `test/test-private-marker.sh` **fallisce** se `~/.roberdan-os/private/brain` diventa un repo
+  git, e il messaggio nomina la causa probabile e il comando giusto. Su una macchina dove la
+  cartella non esiste salta, dichiarandolo: un test che fallisce dove la cosa non esiste
+  insegna solo a ignorarlo. Asserita anche la **direzione opposta** — che la regola sappia
+  riconoscere una cartella dentro un repo — perche' un controllo che non sa fallire non
+  protegge niente.
+- `docs/privacy-leak-check.md` § *La trappola del futuro* e `memory/memory-protocol.md`
+  scrivono `sync` vs `import` dove verranno letti. L'avviso di gbrain non e' sotto il nostro
+  controllo; che l'invito non venga accolto, si'.
+
+### Findings
+
+- Annotata in `docs/findings.md` la **classe**, non l'istanza: un tool senza destinazione
+  dichiarata non rinuncia a scrivere, scrive dove si trova. Il gate lo prende solo se il file
+  si dichiara privato — un tool che scrive dati riservati **senza** marcatore passerebbe tutti
+  e tre i controlli. Resta un finding con la sua condizione di promozione, non una card:
+  costruire oggi una difesa generale su un solo caso e' progettare al buio.
+
 ## [v2.34.0] - 2026-08-24
 
 **Le note private di gbrain hanno una casa, e non e' un repo.** Il gate del v2.33.0 fermava

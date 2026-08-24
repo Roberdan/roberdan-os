@@ -115,6 +115,46 @@ Le alternative scartate, con la ragione:
 proprieta', non una convenzione di nomi, a rendere irraggiungibile la cartella da qualunque
 commit.
 
+### La trappola del futuro: `gbrain sync` vs `gbrain import`
+
+C'e' un modo preciso in cui questa correzione si disfa da sola, e vale la pena scriverlo
+perche' l'errore verrebbe fatto **in buona fede**.
+
+`gbrain sources status` stampa:
+
+```
+⚠ default: never synced — run `gbrain sync --source default`
+```
+
+Quel comando li' dentro **fallisce**:
+
+```
+Not inside a git repository: /Users/Roberdan/.roberdan-os/private/brain.
+GBrain sync requires a git-initialized repo (or a subdirectory of one).
+```
+
+La correzione ovvia a quell'errore e' `git init`. Sarebbe la mossa sbagliata fatta per la
+ragione giusta: rimetterebbe le note dentro un worktree git, cioe' esattamente la condizione
+da cui le abbiamo tolte. Un repo senza remote non si puo' pushare **oggi**; un `git remote
+add` un anno dopo non chiede il permesso a nessuno.
+
+**Il comando giusto per la sorgente `default` e' `gbrain import`**, che non vuole git:
+
+```
+cd ~/.roberdan-os/private/brain && gbrain import .
+```
+
+Ed e' **additivo**, misurato e non dedotto: 354 → 357 pagine, zero cancellate. E' la
+differenza che rendeva `sync` pericoloso qui: `sync` riconcilia una directory con la
+sorgente, quindi 3 file davanti a 354 pagine sono 351 candidate alla cancellazione; `import`
+aggiunge e aggiorna, e basta.
+
+L'avviso di gbrain resta li' e continuera' a consigliare `sync`: non e' sotto il nostro
+controllo. Quello che e' sotto controllo e' che l'invito non venga accolto — lo asserisce
+`test/test-private-marker.sh`, che fallisce se `~/.roberdan-os/private/brain` diventa un
+repo git. Su una macchina dove la cartella non esiste il controllo salta, dichiarandolo: un
+test che fallisce dove la cosa non esiste insegna solo a ignorarlo.
+
 ### Perche' NON stanno nel .gitignore
 
 La prima correzione elencava `people/ projects/ orgs/ claude-code/` nel `.gitignore`. E'

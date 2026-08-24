@@ -223,5 +223,46 @@ else
   err "il gate dice cosa NON fare senza dire dove spostarlo"
 fi
 
+section "la casa del cervello privato e' fuori da git — e ci deve restare"
+# QUESTA e' la proprieta' che fa il lavoro. Non il nome della cartella, non il .gitignore:
+# il fatto che nessun `git add` possa raggiungerla perche' non esiste nessun repo sopra di
+# lei. Se un giorno smette di essere vera, tutto il resto e' decorazione.
+#
+# E c'e' una trappola precisa che la renderebbe falsa in buona fede: `gbrain sources status`
+# stampa "⚠ default: never synced — run gbrain sync --source default", ma quel comando li'
+# dentro fallisce con "Not inside a git repository". La correzione ovvia a quell'errore e'
+# `git init`. Sarebbe la mossa sbagliata, fatta per la ragione giusta — ed e' esattamente
+# il tipo di errore che una riga di prosa non ferma e un'asserzione si'.
+# Il comando giusto per quella sorgente e' `gbrain import`, che non vuole git ed e'
+# additivo (misurato: 354 -> 357 pagine, nessuna cancellata).
+# La regola in una funzione, cosi' si puo' provare che sa dire NO e non solo SI'.
+_fuori_da_git() { ! git -C "$1" rev-parse --show-toplevel >/dev/null 2>&1; }
+
+BRAIN_HOME="${PRIVATE_BRAIN_HOME:-$HOME/.roberdan-os/private/brain}"
+if [ ! -d "$BRAIN_HOME" ]; then
+  # Clone spoglio, CI, altra macchina: non c'e' niente da proteggere, e un test che
+  # fallisce dove la cosa non esiste insegna solo a ignorarlo.
+  ok "casa non presente su questa macchina: niente da verificare (skip onesto)"
+elif ! _fuori_da_git "$BRAIN_HOME"; then
+  top="$(git -C "$BRAIN_HOME" rev-parse --show-toplevel 2>/dev/null)"
+  err "$BRAIN_HOME e' dentro un repo git ($top): un git add puo' raggiungere le note private. Se e' stato fatto per zittire l'avviso 'never synced', il comando giusto e' 'gbrain import', non 'gbrain sync'."
+else
+  ok "fuori da qualsiasi worktree git: nessun commit puo' raggiungerla"
+fi
+# Direzione opposta: un controllo che non sa fallire non protegge niente. `$R` E' un repo
+# git, quindi la regola deve rifiutarlo. Senza questa riga, un `_fuori_da_git` rotto che
+# risponde sempre "va bene" passerebbe come verde per sempre.
+if _fuori_da_git "$R"; then
+  err "la regola non riconosce una cartella DENTRO un repo git: e' verde qualunque cosa succeda"
+else
+  ok "la regola sa dire di no: una cartella dentro un repo git viene riconosciuta"
+fi
+
+if grep -q 'gbrain import' "$ROOT/docs/privacy-leak-check.md"; then
+  ok "la doc dice quale comando usare al posto di 'gbrain sync' (la trappola e' scritta)"
+else
+  err "la doc non nomina 'gbrain import': l'avviso di gbrain resta un invito a fare git init"
+fi
+
 if [ "$FAIL" -eq 0 ]; then printf "\ntest-private-marker: ✅ ALL GREEN\n"; else printf "\ntest-private-marker: ❌ FAIL (see above)\n"; fi
 exit "$FAIL"
