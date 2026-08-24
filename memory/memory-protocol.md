@@ -24,6 +24,17 @@ its notes relative to the CWD — which that day was a **public** repo. A genera
 declared destination does not decline to write; it writes wherever it happens to be
 standing. See [`docs/privacy-leak-check.md`](../docs/privacy-leak-check.md).
 
+**Refresh it with `gbrain import`, never `gbrain sync`.** `sync` requires a git repo — and
+the private brain is deliberately outside one, so following gbrain's own
+`⚠ default: never synced — run gbrain sync` hint ends in a `git init` that undoes the whole
+point. `sync` also *reconciles* a directory against the source, so 3 files in front of 354
+pages are 351 deletion candidates; `import` only adds and updates (measured: 354 → 357, none
+deleted).
+
+```
+cd ~/.roberdan-os/private/brain && gbrain import .
+```
+
 `~/.claude/.../memory/` = **deprecated cache**. Content migrated to the vault; it is no
 longer the source-of-truth.
 

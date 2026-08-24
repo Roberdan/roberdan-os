@@ -226,3 +226,20 @@ _Aggiornato: 2026-08-03._
   disinstallato. *Condizione che lo renderebbe una card:* se una ricerca non trova qualcosa che
   sai di aver scritto — quello sarebbe contenuto davvero mancante, e questa riga andrebbe
   riaperta.
+
+- **Un tool senza destinazione dichiarata scrive nella CWD, e la CWD e' un repo di qualcuno**
+  (24 agosto 2026). gbrain e' l'istanza, non la classe. La sorgente `default` non aveva
+  `local_path`: non ha rinunciato a scrivere, ha scritto dove si trovava — un repo pubblico —
+  e i file erano l'**unica copia** di quei fatti (`gbrain get` → `page_not_found` su tutti e
+  tre gli slug), quindi il rischio non era solo la fuga ma anche la perdita se qualcuno li
+  avesse cancellati invece che spostati. Risolto per gbrain: casa in
+  `~/.roberdan-os/private/brain`, fuori da qualsiasi worktree git, asserito in
+  `test/test-private-marker.sh`; `test/private-marker-check.sh` guarda anche gli untracked.
+  Quello che **non** e' risolto e' la classe: qualsiasi altro tool con permesso di scrittura,
+  lanciato dentro una sessione agente, ha lo stesso comportamento di default, e il gate lo
+  prende solo se il file si dichiara privato. Un tool che scrive dati riservati **senza**
+  marcatore passerebbe tutti e tre i controlli. *Condizione che lo renderebbe una card:* un
+  secondo tool diverso da gbrain che deposita file non richiesti in un repo — allora il
+  pattern e' confermato e vale un'inversione (una CWD di lavoro che non sia mai un repo,
+  oppure un controllo su "file comparsi che nessuno ha scritto a mano"), che oggi sarebbe
+  costruire una difesa generale su un solo caso.
