@@ -3,6 +3,30 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.32.1] - 2026-08-24
+
+**La board di `kb` dice cosa fa ogni card, invece di una parete di timestamp.** Tre colonne
+affiancate da 34 caratteri entravano solo `id (repo)`: per sapere che cosa fosse `260802-135739`
+servivano un `kb show` per card. Ora la board e' impilata per colonna (TO DO, DOING, DONE piu'
+recenti) e ogni card ha **una riga**: `id  (repo)  cosa fa / cosa dovrebbe fare`.
+
+- La riga e' il `title:` della card; per le card legacy senza titolo ripiega sulla prima clausola
+  del `dod:` — "cosa dovrebbe fare" e' letteralmente quello che il `dod:` registra. Non e' mai vuota.
+- Colonne **misurate**, non fisse: id e `(repo)` sono allineati su tutte e tre le sezioni, quindi
+  la board si legge come una tabella sola. L'**id non viene mai troncato** (e' la chiave che
+  ridigiti in `show`/`start`/`finish`); a cedere e' il riassunto, tagliato con `…` alla larghezza
+  del terminale (`COLUMNS`, limitata a 60–160).
+- Padding **a caratteri, non a byte**: un titolo accentato non sposta piu' la colonna a destra.
+- Una colonna vuota stampa `(vuota)`: uno spazio bianco non si distingue da un render morto.
+- I tre totali restano su **una riga di riepilogo** in cima — gli stessi che stampa `kb counts`,
+  e `test-kb-views` continua a fissarli uguali.
+- Il render vive ora in `kanban/board.sh`, sourceato **pigramente** da `kb.sh`: la strada calda
+  del hook di sessione (`kb counts` / `kb doing`) non paga la lettura di un file per una tabella
+  che non stampa.
+- Nuova suite `test/test-kb-board.sh` (agganciata a `validate.sh`): una riga per card, id intero,
+  fallback sul `dod:`, colonne allineate fra sezioni, `(vuota)`, e nessuna riga oltre la larghezza
+  a `COLUMNS=62`.
+
 ## [v2.32.0] - 2026-08-21
 
 **Il canone ora arriva anche nei due ambienti Cowork e il percorso full-recall e' installabile

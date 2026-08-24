@@ -57,18 +57,18 @@ mk_board "$R1" 260705-100000 alpha "Alpha objective" todo
 mk_board "$R2" 260705-100001 beta  "Beta objective"  doing
 REG="$TMP/registry"; printf '%s\n%s\n' "$R1" "$R2" > "$REG"
 out="$(RDA_KANBAN_REGISTRY="$REG" bash "$KB" all 2>&1)"
-# aggregated view is now the three-column board — cells render "id (repo)" (no title)
-if echo "$out" | grep -q '260705-100000 (alpha)' \
-  && echo "$out" | grep -q '260705-100001 (beta)' \
+# Stacked board "id  (repo)  <summary>": assert a REGEX, never a single-space literal.
+if echo "$out" | grep -qE '260705-100000 +\(alpha\) +Alpha objective' \
+  && echo "$out" | grep -qE '260705-100001 +\(beta\) +Beta objective' \
   && echo "$out" | grep -q 'TO DO' && echo "$out" | grep -q 'DOING'; then
-  ok "kb all renders a three-column board with cards from both boards, tagged with repo:"
+  ok "kb all renders the stacked board with cards from both boards, tagged with repo: + summary"
 else
   err "kb all did not aggregate both boards into the board shape — got: $out"
 fi
 
 section "phase1: kb g is an alias for kb all"
 out="$(RDA_KANBAN_REGISTRY="$REG" bash "$KB" g 2>&1)"
-echo "$out" | grep -q '260705-100000 (alpha)' \
+echo "$out" | grep -qE '260705-100000 +\(alpha\)' \
   && ok "kb g aggregates like kb all" \
   || err "kb g did not behave as kb all — got: $out"
 
@@ -78,7 +78,7 @@ mk_board "$R3" 260705-200000 gamma "Gamma card" todo
 mk_board "$R4" 260705-200000 delta "Delta card" todo   # SAME id, different repo
 REG2="$TMP/registry2"; printf '%s\n%s\n' "$R3" "$R4" > "$REG2"
 out="$(RDA_KANBAN_REGISTRY="$REG2" bash "$KB" all 2>&1)"
-if echo "$out" | grep -q '260705-200000 (gamma)' && echo "$out" | grep -q '260705-200000 (delta)'; then
+if echo "$out" | grep -qE '260705-200000 +\(gamma\)' && echo "$out" | grep -qE '260705-200000 +\(delta\)'; then
   ok "a bare id shared by two repos renders both, disambiguated by repo:"
 else
   err "same-id-different-repo was not rendered independently — got: $out"

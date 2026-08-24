@@ -257,17 +257,6 @@ _repo_tag() {
   local repo; repo="$(_field "$1" repo)"
   printf '%s' "${repo:--}"
 }
-# board cells are id-first (the id is the key you pass to show/start/finish — it must
-# never be truncated). Append " (repo)" only when it fits within the column's content
-# width; otherwise degrade to the bare id rather than corrupt it. Full repo+title is
-# always available via `kb list`/`kb show`.
-_board_cell() {
-  local f="$1" w="$2" id repo cell
-  id="$(basename "$f" .md)"
-  repo="$(_repo_tag "$f")"
-  cell="$id ($repo)"
-  if [ "${#cell}" -le "$w" ]; then printf '%s' "$cell"; else printf '%s' "$id"; fi
-}
 _list() {
   local c="$1" any=0 f
   for f in "$KB/$c"/*.md; do
@@ -290,95 +279,13 @@ _archive_hint() {
   echo "  (past work archived in kanban/done/${archives[*]} — read on demand, not counted above)"
 }
 
-# visual kanban: three columns side by side. Default: the current-repo board ($KB). With
-# --all: the SAME three-column shape but aggregated across every registered board (home +
-# registry), each card still tagged with its repo: via _board_cell. This is what `kb all`
-# and `kb` outside a repo render — a real kanban, not a flat list.
-_board() {
-  local W=34 f i bd
-  local w=$((W-2))
-  local -a boards=()
-  if [ "${1:-}" = "--all" ]; then
-    echo "=== AGGREGATED BOARD — active cards across all registered repos ==="
-    while IFS= read -r bd; do
-      [ -n "$bd" ] && [ -d "$bd/kanban" ] && boards+=("$bd/kanban")
-    done < <(_board_roots)
-  fi
-  [ "${#boards[@]}" -eq 0 ] && boards=("$KB")
-  local -a T=() D=() N=()
-  for bd in "${boards[@]}"; do
-    for f in "$bd/todo"/*.md;  do [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue;; esac; T+=("$(_board_cell "$f" "$w")"); done
-    for f in "$bd/doing"/*.md; do [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue;; esac; D+=("$(_board_cell "$f" "$w")"); done
-  done
-  # done: newest 10 across ALL selected boards, by mtime desc (cross-repo when aggregated)
-  local -a drows=()
-  for bd in "${boards[@]}"; do
-    for f in "$bd/done"/*.md; do
-      [ -e "$f" ] || continue
-      case "$(basename "$f")" in _*) continue;; esac
-      drows+=("$(_mtime "$f")|$f")
-    done
-  done
-  local ntot=${#drows[@]}
-  if [ "$ntot" -gt 0 ]; then
-    while IFS='|' read -r _ f; do [ -n "$f" ] && N+=("$(_board_cell "$f" "$w")"); done \
-      < <(printf '%s\n' "${drows[@]}" | sort -t'|' -k1,1 -rn | head -10)
-  fi
-  # archived goals: one numbered table row each in _archive-*.md (rolled-up history).
-  # Pre-existing bug found while testing this function on a fixture with zero archive
-  # files: the bare glob passed straight to grep/pipefail died under `set -e` when it
-  # didn't match anything (grep tried to open the literal string "_archive-*.md",
-  # failed, and pipefail propagated that failure into killing the whole script) — never
-  # triggered on the real board because it always has at least one archive file. Loop
-  # with an existence check instead, same convention as _archive_hint/_archive_cmd below.
-  local narch=0 _af
-  for bd in "${boards[@]}"; do
-    for _af in "$bd/done"/_archive-*.md; do
-      [ -e "$_af" ] || continue
-      narch=$((narch + $(grep -cE '^\| [0-9]+ \|' "$_af" 2>/dev/null || true)))
-    done
-  done
-  local done_label=" DONE ($ntot"
-  [ "$narch" -gt 0 ] && done_label="$done_label +$narch arch"
-  done_label="$done_label)"
-  local nt=${#T[@]} nd=${#D[@]} nn=${#N[@]} rows
-  rows=$nt; [ $nd -gt $rows ] && rows=$nd; [ $nn -gt $rows ] && rows=$nn
-  [ $rows -eq 0 ] && rows=1
-  local ln; ln="$(printf '─%.0s' $(seq 1 $W))"
-  printf '┌%s┬%s┬%s┐\n' "$ln" "$ln" "$ln"
-  # Header labels are ASCII-only (no emoji): emoji render 2 cells wide but printf counts them
-  # as 1 (or as their byte length), so they'd desync the header's │ separators from the rows.
-  printf '│%-*s│%-*s│%-*s│\n' $W " TO DO ($nt)" $W " DOING ($nd)" $W "$done_label"
-  printf '├%s┼%s┼%s┤\n' "$ln" "$ln" "$ln"
-  for ((i=0; i<rows; i++)); do
-    printf '│ %-*.*s │ %-*.*s │ %-*.*s │\n' \
-      $w $w "${T[$i]:-}" $w $w "${D[$i]:-}" $w $w "${N[$i]:-}"
-  done
-  printf '└%s┴%s┴%s┘\n' "$ln" "$ln" "$ln"
+# The board renderer lives in kanban/board.sh (kb.sh is already far over the 300-line rule;
+# a table renderer with its own width arithmetic is a self-contained unit). It is sourced
+# LAZILY — the SessionStart hook's hot path is `kb counts`/`kb doing`, which must not pay a
+# file read for a box it never prints. Sourcing defines the real _board over this stub, and
+# the next line calls it.
+_board() { . "$ROOT/kanban/board.sh"; _board "$@"; }
 
-  # Legend: what each ACTIVE card (todo + doing) is — so the IDs in the box aren't opaque.
-  # It lives BELOW the box because titles are long and may be non-ASCII, which would desync the
-  # box's │ column separators if placed inside a fixed-width cell. Done cards are omitted (many,
-  # and finished). Same board order as the columns above, so an ID is easy to look up.
-  # When the dashboard follows (bare `kb`) it details every DOING card just below, so the legend
-  # drops that column rather than printing each doing title twice.
-  local _lf _legend=0 _lhdr="TO DO / DOING — cosa fa ogni card:"
-  local -a _lcols=("todo" "doing")
-  if [ "${KB_LEGEND_TODO_ONLY:-0}" = "1" ]; then
-    _lcols=("todo"); _lhdr="TO DO — cosa fa ogni card (le DOING sono dettagliate sotto):"
-  fi
-  local _lc
-  for bd in "${boards[@]}"; do
-   for _lc in "${_lcols[@]}"; do
-    for _lf in "$bd/$_lc"/*.md; do
-      [ -e "$_lf" ] || continue; case "$(basename "$_lf")" in _*) continue ;; esac
-      [ "$_legend" -eq 0 ] && { echo; echo "$_lhdr"; _legend=1; }
-      printf '  %s (%s) — %s\n' "$(basename "$_lf" .md)" "$(_repo_tag "$_lf")" "$(_field "$_lf" title)"
-    done
-   done
-  done
-  _archive_hint
-}
 
 # kb counts — the three column totals ALONE, for the SessionStart hook.
 #
@@ -750,10 +657,10 @@ _resume() {
   echo "  Gates still apply on resume: todo->doing is Roberto's; never auto-cross a human gate."
 }
 
-# kb all / kb g — the aggregated view is `_board --all` (real three-column kanban across
-# every registered board, cards tagged with repo:). A flat-list variant used to live here;
-# it was replaced by the board shape (design §2b, @rex #2; Roberto's preference for the
-# kanban form). `kb list`/`kb ls` remains the plain vertical list.
+# kb all / kb g — the aggregated view is `_board --all` (the same stacked board across every
+# registered board, cards tagged with repo: and each with its one-line summary). A flat-list
+# variant used to live here; it was replaced by the board shape (design §2b, @rex #2).
+# `kb list`/`kb ls` remains the plain vertical list.
 
 # kb handoff — inside a recognized repo: that repo's handoff/latest.md. Otherwise
 # (aggregate): concatenate every registered repo's handoff/latest.md newest-first
@@ -1372,7 +1279,6 @@ _cover() {
 
 case "$cmd" in
   "")                              # bare `kb` (a human typed it): board + the detail blocks
-    KB_LEGEND_TODO_ONLY=1
     if [ "$KB_MATCHED" -eq 0 ]; then _board --all; else _board; fi
     _dash
     ;;
@@ -1395,7 +1301,7 @@ case "$cmd" in
   init) _kb_init "${1:-$ROOT}" ;;  # scaffold + privatize a repo's board (idempotent)
   lint) RDA_KANBAN="$KB" bash "$ROOT/kanban/lint-cards.sh" ;;  # runner/human_gates schema lint
   dispatch) bash "$ROOT/factory/dispatch-runner.sh" "$@" ;;   # restricted external-CLI dispatcher (DORMANT — always refuses)
-  all|g) _board --all ;;           # aggregated three-column board across the registry
+  all|g) _board --all ;;           # aggregated board across the registry (id + repo + summary)
   handoff) _handoff ;;             # per-repo (in a repo) or aggregated live state
   pause) _pause "${1:-}" ;;         # write a resume checkpoint (safe to leave)
   resume) _resume "${1:-}" ;;       # read it (--all aggregates, --done clears)

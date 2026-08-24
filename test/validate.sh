@@ -18,7 +18,7 @@ ok()      { printf "  ok: %s\n" "$1"; }
 # shellcheck source=test/lib-suites.sh
 . "$ROOT/test/lib-suites.sh"
 
-for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-done-gate test-kb-diet test-kb-queue \
+for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue \
           test-file-size-ratchet test-edge-only test-kb-precheck \
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-fork-merge test-autofmt \
@@ -67,6 +67,7 @@ if _suite test-factory-kb; then ok "kb gates + factory guardrails green"; else e
 # --- 6b) kb detail/ops views (history/archive/plans/plan/sched) --------------
 section "kb views (history/archive/plans/plan/sched)"
 if _suite test-kb-views; then ok "kb views green"; else err "test-kb-views — see bash test/test-kb-views.sh"; fi
+if _suite test-kb-board; then ok "board rendering green (one readable line per card)"; else err "test-kb-board — see bash test/test-kb-board.sh"; fi
 
 # --- 6b3) $ROOT must survive the symlink it is always reached through ---------
 # `kb` is installed as ~/.local/bin/kb -> kanban/kb.sh, and BASH_SOURCE reports
