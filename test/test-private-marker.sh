@@ -173,14 +173,55 @@ else
   err "l'hook non gestisce il caso 'gate mancante' — un check che non parte legge come verde"
 fi
 
-section "le cartelle che gbrain usa oggi sono ignorate da questo repo"
-for d in people/ projects/ claude-code/; do
+section "una nota NON TRACCIATA viene vista (e' lo stato normale di una nota generata)"
+# Le sezioni precedenti lasciano in giro fixture che il gate segnala di suo (una tabella
+# gbrain, anche `public`, resta un contenitore di roba generata). Si riparte da pulito,
+# altrimenti questa sezione misura il rumore di quelle sopra invece della sua proprieta'.
+( cd "$R" && git rm -q --cached docs/pubblico.md >/dev/null 2>&1 || true; rm -rf docs people projects orgs )
+if ( cd "$R" && bash ./private-marker-check.sh >/dev/null 2>&1 ); then :; else
+  err "il repo di prova non riparte verde: le asserzioni qui sotto misurerebbero altro"
+fi
+_facts "$R/orgs/acme.md" private
+if out="$( cd "$R" && bash ./private-marker-check.sh 2>&1 )"; then
+  err "una nota untracked col marcatore passa: il gate se ne accorgerebbe solo a commit fatto"
+else
+  ok "presa da untracked: $(printf '%s' "$out" | grep -c 'orgs/acme.md') riga/e la nominano"
+fi
+
+# ...ma il .gitignore va rispettato, altrimenti il rinforzo qui sopra diventa un falso
+# positivo per chiunque abbia una cartella legittimamente ignorata.
+( cd "$R" && echo "ignorata/" > .gitignore )
+mkdir -p "$R/ignorata"; _facts "$R/ignorata/x.md" private
+rm -f "$R/orgs/acme.md"
+if ( cd "$R" && bash ./private-marker-check.sh >/dev/null 2>&1 ); then
+  ok "un file dentro una cartella ignorata non e' un falso positivo (--exclude-standard)"
+else
+  err "il gate ignora il .gitignore: ogni cartella ignorata diventa un falso positivo"
+fi
+rm -rf "$R/ignorata" "$R/orgs"; ( cd "$R" && rm -f .gitignore )
+
+section "le cartelle di gbrain NON sono ignorate da questo repo — e' una scelta"
+# La prima versione le elencava nel .gitignore. Sbagliato: si ignora cio' che ha diritto di
+# stare nell'albero e non va versionato. Queste li' non ci devono stare per niente, e
+# ignorarle le rendeva invisibili in `git status` senza renderle piu' sicure. La casa vera
+# e' ~/.roberdan-os/private/brain, fuori da git; se ricompaiono qui e' un bug DA VEDERE.
+for d in people/ projects/ orgs/ claude-code/; do
   if grep -qE "^$d\$" "$ROOT/.gitignore"; then
-    ok ".gitignore copre $d"
+    err ".gitignore elenca $d — la rende invisibile in git status senza renderla sicura"
   else
-    err ".gitignore non copre $d — un file generato li' torna committabile"
+    ok "$d non e' ignorata: se ricompare, si vede"
   fi
 done
+if grep -q 'roberdan-os/private/brain' "$ROOT/.gitignore"; then
+  ok ".gitignore dice DOVE devono stare invece"
+else
+  err ".gitignore toglie l'elenco senza dire dov'e' la casa: resta solo un divieto"
+fi
+if grep -q 'roberdan-os/private/brain' "$CHECK"; then
+  ok "il messaggio d'errore del gate indirizza alla casa giusta"
+else
+  err "il gate dice cosa NON fare senza dire dove spostarlo"
+fi
 
 if [ "$FAIL" -eq 0 ]; then printf "\ntest-private-marker: ✅ ALL GREEN\n"; else printf "\ntest-private-marker: ❌ FAIL (see above)\n"; fi
 exit "$FAIL"

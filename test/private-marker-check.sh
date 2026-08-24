@@ -68,11 +68,18 @@ _esente() {
 _MARK_PRIVATE='^\|.*\| *private *\|'
 _MARK_GBRAIN='<!--- *gbrain:facts:begin'
 
+# In modalita' repo si guardano anche i file NON TRACCIATI (e non ignorati). E' li' che una
+# nota generata atterra: untracked e' il suo stato normale finche' qualcuno non fa `add`.
+# Guardare solo `ls-files` vorrebbe dire accorgersene solo nel momento in cui e' gia' stata
+# messa in commit — cioe' proprio quando serviva saperlo prima. `--exclude-standard` fa si'
+# che il .gitignore resti rispettato: se un domani qualcosa qui va davvero ignorato, questo
+# controllo non lo trasforma in un falso positivo.
 _files() {
   if [ "$MODE" = "--staged" ]; then
     git diff --cached --name-only --diff-filter=ACMR
   else
     git ls-files
+    git ls-files --others --exclude-standard
   fi
 }
 
@@ -109,10 +116,16 @@ while [ "$i" -lt "${#_trovati[@]}" ]; do
   i=$((i+1))
 done
 echo "" >&2
-echo "  Questi file sono scritti da un tool (gbrain), non a mano. Restano sul disco: vanno" >&2
-echo "  tolti da git, non cancellati." >&2
-echo "  Toglili dall'indice:  git rm --cached <file>" >&2
-echo "  e ignorali:           aggiungi la sua cartella a .gitignore" >&2
+echo "  Questi file sono scritti da un tool (gbrain), non a mano, e possono essere l'UNICA" >&2
+echo "  copia di quello che contengono: vanno SPOSTATI, mai cancellati." >&2
+echo "  Se sono ancora in git:  git rm --cached <file>" >&2
+echo "  Poi portali a casa:      mkdir -p ~/.roberdan-os/private/brain/<sottocartella>" >&2
+echo "                           mv <file> ~/.roberdan-os/private/brain/<file>" >&2
+echo "  Quella e' la casa dichiarata del cervello personale di gbrain (sorgente 'default'):" >&2
+echo "  fuori da qualsiasi worktree git, quindi nessun commit puo' raggiungerla." >&2
+echo "  NON aggiungerli al .gitignore: li renderebbe invisibili senza renderli sicuri, e" >&2
+echo "  qui dentro non ci devono stare affatto. Se ricompaiono, la sorgente 'default' ha" >&2
+echo "  perso il suo local_path — ricontrollalo con: gbrain sources list" >&2
 echo "  Se invece il contenuto e' davvero pubblicabile, cambia 'private' nel file: la" >&2
 echo "  dichiarazione e' quello che questo gate legge, e va corretta li', non aggirata qui." >&2
 exit 1
