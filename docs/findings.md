@@ -238,8 +238,9 @@ _Aggiornato: 2026-08-03._
   Quello che **non** e' risolto e' la classe: qualsiasi altro tool con permesso di scrittura,
   lanciato dentro una sessione agente, ha lo stesso comportamento di default, e il gate lo
   prende solo se il file si dichiara privato. Un tool che scrive dati riservati **senza**
-  marcatore passerebbe tutti e tre i controlli. *Condizione che lo renderebbe una card:* un
-  secondo tool diverso da gbrain che deposita file non richiesti in un repo — allora il
-  pattern e' confermato e vale un'inversione (una CWD di lavoro che non sia mai un repo,
-  oppure un controllo su "file comparsi che nessuno ha scritto a mano"), che oggi sarebbe
-  costruire una difesa generale su un solo caso.
+  marcatore passerebbe tutti e tre i controlli. **PROMOSSO A CARD** il 24 agosto 2026 su
+  decisione di Roberto: `todo/260824-182954` (repo `roberdan-os`). La condizione che avevo
+  scritto qui era "un secondo tool diverso da gbrain che deposita file non richiesti in un
+  repo"; non si e' avverata, e la promozione e' comunque la sua chiamata, non la mia — le
+  condizioni di questo file dicono quando *proporre*, mai quando decidere. Il seguito sta
+  sulla card, questa riga resta come origine del perche'.
