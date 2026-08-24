@@ -158,34 +158,44 @@ Where it shows up: `kb list`/`kb todo`/`kb doing`/`kb done` print `[id] (repo) t
 prints `[id] (repo) title (verified <date>)`. Legacy cards with no `repo:` render as `(-)` instead
 of crashing.
 
-### The board (`kb` / `kb view` / `kb all`) — one line per card, aligned
+### The board (`kb` / `kb view` / `kb all`) — una frase per card, allineata
 
-The board is **stacked by column** (TO DO, then DOING, then DONE — newest 10), with a single
-summary line on top carrying the three counts (the same three `kb counts` prints; a test pins
-them equal). Every card gets **one line saying what it does / should do**:
+La board è **impilata per colonna** (TO DO, poi DOING, poi le DONE più recenti), con una riga
+di riepilogo in cima che porta i tre totali (gli stessi che stampa `kb counts`; un test li tiene
+uguali). Ogni card è descritta da una **frase completa**, mai troncata: se non ci sta, **va a
+capo** sotto la propria colonna.
 
 ```
-TO DO (3) · DOING (1) · DONE (155 +21 arch)
-──────────────────────────────────────────────────────────────────────────────
+TO DO (3) · DOING (0) · DONE (155 +21 arch)
+──────────────────────────────────────────────────────────────────────────────────────
 
   TO DO (3)
-    260824-130724              (VirtualBPMFy27)  ADO comments: server-rendered HTML template…
-    260822-020005-copilot      (roberdan-os)     evolve: analyze copilot updates and propose…
+    260824-130724  (VirtualBPMFy27)  ADO comments: server-rendered HTML template with real
+                                     @mentions, so the model never authors markup.
+                                     Fatta quando: vbp_server renders ADO comment HTML from
+                                     a fixed server-owned template fed by a typed structure.
 ```
 
-- **The line is `title:`**, falling back to the first clause of `dod:` for legacy cards with no
-  title ("what it should do" is literally what `dod:` records). It is never blank.
-- **Columns are measured, not fixed:** id and `(repo)` are padded to the widest value actually
-  printed, so the three sections line up as one table. The **id is never truncated** — it is the
-  key you pass to `show`/`start`/`finish`; the summary is what gives way, cut with `…` to the
-  terminal width (`COLUMNS`, clamped to 60–160).
-- Padding is done **by character, not by byte**, so an accented title (`perché`) doesn't shift
-  the column to its right.
-- An empty column prints `(vuota)` — a blank gap is indistinguishable from a broken render.
+- **La frase è il `title:`**, chiusa con un punto se l'autore non l'ha chiusa. Per TO DO e DOING
+  segue un secondo paragrafo — **`Fatta quando: <dod:>`** — perché "cosa fa" e "quando è finita"
+  sono due affermazioni diverse. Il `dod:` è tagliato alla prima clausola e a 200 caratteri: il
+  testo integrale resta in `kb show`, la board è la sintesi.
+- **DONE resta compatta** (solo la frase): è storia, non lavoro davanti a te. Una card legacy
+  senza `title:` è descritta comunque dal suo `dod:`, in `done/` come altrove — un id senza
+  niente accanto è esattamente il problema che questa vista esiste per togliere.
+- **Due forme, una regola**: finché la frase ha ≥40 caratteri, id e `(repo)` restano in colonna e
+  il testo va a capo di fianco (tabella). Sotto quella soglia — terminale stretto, o id molto
+  lunghi — la card diventa un **blocco**: id + `(repo)` su una riga, la frase sotto, rientrata,
+  con quasi tutta la larghezza.
+- **L'id non viene mai troncato** (è la chiave che ridigiti in `show`/`start`/`finish`); le
+  colonne sono **misurate** sulle card effettivamente stampate e allineate su tutte e tre le
+  sezioni, così la board si legge come una tabella sola.
+- Il wrap è fatto **a caratteri, non a byte** (`fold` su macOS conta byte e spezzerebbe a metà
+  un accento); una parola più lunga della colonna viene spezzata invece di sfondarla.
+- Una colonna vuota stampa `(vuota)`: uno spazio bianco non si distingue da un render morto.
 
-Why it isn't three side-by-side columns anymore: 34 chars only fit `id (repo)`, so the board was
-a wall of opaque timestamps and you had to `kb show` each one to learn what it was. The sentence
-that says what a card is doesn't fit next to two other columns.
+Perché non sono più tre colonne affiancate: in 34 caratteri ci stava solo `id (repo)`, quindi la
+board era una parete di timestamp e per sapere cosa fosse una card serviva un `kb show` per card.
 
 ## Federation — one board per repo, one aggregating `kb`
 

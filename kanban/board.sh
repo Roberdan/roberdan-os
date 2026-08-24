@@ -11,34 +11,64 @@
 # this file was written to delete.
 
 # --- board row primitives ---------------------------------------------------
-# A board row is id + (repo) + ONE line saying what the card does / should do. The id is
-# the key you pass to show/start/finish, so it is NEVER truncated: everything else gives
-# way first. Fields are joined with US (\x1f) because a title may contain anything a human
-# types except a control character.
+# A board row is id + (repo) + a COMPLETE SENTENCE saying what the card does / should do.
+# The id is the key you pass to show/start/finish, so it is NEVER truncated; the sentence
+# is never truncated either — it WRAPS under its own column (see _board_section). Fields
+# are joined with US (\x1f) because a title may contain anything a human types except a
+# control character.
 _ROW_SEP=$'\x1f'
 
-# The one line. `title:` is the card's own summary; when it is missing (legacy cards) fall
-# back to the first clause of the Definition of Done — "what it should do" is literally
-# what dod: records — rather than printing an opaque id with nothing next to it.
+# One sentence, not a fragment. `title:` is what the card is; `dod:` is the condition that
+# would make it finished — together they answer "cosa fa / cosa dovrebbe fare", which is the
+# question a board exists to answer. A card with no title: (legacy) is described by its dod:
+# alone rather than left blank, and a card with neither says so explicitly instead of showing
+# an id with nothing next to it.
+#
+# The dod: is cut at its first clause and capped: some are 300+ characters of acceptance
+# prose, and pasting all of it onto the board would bury the ten other cards. `kb show` is
+# still the place for the full text — this is the synthesis, not the card.
+_DOD_MAX=200
 _card_summary() {
-  local f="$1" s
-  s="$(_field "$f" title)"
-  if [ -z "$s" ]; then
-    s="$(_field "$f" dod)"
-    s="${s%%;*}"; s="${s%%. *}"
-    [ -n "$s" ] && s="dod: $s"
+  local f="$1" want_dod="${2:-1}" t d
+  t="$(_field "$f" title)"
+  # DONE is history: there the sentence is enough, and ten cards x "Fatta quando: ..." would
+  # make the archive the longest part of the board. The condition matters where the work is
+  # still ahead of you — todo/doing. It stays a FALLBACK everywhere, though: a legacy card
+  # with no title: must still be described, in done/ as much as anywhere else.
+  d=""
+  if [ "$want_dod" = "1" ] || [ -z "$t" ]; then d="$(_field "$f" dod)"; fi
+  case "$d" in FILL:*|"") d="" ;; esac
+  # first clause only: dod: are written as "A; B; C" or "A. B. C"
+  d="${d%%;*}"; d="${d%% . *}"
+  case "$d" in *". "*) d="${d%%. *}." ;; esac
+  if [ "${#d}" -gt "$_DOD_MAX" ]; then d="${d:0:$_DOD_MAX}…"; elif [ -n "$d" ]; then d="$(_sentence "$d")"; fi
+  if [ -n "$t" ] && [ -n "$d" ]; then
+    printf '%s%sFatta quando: %s' "$(_sentence "$t")" "$_ROW_SEP" "$d"
+  elif [ -n "$t" ]; then
+    printf '%s' "$(_sentence "$t")"
+  elif [ -n "$d" ]; then
+    printf 'Fatta quando: %s' "$d"
+  else
+    printf '(nessun titolo e nessun dod: — kb show %s per il contenuto)' "$(basename "$f" .md)"
   fi
-  printf '%s' "${s:-(nessun titolo — kb show per il contenuto)}"
+}
+
+# A title is often written as a fragment ("evolve: analyze copilot updates"). Closing it with
+# a full stop is the cheapest thing that makes the board read as prose instead of as labels;
+# it is cosmetic and deliberately does nothing else — rewriting a human's words to sound like
+# a sentence is how a summary starts lying about what the card says.
+_sentence() {
+  local s="$1"
+  case "$s" in *.|*!|*\?|*:|*…) printf '%s' "$s" ;; *) printf '%s.' "$s" ;; esac
 }
 
 _board_row() {
-  local f="$1"
-  printf '%s%s%s%s%s' "$(basename "$f" .md)" "$_ROW_SEP" "$(_repo_tag "$f")" "$_ROW_SEP" "$(_card_summary "$f")"
+  local f="$1" want_dod="${2:-1}"
+  printf '%s%s%s%s%s' "$(basename "$f" .md)" "$_ROW_SEP" "$(_repo_tag "$f")" "$_ROW_SEP" "$(_card_summary "$f" "$want_dod")"
 }
 
-# Pad/truncate by CHARACTERS, not bytes: printf '%-*s' counts bytes, so an accented title
-# (perché, già) would shift every border to its right. ${#s} counts characters under a
-# UTF-8 locale, and the ellipsis is written separately so the cut never splits a glyph.
+# Pad by CHARACTERS, not bytes: printf '%-*s' counts bytes, so an accented title (perché,
+# già) would shift every column to its right. ${#s} counts characters under a UTF-8 locale.
 _pad() {
   local s="$1" w="$2" n
   n=$((w - ${#s}))
@@ -50,6 +80,29 @@ _trunc() {
   [ "$w" -lt 1 ] && { printf ''; return; }
   if [ "${#s}" -le "$w" ]; then printf '%s' "$s"; else printf '%s…' "${s:0:$((w-1))}"; fi
 }
+
+# Word wrap, in bash, by characters. Not `fold`: fold on macOS counts BYTES, so it breaks a
+# line early — and mid-glyph — as soon as a summary contains an accent, which is most of them
+# here. A single word longer than the column (a URL, a path) is hard-split rather than allowed
+# to blow the column open. Emits one wrapped line per line of output.
+_wrap() {
+  local text="$1" w="$2" line="" word
+  [ "$w" -lt 8 ] && w=8
+  for word in $text; do
+    while [ "${#word}" -gt "$w" ]; do
+      [ -n "$line" ] && { printf '%s\n' "$line"; line=""; }
+      printf '%s\n' "${word:0:$w}"
+      word="${word:$w}"
+    done
+    if [ -z "$line" ]; then line="$word"
+    elif [ "$(( ${#line} + 1 + ${#word} ))" -le "$w" ]; then line="$line $word"
+    else printf '%s\n' "$line"; line="$word"
+    fi
+  done
+  [ -n "$line" ] && printf '%s\n' "$line"
+  return 0
+}
+
 # visual kanban, stacked by column so every card gets ONE readable line:
 #
 #     260802-135739  (VirtualBPMFy27)  Sort before cutting: the queue must stay stable
@@ -90,7 +143,7 @@ _board() {
   done
   local ntot=${#drows[@]}
   if [ "$ntot" -gt 0 ]; then
-    while IFS='|' read -r _ f; do [ -n "$f" ] && N+=("$(_board_row "$f")"); done \
+    while IFS='|' read -r _ f; do [ -n "$f" ] && N+=("$(_board_row "$f" 0)"); done \
       < <(printf '%s\n' "${drows[@]}" | sort -t'|' -k1,1 -rn | head -10)
   fi
   # archived goals: one numbered table row each in _archive-*.md (rolled-up history).
@@ -128,33 +181,67 @@ _board() {
   [ "$cols" -lt 20 ] && cols="$(tput cols 2>/dev/null || echo 100)"
   [ "$cols" -lt 60 ] && cols=60
   [ "$cols" -gt 160 ] && cols=160
-  local sumw=$((cols - 4 - idw - 2 - rpw - 2))
+  # Two shapes, one rule: the sentence must have room to BE a sentence. While it gets 40+
+  # characters, id and (repo) stay in their own columns and the text wraps beside them (a
+  # table). Below that — a narrow terminal, or very long ids — the columns would squeeze the
+  # text into a ragged 25-character ribbon, so the card becomes a block instead: id + (repo)
+  # on their own line, the sentence indented underneath with nearly the whole width.
+  local sumw=$((cols - 4 - idw - 2 - rpw - 2)) blockw=0
+  if [ "$sumw" -lt 40 ]; then blockw=$((cols - 6)); sumw="$blockw"; fi
   [ "$sumw" -lt 20 ] && sumw=20
-  local rule; rule="$(printf '─%.0s' $(seq 1 $((idw + rpw + sumw + 8))))"
+  local rulew=$((idw + rpw + sumw + 8))
+  [ "$blockw" -gt 0 ] && rulew=$((blockw + 4))
+  local rule; rule="$(printf '─%.0s' $(seq 1 $rulew))"
 
   printf '%s · DOING (%s) · %s\n' "TO DO ($nt)" "$nd" "$done_label"
   printf '%s\n' "$rule"
-  _board_section "TO DO ($nt)"    "$idw" "$rpw" "$sumw" ${T[@]+"${T[@]}"}
-  _board_section "DOING ($nd)"    "$idw" "$rpw" "$sumw" ${D[@]+"${D[@]}"}
+  _board_section "TO DO ($nt)" "$idw" "$rpw" "$sumw" 1 "$blockw" ${T[@]+"${T[@]}"}
+  _board_section "DOING ($nd)" "$idw" "$rpw" "$sumw" 1 "$blockw" ${D[@]+"${D[@]}"}
   local done_hdr="$done_label"
   [ "$nn" -gt 0 ] && done_hdr="$done_label — le $nn più recenti"
-  _board_section "$done_hdr" "$idw" "$rpw" "$sumw" ${N[@]+"${N[@]}"}
+  _board_section "$done_hdr" "$idw" "$rpw" "$sumw" 0 "$blockw" ${N[@]+"${N[@]}"}
   _archive_hint
 }
 
-# one column of the board: a header, then one aligned line per card. Empty columns say so
-# explicitly — a blank gap is indistinguishable from a render that failed.
+# One column of the board. Each card is a block: id + (repo) on the first line, and the
+# card's sentence WRAPPED under its own column — never cut. A `dod:` follows as a second,
+# indented paragraph ("Fatta quando: …"), because "what it does" and "when it is finished"
+# are two different statements and running them together reads as one confused one.
+#
+# Blocks are separated by a blank line for the columns a human acts on (todo/doing); DONE
+# is finished work and stays compact. Empty columns say "(vuota)" — a blank gap is
+# indistinguishable from a render that died halfway.
 _board_section() {
-  local label="$1" idw="$2" rpw="$3" sumw="$4"; shift 4
+  local label="$1" idw="$2" rpw="$3" sumw="$4" spaced="$5" blockw="$6"; shift 6
   printf '\n  %s\n' "$label"
   if [ "$#" -eq 0 ]; then printf '    %s\n' "(vuota)"; return 0; fi
-  local r id rp sum
+  local r id rp sum head cont first=1 ln para
+  # continuation lines start exactly under the summary column, so a wrapped sentence reads
+  # as one paragraph instead of drifting back under the id.
+  cont="$(printf '    %*s  %*s  ' "$idw" '' "$rpw" '')"
+  [ "$blockw" -gt 0 ] && cont="      "
   for r in "$@"; do
     id="${r%%$_ROW_SEP*}"; r="${r#*$_ROW_SEP}"
     rp="${r%%$_ROW_SEP*}"; sum="${r#*$_ROW_SEP}"
-    printf '    %s  %s  %s\n' \
-      "$(_pad "$id" "$idw")" \
-      "$(_pad "$(_trunc "($rp)" "$rpw")" "$rpw")" \
-      "$(_trunc "$sum" "$sumw")"
+    [ "$first" -eq 0 ] && [ "$spaced" = "1" ] && echo
+    first=0
+    if [ "$blockw" -gt 0 ]; then
+      printf '    %s  (%s)\n' "$id" "$rp"
+      head="      "
+    else
+      head="$(printf '    %s  %s  ' "$(_pad "$id" "$idw")" "$(_pad "$(_trunc "($rp)" "$rpw")" "$rpw")")"
+    fi
+    # the summary may carry a second paragraph (the dod:), separated by the same US byte
+    while [ -n "$sum" ]; do
+      case "$sum" in
+        *"$_ROW_SEP"*) para="${sum%%$_ROW_SEP*}"; sum="${sum#*$_ROW_SEP}" ;;
+        *)             para="$sum"; sum="" ;;
+      esac
+      [ -n "$para" ] || continue
+      while IFS= read -r ln; do
+        printf '%s%s\n' "$head" "$ln"
+        head="$cont"
+      done < <(_wrap "$para" "$sumw")
+    done
   done
 }

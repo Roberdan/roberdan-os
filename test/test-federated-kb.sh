@@ -56,8 +56,8 @@ R1="$TMP/repoAlpha"; R2="$TMP/repoBeta"
 mk_board "$R1" 260705-100000 alpha "Alpha objective" todo
 mk_board "$R2" 260705-100001 beta  "Beta objective"  doing
 REG="$TMP/registry"; printf '%s\n%s\n' "$R1" "$R2" > "$REG"
-out="$(RDA_KANBAN_REGISTRY="$REG" bash "$KB" all 2>&1)"
-# Stacked board "id  (repo)  <summary>": assert a REGEX, never a single-space literal.
+out="$(COLUMNS=140 RDA_KANBAN_REGISTRY="$REG" bash "$KB" all 2>&1)"
+# Board "id  (repo)  <frase>": REGEX, mai literal (COLUMNS fissa: sotto ~90 va a blocco).
 if echo "$out" | grep -qE '260705-100000 +\(alpha\) +Alpha objective' \
   && echo "$out" | grep -qE '260705-100001 +\(beta\) +Beta objective' \
   && echo "$out" | grep -q 'TO DO' && echo "$out" | grep -q 'DOING'; then
@@ -67,7 +67,7 @@ else
 fi
 
 section "phase1: kb g is an alias for kb all"
-out="$(RDA_KANBAN_REGISTRY="$REG" bash "$KB" g 2>&1)"
+out="$(COLUMNS=140 RDA_KANBAN_REGISTRY="$REG" bash "$KB" g 2>&1)"
 echo "$out" | grep -qE '260705-100000 +\(alpha\)' \
   && ok "kb g aggregates like kb all" \
   || err "kb g did not behave as kb all — got: $out"
@@ -77,7 +77,7 @@ R3="$TMP/repoGamma"; R4="$TMP/repoDelta"
 mk_board "$R3" 260705-200000 gamma "Gamma card" todo
 mk_board "$R4" 260705-200000 delta "Delta card" todo   # SAME id, different repo
 REG2="$TMP/registry2"; printf '%s\n%s\n' "$R3" "$R4" > "$REG2"
-out="$(RDA_KANBAN_REGISTRY="$REG2" bash "$KB" all 2>&1)"
+out="$(COLUMNS=140 RDA_KANBAN_REGISTRY="$REG2" bash "$KB" all 2>&1)"
 if echo "$out" | grep -qE '260705-200000 +\(gamma\)' && echo "$out" | grep -qE '260705-200000 +\(delta\)'; then
   ok "a bare id shared by two repos renders both, disambiguated by repo:"
 else
