@@ -3,6 +3,38 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.36.0] - 2026-08-27
+
+**Due cambi al modo in cui gli agenti parlano e ragionano.** Roberto ha detto, tre volte
+nella stessa sessione, che le risposte non le capiva: *"io sono piu' le volte che non ti
+capisco che quelle che ti capisco"*. La regola sul linguaggio semplice c'era gia' dal
+v2.x — era prosa advisory, e durante il lavoro tecnico si perdeva. Ora e' un **formato
+fisso**, che una checklist non lascia saltare.
+
+- **Formato executive a 5 sezioni** per ogni risposta a Roberto: (1) il punto in una frase,
+  niente preamboli · (2) cosa serve da te — opzioni con conseguenze e raccomandazione, o
+  "Niente" · (3) contesto, max 3 righe, solo se serve · (4) dettaglio tecnico in fondo ·
+  (5) verificato / non verificato — **obbligatorio** su ogni claim di "fatto". Due regole di
+  ferro: una sezione vuota si cancella (non "N/A"); la sezione 5 non si salta mai — il tono
+  da executive non deve diventare finta sicurezza. Tetto abbassato da ~15 a ~6 righe prima
+  del dettaglio; lista nera di gergo senza spiegazione (*wired, hook, gate, commit, SHA,
+  deploy, merge, repo, CI*). Scritto in `AGENTS.md` (gate breve), `behavior/roberto-mode.md
+  § Communicating` (contratto completo) e nell'output style `roberto-plain` di Claude Code.
+  Verifica in corso: Roberto marca "ok"/"no" sulle prossime risposte, alla decima si tira
+  la somma.
+
+- **Lente AI-era di Bill Gates** — nuovo `behavior/ai-era-lens.md`, distillato dall'articolo
+  *"The turbulent AI era is here. The choices we make now are critical"* (gatesnotes,
+  2026-08-27). Non un riassunto: **7 regole che gate-ano una raccomandazione** su decisioni
+  AI / strategia / prodotto / deploy-vs-wait — doppio imperativo (ridurre il danno **e**
+  massimizzare il beneficio, allo stesso peso), le analogie col passato ingannano, dichiara
+  il conflitto di interesse, agisci prima che il danno si veda, *Human Reserved*, *productive
+  struggle*, non lasciarlo ai soli tecnici. Le proposte di policy di Gates (tassare i robot,
+  organismo internazionale, cooperazione USA-Cina) restano **fuori**: contesto, non
+  azionabili in un repo. Wired: `thinking-toolkit` repertoire, tabella di orchestrazione di
+  `twin`, `board.md` (Bill Gates da nome a scheda con "quando convocarlo"), `AGENTS.md
+  § Behavior`. `validate.sh` verde, link check verde, file 65 righe.
+
 ## [v2.35.0] - 2026-08-24
 
 **La trappola che avrebbe disfatto il v2.34.0, chiusa prima che scattasse.** Il cervello
