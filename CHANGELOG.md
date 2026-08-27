@@ -3,6 +3,25 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.36.1] - 2026-08-27
+
+**Il formato executive del v2.36.0 ora arriva davvero a Copilot, e a livello di system
+prompt.** Su Claude lo tiene l'output style; Copilot non aveva l'equivalente e leggeva un
+file-ponte che era un indice e non citava il formato — quindi le risposte restavano quelle
+di sempre.
+
+- **Copilot, aggancio forte.** L'estensione nativa passa il formato a 5 sezioni (estratto a
+  runtime da `behavior/roberto-mode.md` fra i marker `exec-format`) come `systemMessage` di
+  `joinSession()` — `mode: "append"`, tiene tutti i guardrail dell'SDK. Se il runtime non
+  accetta la chiave, retry senza: un SDK vecchio non fa perdere l'estensione. Rinforzo ad
+  ogni turno con `onUserPromptSubmitted` (l'append si diluisce nelle sessioni lunghe, la
+  riga per-turno no). Provato dal vivo: `copilot -p "..."` risponde nelle 5 sezioni senza
+  che glielo si chieda.
+- **Copilot, aggancio debole (rete).** `bin/sync.sh` genera `copilot-instructions.md` col
+  formato inline e `--install` lo collega a `~/.copilot/copilot-instructions.md`, letto ad
+  ogni sessione anche se l'estensione non parte. Formato aggiunto anche a `~/GitHub/AGENTS.md`
+  e al blocco `.github/copilot-instructions.md`.
+
 ## [v2.36.0] - 2026-08-27
 
 **Due cambi al modo in cui gli agenti parlano e ragionano.** Roberto ha detto, tre volte
