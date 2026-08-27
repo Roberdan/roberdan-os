@@ -29,7 +29,7 @@ err() { printf '  FAIL: %s\n' "$1"; FAIL=1; }
 # vendorizzato, lock, snapshot, dati, migrazioni. Qui si traducono in percorsi, perché un gate
 # che ispeziona il contenuto per indovinare "è generato?" sbaglia in silenzio.
 _a_mano() {
-  git ls-files '*.sh' 2>/dev/null | grep -vE '^(platforms/|vendor/|node_modules/|.*\.lock$|.*/snapshots?/|.*/fixtures?/|.*/migrations?/)'
+  git ls-files '*.sh' '*.mjs' '*.js' 2>/dev/null | grep -vE '^(platforms/|vendor/|node_modules/|.*\.lock$|.*/snapshots?/|.*/fixtures?/|.*/migrations?/)'
 }
 
 [ -f "$BASELINE" ] || { echo "  FAIL: manca $BASELINE — senza baseline questo gate sarebbe retroattivo"; exit 1; }

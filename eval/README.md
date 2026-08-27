@@ -227,6 +227,17 @@ RDA_EVAL_AGENT_CMD="hermes chat -z" eval/run-eval.sh
 the prompt from stdin, confirms no claude-specific flags reached it, and confirms the real
 `claude` stub was never invoked while the override was active.
 
+**Honest limit — always-on agent config contaminates the without-canon arm.** The harness runs
+the real agent CLI in the real environment. Any behavioral config that CLI loads unconditionally
+— a Claude Code output style, `~/.claude/CLAUDE.md`, or (since v2.36.1) the roberdan-os Copilot
+extension, which injects the executive response format and `context-inject.sh` output on every
+session — reaches condition B (without-canon) too. So condition B is "without the canon *file in
+the prompt*", never "without the canon's influence". This hits the communication-format criteria
+of the judge checklist hardest, because the extension prompts exactly that. To measure a clean
+B with `copilot -p`, run it under a throwaway `COPILOT_HOME` so no extension or user instructions
+load; there is no equivalent one-liner for a Claude Code output style (remove it for the run).
+This is the § "mechanism limitation" above in a new specific form, not a new class of problem.
+
 ## What's real vs. what's stub
 
 **On a machine without a usable headless `claude` binary** — where `eval_resolve_claude` in

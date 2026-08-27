@@ -48,5 +48,28 @@ else
   err "root AGENTS.md missing or empty — every pointer (.github/copilot-instructions.md, CLAUDE.md, ~/.codex/AGENTS.md) depends on it"
 fi
 
+# --- executive response format — one wording, carried by every surface --------------------
+# The format lives, hand-maintained, in four places (no one generated from another):
+# behavior/roberto-mode.md (source), AGENTS.md (the gate line), .github/copilot-instructions.md
+# (the Copilot block), and the bin/sync.sh heredoc that generates the Copilot user file.
+# @rex flagged the drift risk: reword one, the others go stale silently. Anchor phrases that
+# define the format must appear in all four — reword the format and this goes red until every
+# copy is updated together.
+section "executive response format — all four surfaces carry the same anchor phrases"
+for f in behavior/roberto-mode.md AGENTS.md .github/copilot-instructions.md bin/sync.sh; do
+  if [ ! -f "$f" ]; then err "$f missing — it must carry the executive response format"; continue; fi
+  # Flatten whitespace first: the anchor phrases wrap across lines in the prose copies.
+  flat="$(tr -s '[:space:]' ' ' < "$f" | tr 'A-Z' 'a-z')"
+  missing=""
+  case "$flat" in *"verified / not verified"*) : ;; *) missing="${missing} 'verified / not verified'" ;; esac
+  case "$flat" in *"unexplained jargon"*) : ;; *) missing="${missing} 'unexplained jargon'" ;; esac
+  case "$flat" in *"executive"*) : ;; *) missing="${missing} 'executive'" ;; esac
+  if [ -n "$missing" ]; then
+    err "$f is missing executive-format anchor(s):${missing} — a reword drifted one copy"
+  else
+    ok "$f carries the executive-format anchors"
+  fi
+done
+
 [ "$FAIL" -eq 0 ] && { echo; echo "test-canon-structure: PASS"; exit 0; }
 echo; echo "test-canon-structure: FAIL"; exit 1
