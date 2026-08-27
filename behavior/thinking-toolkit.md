@@ -108,6 +108,11 @@ NLP's theoretical claims, which don't hold up — evidence over pseudoscience.
 | **Feedback loops & leverage points** | where a small intervention moves a lot |
 | **Chesterton's fence** | don't remove something until you understand why it exists |
 
+### Reasoning about AI's own trajectory
+| Tool | Use when |
+|---|---|
+| **[AI-era lens](ai-era-lens.md)** | the question is *"what does AI do to the people this touches, and what choice is still open?"* — an AI-strategy, product, mission, or deploy-vs-wait call. Seven checks (dual imperative, past-analogies mislead, name your conflict, act before the harm shows, Human Reserved, productive struggle, not-for-technologists-alone). Distilled from Bill Gates, gatesnotes 2026-08-27. |
+
 ---
 
 ## Running on Fable 5 (model-scoped — only when the agent actually runs on Fable)
