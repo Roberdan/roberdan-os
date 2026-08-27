@@ -282,13 +282,25 @@ emit_copilot() {
   local d="$P/copilot"
   mkdir -p "$d/prompts"
 
-  # .github/copilot-instructions.md thin → AGENTS.md.
+  # copilot-instructions.md → AGENTS.md pointer + the executive-format rule inline (must not
+  # wait behind a pointer). --install symlinks it to ~/.copilot/copilot-instructions.md too
+  # (user-level, every session, no flag; soft — extension systemMessage is the hard-bind path).
   cat > "$d/copilot-instructions.md" <<EOF
 # Copilot instructions → roberdan-os
 
 The canonical source of behavior is \`AGENTS.md\` in roberdan-os. Copilot reads this
 thin file: for the full behavior follow \`AGENTS.md\` (Behavior, Rules, Agents,
 Loop Protocol, Human gates).
+
+## Talk to ${FULL_NAME} like an executive — fixed format, every reply
+
+Accessibility commitment, not a style preference. Every reply: (1) **the point** in one
+sentence, no preamble; (2) **what I need from you** — options with their consequences in his
+terms + your recommendation, or "Nothing"; (3) **context** only if needed, max 3 lines;
+(4) **detail** (commands, paths, numbers) at the bottom; (5) **verified / not verified** —
+mandatory on any "done" claim. Delete empty sections, never write "N/A". No unexplained
+jargon. Max ~6 lines before the detail. "I don't understand" = fix the writing, not repeat
+it louder. Full contract: \`behavior/roberto-mode.md\` § Communicating with Roberto.
 
 ## Behavior
 - Engineering: \`behavior/roberto-mode.md\` — autonomy, evidence-first, done-criteria, quality gate.
@@ -505,6 +517,21 @@ EOF
   else
     echo "--- skills install (copilot) ---"
     echo "SKIP copilot: $COPILOT_ROOT non trovato (Copilot non installato)"
+  fi
+
+  # Copilot user-level instructions → ~/.copilot/copilot-instructions.md (read every session,
+  # no flag). Symlink the generated file so it tracks the canon; never clobber a user's own.
+  COPILOT_USER_INSTR="${RDA_COPILOT_USER_INSTR:-$COPILOT_ROOT/copilot-instructions.md}"
+  COPILOT_INSTR_SRC="$P/copilot/copilot-instructions.md"
+  echo ""
+  echo "--- copilot user instructions (symlink → $COPILOT_USER_INSTR) ---"
+  if [ ! -d "$COPILOT_ROOT" ]; then
+    echo "SKIP: $COPILOT_ROOT non trovato (Copilot non installato)"
+  elif [ -e "$COPILOT_USER_INSTR" ] && [ ! -L "$COPILOT_USER_INSTR" ]; then
+    echo "SKIP: $COPILOT_USER_INSTR è un file curato — unisci a mano da $COPILOT_INSTR_SRC"
+  else
+    ln -sf "$COPILOT_INSTR_SRC" "$COPILOT_USER_INSTR"
+    echo "INSTALL: $COPILOT_USER_INSTR -> $COPILOT_INSTR_SRC"
   fi
 
   # Copilot native custom AGENTS → collision-safe per-file symlink into ~/.copilot/agents.
