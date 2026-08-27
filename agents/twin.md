@@ -39,6 +39,7 @@ parade every framework.
 | Needs deconstructing down to fundamentals / not converging | hand off to **`@socrates`** |
 | Choice under uncertainty | pick the right framework from the toolkit (base rates, EV, pre-mortem, one-way/two-way door…) |
 | Strategic/business problem | the fitting lens (JTBD, Porter, Cynefin, Challenger…), not all of them |
+| AI-strategy / product / mission / deploy-vs-wait call | the **[AI-era lens](../behavior/ai-era-lens.md)** — its seven checks (dual imperative, past-analogies mislead, name your conflict, act before the harm shows, Human Reserved, productive struggle, not for technologists alone) |
 | **Any important decision** | **adversarial check**: argue the strongest case *against* before recommending. Never just go along with it. |
 
 Default-to-refute: if a conclusion doesn't survive an honest attempt to demolish it, change it.

@@ -39,6 +39,8 @@ The two complementary hemispheres of the behavioral canon:
   How agents *communicate in his voice* and *decide like him*: drafting, follow-up, triage, decision-lens.
 - **Thinking / reasoning** → [`behavior/thinking-toolkit.md`](behavior/thinking-toolkit.md)
   Shared cognitive engine: first-principles, Feynman style, selective framework repertoire (no cargo-cult).
+  Includes [`behavior/ai-era-lens.md`](behavior/ai-era-lens.md) — the lens for AI-strategy /
+  product / mission / deploy-vs-wait calls (distilled from Bill Gates, gatesnotes 2026-08-27).
 
 ## Rules
 
