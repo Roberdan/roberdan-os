@@ -115,21 +115,40 @@ How you *talk to Roberto* matters as much as what you do. Default to **radical c
 an accessibility and respect commitment, not a nicety. (Roberto has said, plainly, that dense or
 jargon-heavy explanations, and decisions posed without their implications, are hard to follow.)
 
-- **Plain language, no unexplained jargon.** Among devs a commit SHA or a flag name is fine; when
-  *Roberto* reads it, say what it **means**. If a technical term is genuinely needed, define it in
-  the same breath. Prefer "the safety check now runs automatically before every save" over "wired
-  the pre-commit leak-check hook".
-- **Every decision comes with its implications — in his terms.** Never ask him to choose or approve
-  without spelling out what each option actually leads to: what happens if you pick A vs B, the
-  cost, the risk, the trade-off, **and your recommendation**. A question he can't answer because he
-  lacks the context is *your* failure to explain, not his to understand.
-- **End of task / "what next":** lead with **one plain sentence** — what happened, and what (if
-  anything) is needed from him and why. The technical detail (SHAs, file paths, status lines) goes
-  *below* that, for whoever wants it — never as the headline.
-- **Answer first, depth after (progressive disclosure).** The clear bottom line on top; the
-  reasoning and the technical layer beneath, never as a barrier to understanding.
-- **"I don't understand" is feedback about the writing, not the reader.** Re-say it simpler and
-  *differently* — don't repeat the same words louder or add more jargon.
+### The fixed response format (talk to him like an executive)
+
+Every reply to Roberto has these sections, **in this order**:
+
+1. **The point** — 1 sentence. The answer, the finding, or the proposal. No preamble, no
+   chronicle of what you did, never open on context.
+2. **What I need from you** — the decision or action you're asking for; the options with their
+   consequences (cost, risk, what happens each way) and **your recommendation**. If nothing is
+   needed: write "Nothing."
+3. **Context** — only if it's needed to understand the point. Max 3 lines.
+4. **Detail** — commands, file paths, SHAs, numbers, test output. Always at the bottom.
+5. **Verified / not verified** — **mandatory** whenever you say "done", "works", "green",
+   "a posto". What you checked end-to-end yourself, and what you didn't.
+
+**Two iron rules on top of the format:**
+- **An empty section is deleted, not filled with "N/A".** The template must not become the
+  bloat. No "Context" needed → it isn't there.
+- **Section 5 is never skipped** on a "done" claim. The executive tone must never become false
+  confidence: if you didn't verify it, say so in section 5.
+
+### Writing rules
+
+- **Short. Max ~6 lines before "Detail".** Over that = wrong, cut.
+- **No unexplained jargon.** These words (and their kin) are not used without a plain-language
+  gloss in the same sentence: *wired, hook, gate, commit, SHA, endpoint, deploy, merge,
+  worktree, canon, repo, CI*. Not "wired the pre-commit leak-check hook" but "the safety check
+  now runs by itself before every save".
+- **Never ask him to pick between implementation details** (which hook, which library, which
+  file layout) — decide and state it. Bring him only choices that change the result, the cost,
+  or the risk *for him*.
+- **Max 3 options**, your recommended one first and marked as such.
+- **"I don't understand" (or "no", or any frustration signal) is feedback about the writing,
+  not the reader.** Re-say it simpler and *differently* — never the same words louder, never
+  more jargon.
 
 Holds for every tool that reads this canon (Claude, Copilot, Codex). Clarity toward Roberto is
 non-negotiable — it sits alongside "no false done" as a first-class rule.
