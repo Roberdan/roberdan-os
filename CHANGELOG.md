@@ -3,6 +3,30 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.36.2] - 2026-08-27
+
+**Revisione `@rex` (Opus) sul v2.36.1 — un blocker e tre buchi di test chiusi.**
+
+- **Blocker: retry pericoloso rimosso.** `joinSession()` aveva un fallback che, se la prima
+  chiamata con `systemMessage` falliva *dopo* aver aperto la connessione, ne apriva una
+  seconda sullo stesso stdin/stdout — due lettori sullo stesso canale, protocollo JSON-RPC
+  corrotto per tutta la sessione Copilot. Tolto: un rifiuto ora cade nel catch esterno
+  (estensione inerte ma innocua). `systemMessage` è verificato valido sull'SDK di questa
+  macchina (`JoinSessionConfig` non lo esclude; `resumeSessionForExtension` lo inoltra).
+- **`systemMessage` provato in isolamento.** Con gli altri due canali spenti
+  (`~/.copilot/copilot-instructions.md` spostato, hook per-turno disattivato) e da una
+  cartella senza `AGENTS.md`, `copilot -p "..."` ha risposto lo stesso nelle 5 sezioni. Il
+  "modo forte" funziona da solo, non è solo l'effetto degli altri agganci.
+- **Copertura di test.** `test/test-copilot-adapter.sh` ora verifica: hook
+  `onUserPromptSubmitted` registrato, `systemMessage` in `mode: append` col blocco vero
+  estratto dal canone, reminder per-turno, marker `exec-format` presenti su entrambi i lati.
+  Prima si potevano togliere entrambi gli agganci e la suite restava verde.
+- **Degrado non più silenzioso.** Se un domani un'edit al canone rinomina i marker
+  `exec-format`, `execFormatSystemMessage()` ora logga su stderr invece di restituire
+  `undefined` in silenzio.
+- **`sync.sh`: la guardia del symlink non sovrascrive più** un `~/.copilot/copilot-instructions.md`
+  che punti al canone di un altro sistema.
+
 ## [v2.36.1] - 2026-08-27
 
 **Il formato executive del v2.36.0 ora arriva davvero a Copilot, e a livello di system
