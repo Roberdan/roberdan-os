@@ -26,6 +26,14 @@
 // (checkpoint, sync), but it CANNOT hold back a premature "done" claim the way the Claude
 // Stop hook's blocking output can. verify-done / pre-completion-gate remain advisory here.
 //
+// RESPONSE SHAPING (added 2026-08-27, @github/copilot-sdk >= 1.0.11): the Claude "output
+// style" analog. joinSession() now accepts `systemMessage` — we APPEND the executive response
+// format (sliced from behavior/roberto-mode.md) so it binds at the model level every session,
+// with a plain no-systemMessage retry so an older runtime never costs us the extension. It is
+// reinforced per turn by onUserPromptSubmitted (a system-message append can still be diluted
+// in a very long session; a per-turn line cannot). This shapes the reply UP FRONT; it still
+// does not BLOCK a bad reply after the fact — that limitation above stands.
+//
 // CONTEXT-PRESSURE TELEMETRY — deliberately NOT built (verified 2026-07-12 against
 // @github/copilot-sdk@1.0.6 types): the hooks wired here DO carry more than working-dir/tool
 // name/args/error (e.g. onSessionStart's sessionId/initialPrompt, onPostToolUse's toolResult),
@@ -459,6 +467,36 @@ const tools = [
     },
 ];
 
+// --- response shaping ------------------------------------------------------------
+
+// The executive response format, sliced from the canon between the exec-format markers.
+// Returns a SystemMessageConfig (mode "append" — keeps every SDK guardrail) or undefined if
+// the canon is unreadable / the markers are gone. Never throws.
+function execFormatSystemMessage() {
+    try {
+        const md = readFileSync(join(RDA_OS, "behavior", "roberto-mode.md"), "utf-8");
+        const m = md.match(/<!-- exec-format:begin[\s\S]*?-->([\s\S]*?)<!-- exec-format:end -->/);
+        const body = m && m[1] ? m[1].trim() : "";
+        if (!body) return undefined;
+        return {
+            mode: "append",
+            content: `## Communicating with Roberto — the fixed response format (non-negotiable)\n\n${body}`,
+        };
+    } catch (e) {
+        diag("execFormatSystemMessage:read", e);
+        return undefined;
+    }
+}
+
+// One line that rides on every user turn — a system-message append can be diluted in a very
+// long session, this cannot. Kept short on purpose.
+const EXEC_FORMAT_TURN_REMINDER =
+    'Reply to Roberto in the fixed executive format: (1) the point, one sentence, no preamble; ' +
+    '(2) what I need from you — options + your recommendation, or "Nothing"; (3) context, max 3 ' +
+    'lines, only if needed; (4) detail (commands, paths, numbers) at the bottom; (5) verified / ' +
+    'not verified — mandatory on any "done" claim. Delete empty sections. No unexplained jargon. ' +
+    'Max ~6 lines before the detail.';
+
 // --- hooks -------------------------------------------------------------------
 
 const hooks = {
@@ -469,6 +507,10 @@ const hooks = {
         const ctx = (stdout || "").trim();
         return ctx ? { additionalContext: ctx } : undefined;
     },
+
+    // Per-turn reinforcement of the executive response format (see EXEC_FORMAT_TURN_REMINDER).
+    // additionalContext only — never rewrites the user's prompt.
+    onUserPromptSubmitted: async () => ({ additionalContext: EXEC_FORMAT_TURN_REMINDER }),
 
     onPreToolUse: async (input) => {
         const name = String((input && input.toolName) || "").toLowerCase();
@@ -544,7 +586,16 @@ const hooks = {
 // --- join --------------------------------------------------------------------
 
 try {
-    session = await joinSession({ tools, hooks });
+    // Response shaping: pass the executive-format systemMessage if the runtime accepts it;
+    // fall back to a plain join if it doesn't, so an older SDK never costs us the extension.
+    const systemMessage = execFormatSystemMessage();
+    try {
+        session = await joinSession(systemMessage ? { tools, hooks, systemMessage } : { tools, hooks });
+    } catch (e) {
+        if (!systemMessage) throw e;
+        diag("join:systemMessage-rejected(retrying plain)", e);
+        session = await joinSession({ tools, hooks });
+    }
     // The Claude "Stop" analog: after every turn Copilot emits session.idle. We run the
     // advisory gate chain + always-on checkpoint here (throttled + serialized). This can WARN
     // and run side effects, but — per the documented limitation — it cannot block/rewrite the

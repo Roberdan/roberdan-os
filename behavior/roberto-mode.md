@@ -115,6 +115,8 @@ How you *talk to Roberto* matters as much as what you do. Default to **radical c
 an accessibility and respect commitment, not a nicety. (Roberto has said, plainly, that dense or
 jargon-heavy explanations, and decisions posed without their implications, are hard to follow.)
 
+<!-- exec-format:begin — sliced verbatim into the Copilot extension's joinSession systemMessage;
+     keep this block self-contained (no cross-refs that only resolve inside this file). -->
 ### The fixed response format (talk to him like an executive)
 
 Every reply to Roberto has these sections, **in this order**:
@@ -152,6 +154,12 @@ Every reply to Roberto has these sections, **in this order**:
 
 Holds for every tool that reads this canon (Claude, Copilot, Codex). Clarity toward Roberto is
 non-negotiable — it sits alongside "no false done" as a first-class rule.
+<!-- exec-format:end -->
+
+On Claude this is enforced by the `roberto-plain` output style (edits the system prompt). On
+Copilot the block above is spliced into the extension's `joinSession` system-message at
+`hooks/copilot/extension.template.mjs` and reinforced per-turn via `onUserPromptSubmitted`.
+Codex reads it here in `AGENTS.md` context.
 
 ### How much to say *while* working (the volume contract)
 
