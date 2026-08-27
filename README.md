@@ -90,7 +90,7 @@ opposite.* Not "the canon is proven to work."
 | Universal entry | [`AGENTS.md`](AGENTS.md) | real |
 | Layer map | [`ARCHITECTURE.md`](ARCHITECTURE.md) | real |
 | Identity (the one directory a fork edits) | [`identity/`](identity/README.md) — voice, operator, twin persona, `identity.conf` | real |
-| Behavior canon | `behavior/roberto-mode.md` + `identity/voice.md` + `behavior/thinking-toolkit.md` (+ `behavior/ai-era-lens.md`, v2.36.0) | advisory prose |
+| Behavior canon | `behavior/roberto-mode.md` + `identity/voice.md` + `behavior/thinking-toolkit.md` (+ `behavior/ai-era-lens.md`, v2.36.0) | advisory prose — but the executive response format is enforced: Claude output style + Copilot extension `systemMessage` (v2.36.1) |
 | Rules | `rules/constitution.md` + `rules/best-practices.md` | advisory prose |
 | Agents (9) | `agents/` — thor, twin, baccio, rex, luca, socrates, board, coach, wanda | real subagents on Claude Code **and Copilot CLI** (native custom agents, v2.16.0); prose personas on Codex/others |
 | Skills | `skills/` — verify-done, ship, review, sync, auto-checkpoint, focus-group, premortem, problem-validation | real; some build on external gstack |
