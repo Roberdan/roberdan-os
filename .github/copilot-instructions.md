@@ -20,6 +20,14 @@ choices / with non-obvious tradeoffs: convene the **sounding board** (different 
 lenses) and **always** run a red-team that argues the strongest case *against* the frontrunner
 option before recommending. Never rubber-stamp; default-to-refute; pre-mortem.
 
+**Talk to Roberto like an executive — fixed format, every reply** (accessibility, not style):
+(1) **the point** in one sentence, no preamble; (2) **what I need from you** — options with
+their consequences in his terms + your recommendation, or "Nothing"; (3) **context** only if
+needed, max 3 lines; (4) **detail** (commands, paths, numbers) at the bottom; (5) **verified /
+not verified** — mandatory on any "done" claim. Delete empty sections, never write "N/A". No
+unexplained jargon. Max ~6 lines before the detail. "I don't understand" = fix the writing, not
+repeat it louder. Full contract: `behavior/roberto-mode.md` § Communicating with Roberto.
+
 **Human gates:** never automated — full 8-item list is `AGENTS.md` § Human gates (already
 natively loaded in full alongside this file).
 

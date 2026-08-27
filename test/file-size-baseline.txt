@@ -64,11 +64,18 @@
 # rilasciato (una verifica di @thor uccisa a meta') ha fatto uscire validate.sh ROSSO SU
 # test-bus, che non c'entrava niente. Un rosso su un innocente insegna a cancellare i lucchetti
 # a mano, cioe' a disarmare la protezione.
+# 2026-08-27, undicesima: +11 sync.sh per il formato executive in copilot-instructions.md +
+# il symlink a ~/.copilot/copilot-instructions.md (letto da Copilot ogni sessione, nessun
+# flag). Roberto: "io sono piu' le volte che non ti capisco che quelle che ti capisco". Su
+# Claude il fix e' l'output style, che entra nel system prompt; Copilot non ha l'equivalente,
+# e il file-ponte che leggeva era un indice che non citava il formato. Otto righe sono il
+# testo del formato (contenuto, non logica); tre sono l'install del symlink. Il hard-bind vero
+# (extension systemMessage) resta da fare — vedi memory copilot-executive-format-binding.
 1753 kanban/kb.sh
 1390 test/test-bus.sh
 1133 test/test-bus-mutants.sh
 774 bus/bus.sh
-638 bin/sync.sh
+649 bin/sync.sh
 601 test/test-federated-kb.sh
 578 test/test-factory-kb.sh
 438 eval/test-eval-pipeline.sh
