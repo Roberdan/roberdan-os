@@ -527,6 +527,8 @@ EOF
   echo "--- copilot user instructions (symlink → $COPILOT_USER_INSTR) ---"
   if [ ! -d "$COPILOT_ROOT" ]; then
     echo "SKIP: $COPILOT_ROOT non trovato (Copilot non installato)"
+  elif [ -L "$COPILOT_USER_INSTR" ] && [ "$(readlink "$COPILOT_USER_INSTR")" != "$COPILOT_INSTR_SRC" ]; then
+    echo "SKIP: $COPILOT_USER_INSTR è un symlink di un altro sistema — mai overwrite"
   elif [ -e "$COPILOT_USER_INSTR" ] && [ ! -L "$COPILOT_USER_INSTR" ]; then
     echo "SKIP: $COPILOT_USER_INSTR è un file curato — unisci a mano da $COPILOT_INSTR_SRC"
   else

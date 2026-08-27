@@ -477,7 +477,12 @@ function execFormatSystemMessage() {
         const md = readFileSync(join(RDA_OS, "behavior", "roberto-mode.md"), "utf-8");
         const m = md.match(/<!-- exec-format:begin[\s\S]*?-->([\s\S]*?)<!-- exec-format:end -->/);
         const body = m && m[1] ? m[1].trim() : "";
-        if (!body) return undefined;
+        if (!body) {
+            // Markers renamed/removed by a canon edit: degrade to the per-turn reminder only,
+            // but never silently — this feature is an accessibility commitment.
+            diag("execFormatSystemMessage:markers-missing", "exec-format markers not found in roberto-mode.md");
+            return undefined;
+        }
         return {
             mode: "append",
             content: `## Communicating with Roberto — the fixed response format (non-negotiable)\n\n${body}`,
@@ -586,16 +591,15 @@ const hooks = {
 // --- join --------------------------------------------------------------------
 
 try {
-    // Response shaping: pass the executive-format systemMessage if the runtime accepts it;
-    // fall back to a plain join if it doesn't, so an older SDK never costs us the extension.
+    // Response shaping: pass the executive-format systemMessage. Verified against the bundled
+    // SDK on this machine — JoinSessionConfig does NOT omit `systemMessage` (only
+    // onPermissionRequest + extensionSdkPath are), and resumeSessionForExtension forwards it in
+    // the session.resume RPC. NO retry-without-systemMessage: every joinSession() builds a fresh
+    // stdio connection with no singleton guard, so a second call after the first has connected
+    // would put two readers on one stdin — corrupting the CLI's JSON-RPC channel. A rejection
+    // here falls through to the outer catch: extension inert but harmless, which is the contract.
     const systemMessage = execFormatSystemMessage();
-    try {
-        session = await joinSession(systemMessage ? { tools, hooks, systemMessage } : { tools, hooks });
-    } catch (e) {
-        if (!systemMessage) throw e;
-        diag("join:systemMessage-rejected(retrying plain)", e);
-        session = await joinSession({ tools, hooks });
-    }
+    session = await joinSession(systemMessage ? { tools, hooks, systemMessage } : { tools, hooks });
     // The Claude "Stop" analog: after every turn Copilot emits session.idle. We run the
     // advisory gate chain + always-on checkpoint here (throttled + serialized). This can WARN
     // and run side effects, but — per the documented limitation — it cannot block/rewrite the
