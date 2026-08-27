@@ -3,6 +3,22 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.36.3] - 2026-08-27
+
+**Chiude i tre punti minori della revisione `@rex`. Solo test e doc, nessun cambio di
+comportamento.**
+
+- **Il ratchet delle 300 righe ora misura anche `*.mjs` / `*.js` scritti a mano.** Era cieco
+  all'unico file JS del repo (`hooks/copilot/extension.template.mjs`, 620 righe), che entra
+  in baseline così com'è.
+- **Nuovo controllo anti-drift** in `test/test-canon-structure.sh`: il formato executive vive
+  a mano in quattro punti (`behavior/roberto-mode.md`, `AGENTS.md`,
+  `.github/copilot-instructions.md`, l'heredoc di `bin/sync.sh`). Se un reword ne aggiorna uno
+  solo, il test diventa rosso finché non sono allineati tutti.
+- **`eval/README.md`**: documentato che il ramo "senza canone" dell'A/B è contaminato da
+  qualsiasi config sempre-attiva dell'agente (output style di Claude, estensione Copilot) —
+  stessa classe del limite di meccanismo già dichiarato, in forma nuova e specifica.
+
 ## [v2.36.2] - 2026-08-27
 
 **Revisione `@rex` (Opus) sul v2.36.1 — un blocker e tre buchi di test chiusi.**
