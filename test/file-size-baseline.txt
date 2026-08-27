@@ -1,6 +1,6 @@
 # Baseline delle 300 righe — file scritti a mano gia' oltre soglia il 2026-07-30.
 # Congelati, non condannati: passano cosi' come sono, ma non possono CRESCERE.
-# file in baseline: 11
+# file in baseline: 12
 # Un file NON in questa lista che supera le 300 righe fa fallire test/test-file-size-ratchet.sh.
 # Si accorcia una riga togliendola; si allarga solo con una decisione visibile in un diff.
 # 2026-07-30, decisione visibile come il file stesso chiede: +39 kb.sh, +62 test-kb-views.sh
@@ -78,6 +78,12 @@
 # fissano: hook registrato, systemMessage mode:append col blocco vero estratto dal canone,
 # reminder per-turno, e i marker exec-format presenti nei due lati. L'harness dello stub SDK
 # e' condiviso con il resto del file: uno split duplicherebbe ~50 righe di setup.
+# 2026-08-27, tredicesima: il ratchet ora misura anche *.mjs/*.js scritti a mano (rilievo
+# @rex: era cieco all'unico file JS del repo). Ne esiste uno solo — hooks/copilot/
+# extension.template.mjs, 620 righe — che entra in lista cosi' com'e'. Il resto e' generato
+# (platforms/, gia' escluso). Split reale rimandato: e' l'adattatore Copilot completo
+# (tool nativi + guardie + hook + Stop chain), e spezzarlo senza un motivo di prodotto e'
+# proprio il refactor imposto da un contatore che questo file rifiuta.
 1753 kanban/kb.sh
 1390 test/test-bus.sh
 1133 test/test-bus-mutants.sh
@@ -89,3 +95,4 @@
 446 test/test-kb-views.sh
 344 eval/report.sh
 315 test/test-copilot-adapter.sh
+620 hooks/copilot/extension.template.mjs
