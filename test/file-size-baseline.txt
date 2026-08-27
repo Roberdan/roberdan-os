@@ -1,6 +1,6 @@
 # Baseline delle 300 righe — file scritti a mano gia' oltre soglia il 2026-07-30.
 # Congelati, non condannati: passano cosi' come sono, ma non possono CRESCERE.
-# file in baseline: 10
+# file in baseline: 11
 # Un file NON in questa lista che supera le 300 righe fa fallire test/test-file-size-ratchet.sh.
 # Si accorcia una riga togliendola; si allarga solo con una decisione visibile in un diff.
 # 2026-07-30, decisione visibile come il file stesso chiede: +39 kb.sh, +62 test-kb-views.sh
@@ -64,20 +64,28 @@
 # rilasciato (una verifica di @thor uccisa a meta') ha fatto uscire validate.sh ROSSO SU
 # test-bus, che non c'entrava niente. Un rosso su un innocente insegna a cancellare i lucchetti
 # a mano, cioe' a disarmare la protezione.
-# 2026-08-27, undicesima: +11 sync.sh per il formato executive in copilot-instructions.md +
+# 2026-08-27, undicesima: +13 sync.sh per il formato executive in copilot-instructions.md +
 # il symlink a ~/.copilot/copilot-instructions.md (letto da Copilot ogni sessione, nessun
 # flag). Roberto: "io sono piu' le volte che non ti capisco che quelle che ti capisco". Su
-# Claude il fix e' l'output style, che entra nel system prompt; Copilot non ha l'equivalente,
-# e il file-ponte che leggeva era un indice che non citava il formato. Otto righe sono il
-# testo del formato (contenuto, non logica); tre sono l'install del symlink. Il hard-bind vero
-# (extension systemMessage) resta da fare — vedi memory copilot-executive-format-binding.
+# Claude il fix e' l'output style, che entra nel system prompt; Copilot ora ha l'equivalente
+# (extension systemMessage), e questa e' la rete se non parte. Otto righe sono il testo del
+# formato (contenuto, non logica); cinque sono l'install del symlink, con la guardia che non
+# sovrascrive il symlink di un altro sistema (rilievo @rex).
+# 2026-08-27, dodicesima: test-copilot-adapter.sh entra in lista a 315 (era a 300 esatte, non
+# baselinato). +15 righe: la revisione @rex ha trovato che i due nuovi agganci del formato
+# (systemMessage su joinSession, hook onUserPromptSubmitted) non avevano UNA riga di test — si
+# potevano togliere entrambi e la suite restava verde (No False Done #4). Le assert nuove
+# fissano: hook registrato, systemMessage mode:append col blocco vero estratto dal canone,
+# reminder per-turno, e i marker exec-format presenti nei due lati. L'harness dello stub SDK
+# e' condiviso con il resto del file: uno split duplicherebbe ~50 righe di setup.
 1753 kanban/kb.sh
 1390 test/test-bus.sh
 1133 test/test-bus-mutants.sh
 774 bus/bus.sh
-649 bin/sync.sh
+651 bin/sync.sh
 601 test/test-federated-kb.sh
 578 test/test-factory-kb.sh
 438 eval/test-eval-pipeline.sh
 446 test/test-kb-views.sh
 344 eval/report.sh
+315 test/test-copilot-adapter.sh

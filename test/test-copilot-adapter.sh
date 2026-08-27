@@ -96,6 +96,13 @@ else
   err "emission is non-deterministic"
 fi
 
+# exec-format markers: a canon edit that renames/drops them makes execFormatSystemMessage()
+# silently return undefined. Pin both ends in the canon and the slice regex in the extension.
+grep -qF 'exec-format:begin' behavior/roberto-mode.md && grep -qF 'exec-format:end -->' behavior/roberto-mode.md \
+  && grep -qF 'exec-format:begin' "$EXT" \
+  && ok "exec-format markers present in roberto-mode.md and referenced by the extension" \
+  || err "exec-format markers/regex broken — the Copilot systemMessage slice would be empty"
+
 # --- F) privacy: extension never reads/echoes mcp-config contents -------------
 section "privacy — extension only tests for the gbrain token, never reads/prints mcp-config contents"
 if grep -qE 'readFileSync\(mcp\b' "$EXT"; then
@@ -181,8 +188,16 @@ for (const n of ["roberdanos_kanban","roberdanos_pause","roberdanos_resume","rob
 A(names.every((n) => n.startsWith("roberdanos_")), "all tool names are roberdanos_-namespaced (globally unique)");
 
 // hook registration
-for (const h of ["onSessionStart","onPreToolUse","onPostToolUse","onPostToolUseFailure","onSessionEnd"])
+for (const h of ["onSessionStart","onUserPromptSubmitted","onPreToolUse","onPostToolUse","onPostToolUseFailure","onSessionEnd"])
   A(typeof cfg.hooks[h] === "function", "hook " + h + " registered");
+
+// response shaping: exec-format reaches Copilot two ways, both must stay wired
+A(cfg.systemMessage && cfg.systemMessage.mode === "append"
+  && /verified \/ not verified/i.test(cfg.systemMessage.content || "") && (cfg.systemMessage.content || "").length > 500,
+  "join passes the sliced exec-format as a mode:append systemMessage");
+{ const ups = await cfg.hooks.onUserPromptSubmitted({});
+  A(ups && /executive format/i.test(ups.additionalContext || ""),
+    "onUserPromptSubmitted returns the per-turn exec-format reminder"); }
 
 const pre = cfg.hooks.onPreToolUse;
 // deny: force push
