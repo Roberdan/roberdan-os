@@ -209,6 +209,28 @@ and nothing warned. Two consequences:
 - Widening `.gitignore` is not the fix. An ignore rule protects this repo, on this machine, for
   the patterns someone thought of; keeping the file outside the tree protects it everywhere.
 
+## Subagent models — always the newest generation of the tier, never a hand-picked old id
+
+When you spawn a subagent you **must** pass `model` explicitly, and it must be the **newest
+generation of the tier you chose**. Never leave it to the default (which may be a previous
+generation) and never type a version number from memory.
+
+**The single source of truth is `copilot_model()` in `bin/sync.sh`** — canon tiers → concrete
+ids (`opus` → `claude-opus-5`, `sonnet` → `claude-sonnet-5`, `haiku` → `claude-haiku-4.5`).
+If you are about to write a concrete id in a tool call, it must match that table, or a newer
+generation you can see in the tool's own model list. When the tool's list shows a higher
+generation than the table, **the list wins and the table gets updated** in the same session.
+
+Which tier: read the `model-selection-policy` skill. The rule here is only *how new*, not
+*how big*. If unsure between two generations, **go up** — a previous generation at the same
+tier usually costs the same and reasons worse.
+
+**Precedent, 2026-08-28 (audit MirrorScopio):** four verification subagents were launched on
+`claude-sonnet-4.6` while `claude-sonnet-5` and `claude-opus-5` were both in the tool's own
+model list. Roberto caught it and the whole pass had to be redone. Nothing in the canon was
+wrong — the mapping above was already correct — the id was simply typed from memory. That is
+the failure mode this rule exists to stop.
+
 ## Execution Defaults
 **Browser:** Playwright = Microsoft Edge (`msedge`) only; no Chrome/Chromium fallback. If Edge is unavailable, stop and report the blocker; override only for Roberto-requested cross-browser tests. **Writing:** Tables > prose; commands > descriptions; comments WHY-only; conventional commits; PR = summary + test plan.
 
