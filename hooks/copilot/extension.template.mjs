@@ -129,6 +129,33 @@ let lastChainRun = 0;
 
 let session;
 
+// The joined session's own id. Claude Code passes `session_id` in every hook payload, and BOTH
+// hooks/goal-gate.sh and hooks/bus-doorbell.sh key their per-session state on it, falling back
+// to the literal string "nosession" when it is absent. Calling them without it is therefore not
+// a cosmetic omission: every Copilot session on the machine collapses onto ONE shared state key,
+// so one repo's doorbell stamp and one repo's goal-gate retry/stall counters overwrite another's
+// (@thor reproduced both). `sessionId` is a readonly field on the joined session object
+// (copilot-sdk session.d.ts) and is available from joinSession() onwards; before the join
+// resolves there is no session to speak of, so an empty string is the honest answer and the
+// hooks' own "nosession" fallback applies exactly as it does on Claude with an unknown session.
+function sessionId() {
+    try {
+        return String((session && session.sessionId) || "");
+    } catch (e) {
+        diag("sessionId", e);
+        return "";
+    }
+}
+
+// The stdin payload shape Claude Code hands its hooks. Keep the key names identical — the hooks
+// are provider-neutral and parse these names directly.
+function hookPayload(cwd) {
+    const sid = sessionId();
+    const payload = { cwd: cwd || process.cwd() };
+    if (sid) payload.session_id = sid;
+    return JSON.stringify(payload);
+}
+
 // --- shell helpers -----------------------------------------------------------
 
 // Run a script, feed it stdin, resolve { code, stdout, stderr }. Never rejects — a spawn
@@ -266,7 +293,7 @@ async function runStopChain(cwd) {
         for (const rel of ["pre-completion-gate.sh", "verify-done.sh", "goal-gate.sh"]) {
             const p = join(HOOKS, rel);
             if (!existsSync(p)) continue;
-            const { stdout, stderr } = await runScript(p, "", cwd);
+            const { stdout, stderr } = await runScript(p, hookPayload(cwd), cwd);
             const msg = `${stdout || ""}${stderr || ""}`.trim();
             if (msg) {
                 try {
@@ -277,9 +304,11 @@ async function runStopChain(cwd) {
             }
         }
         // Side effects: opt-in wrapper regen (self-gated by RDA_AUTOSYNC) + always-on checkpoint.
+        // These get the same payload as the gates — Claude Code hands every Stop hook the identical
+        // stdin object, and a hook that ignores it costs nothing.
         for (const rel of ["post-task-sync.sh", "auto-checkpoint.sh"]) {
             const p = join(HOOKS, rel);
-            if (existsSync(p)) await runScript(p, "", cwd);
+            if (existsSync(p)) await runScript(p, hookPayload(cwd), cwd);
         }
     } finally {
         chainRunning = false;
@@ -298,7 +327,7 @@ async function ringDoorbell(cwd) {
     try {
         const p = join(HOOKS, "bus-doorbell.sh");
         if (!existsSync(p)) return;
-        const { stdout } = await runScript(p, JSON.stringify({ cwd: cwd || process.cwd() }), cwd);
+        const { stdout } = await runScript(p, hookPayload(cwd), cwd);
         const trimmed = (stdout || "").trim();
         if (!trimmed) return; // fast path: no traffic for this repo, or nothing new since last ring
         let text = "";
@@ -633,7 +662,7 @@ const hooks = {
     onSessionEnd: async (input) => {
         // Final always-on checkpoint so an exit/crash loses at most the current turn.
         const p = join(HOOKS, "auto-checkpoint.sh");
-        if (existsSync(p)) await runScript(p, "", input && input.workingDirectory);
+        if (existsSync(p)) await runScript(p, hookPayload(input && input.workingDirectory), input && input.workingDirectory);
         return undefined;
     },
 };
