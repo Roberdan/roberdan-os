@@ -10,10 +10,11 @@
 // What it does — translate the provider-neutral hooks/ into Copilot lifecycle APIs:
 //   onSessionStart     -> hooks/context-inject.sh  (inject fresh durable context)
 //   onPreToolUse       -> hooks/main-guard.sh + hooks/bash-guard.sh (allow/ask/deny)
-//   onPostToolUse      -> hooks/autofmt.sh (best-effort format after edits)
+//   onPostToolUse      -> hooks/bus-doorbell.sh (every tool) + hooks/autofmt.sh (after edits)
 //   onPostToolUseFailure -> ephemeral observability log (no hidden success)
 //   session.idle       -> the Claude "Stop" chain (pre-completion-gate, verify-done,
-//                         post-task-sync, auto-checkpoint) as WARN + always-on checkpoint
+//                         goal-gate, post-task-sync, auto-checkpoint) as WARN + always-on
+//                         checkpoint
 //   onSessionEnd       -> final auto-checkpoint
 // Plus safe, namespaced native tools (kanban view/actions, pause, resume, verify-done,
 // doctor). The kanban gates (todo->doing needs --by, doing->done needs @thor evidence)
@@ -24,7 +25,10 @@
 // already produced. There is no proven Copilot hook that can BLOCK or REWRITE that final
 // response. So the "Stop" chain here can WARN (via session.log) and run side effects
 // (checkpoint, sync), but it CANNOT hold back a premature "done" claim the way the Claude
-// Stop hook's blocking output can. verify-done / pre-completion-gate remain advisory here.
+// Stop hook's blocking output can. verify-done / pre-completion-gate / goal-gate remain
+// advisory here: goal-gate's exit 2 is read as a warning to surface, never as a turn block.
+// This is the ONE remaining behavioral difference from Claude Code, and it is a platform
+// limit, not a wiring gap.
 //
 // RESPONSE SHAPING (added 2026-08-27, @github/copilot-sdk >= 1.0.11): the Claude "output
 // style" analog. joinSession() now accepts `systemMessage` — we APPEND the executive response
@@ -124,6 +128,33 @@ let chainRunning = false;
 let lastChainRun = 0;
 
 let session;
+
+// The joined session's own id. Claude Code passes `session_id` in every hook payload, and BOTH
+// hooks/goal-gate.sh and hooks/bus-doorbell.sh key their per-session state on it, falling back
+// to the literal string "nosession" when it is absent. Calling them without it is therefore not
+// a cosmetic omission: every Copilot session on the machine collapses onto ONE shared state key,
+// so one repo's doorbell stamp and one repo's goal-gate retry/stall counters overwrite another's
+// (@thor reproduced both). `sessionId` is a readonly field on the joined session object
+// (copilot-sdk session.d.ts) and is available from joinSession() onwards; before the join
+// resolves there is no session to speak of, so an empty string is the honest answer and the
+// hooks' own "nosession" fallback applies exactly as it does on Claude with an unknown session.
+function sessionId() {
+    try {
+        return String((session && session.sessionId) || "");
+    } catch (e) {
+        diag("sessionId", e);
+        return "";
+    }
+}
+
+// The stdin payload shape Claude Code hands its hooks. Keep the key names identical — the hooks
+// are provider-neutral and parse these names directly.
+function hookPayload(cwd) {
+    const sid = sessionId();
+    const payload = { cwd: cwd || process.cwd() };
+    if (sid) payload.session_id = sid;
+    return JSON.stringify(payload);
+}
 
 // --- shell helpers -----------------------------------------------------------
 
@@ -252,10 +283,17 @@ async function runStopChain(cwd) {
     lastChainRun = now;
     try {
         // Advisory gates first: surface anything that would make a "done" claim premature.
-        for (const rel of ["pre-completion-gate.sh", "verify-done.sh"]) {
+        // goal-gate.sh is the Claude Stop chain's ONLY blocking hook (exit 2 = don't close the
+        // turn). Copilot cannot block an already-emitted final message, so here it is demoted to
+        // the same WARN channel as the others — but its *content* (the authorized queue is not
+        // finished, here is the next card) is exactly what would otherwise be lost, and losing it
+        // is the difference between "the loop keeps going" and the multi-hour silences that
+        // goal-gate.sh was measured on. Its reason is written to stderr on exit 2, which
+        // runScript already captures, so no special-casing of the exit code is needed.
+        for (const rel of ["pre-completion-gate.sh", "verify-done.sh", "goal-gate.sh"]) {
             const p = join(HOOKS, rel);
             if (!existsSync(p)) continue;
-            const { stdout, stderr } = await runScript(p, "", cwd);
+            const { stdout, stderr } = await runScript(p, hookPayload(cwd), cwd);
             const msg = `${stdout || ""}${stderr || ""}`.trim();
             if (msg) {
                 try {
@@ -266,12 +304,45 @@ async function runStopChain(cwd) {
             }
         }
         // Side effects: opt-in wrapper regen (self-gated by RDA_AUTOSYNC) + always-on checkpoint.
+        // These get the same payload as the gates — Claude Code hands every Stop hook the identical
+        // stdin object, and a hook that ignores it costs nothing.
         for (const rel of ["post-task-sync.sh", "auto-checkpoint.sh"]) {
             const p = join(HOOKS, rel);
-            if (existsSync(p)) await runScript(p, "", cwd);
+            if (existsSync(p)) await runScript(p, hookPayload(cwd), cwd);
         }
     } finally {
         chainRunning = false;
+    }
+}
+
+// --- the bus doorbell (PostToolUse, every tool) ------------------------------
+
+// Ring, never deliver. hooks/bus-doorbell.sh prints its count as JSON on
+// `hookSpecificOutput.additionalContext` because that is the only channel Claude Code injects
+// next to a PostToolUse result. Copilot's onPostToolUse has no verified additionalContext
+// equivalent, so the text is surfaced through the same ephemeral session.log channel already
+// used by onPostToolUseFailure: the user and the model see the COUNT, and the message bodies
+// still only ever arrive through an explicit `bus read`. Never throws, never blocks.
+async function ringDoorbell(cwd) {
+    try {
+        const p = join(HOOKS, "bus-doorbell.sh");
+        if (!existsSync(p)) return;
+        const { stdout } = await runScript(p, hookPayload(cwd), cwd);
+        const trimmed = (stdout || "").trim();
+        if (!trimmed) return; // fast path: no traffic for this repo, or nothing new since last ring
+        let text = "";
+        try {
+            const parsed = JSON.parse(trimmed);
+            text = String((parsed.hookSpecificOutput && parsed.hookSpecificOutput.additionalContext) || "").trim();
+        } catch (e) {
+            // Non-JSON output is not silently dropped: it is still a ring, just an unshaped one.
+            diag("ringDoorbell:parse", e);
+            text = trimmed;
+        }
+        if (!text) return;
+        await session.log(`[roberdan-os bus]\n${text}`, { level: "warning", ephemeral: true });
+    } catch (e) {
+        diag("ringDoorbell", e);
     }
 }
 
@@ -547,6 +618,14 @@ const hooks = {
     },
 
     onPostToolUse: async (input) => {
+        const cwd = input && input.workingDirectory;
+        // Doorbell first, and for EVERY tool — Claude wires bus-doorbell.sh on PostToolUse with
+        // matcher "*", so restricting it to write tools here would be a silent parity loss (a
+        // read-only review session would never hear the bell). The hook's own fast path exits 0
+        // with no output when the current repo has no bus traffic, so the per-tool cost is one
+        // directory stat.
+        await ringDoorbell(cwd);
+
         const name = String((input && input.toolName) || "").toLowerCase();
         if (!WRITE_TOOLS.has(name)) return undefined;
         const args = toolArgsOf(input);
@@ -583,7 +662,7 @@ const hooks = {
     onSessionEnd: async (input) => {
         // Final always-on checkpoint so an exit/crash loses at most the current turn.
         const p = join(HOOKS, "auto-checkpoint.sh");
-        if (existsSync(p)) await runScript(p, "", input && input.workingDirectory);
+        if (existsSync(p)) await runScript(p, hookPayload(input && input.workingDirectory), input && input.workingDirectory);
         return undefined;
     },
 };
