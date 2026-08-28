@@ -1,0 +1,13 @@
+# test/.new-area-ack — le zone di primo livello aperte DA UN ESSERE UMANO, di proposito.
+#
+# `new-area-check.sh` rifiuta un commit che porta file in una zona dove nessun file e' mai
+# stato in tutta la storia del repo. Una zona che ha gia' storia in HEAD non ha bisogno di
+# stare qui: passa da sola. Questo file serve SOLO al momento in cui una zona nasce.
+#
+# Una riga = un nome esatto di zona (il primo pezzo del percorso: `docs` per `docs/x.md`,
+# `README.md` per un file in radice). Niente glob: `*` sarebbe una porta aperta, non
+# un'eccezione. `#` per i commenti.
+#
+# Prima di aggiungere una riga qui, chiediti chi ha scritto quei file. Se non li hai scritti
+# tu, la riga giusta non e' qui: e' `git rm --cached` piu' la casa fuori da git
+# (~/.roberdan-os/private/brain/). Vedi docs/privacy-leak-check.md.

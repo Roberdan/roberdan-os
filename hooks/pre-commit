@@ -60,6 +60,31 @@ if ! bash "$_priv_check" --staged; then
   exit 1
 fi
 
+# I tre controlli sopra chiedono qualcosa AL FILE: il vocabolario, la forma, la dichiarazione.
+# Tutti e tre dipendono dalla buona educazione di chi il file l'ha scritto. Un tool che
+# deposita dati riservati senza mettere nessun marcatore, con parole che non sono su nessuna
+# lista e senza indirizzi dentro, li passa tutti e tre — e li passa correttamente.
+# Il quarto non guarda il contenuto per niente: guarda IL POSTO. Il 2026-08-24 le note
+# generate sono atterrate in `people/`, `projects/`, `claude-code/` — tre zone dove nessun
+# file era mai stato. Un generatore senza destinazione dichiarata scrive relativo alla CWD, e
+# cio' che scrive apre una zona che nessun umano ha mai aperto. Quella e' l'impronta della
+# provenienza, e si legge senza aprire il file.
+_area_check="$ROOT/test/new-area-check.sh"
+if [ ! -f "$_area_check" ]; then
+  # Stessa regola degli altri due: fallire chiuso, ma dire la ragione VERA. Annunciare una
+  # zona sospetta per un controllo che non e' mai partito insegna che il messaggio non vuol
+  # dire niente, e il giorno in cui e' vero viene scavalcato.
+  echo "" >&2
+  echo "pre-commit: BLOCCATO — manca $_area_check, quindi non e' stato controllato niente." >&2
+  echo "Non e' un ritrovamento. Ripristina il file o reinstalla gli hook." >&2
+  exit 1
+fi
+if ! bash "$_area_check" --staged; then
+  echo "" >&2
+  echo "pre-commit: BLOCCATO — il commit apre una zona del repo che nessuno ha mai aperto (vedi sopra)." >&2
+  exit 1
+fi
+
 # --- the board is a repo INSIDE this one, and this repo cannot see it ---------------
 #
 # `kanban/` is a separate private git repo nested in this one (the cards carry real names
