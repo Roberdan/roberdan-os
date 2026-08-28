@@ -3,6 +3,32 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.39.0] - 2026-08-28
+
+**pkgnet-guard reaches processes that never source a shell rc file** — the hole that kept the
+Defender "REDACTED-INTERNAL-POLICY" toast coming back after v2.37.0.
+
+v2.37.0 delivered the proxy override through `~/.config/roberdan-os/pkgnet.env`, sourced by
+`~/.zshenv`. That covers zsh trees and nothing else. Measured on this machine: Warp starts its
+login shell as `zsh -g --no_rcs` (which suppresses *every* startup file, `.zshenv` included), and
+`gh copilot --yolo` runs its commands as `bash --norc --noprofile -c …`. A Copilot agent doing
+`npm install` in MirrorBuddy therefore had no `npm_config_registry`, the repo's committed
+`.npmrc` (`registry=https://registry.npmjs.org/`) won, and every request hit the blocked host.
+
+- **`launchctl setenv` is now the primary layer.** `bin/pkgnet-guard.sh` seeds
+  `npm_config_registry`, `NPM_CONFIG_REGISTRY`, `PIP_INDEX_URL` and `UV_INDEX_URL` into the user's
+  gui domain, so every process started afterwards inherits them regardless of shell — or of no
+  shell at all. `pkgnet.env` + `.zshenv` stay as the second layer.
+- **`--install-agent`** writes and loads `~/Library/LaunchAgents/com.roberdan.pkgnet-guard.plist`
+  (RunAtLoad + every 30 min). Without it the launchd vars die at reboot and a network change is
+  never noticed.
+- **`--check` now also verifies the launchd vars**, and `bin/toolchain-doctor.sh` check #6 gained
+  a `pkgnet-launchagent` gate that goes `warn` when the agent is not loaded (mutation-tested:
+  bootout → warn, reinstall → ok).
+- **Known limit, by construction:** `launchctl setenv` seeds only *new* processes. Apps already
+  running when the guard applies — a Warp window, a live `gh copilot` session — keep the old
+  environment until they are relaunched.
+
 ## [v2.38.1] - 2026-08-28
 
 **Le tre migliorie della proposta claude-code del 2026-08-22, applicate** (card `260828-123448`).
