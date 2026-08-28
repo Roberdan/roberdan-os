@@ -3,6 +3,27 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.37.0] - 2026-08-28
+
+**`pkgnet-guard`: quando la rete aziendale blocca i registry pubblici dei pacchetti,
+instrada npm/pnpm/bun/pip/uv sul proxy autorizzato — automaticamente e solo dove serve.**
+
+- **Il problema.** `~/.npmrc`, `pip.conf` e `uv.toml` globali puntano già al proxy
+  Microsoft, ma un `.npmrc` di progetto committato con `registry=https://registry.npmjs.org/`
+  (alcuni repo OSS lo fanno per la riproducibilità del lockfile — `hve-core`, `MirrorBuddy`)
+  vince sul globale e colpisce l'host bloccato: toast Defender "REDACTED-INTERNAL-POLICY" o TLS
+  reset.
+- **`bin/pkgnet-guard.sh`** (nuovo) sonda la rete. Se i registry pubblici sono irraggiungibili
+  e il proxy risponde, scrive `~/.config/roberdan-os/pkgnet.env` con `export
+  npm_config_registry` / `PIP_INDEX_URL` / `UV_INDEX_URL` verso il proxy — e una variabile
+  d'ambiente batte *qualsiasi* `.npmrc` di progetto. Su una rete non bloccata **cancella** il
+  file: no-op ovunque, niente da disfare.
+- **Sonda solo su richiesta.** Il probe gira in `bin/bootstrap.sh` (step 3d) e in
+  `bin/toolchain-doctor.sh` (check #6), mai all'avvio della shell. `~/.zshenv` fa solo
+  `[ -f … ] && . …` (una riga, inerte se il file non c'è).
+- **`toolchain-doctor` check #6**: rosso se `pkgnet.env` e la rete non concordano; warn se il
+  file esiste ma `~/.zshenv` non lo carica (le shell nuove resterebbero scoperte).
+
 ## [v2.36.3] - 2026-08-27
 
 **Chiude i tre punti minori della revisione `@rex`. Solo test e doc, nessun cambio di
