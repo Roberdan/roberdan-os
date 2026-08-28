@@ -92,7 +92,25 @@ second="$(payload s4 | bash "$HOOK" 2>/dev/null)"
 other="$(payload s5 | bash "$HOOK" 2>/dev/null)"
 [ -n "$other" ] || fail "a second session inherited the first session's silence"
 
-# --- 5. it starts nothing ---------------------------------------------------
+# --- 4b. the stamp is per SESSION **AND REPO** ------------------------------
+# The stamp holds a signature computed over ONE repo's mailbox. Keyed on the session alone, a
+# session that touches two repos makes them overwrite each other's signature, so every
+# alternation reads as "the state changed" and the hook rings again for mail it already
+# announced — property 4 (edge, not level) silently degrades back into a level as soon as a
+# second repo is in play. The failure is noise, not silence, so nothing else here would catch it.
+REPO_B=doorbell-repo-b
+WORK_B="$TMP/$REPO_B"; mkdir -p "$WORK_B"
+echo "mail for the other repo" | bash "$BUS" send --repo "$REPO_B" --card d9 \
+  --from sol-gate --to implementer --kind note >/dev/null || fail "could not seed the second repo"
+payload_b() { printf '{"session_id":"%s","cwd":"%s","hook_event_name":"PostToolUse"}' "$1" "$WORK_B"; }
+
+[ -n "$(payload   s-two-repos | bash "$HOOK" 2>/dev/null)" ] || fail "no ring for repo A on a fresh session"
+[ -n "$(payload_b s-two-repos | bash "$HOOK" 2>/dev/null)" ] || fail "the second repo inherited the first repo's stamp: it was never told"
+again="$(payload s-two-repos | bash "$HOOK" 2>/dev/null)"
+[ -z "$again" ] \
+  || fail "repo A rang a second time for unchanged state after another repo rang in the same session — the stamp is keyed on the session alone"
+
+
 # Same lever as test-bus.sh: stub agent CLIs first on PATH, each dropping a
 # canary when invoked. The hook runs on every tool call, so a payload here would
 # fire more often than anywhere else in the system.

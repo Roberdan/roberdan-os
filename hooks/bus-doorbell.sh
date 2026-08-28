@@ -109,7 +109,15 @@ mkdir -p "$STAMPDIR" 2>/dev/null || exit 0
 # lives outside the bus store on purpose — liveness in this system is observed,
 # never declared, and a file under the store claiming who is present would be the
 # lease the board cut (test 12 asserts no such registry ever appears there).
-stamp="$STAMPDIR/$(printf '%s' "$sid" | tr -c 'A-Za-z0-9._-' '_')"
+#
+# THE KEY IS SESSION **AND REPO**, and the second half is what was missing. The signature this
+# stamp holds is computed over `$BUS_HOME/$repo` — ONE repo's mailbox. Keyed on the session
+# alone, a session that touches two repos made them overwrite each other's signature: every
+# alternation between them reads as "the state changed", so the doorbell rings again for mail it
+# already announced and the 10-minute reminder timer restarts each time. The failure mode is
+# NOISE, not silence, which is exactly why it survives review — the hook still looks like it
+# works, and the edge it exists to produce has quietly become a level again.
+stamp="$STAMPDIR/$(printf '%s' "$sid" | tr -c 'A-Za-z0-9._-' '_').$(printf '%s' "$repo" | tr -c 'A-Za-z0-9._-' '_')"
 prev_sig=""; prev_ts=0; prev_had=0
 if [ -f "$stamp" ]; then
   prev_sig="$(sed -n 1p "$stamp" 2>/dev/null || true)"
