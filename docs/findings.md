@@ -244,3 +244,20 @@ _Aggiornato: 2026-08-03._
   repo"; non si e' avverata, e la promozione e' comunque la sua chiamata, non la mia — le
   condizioni di questo file dicono quando *proporre*, mai quando decidere. Il seguito sta
   sulla card, questa riga resta come origine del perche'.
+
+- **2026-08-28 — `agents/coach.md` ha un frontmatter che non e' YAML valido.** Trovato mentre
+  applicavo `cacheTtl` ai quattro agenti opus (card `260828-123448`), verificando che il
+  frontmatter reggesse dopo la modifica: `coach` non parsava nemmeno **prima** di toccare
+  qualsiasi cosa (`git stash` e riprova → stesso errore). Causa: il valore di `description`
+  contiene due punti seguiti da spazio (`"...challenge himself. Maieutic and empathetic: asks
+  the right questions..."`) e non e' fra virgolette, quindi YAML lo legge come una mappa
+  annidata e si ferma. `wanda` e `board`, controllati insieme, parsano bene. Oggi non rompe
+  niente di osservabile: chi legge questi file lo fa con `grep`/`sed`, non con un parser YAML,
+  ed e' esattamente per questo che il difetto e' sopravvissuto. **La condizione che lo
+  renderebbe una card:** il primo consumatore che parsi davvero il frontmatter — un
+  `bin/sync.sh` che generi i wrapper da una struttura invece che per sostituzione di testo, un
+  test che validi tutti gli agenti, o un host che rifiuti l'agente all'avvio. Quel giorno
+  `coach` sparisce in silenzio, ed e' l'agente con cui Roberto ragiona. Fix, quando servira':
+  virgolettare il `description`. Non fatto qui perche' non e' il lavoro della card, e un file
+  di comportamento non si tocca di straforo (`AGENTS.md` § Memory: mai auto-commit su
+  `agents/`).

@@ -243,7 +243,7 @@ EOF
   # purpose - a Stop hook that surfaces pending mail is one edit away from "if a message
   # is pending, continue the session", which is the mutation bus-protocol.md forbids.
   cat > "$d/settings-hooks.json" <<'EOF'
-{
+{ "promptCacheTtl": "1h", "subagentPromptCacheTtl": "5m",
   "hooks": {
     "SessionStart": [
       { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/context-inject.sh 2>/dev/null || true", "timeout": 15 }] }

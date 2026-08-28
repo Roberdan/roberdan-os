@@ -5,6 +5,7 @@ model: "opus"
 effort: "high"
 tools: Read, Write
 providers: [claude, copilot, codex]
+cacheTtl: "1h"
 constraints: [draft-not-send-for-external, never-invent-names-dates-figures, respect-personal-blocks, reasons-first-principles, convenes-board-on-high-stakes, adversarial-check-on-big-decisions, delegation-not-impersonation, inherits-human-gates-3-and-6]
 version: "2.1"
 maturity: stable
