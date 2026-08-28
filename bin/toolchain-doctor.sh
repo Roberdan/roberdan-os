@@ -194,6 +194,33 @@ else
   emit "capability-litter" ok "not inside a git repo, nothing to check"
 fi
 
+# --- 6. package-registry proxy guard --------------------------------------
+# The corporate network blocks registry.npmjs.org / files.pythonhosted.org
+# (Defender "REDACTED-INTERNAL-POLICY"). bin/pkgnet-guard.sh writes pkgnet.env with
+# the proxy override when that is true and removes it when it is not; if the
+# two disagree, npm/pnpm/bun installs fail with a toast or a TLS reset.
+GUARD_ENV="${XDG_CONFIG_HOME:-$HOME/.config}/roberdan-os/pkgnet.env"
+GUARD_SH="$(dirname "${BASH_SOURCE[0]}")/pkgnet-guard.sh"
+if [ ! -x "$GUARD_SH" ]; then
+  emit "pkgnet-guard" degraded "bin/pkgnet-guard.sh not found" \
+    "cannot tell whether the package-registry proxy override matches the network" \
+    "restore bin/pkgnet-guard.sh from the canon"
+elif "$GUARD_SH" --check >/dev/null 2>&1; then
+  if [ -f "$GUARD_ENV" ]; then
+    emit "pkgnet-guard" ok "public registries blocked, proxy override active"
+    grep -q 'pkgnet.env' "$HOME/.zshenv" 2>/dev/null || emit "pkgnet-zshenv" degraded \
+      "pkgnet.env exists but ~/.zshenv does not source it" \
+      "new shells still hit the blocked registry; only this repo's scripts are covered" \
+      "add to ~/.zshenv:  [ -f \"\$HOME/.config/roberdan-os/pkgnet.env\" ] && . \"\$HOME/.config/roberdan-os/pkgnet.env\""
+  else
+    emit "pkgnet-guard" ok "public registries reachable, no override needed"
+  fi
+else
+  emit "pkgnet-guard" broken "pkgnet.env disagrees with the network" \
+    "npm/pnpm/bun/pip/uv installs fail with a Defender block or a TLS reset" \
+    "bash $GUARD_SH"
+fi
+
 if [ "$MODE" = json ]; then
   printf '{"broken":%d,"degraded":%d,"checks":[%s]}\n' "$BROKEN" "$DEGRADED" "$JSON_ROWS"
 elif [ "$BROKEN" -gt 0 ]; then
