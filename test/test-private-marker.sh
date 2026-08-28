@@ -161,8 +161,11 @@ if grep -q 'private-marker-check.sh' "$ROOT/hooks/pre-commit"; then
 else
   err "hooks/pre-commit non chiama il gate: esiste ma non protegge niente"
 fi
-if grep -q 'private-marker-check.sh' "$ROOT/test/validate.sh"; then
-  ok "test/validate.sh lo chiama"
+# validate.sh ha estratto i quattro gate in test/validate-privacy.sh (era al limite delle 300
+# righe). La domanda vera non e' "in quale file sta la riga" ma "girando validate.sh, il gate
+# parte?": si guarda validate.sh PIU' i file che sorgono da li'.
+if grep -rq 'private-marker-check.sh' "$ROOT/test/validate.sh" "$ROOT/test/validate-privacy.sh" 2>/dev/null; then
+  ok "test/validate.sh lo chiama (direttamente o via il file che sorge)"
 else
   err "test/validate.sh non chiama il gate"
 fi
