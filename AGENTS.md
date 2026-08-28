@@ -320,7 +320,7 @@ made them invisible in `git status` without making them any safer. **Visible and
 hidden and blocked**, so the entries were removed and `test/test-private-marker.sh` now asserts
 they stay out.
 
-**Three gates, because each is blind to what the others catch.** All three run in
+**Four gates, because each is blind to what the others catch.** All four run in
 `hooks/pre-commit` (which BLOCKS) and in `test/validate.sh`:
 
 1. [`test/leak-check.sh`](test/leak-check.sh) — **vocabolario**: a three-tier fallback (local
@@ -337,6 +337,16 @@ they stay out.
    a generated note's normal state, and a gate that waits for `git add` learns too late.
    Its error message names the destination (`~/.roberdan-os/private/brain`), because a file
    that may be the only copy must be **moved, never deleted**. **Never use `git add -A` here.**
+4. [`test/new-area-check.sh`](test/new-area-check.sh) — **il posto**: is this file in an area
+   of the repo **nobody has ever opened**? The first three all ask something *of the file*, so
+   all three depend on the good manners of whatever wrote it: a tool that deposits confidential
+   data with no marker, no listed term and no addresses passes all three — correctly. This one
+   does not read the file at all. It asks whether the path's top-level area has zero files in
+   `HEAD`, which is the fingerprint of the 2026-08-24 case: a generator with no declared
+   destination writes relative to the CWD, so what it writes lands where no human ever put
+   anything. Its logic names **no folder, no tool and no marker** — opening an area on purpose
+   costs one visible line in `test/.new-area-ack`. **Honest limit:** it sees the *area*, not the
+   file, so a deposit inside an area that already exists does not trip it.
 
 Full mechanics, honest limits and what each gate deliberately does NOT do:
 [`docs/privacy-leak-check.md`](docs/privacy-leak-check.md).

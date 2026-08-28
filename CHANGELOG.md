@@ -3,6 +3,39 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.37.0] - 2026-08-28
+
+**Un quarto cancello di privacy: il POSTO, quando il file non dice niente** (card
+`260824-182954`).
+
+- **Il buco che chiude.** I tre gate esistenti chiedono qualcosa *al file* — il vocabolario
+  (`leak-check`), la forma (`directory-dump-check`), la dichiarazione (`private-marker-check`).
+  Tutti e tre dipendono dalla buona educazione di chi il file l'ha scritto: un tool che
+  deposita dati riservati senza marcatore, con parole che nessuna denylist puo' avere e senza
+  indirizzi dentro, li passa tutti e tre — correttamente. Era la domanda aperta lasciata dal
+  caso del 2026-08-24 (v2.33.0-v2.35.0).
+- **`test/new-area-check.sh`** non apre il file: chiede se il percorso sta in una zona del
+  repo dove **nessun file e' mai stato in `HEAD`**. Quel giorno le note generate sono atterrate
+  in tre cartelle mai viste, e non era un dettaglio: un generatore senza destinazione
+  dichiarata scrive relativo alla CWD, quindi scrive dove nessun umano ha mai messo niente.
+  E' l'impronta della provenienza, leggibile senza guardare il contenuto.
+- **La logica non nomina niente**: nessuna cartella, nessun tool, nessun marcatore. Non e' una
+  promessa ma un'asserzione — `test/test-new-area-check.sh` rilegge lo script senza commenti e
+  diventa rosso se una di quelle parole rientra nella logica. Era il requisito letterale della
+  card.
+- **`HEAD`, non l'indice**: in modalita' `--staged` il file appena aggiunto e' gia' nell'indice
+  e popolerebbe la zona da se stesso. Vale anche per un file depositato **in radice**.
+- **La deroga costa una riga visibile in un diff**: `test/.new-area-ack`, un nome esatto per
+  riga, niente glob (verificato dal test). Non si accumula: appena la zona ha un commit alle
+  spalle passa da sola e la riga si toglie.
+- **Prova, non intenzione**: l'ultima sezione del test fa passare la fixture del 2026-08-24
+  spogliata di ogni marcatore sotto `private-marker-check` e `directory-dump-check` — la
+  lasciano passare entrambi — e poi sotto il nuovo gate, che la blocca.
+- **Limite onesto, scritto**: vede la *zona*, non il file. Un deposito dentro una zona che
+  esiste gia' non lo fa scattare.
+- Wiring: `hooks/pre-commit` (blocca, fail-closed se lo script manca), `test/validate.sh`,
+  `AGENTS.md § Privacy` (ora **quattro** gate), `docs/privacy-leak-check.md`.
+
 ## [v2.36.3] - 2026-08-27
 
 **Chiude i tre punti minori della revisione `@rex`. Solo test e doc, nessun cambio di
