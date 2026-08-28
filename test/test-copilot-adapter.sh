@@ -160,6 +160,9 @@ cat > "$STAGE/node_modules/@github/copilot-sdk/extension.mjs" <<'JS'
 export async function joinSession(cfg) {
   globalThis.__RDA_CFG = cfg;
   return {
+    // The real SDK exposes a readonly sessionId on the joined session; the stub must too, or
+    // the extension's per-session hook payload cannot be asserted.
+    sessionId: "rda-test-session",
     on(evt, cb) { (globalThis.__H ??= {})[evt] = cb; return () => {}; },
     log: async () => {}, send: async () => {}, sendAndWait: async () => ({}), workspacePath: undefined, rpc: {},
   };
@@ -338,6 +341,36 @@ JS
   || err "goal-gate.sh did NOT run on idle — Claude Stop chain includes it, Copilot must too"
 [ -s "$BD" ] && ok "bus-doorbell.sh runs on a READ-ONLY tool (Claude PostToolUse matcher '*')" \
   || err "bus-doorbell.sh did NOT run on a read-only tool — doorbell is deaf outside write turns"
+
+# G) SESSION IDENTITY — the defect @thor reproduced in round 1. goal-gate.sh and bus-doorbell.sh
+# both key their per-session state on `session_id` from stdin, falling back to the literal
+# "nosession". The first cut of the wiring above passed no session_id at all, so EVERY Copilot
+# session on the machine collapsed onto one shared state key and one repo's doorbell stamp /
+# retry counters clobbered another's. This asserts the payload the hooks actually receive.
+section "session identity — hooks receive a real session_id (per-session state stays separate)"
+SID_OS="$TMP/sid-os"; mkdir -p "$SID_OS/hooks"
+SID_OUT="$TMP/sid-capture"; : > "$SID_OUT"
+for h in goal-gate.sh bus-doorbell.sh auto-checkpoint.sh post-task-sync.sh verify-done.sh pre-completion-gate.sh; do
+  printf '#!/usr/bin/env bash\nprintf "%%s|%%s\\n" "%s" "$(cat)" >> "%s"\nexit 0\n' "$h" "$SID_OUT" > "$SID_OS/hooks/$h"
+  chmod +x "$SID_OS/hooks/$h"
+done
+cat > "$STAGE/driver-sid.mjs" <<JS
+import "./extension.mjs";
+const cfg = globalThis.__RDA_CFG;
+const idle = (globalThis.__H || {})["session.idle"];
+if (typeof idle === "function") { idle(); await new Promise((r) => setTimeout(r, 900)); }
+await cfg.hooks.onPostToolUse({ toolName: "view", toolArgs: { path: "/tmp/x" }, workingDirectory: process.cwd() });
+await cfg.hooks.onSessionEnd({ workingDirectory: process.cwd() });
+await new Promise((r) => setTimeout(r, 500));
+console.log("DONE");
+JS
+( cd "$STAGE" && RDA_OS="$SID_OS" node driver-sid.mjs >/dev/null 2>&1 )
+missing=""
+for h in goal-gate.sh bus-doorbell.sh auto-checkpoint.sh; do
+  grep -q "^$h|.*\"session_id\":\"rda-test-session\"" "$SID_OUT" || missing="$missing $h"
+done
+[ -z "$missing" ] && ok "goal-gate / bus-doorbell / auto-checkpoint all receive the real session_id" \
+  || err "hooks called WITHOUT session_id (state collapses onto 'nosession'):$missing"
 
 # --- Result --------------------------------------------------------------
 printf "\n"
