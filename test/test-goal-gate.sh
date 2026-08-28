@@ -149,6 +149,10 @@ run; a3=$?                                                 # A: fermo, giro 3 ->
 [ "$a1" -eq 2 ] && [ "$a2" -eq 2 ] \
   && ok "repo A blocca finche' ha senso, mentre un altro repo lavora nella stessa sessione" \
   || err "repo A doveva bloccare i primi due giri (a1=$a1 a2=$a2)"
+# ^ PRECONDIZIONE, non una regressione: questa passa anche con la chiave sbagliata (verificato
+#   da @thor). Resta perche' senza di essa l'asserzione seguente non dimostrerebbe niente — un
+#   `a3=0` ottenuto perche' il cancello non ha mai bloccato non e' il freno che ha funzionato.
+#   Le tre che seguono sono quelle che falliscono davvero senza la fix.
 [ "$a3" -eq 0 ] \
   && ok "repo A fermo per due giri molla ANCHE SE un altro repo avanza nella stessa sessione" \
   || err "il progresso di un ALTRO repo ha azzerato il freno di questo (a3=$a3): stato non separato per repo"
