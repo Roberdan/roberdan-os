@@ -3,6 +3,38 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.38.1] - 2026-08-28
+
+**Le tre migliorie della proposta claude-code del 2026-08-22, applicate** (card `260828-123448`).
+
+Solo frontmatter, settings e documentazione: nessun comportamento del codice cambia. La proposta
+`proposals/2026-08-22-claude-code.md` le lasciava in "awaiting Roberto"; Roberto ha detto di farle.
+
+- **Cache del prompt, due finestre diverse perche' i due casi sono diversi.** Lo snippet generato
+  da `bin/sync.sh` ora dichiara `promptCacheTtl: "1h"` e `subagentPromptCacheTtl: "5m"`
+  (claude-code >= 2.1.243). Una card e' *una* conversazione lunga che rimanda lo stesso prefisso
+  per ore: la finestra da un'ora la fa pagare una volta invece che ogni cinque minuti. Un
+  subagente e' l'opposto — vive poco, fa una cosa sola, e una finestra larga li' mette in cache
+  un prefisso che nessuno richiedera'. Fissare `5m` *esplicitamente* e' il punto della seconda
+  chiave: senza, il subagente eredita in silenzio qualunque cosa diventi il default.
+- **`cacheTtl: "1h"` nel frontmatter di `baccio`, `luca`, `socrates`, `twin`** (claude-code
+  >= 2.1.248): opus, system prompt lunghi, invocati piu' volte dentro lo stesso loop. Gli agenti
+  leggeri restano al default apposta — una finestra di cache costa niente ad allargarla e tutto a
+  doverci ragionare sopra dopo, quindi si allarga solo dove il riuso e' reale.
+- **`factory/factory-protocol.md`: un taglio a meta' risposta non e' piu' un fallimento**
+  (claude-code >= 2.1.247). In modalita' `-p` una risposta interrotta da errore server, caduta di
+  connessione o stallo viene ripresa da sola. Quindi `failed/` oggi vuol dire che il *task* e'
+  fallito, non che la rete ha singhiozzato — e i log vecchi di prima della 2.1.247 contengono
+  fallimenti transitori che oggi si sarebbero risolti da soli. Il contratto non cambia: `done/`
+  richiede ancora exit 0.
+- **Il vincolo che ha dettato la forma.** `bin/sync.sh` e' gia' oltre soglia e il ratchet
+  (`test/test-file-size-ratchet.sh`) vieta a un file congelato di crescere di *una* riga. Le due
+  chiavi stanno quindi sulla stessa riga dell'apertura JSON (+0 righe, 651 prima e dopo) e la
+  spiegazione — che e' la parte che serve fra sei mesi — vive in `docs/USAGE.md`. Un commento in
+  meno nello script non e' una perdita se la ragione e' scritta dove la si va a cercare.
+- **Non fatto, e resta proposta:** il punto 4 (`--restricted` al posto di
+  `--dangerously-skip-permissions` sui job di sola verifica della factory) vale una card sua.
+
 ## [v2.38.0] - 2026-08-28
 
 **Un quarto cancello di privacy: il POSTO, quando il file non dice niente** (card

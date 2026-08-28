@@ -26,6 +26,12 @@ Convergio, daemon-optional.
   re-processes what's left. Loops until the queue is empty or `MAX` is hit.
 - If any task fails in a run, a summary is appended to `handoff/latest.md` so the next session
   sees it — a failure that only lives in `logs/` is a failure nobody sees.
+- **A mid-stream cutoff is no longer a failure** (claude-code ≥ 2.1.247): in `-p` mode a response
+  cut off by a server error, a dropped connection or a stall is continued automatically instead of
+  ending with an error. So `failed/` now means the *task* failed — not that the network hiccuped.
+  Nothing above changes: `done/` still requires exit 0, and a non-zero exit still goes through the
+  same retry-then-`failed/` path. Worth knowing when reading an old log: pre-2.1.247 entries in
+  `failed/` include transient cutoffs that today would have recovered on their own.
 - launchd `com.roberdan.rda-factory` runs `run.sh` nightly (or on demand). **Check `failed/` in the
   morning** — do not assume the queue being empty means everything succeeded.
 

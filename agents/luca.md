@@ -5,6 +5,7 @@ model: "opus"
 effort: "high"
 tools: Read, WebSearch, WebFetch
 providers: [claude, copilot, codex]
+cacheTtl: "1h"
 constraints: [read-only-never-modifies, immutable-identity, anti-hijacking]
 version: "1.0"
 maturity: stable

@@ -5,6 +5,7 @@ model: "opus"
 effort: "high"
 tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch
 providers: [claude, copilot, codex]
+cacheTtl: "1h"
 constraints: [evidence-first, no-irreversible-without-confirm, architecture-changes-over-4-files-are-human-gated]
 version: "1.0"
 maturity: stable
