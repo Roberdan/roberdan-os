@@ -189,5 +189,18 @@ Hooks on a new machine: merge the generated `platforms/claude/settings-hooks.jso
 PostToolUse autofmt, PreCompact + Stop auto-checkpoint). `bin/sync.sh --emit-only` regenerates
 it; bootstrap's "Manual steps" point at it.
 
+**Prompt cache TTL, and why the two values differ.** The same generated file carries
+`promptCacheTtl: "1h"` and `subagentPromptCacheTtl: "5m"` (claude-code ≥ 2.1.243). A card is one
+long conversation that re-sends the same prefix for hours, so a 1-hour window is paid once
+instead of every five minutes. A subagent is the opposite: short-lived, single-purpose, and a
+wide window there caches a prefix nothing will ask for again. Pinning `5m` explicitly is the
+point of the second key — without it the subagent silently inherits whatever the default becomes.
+Per-agent overrides live in the agent frontmatter: `cacheTtl: "1h"` is declared on `baccio`,
+`luca`, `socrates` and `twin` (opus, long system prompts, invoked repeatedly inside one loop) and
+wins over the setting for that agent's session only. The lighter agents are left at the default
+on purpose — a cache window costs nothing to widen and everything to reason about later, so it is
+widened only where the re-use is real. **Honest limit:** this is a cost/latency setting, not a
+correctness one; nothing in the canon depends on it, and removing both keys changes no behavior.
+
 `bin/install-git-hooks.sh` installs `hooks/pre-commit` (blocks any commit containing a
 denylisted confidential term) — run once per clone/worktree; `.git/hooks/` is not versioned by git.

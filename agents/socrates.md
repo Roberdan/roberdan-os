@@ -5,6 +5,7 @@ model: "opus"
 effort: "xhigh"
 tools: Read, Grep, Glob, WebSearch, WebFetch
 providers: [claude, copilot, codex]
+cacheTtl: "1h"
 constraints: [advisory-analysis-only, intellectually-humble, evidence-validated]
 version: "1.0"
 maturity: stable
