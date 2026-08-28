@@ -1,7 +1,7 @@
 # privacy-leak-check — the confidentiality gates
 
-Mechanics of the privacy gates summarized in `AGENTS.md § Privacy`. There are **three**, and
-they exist because each one is blind to what the others catch. All three run in
+Mechanics of the privacy gates summarized in `AGENTS.md § Privacy`. There are **four**, and
+they exist because each one is blind to what the others catch. All four run in
 [`hooks/pre-commit`](../hooks/pre-commit) and in `test/validate.sh`:
 
 | gate | domanda che fa | cosa NON puo' vedere |
@@ -9,8 +9,11 @@ they exist because each one is blind to what the others catch. All three run in
 | [`leak-check.sh`](../test/leak-check.sh) | "e' il segreto che ho gia' scritto in lista?" (VOCABOLARIO) | un nome che non e' su nessuna lista |
 | [`directory-dump-check.sh`](../test/directory-dump-check.sh) | "questo file ha la forma di un estratto di rubrica?" (FORMA) | un file senza indirizzi ne' ruoli |
 | [`private-marker-check.sh`](../test/private-marker-check.sh) | "il file DICE DA SOLO di essere privato?" (DICHIARAZIONE) | un file che non dichiara niente |
+| [`new-area-check.sh`](../test/new-area-check.sh) | "sta in una zona del repo che nessuno ha mai aperto?" (IL POSTO) | un deposito dentro una zona che esiste gia' |
 
-Il terzo e' l'ultimo arrivato, ed e' descritto sotto (§ private-marker-check). Il primo,
+I primi tre chiedono qualcosa **al file**; il quarto non lo apre nemmeno, e ne guarda il
+**posto** — e' l'unico che non dipende dalla buona educazione di chi il file l'ha scritto.
+Sono descritti sotto (§ private-marker-check, § new-area-check). Il primo,
 storicamente il principale, e':
 [`test/leak-check.sh`](../test/leak-check.sh) (denylist in `private/.denylist`), with a
 three-tier fallback:
@@ -172,10 +175,65 @@ e' lo stato *normale* di una nota generata, e un controllo che aspetta `git add`
 accorgersene lo scopre sempre un passo troppo tardi.
 
 **Limite onesto.** Vede solo i file che si dichiarano. Un tool che domani scrivesse dati
-riservati senza marcarli passerebbe — e per quello restano gli altri due gate e la revisione
-del diff. E come tutti gli hook, `--no-verify` lo salta: e' per questo che il messaggio
+riservati senza marcarli passerebbe — ed e' esattamente la domanda che ha fatto nascere il
+quarto gate, `new-area-check` (§ sotto): quel file non lo dichiara, ma **il posto lo tradisce**.
+E come tutti gli hook, `--no-verify` lo salta: e' per questo che il messaggio
 d'errore dice sempre come uscirne, perche' un gate che non offre una via d'uscita insegna a
 scavalcarlo, e scavalcare questo vuol dire scavalcare anche il leak-check nello stesso hook.
 
 Meta' di [`test/test-private-marker.sh`](../test/test-private-marker.sh) verifica che il gate
 **lasci passare**: un guardiano che non puo' piu' aprirsi e' peggio di uno che non si chiude mai.
+
+---
+
+## new-area-check — il posto, quando il file non dice niente
+
+**La domanda che mancava.** I tre gate sopra chiedono qualcosa **al file**: e' un termine in
+lista? ha la forma di una rubrica? si dichiara privato? Tutte e tre le risposte dipendono
+dalla **buona educazione di chi il file l'ha scritto**. Un tool che deposita dati riservati
+senza mettere nessun marcatore, con parole che nessuna denylist puo' avere e senza indirizzi
+dentro, passa tutti e tre — e li passa *correttamente*: hanno risposto alla loro domanda, e la
+risposta era no. Quel buco e' la card `260824-182954`, e questo gate e' la sua risposta.
+
+**Il quarto non apre il file.** Chiede: *questo percorso sta in una zona del repo dove nessun
+file e' mai stato, in tutta la storia?* Nel caso del 2026-08-24 le tre note sono atterrate in
+`people/`, `projects/`, `claude-code/` — e non e' un dettaglio di quel giorno, e' la **forma**
+dell'incidente. Un generatore senza destinazione dichiarata non rinuncia a scrivere: scrive
+relativo alla CWD. Quello che scrive finisce dove nessun essere umano ha mai messo niente.
+Quella e' l'impronta della provenienza, e si legge senza guardare il contenuto.
+
+**Cosa NON nomina, ed e' il requisito che l'ha fatto nascere.** Nel codice del gate (commenti
+esclusi) non compare nessuna cartella (`people`, `projects`, `claude-code`, `orgs`), nessun
+tool (`gbrain`) e nessun marcatore (`visibility`). Non e' una promessa: e' una sezione di
+[`test/test-new-area-check.sh`](../test/test-new-area-check.sh) che rilegge lo script e
+fallisce se una di quelle parole rientra nella logica. La regola e' "zona con zero file in
+`HEAD`", quindi vale per la cartella inventata ieri e per quella di domani.
+
+**Perche' `HEAD` e non l'indice.** In modalita' `--staged` il file appena messo in stage e'
+gia' nell'indice: `git ls-files` direbbe che la zona e' popolata — da se stessa — e il gate
+direbbe sempre di si'. `HEAD` e' l'unica fotografia del *prima* che il commit non puo'
+contaminare.
+
+**Anche un file in radice.** La zona di `roberto.md` in cima al repo e' il file stesso, che in
+`HEAD` non esiste: viene fermato. Sarebbe un buco stupido lasciar passare un deposito solo
+perche' non si e' portato dietro una cartella.
+
+**La deroga costa una riga visibile in un diff.** Aprire una zona nuova si fa davvero, ogni
+tanto, di proposito: il nome della zona va in
+[`test/.new-area-ack`](../test/.new-area-ack), **un percorso esatto per riga, niente glob**
+(un `*` sarebbe una porta aperta, non un'eccezione — e il test lo verifica). Stessa scelta di
+`.private-marker-allow` e `.directory-dump-baseline`: concedere un'eccezione deve costare una
+riga che si vede in una review, non una condizione sepolta nello script. E l'ack **non si
+accumula**: appena la zona ha un commit alle spalle passa da sola, e la riga si puo' togliere.
+
+**Limite onesto.** Vede la **zona**, non il file. Un tool che deposita dentro una zona gia'
+esistente (`docs/`, `skills/`) non lo fa scattare: li' rispondono gli altri tre, o nessuno.
+E' una difesa in piu', non la difesa definitiva — chiude la strada osservata il 2026-08-24 (una
+cartella comparsa dal nulla) e lascia aperta quella di un deposito mimetizzato in casa d'altri.
+Scriverlo qui e' meglio che scoprirlo dopo.
+
+**La prova che giustifica il gate** e' l'ultima sezione del suo test: la fixture del
+2026-08-24, spogliata di ogni marcatore, viene fatta passare sotto `private-marker-check` e
+`directory-dump-check`, che la lasciano passare entrambi, e poi sotto questo, che la blocca.
+Se un giorno quella sezione diventa verde su tutti e quattro, qualcuno ha reso questo gate
+ridondante: va riletto tutto, non "aggiustato" il test.
