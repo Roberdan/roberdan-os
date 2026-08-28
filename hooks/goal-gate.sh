@@ -51,7 +51,20 @@ restanti="$(cd "$repo_root" && "$KBSH" queue --restanti 2>/dev/null | tr -cd '0-
 # passa solo a macchina pulita non e' un test, e' una coincidenza.
 STATE_DIR="${RDA_GOAL_GATE_STATE:-${TMPDIR:-/tmp}/rda-goal-gate}"
 mkdir -p "$STATE_DIR" 2>/dev/null || exit_pass
-sf="$STATE_DIR/$(printf '%s' "$session" | tr -cd 'A-Za-z0-9._-')"
+# LA CHIAVE E' SESSIONE **PIU' REPO**, e il "piu' repo" non e' un dettaglio di igiene.
+# I tre contatori qui sotto (blocchi, coda precedente, giri fermi) descrivono UNA coda, e la coda
+# e' per repo: `restanti` arriva da `kb queue --restanti` eseguito dentro $repo_root. Con la
+# chiave sulla sola sessione, una sessione che tocca due repo li faceva scrivere sullo stesso
+# file: `prec` del repo A confrontato con `restanti` del repo B produce un progresso o uno stallo
+# che non e' avvenuto, quindi il FRENO 1 scatta (o non scatta) sulla misura di un altro repo, e
+# il tetto del FRENO 2 si consuma in comune. Il difetto e' silenzioso nel modo peggiore: il
+# cancello continua a funzionare, decide solo sul numero sbagliato.
+# `cksum` e' POSIX (a differenza di shasum/sha1sum, che si dividono per piattaforma) e qui serve
+# soltanto una chiave STABILE per un percorso. La chiave e' il percorso INTERO, non il nome della
+# cartella: due worktree dello stesso repo sono due code diverse (`kb start` ne crea uno per
+# card), e condividerebbero i contatori se la chiave fosse il nome.
+scope="$(printf '%s' "$repo_root" | cksum 2>/dev/null | tr -cd '0-9')"
+sf="$STATE_DIR/$(printf '%s' "$session" | tr -cd 'A-Za-z0-9._-').${scope:-norepo}"
 blocchi=0; prec=-1; fermi=0
 [ -f "$sf" ] && read -r blocchi prec fermi < "$sf" 2>/dev/null
 case "$blocchi$prec$fermi" in *[!0-9-]*|'') blocchi=0; prec=-1; fermi=0 ;; esac
