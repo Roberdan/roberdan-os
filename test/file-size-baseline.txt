@@ -84,6 +84,25 @@
 # (platforms/, gia' escluso). Split reale rimandato: e' l'adattatore Copilot completo
 # (tool nativi + guardie + hook + Stop chain), e spezzarlo senza un motivo di prodotto e'
 # proprio il refactor imposto da un contatore che questo file rifiuta.
+# 2026-08-28, quattordicesima: +79 hooks/copilot/extension.template.mjs (620 -> 699) e +62
+# test/test-copilot-adapter.sh (315 -> 377). Perche' valgono, e perche' NON e' l'allargamento
+# che questo file rifiuta: l'adattatore Copilot cablava quasi tutti gli hook di Claude e ne
+# saltava DUE in silenzio — goal-gate.sh (l'unico hook che blocca, sullo Stop di Claude) e
+# bus-doorbell.sh (PostToolUse matcher '*', qui non partiva mai perche' onPostToolUse usciva
+# subito sui tool non di scrittura). Un buco di parita' e' invisibile per costruzione: le due
+# piattaforme "funzionano" entrambe, e la differenza si vede solo quando serve il cancello che
+# manca. @thor ha poi bocciato il primo giro: i due hook chiavano lo stato su session_id e
+# l'estensione non lo passava, quindi OGNI sessione Copilot della macchina collassava sulla
+# stessa chiave "nosession" e un repo sovrascriveva i contatori di un altro (riprodotto, non
+# ipotizzato). Da qui sessionId()/hookPayload(): la stessa struttura che Claude passa a ogni
+# hook. Le 62 righe di test sono le due sezioni che INCHIODANO tutto questo — cablaggio (gli
+# hook partono davvero, il campanello anche su un tool di sola lettura) e identita' di
+# sessione (il payload che gli hook ricevono davvero) — entrambe provate rosse rimuovendo la
+# correzione. Senza, la parita' tornava a essere una promessa: esattamente il difetto che
+# questo lavoro chiude. Lo split resta rimandato per il motivo gia' scritto sopra (l'harness
+# dello stub SDK e' condiviso da tutte le sezioni; spezzare duplicherebbe ~50 righe di setup),
+# e la nota della tredicesima resta in piedi: chi tocca l'adattatore per un motivo di
+# PRODOTTO lo spezza, non lo allarga una terza volta.
 1753 kanban/kb.sh
 1390 test/test-bus.sh
 1133 test/test-bus-mutants.sh
@@ -94,5 +113,5 @@
 438 eval/test-eval-pipeline.sh
 446 test/test-kb-views.sh
 344 eval/report.sh
-315 test/test-copilot-adapter.sh
-620 hooks/copilot/extension.template.mjs
+377 test/test-copilot-adapter.sh
+699 hooks/copilot/extension.template.mjs

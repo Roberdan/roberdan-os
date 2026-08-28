@@ -40,7 +40,7 @@ while read -r f; do
   misurati=$((misurati+1))
   n=$(wc -l < "$f" | tr -d ' ')
   [ "$n" -le "$LIMITE" ] && continue
-  base="$(awk -v p="$f" '$2==p{print $1}' "$BASELINE")"
+  base="$(awk -v p="$f" '/^[0-9]/ && $2==p{print $1}' "$BASELINE")"
   if [ -z "$base" ]; then
     err "$f è a $n righe (limite $LIMITE) e non è nella baseline: un file NUOVO non nasce oltre soglia"
     nuovi=$((nuovi+1))
