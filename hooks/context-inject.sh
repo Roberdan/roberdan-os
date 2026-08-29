@@ -6,6 +6,26 @@
 [ "${RDA_CONTEXT:-1}" = "1" ] || exit 0
 
 ROOT="$HOME/GitHub/roberdan-os"
+
+# claude-code v2.1.251: a SessionStart resume/fork hook now receives whether the resumed
+# transcript's prompt cache is still warm (prompt_cache_likely_expired=false means the window
+# just went away for a couple of minutes — everything below is still in it). On a FRESH resume
+# only, skip the full block and print one line instead: this hook has no matcher on purpose
+# (fires on startup/resume/clear/compact/fork alike, see bin/sync.sh), so a resume two minutes
+# after backgrounding used to re-print the whole board on top of a window that already has it.
+# Fallback is the full block, unconditionally, when the field is absent or unparseable — older
+# Claude Code, and Copilot's emulated chain, which calls this hook with empty stdin (see
+# hooks/copilot/extension.template.mjs onSessionStart: runScript(ci, "", ...)).
+_stdin="$(cat 2>/dev/null || true)"
+if command -v jq >/dev/null 2>&1 && [ -n "$_stdin" ]; then
+  _src="$(printf '%s' "$_stdin" | jq -r '.source // ""' 2>/dev/null || echo "")"
+  _fresh="$(printf '%s' "$_stdin" | jq -r 'if .prompt_cache_likely_expired == false then "1" else "" end' 2>/dev/null || echo "")"
+  if { [ "$_src" = "resume" ] || [ "$_src" = "fork" ]; } && [ -n "$_fresh" ]; then
+    echo "## roberdan-os — resumed, cache still warm (context unchanged since last turn)"
+    exit 0
+  fi
+fi
+
 echo "## roberdan-os — session context (auto-injected)"
 # Approval inbox at the very top — a fresh session must SEE what's waiting on Roberto
 # without being asked. Fast local count only (todo + unapproved learning, no gh). See kb pending.

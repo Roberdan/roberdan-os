@@ -24,7 +24,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt \
           test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
-          test-bus-doorbell test-bash-guard test-validate-wiring test-evolve-sources test-kb-autothor \
+          test-bus-doorbell test-bash-guard test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree \
           test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup \
           test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
@@ -161,6 +161,14 @@ if _suite test-autofmt; then ok "autofmt receives files via stdin JSON (see bash
 # and source-in-a-docs-commit had NO test: each scar could have returned with the suite green.
 section "bash guard — deny/ask/allow decisions per rule"
 if _suite test-bash-guard; then ok "invisible-character prefilter, force-push, reset/clean and docs-staging rules all fire, and the allow cases are not over-blocked"; else _suite_out test-bash-guard; err "test-bash-guard — see bash test/test-bash-guard.sh"; fi
+
+# --- 8b2b) main-guard: 2026-08-29, a symlink *.md->source beat the UNRESOLVED-path carve-out.
+section "main guard — resolved-path symlink hole"
+if _suite test-main-guard; then ok "symlink *.md -> source on main is denied; real .md and not-yet-created files still pass"; else _suite_out test-main-guard; err "test-main-guard — see bash test/test-main-guard.sh"; fi
+
+# --- 8b2c) context-inject: warm resume/fork -> one line; empty stdin (Copilot) must NOT read as fresh.
+section "context-inject — resume/fork skips the full block only when the cache is warm"
+if _suite test-context-inject-staleness; then ok "warm resume/fork -> one line; empty stdin, startup/clear/compact, expired cache and unparseable input all still get the full block"; else _suite_out test-context-inject-staleness; err "test-context-inject-staleness — see bash test/test-context-inject-staleness.sh"; fi
 
 # --- 8b3) goal-gate: l'unico hook che BLOCCA. Meta' delle asserzioni verificano che LASCI
 # PASSARE — un cancello che non si apre piu' e' peggio di uno che non si chiude mai.

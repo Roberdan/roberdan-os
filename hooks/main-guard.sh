@@ -9,6 +9,11 @@ set -euo pipefail
 
 input="$(cat)"
 fp="$(printf '%s' "$input" | jq -r '.tool_input.file_path // ""')"
+# Decide on the RESOLVED path: a symlink named *.md pointing at source would otherwise
+# satisfy the meta/docs carve-out below. Same class as claude-code v2.1.251 (Read/Write/Edit
+# following a symlink swapped after the permission check). New file (Write case): no target
+# to resolve yet, so the literal path is kept.
+if [ -e "$fp" ]; then fp="$(/bin/realpath "$fp" 2>/dev/null || printf '%s' "$fp")"; fi
 
 lookup_dir=""
 if [ -n "$fp" ]; then
