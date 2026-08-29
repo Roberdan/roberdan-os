@@ -84,9 +84,10 @@ falling back to the literal path when the file does not exist yet (Write of a ne
 +if [ -e "$fp" ]; then fp="$(/bin/realpath "$fp" 2>/dev/null || printf '%s' "$fp")"; fi
 ```
 
-`/bin/realpath` is an Apple-signed system binary present on stock macOS (verified: `ls -l /bin/realpath`,
-BSD flavour — `-q` only, no GNU long options), so no interpreter start is paid on a hook that fires on
-every edit. A test in `test/` should pin it: symlink `x.md → x.rs` on `main` must be denied.
+`/bin/realpath` is present on stock macOS in its BSD flavour (verified: usage string is
+`realpath [-q] [path ...]`, and `--version` fails with "illegal option" — so no GNU long options;
+`codesign -dv /bin/realpath` gives `Identifier=com.apple.realpath`), so no interpreter start is paid
+on a hook that fires on every edit. A test in `test/` should pin it: symlink `x.md → x.rs` on `main` must be denied.
 Citation: changelog v2.1.251 (2026-08-28).
 
 ### 3. v2.1.251 — new `PreModelSwitch` / `PostModelSwitch` hook events
