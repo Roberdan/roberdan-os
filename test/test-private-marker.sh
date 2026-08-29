@@ -226,40 +226,69 @@ else
   err "il gate dice cosa NON fare senza dire dove spostarlo"
 fi
 
-section "la casa del cervello privato e' fuori da git — e ci deve restare"
+section "il cervello privato non ha nessuna via verso l'esterno"
 # QUESTA e' la proprieta' che fa il lavoro. Non il nome della cartella, non il .gitignore:
 # il fatto che nessun `git add` possa raggiungerla perche' non esiste nessun repo sopra di
 # lei. Se un giorno smette di essere vera, tutto il resto e' decorazione.
 #
-# E c'e' una trappola precisa che la renderebbe falsa in buona fede: `gbrain sources status`
-# stampa "⚠ default: never synced — run gbrain sync --source default", ma quel comando li'
-# dentro fallisce con "Not inside a git repository". La correzione ovvia a quell'errore e'
-# `git init`. Sarebbe la mossa sbagliata, fatta per la ragione giusta — ed e' esattamente
-# il tipo di errore che una riga di prosa non ferma e un'asserzione si'.
+# Trappola storica, ancora valida per chi fa `git init` a mano: `gbrain sources status`
+# stampa "⚠ default: never synced — run gbrain sync --source default", ma li' dentro quel
+# comando fallisce con "Not inside a git repository", e la correzione ovvia e' `git init`.
 # Il comando giusto per quella sorgente e' `gbrain import`, che non vuole git ed e'
 # additivo (misurato: 354 -> 357 pagine, nessuna cancellata).
-# La regola in una funzione, cosi' si puo' provare che sa dire NO e non solo SI'.
-_fuori_da_git() { ! git -C "$1" rev-parse --show-toplevel >/dev/null 2>&1; }
+# AGGIORNATA 2026-08-29. "Fuori da git" non e' piu' ottenibile: gbrain e' git-backed e fa
+# `git init` da solo nella cartella che possiede (commit `gbrain: initial commit (auto-init
+# by sync)`, 29/08 01:22; logica in ~/gbrain/src/core/sync-git.ts, con test dedicato, e si
+# auto-ripara se cancelli .git). Un gate che nessuno puo' rendere verde viene spento.
+# La proprieta' che conta resta, ora detta con precisione — nessun percorso porta quelle
+# note fuori da questa macchina:
+#   1. NON deve esistere un repo PIU' IN ALTO (li' un `git add` da sopra le raggiunge:
+#      fatale, resta rosso come prima);
+#   2. se la cartella e' la radice di un repo (caso gbrain), quel repo deve essere SIGILLATO:
+#      zero destinazioni configurate e un hook pre-push che rifiuta.
+_radice_repo()  { [ "$(git -C "$1" rev-parse --show-toplevel 2>/dev/null)" = "$(cd "$1" && pwd -P)" ]; }
+_dentro_repo()  { git -C "$1" rev-parse --show-toplevel >/dev/null 2>&1; }
+_sigillato()    { [ -z "$(git -C "$1" remote 2>/dev/null)" ] && [ -x "$1/.git/hooks/pre-push" ]; }
+_al_sicuro()    { _dentro_repo "$1" || return 0; _radice_repo "$1" && _sigillato "$1"; }
 
 BRAIN_HOME="${PRIVATE_BRAIN_HOME:-$HOME/.roberdan-os/private/brain}"
 if [ ! -d "$BRAIN_HOME" ]; then
   # Clone spoglio, CI, altra macchina: non c'e' niente da proteggere, e un test che
   # fallisce dove la cosa non esiste insegna solo a ignorarlo.
   ok "casa non presente su questa macchina: niente da verificare (skip onesto)"
-elif ! _fuori_da_git "$BRAIN_HOME"; then
-  top="$(git -C "$BRAIN_HOME" rev-parse --show-toplevel 2>/dev/null)"
-  err "$BRAIN_HOME e' dentro un repo git ($top): un git add puo' raggiungere le note private. Se e' stato fatto per zittire l'avviso 'never synced', il comando giusto e' 'gbrain import', non 'gbrain sync'."
-else
+elif ! _dentro_repo "$BRAIN_HOME"; then
   ok "fuori da qualsiasi worktree git: nessun commit puo' raggiungerla"
-fi
-# Direzione opposta: un controllo che non sa fallire non protegge niente. `$R` E' un repo
-# git, quindi la regola deve rifiutarlo. Senza questa riga, un `_fuori_da_git` rotto che
-# risponde sempre "va bene" passerebbe come verde per sempre.
-if _fuori_da_git "$R"; then
-  err "la regola non riconosce una cartella DENTRO un repo git: e' verde qualunque cosa succeda"
+elif ! _radice_repo "$BRAIN_HOME"; then
+  top="$(git -C "$BRAIN_HOME" rev-parse --show-toplevel 2>/dev/null)"
+  err "$BRAIN_HOME e' dentro un repo git PIU' IN ALTO ($top): un git add da sopra puo' raggiungere le note private. Se e' stato fatto per zittire l'avviso 'never synced', il comando giusto e' 'gbrain import', non 'gbrain sync'."
+elif ! _sigillato "$BRAIN_HOME"; then
+  err "$BRAIN_HOME e' la radice di un repo NON sigillato: remote configurati [$(git -C "$BRAIN_HOME" remote | tr '\n' ' ')] / hook pre-push $([ -x "$BRAIN_HOME/.git/hooks/pre-push" ] && echo presente || echo ASSENTE). Rimuovi i remote e rimetti l hook che rifiuta il push."
 else
-  ok "la regola sa dire di no: una cartella dentro un repo git viene riconosciuta"
+  ok "repo di gbrain sigillato: zero remote + pre-push che rifiuta (nessuna via verso l esterno)"
 fi
+# Direzione opposta: un controllo che non sa fallire non protegge niente. La regola viene
+# provata sui tre modi in cui deve dire NO, ognuno su una cartella usa e getta.
+_T="$(mktemp -d)"
+git init -q "$_T/padre" && mkdir -p "$_T/padre/dentro"
+if _al_sicuro "$_T/padre/dentro"; then
+  err "la regola non riconosce una cartella DENTRO un repo piu in alto: e verde qualunque cosa succeda"
+else
+  ok "la regola sa dire di no: una cartella dentro un repo piu in alto viene riconosciuta"
+fi
+git init -q "$_T/conremote" && git -C "$_T/conremote" remote add origin "$_T/padre"
+printf '#!/bin/sh\nexit 1\n' > "$_T/conremote/.git/hooks/pre-push" && chmod +x "$_T/conremote/.git/hooks/pre-push"
+if _al_sicuro "$_T/conremote"; then
+  err "la regola accetta un repo CON una destinazione configurata: il sigillo non e verificato"
+else
+  ok "la regola sa dire di no: un repo con un remote non e sigillato, anche con l hook"
+fi
+git init -q "$_T/senzahook"
+if _al_sicuro "$_T/senzahook"; then
+  err "la regola accetta un repo SENZA hook pre-push: basterebbe aggiungere un remote e spingere"
+else
+  ok "la regola sa dire di no: senza hook pre-push il repo non e sigillato"
+fi
+rm -rf "$_T"
 
 if grep -q 'gbrain import' "$ROOT/docs/privacy-leak-check.md"; then
   ok "la doc dice quale comando usare al posto di 'gbrain sync' (la trappola e' scritta)"

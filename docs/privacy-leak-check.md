@@ -141,6 +141,19 @@ ragione giusta: rimetterebbe le note dentro un worktree git, cioe' esattamente l
 da cui le abbiamo tolte. Un repo senza remote non si puo' pushare **oggi**; un `git remote
 add` un anno dopo non chiede il permesso a nessuno.
 
+> **Aggiornamento 2026-08-29 — gbrain lo fa comunque, e la difesa e' cambiata.** gbrain e'
+> diventato git-backed: fa `git init` da solo nella cartella che possiede e si auto-ripara
+> se cancelli `.git` (commit `gbrain: initial commit (auto-init by sync)`; logica in
+> `src/core/sync-git.ts`). "Fuori da git" non e' piu' ottenibile, e un gate che nessuno puo'
+> rendere verde viene spento. La proprieta' verificata ora e' piu' precisa: **nessun percorso
+> verso l'esterno**. (1) nessun repo PIU' IN ALTO — resta fatale, un `git add` da sopra
+> raggiungerebbe le note; (2) se la cartella e' la radice del proprio repo, quel repo deve
+> essere **sigillato**: zero remote e un hook `pre-push` che rifiuta. Il `git remote add`
+> "un anno dopo" e' esattamente cio' che l'hook ferma, e il gate verifica entrambe le
+> condizioni ad ogni giro (`test/test-private-marker.sh`, con le tre prove che sa dire NO).
+> Verificato il 2026-08-29: nessun remote, nessun push o fetch nella cronologia, e nessuno
+> di quei file tracciato in altri repo — non e' mai uscito nulla.
+
 **Il comando giusto per la sorgente `default` e' `gbrain import`**, che non vuole git:
 
 ```
