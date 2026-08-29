@@ -62,6 +62,19 @@ Before `git push` or PR creation, run the full local pipeline:
 
 If any step fails, fix and re-run ALL checks. Do NOT push with known failures.
 
+## Parallel streams (mechanics — the rule itself is in `rules/best-practices.md`)
+
+- **One worktree per stream:** `git worktree add ../<repo>-<feature> -b <type>/<feature>` off the
+  base branch. Each worktree has its own index and HEAD, so parallel writers can't fight
+  `.git/index.lock` or clobber each other's staged work — this is what worktrees are for.
+- **Disjoint file ownership:** give each stream a non-overlapping file set. Keep shared, merge-prone
+  files (`VERSION`, `CHANGELOG.md`, `README.md`) OUT of the parallel branches — bump/write them once,
+  sequentially, at merge/release time, so PRs stay conflict-free.
+- **Each stream ends in a PR**, not a direct push to the shared branch: push the branch, let CI go
+  green, `@rex` reviews, `@thor` runs the qualitative done-gate, then merge (merge commit only).
+  Merge PRs **one at a time** and re-check CI between merges.
+- After merge: `git worktree remove` the stream's worktree and delete its branch.
+
 ## Merge Discipline
 
 You are autonomous on merges — but **only after careful evaluation**. Before merging:

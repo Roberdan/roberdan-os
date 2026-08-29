@@ -7,6 +7,8 @@ last_updated: "2026-07-25"
 # Best Practices
 
 Guidelines for quality across every project. These are expectations, not hooks.
+The failures behind them — full accounts, one per rule — live in `rules/scars.md`, read on
+demand: this file carries the rule, that one carries the reason.
 
 ## No False Done (the cardinal reliability rule)
 
@@ -22,10 +24,7 @@ true**. Honesty is not enough; these are structural.
 
 1. **Check EVERY gate the plan declares, not the ones you remember.** If the plan lists gates
    G1…G11, "done" requires **all eleven measured**, each one printed. A gate you defined and then
-   forgot is still a gate: silence on it is a false done, not an omission. *(Real failure,
-   2026-07-14: a plan declared "all views on the design system"; six phases shipped, all "green",
-   and that one gate was never measured. It was at 72/98, with 54 raw colours still in the app.
-   The user found it by asking.)*
+   forgot is still a gate: silence on it is a false done, not an omission. *(scar 2026-07-14 — a forgotten gate: `rules/scars.md` § Gates)*
 
 2. **The one who declares done must NOT be the one who chooses what gets verified.** If you write
    the plan, then brief the verifier on which gates to check, you will hand them the gates you
@@ -35,19 +34,12 @@ true**. Honesty is not enough; these are structural.
 
 3. **A gate that can be satisfied without doing the work is worse than no gate.** Before trusting a
    counter, ask: *what would make this number look good while the work is undone?* Count what the
-   user would see, not what is convenient to grep. *(Same failure: the gate counted "files that
-   mention the design system", so a file with one token and thirty raw colours counted as done, and
-   26 views that colour nothing at all were counted as debt. The metric was wrong in both
-   directions.)*
+   user would see, not what is convenient to grep. *(scar 2026-07-14 — a metric wrong in both directions: `rules/scars.md` § Gates)*
 
 4. **A green suite proves you didn't break what the tests already watched — nothing more.**
    Before claiming an invariant is protected, **put the bug back and watch the test go red**. An
    invariant asserted in a comment but not enforced by code — or "covered" by a test that never
-   exercises it — is *worse* than an absent one: it manufactures unearned confidence. *(Real
-   failure, same campaign: the most important fix of the whole effort — a clock that froze while
-   the phone slept, making a monitor claim "updated a moment ago" over a child unwatched for six
-   hours — was pinned by NOTHING. The done-gate reintroduced the bug and all 620 tests stayed
-   green. The test's own comment claimed it would catch exactly that.)*
+   exercises it — is *worse* than an absent one: it manufactures unearned confidence. *(scar 2026-07-14 — 620 green tests pinning nothing: `rules/scars.md` § Gates)*
 
 - **A claim needs evidence for the claim itself, not for a neighbour.** "Released" ⇒ the CI run
   on the release commit is confirmed green (not "I pushed"). "Tests pass" ⇒ you ran them and read
@@ -68,11 +60,8 @@ true**. Honesty is not enough; these are structural.
   variety, not honesty; a cold model states falsehoods just as confidently. Reliability comes from
   checking before claiming and from gates that carry the evidence, never from a sampling knob.
 
-**Real failure this rule exists to prevent** (2026-07-06): an agent announced "v2.4.0 released,
-all set" while the release commit's CI was in fact **red** — a `--auto` change had been left
-uncommitted, so `main` was broken. "Released" had been claimed on "I pushed", not on a confirmed
-green CI run. The fix that should have been the habit: wait for the CI conclusion, read it, THEN
-say released.
+**Why this is the top rule** — scar 2026-07-06: "released" claimed on a push while the release
+commit's CI was red. Full account: `rules/scars.md` § Released-on-a-push.
 
 ## Surgical Edits
 
@@ -89,15 +78,9 @@ the bar; "a live caller reaches it" is.
 **Verify by tracing the path**, not by confirming the definition. Start at the entry point and
 follow the call/read chain to the feature. No caller on a live path → not wired → not done.
 
-Concrete failure modes this rule exists to catch (all seen in this repo or its work):
-- A config field written in one file but read from a *different* file the runtime uses (e.g. a
-  `provider:` key set in a tool's native profile but not in the profile the dispatcher actually
-  reads → silently ignored).
-- A generated wrapper on disk that no tool is pointed at (the `tool-coverage` gate in
-  `test/validate.sh` exists precisely to prove skills resolve into the canon, not just exist).
-- Code that "looks wired but never ran" (an entire eval fixture class is named after this).
-- A new env var / flag added to a script but never branched on; a new agent file never referenced
-  from `AGENTS.md`; a new skill never symlinked into the tool's skills dir.
+The four shapes this catches — a field read from a different file than it is written to, a
+generated wrapper nothing points at, code that looks wired but never ran, a flag never branched
+on: `rules/scars.md` § Unwired.
 
 **Prefer a mechanical proof.** Where feasible, add a check that fails when a feature is unwired
 (a coverage gate, a grep-for-caller test, a link check) rather than relying on a human to notice.
@@ -115,8 +98,10 @@ Code best practices, current 2026.)
   Generated, vendored, lock, snapshot, data, and migration artifacts are exempt.
 - **Always-loaded instruction files stay lean** — target ≤200 lines each. Remove any line whose
   absence would not cause mistakes; repeated violations need a deterministic hook, not more
-  advisory prose. Claude JIT-loads this file, but the ChatGPT/web bundle includes it verbatim.
-  This file is already over budget: prune before adding.
+  advisory prose. Claude loads this file every session (`~/.claude/rules/` symlink) and the
+  ChatGPT/web bundle includes it verbatim. This file is at 215 lines, still over: the reasons
+  moved to `rules/scars.md` and the mechanics to the `engineering-reference` skill — prune the
+  same way before adding, never by dropping a rule.
 - **Just-in-time retrieval over pre-loading.** Keep pointers (paths, queries, `[[wikilinks]]`) in
   context; pull content on demand (gbrain, grep). Knowledge that applies *sometimes* belongs in a
   skill (progressive disclosure: only name+description load at startup), never in the canon.
@@ -164,31 +149,19 @@ other's files — duplicate frontmatter keys, interleaved commits, a near-collis
 - **`git add -A` is a loaded gun whenever anything else can write to the checkout. Stage by
   explicit path.** A blanket `git add` does not stage *your* work — it stages *whatever is in the
   tree right now*, including another process's in-flight edits. **A `docs(...)` commit must never
-  contain source.** *(Real scar, 2026-07-14, and the worst of the campaign: `@thor` was running a
-  mutation test — deliberately reintroducing a clock bug to prove the test caught it — in the same
-  checkout where the orchestrator ran `git add -A && git commit` to update a plan. The mutation was
-  swept into a commit titled `docs(p3): ...` and **pushed to `Development`**. A clinical-safety
-  regression shipped inside a documentation commit, and every gate stayed green because no test
-  covered that line. Thor spotted it and restored it. Two rules, both cheap: **stage docs by path**,
-  and **mutation testing only ever in a throwaway worktree**.)*
+  contain source.** Second rule from the same
+  scar: **mutation testing only ever in a throwaway worktree**. *(scar 2026-07-14 — a safety
+  regression shipped inside a `docs(...)` commit: `rules/scars.md` § Blanket-add)*
 - **Before removing a worktree, prove the agent is dead — `0 modified files` is not proof.** An
-  agent between edits looks identical to a corpse. *(Same session: a live F4 agent was declared dead
-  and had its worktree pulled from under it; it recreated it, and in doing so reset a second agent's
-  worktree, destroying that one's work. The orchestrator caused both.)*
+  agent between edits looks identical to a corpse. *(scar 2026-07-14 — two worktrees destroyed on
+  one wrong death certificate: `rules/scars.md` § Blanket-add)*
 
-- **One worktree per stream:** `git worktree add ../<repo>-<feature> -b <type>/<feature>` off the
-  base branch. Each worktree has its own index and HEAD, so parallel writers can't fight
-  `.git/index.lock` or clobber each other's staged work — this is exactly what worktrees are for.
-- **Disjoint file ownership:** give each stream a non-overlapping file set. Keep shared, merge-prone
-  files (`VERSION`, `CHANGELOG.md`, `README.md`) OUT of the parallel branches — bump/write them once,
-  sequentially, at merge/release time, so PRs stay conflict-free.
-- **Each stream ends in a PR**, not a direct push to the shared branch: push the branch, let CI go
-  green, `@rex` reviews, `@thor` runs the qualitative done-gate, then merge (merge commit only).
-  Merge PRs **one at a time** and re-check CI between merges.
 - **Sequential work on a personal repo may still commit to the base branch directly** (that's the
   normal solo flow). The worktree+PR rule triggers specifically when you *parallelize* — the moment
   there is more than one writer, isolation is mandatory.
-- After merge: `git worktree remove` the stream's worktree and delete its branch.
+- The mechanics — one worktree per stream, disjoint file ownership, shared files kept out of
+  parallel branches, PR-per-stream merged one at a time, cleanup after merge — are in the
+  `engineering-reference` skill § Parallel streams.
 
 ## Security & Privacy
 
@@ -208,11 +181,8 @@ malicious MCP servers can inject via tool *descriptions* alone). Rules:
 **Never write a backup of a secret-bearing file inside the repo.** Before editing anything that
 holds credentials (`.env*`, `*.pem`, service-account JSON, a `vercel env pull` dump), the copy
 goes **outside the working tree** — `~/.<repo>-env-backups/`, `chmod 600` — never `.env.bak`,
-`.env.local.old`, `.env.copy` next to the original. Reason, measured on MirrorBuddy 2026-08-20:
-`.gitignore` covered `.env*` but not `*.bak`, so `cp .env.production.local .env.production.local.bak`
-produced a file full of live database URLs, Stripe and Supabase keys that `git status` listed as
-untracked — one `git add .` from being committed. The original was ignored, the backup was not,
-and nothing warned. Two consequences:
+`.env.local.old`, `.env.copy` next to the original. *(scar 2026-08-20 — a `.bak` full of live keys, one
+`git add .` from being committed: `rules/scars.md` § Secret-backup)*. Two consequences:
 
 - After creating any such copy, **verify** it: `git check-ignore -q <file>` must succeed, or the
   file does not belong there.
@@ -235,11 +205,8 @@ Which tier: read the `model-selection-policy` skill. The rule here is only *how 
 *how big*. If unsure between two generations, **go up** — a previous generation at the same
 tier usually costs the same and reasons worse.
 
-**Precedent, 2026-08-28 (audit MirrorScopio):** four verification subagents were launched on
-`claude-sonnet-4.6` while `claude-sonnet-5` and `claude-opus-5` were both in the tool's own
-model list. Roberto caught it and the whole pass had to be redone. Nothing in the canon was
-wrong — the mapping above was already correct — the id was simply typed from memory. That is
-the failure mode this rule exists to stop.
+*(scar 2026-08-28 — a whole verification pass redone because an id was typed from memory:
+`rules/scars.md` § Stale-model-id)*
 
 ## Execution Defaults
 **Browser:** Playwright = Microsoft Edge (`msedge`) only; no Chrome/Chromium fallback. If Edge is unavailable, stop and report the blocker; override only for Roberto-requested cross-browser tests. **Writing:** Tables > prose; commands > descriptions; comments WHY-only; conventional commits; PR = summary + test plan.
