@@ -48,6 +48,30 @@ got="$(decide "$tmp/repo/dangling.md")"
   || err "dangling symlink dangling.md -> newsrc.rs on main -> got '$got', expected deny — DANGLING VARIANT OF THE HOLE"
 rm -f "$tmp/repo/dangling.md"
 
+echo "=== a DANGLING chain longer than the 10-hop cap must still deny, not fall through ==="
+# Found by @thor: hopD11/hopD12 (11-12 hops, dangling) allowed and a Write really created the
+# file at chain's end. Fail closed instead: unresolved after the cap -> no carve-out, ever.
+prev="finalsrc.rs"
+for n in $(seq 1 12); do
+  ln -sf "$prev" "$tmp/repo/hopD$n.md"
+  prev="hopD$n.md"
+done
+got="$(timeout 10 bash "$GUARD" <<<"$(jq -n --arg fp "$tmp/repo/hopD12.md" '{tool_input:{file_path:$fp}}')" 2>/dev/null)"
+got="$([ -z "$got" ] && echo allow || printf '%s' "$got" | jq -r '.hookSpecificOutput.permissionDecision // "allow"')"
+[ "$got" = "deny" ] && ok "12-hop dangling chain (past the cap) on main -> deny (fail closed)" \
+  || err "12-hop dangling chain on main -> got '$got', expected deny — CAP-EXCEEDED VARIANT OF THE HOLE"
+for n in $(seq 1 12); do rm -f "$tmp/repo/hopD$n.md"; done
+
+echo "=== a real cycle must not hang, and denying it is an acceptable side effect ==="
+ln -sf cycB.md "$tmp/repo/cycA.md"
+ln -sf cycA.md "$tmp/repo/cycB.md"
+out="$(timeout 10 bash "$GUARD" <<<"$(jq -n --arg fp "$tmp/repo/cycA.md" '{tool_input:{file_path:$fp}}')" 2>/dev/null)"
+rc=$?
+got="$([ -z "$out" ] && echo allow || printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision // "allow"')"
+[ "$rc" -ne 124 ] && ok "symlink cycle terminates within the timeout (got: $got, rc=$rc; a hang would exit 124)" \
+  || err "symlink cycle did not terminate within 10s (timeout rc=124)"
+rm -f "$tmp/repo/cycA.md" "$tmp/repo/cycB.md"
+
 echo "=== must not over-block: a real .md and a not-yet-created file still pass ==="
 echo "# real notes" > "$tmp/repo/README.md"
 got="$(decide "$tmp/repo/README.md")"

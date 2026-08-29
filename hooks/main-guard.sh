@@ -28,6 +28,12 @@ while [ -L "$fp" ] && [ "$_hops" -lt 10 ]; do
   _hops=$((_hops + 1))
 done
 if [ -e "$fp" ]; then fp="$(/bin/realpath "$fp" 2>/dev/null || printf '%s' "$fp")"; fi
+# Still a symlink after 10 hops: either a cycle (cycA<->cycB — harmless either way) or a
+# dangling chain longer than the cap (NOT harmless — the write would still create the file
+# at the end of it, past what was resolved). Fail CLOSED: an unresolved name never earns the
+# meta/docs carve-out below, so it is denied on main exactly like any other source write.
+_unresolved=""
+[ -L "$fp" ] && _unresolved=1
 
 lookup_dir=""
 if [ -n "$fp" ]; then
@@ -38,11 +44,15 @@ repo_root="$(git -C "${lookup_dir:-.}" rev-parse --show-toplevel 2>/dev/null || 
 
 branch="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
 
-# Carve-out: meta/docs editable on main (markdown, .claude/**, config, ADR).
-case "$fp" in
-  *.md|*/.claude/*|*/docs/*|*/.env.example|*/.gitignore)
-    exit 0 ;;
-esac
+# Carve-out: meta/docs editable on main (markdown, .claude/**, config, ADR). Skipped entirely
+# when the name never resolved (see _unresolved above) — no carve-out for a path this guard
+# could not pin down.
+if [ -z "$_unresolved" ]; then
+  case "$fp" in
+    *.md|*/.claude/*|*/docs/*|*/.env.example|*/.gitignore)
+      exit 0 ;;
+  esac
+fi
 
 if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
   jq -cn --arg reason "MainGuard: writes on $branch are blocked. Create a worktree or a feature branch. Override: RDA_ALLOW_MAIN_WRITES=1 (emergency only)." '{
