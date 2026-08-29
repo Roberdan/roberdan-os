@@ -13,6 +13,20 @@ fp="$(printf '%s' "$input" | jq -r '.tool_input.file_path // ""')"
 # satisfy the meta/docs carve-out below. Same class as claude-code v2.1.251 (Read/Write/Edit
 # following a symlink swapped after the permission check). New file (Write case): no target
 # to resolve yet, so the literal path is kept.
+# `-e` alone misses a DANGLING symlink (target doesn't exist yet — a Write through it would
+# create the target): `-e` follows the link and is false there, and /bin/realpath fails
+# outright on any missing final component, dangling symlink included. So the name is resolved
+# by hand first (bounded to 10 hops against a cycle), THEN realpath is tried once the trailing
+# component, if any, actually exists.
+_hops=0
+while [ -L "$fp" ] && [ "$_hops" -lt 10 ]; do
+  _target="$(readlink "$fp")"
+  case "$_target" in
+    /*) fp="$_target" ;;
+    *) fp="$(dirname "$fp")/$_target" ;;
+  esac
+  _hops=$((_hops + 1))
+done
 if [ -e "$fp" ]; then fp="$(/bin/realpath "$fp" 2>/dev/null || printf '%s' "$fp")"; fi
 
 lookup_dir=""

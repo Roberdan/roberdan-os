@@ -39,6 +39,15 @@ got="$(decide "$tmp/repo/notes.md")"
 [ "$got" = "deny" ] && ok "symlink notes.md -> lib.rs on main -> deny (resolved before the carve-out)" \
   || err "symlink notes.md -> lib.rs on main -> got '$got', expected deny — THE HOLE IS BACK"
 
+echo "=== the same hole, DANGLING (the write would CREATE the target) ==="
+# -e follows the link and is false on a dangling target, so a naive "if -e then realpath"
+# guard skips resolution here and the symlink's own *.md name would win the carve-out.
+ln -sf newsrc.rs "$tmp/repo/dangling.md"
+got="$(decide "$tmp/repo/dangling.md")"
+[ "$got" = "deny" ] && ok "dangling symlink dangling.md -> newsrc.rs (target doesn't exist) on main -> deny" \
+  || err "dangling symlink dangling.md -> newsrc.rs on main -> got '$got', expected deny — DANGLING VARIANT OF THE HOLE"
+rm -f "$tmp/repo/dangling.md"
+
 echo "=== must not over-block: a real .md and a not-yet-created file still pass ==="
 echo "# real notes" > "$tmp/repo/README.md"
 got="$(decide "$tmp/repo/README.md")"
