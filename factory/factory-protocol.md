@@ -5,6 +5,11 @@ resumable — the "agent factory" that keeps going while you sleep. Built on the
 only: `claude -p` (headless) + a durable file queue + `launchd` + the loop-protocol. No daemon, no
 Convergio, daemon-optional.
 
+> Unrelated to **Warp Factories** (Early Access since Warp 2026.08.18), which is Warp's own
+> cloud build infrastructure plus a built-in Factory MCP server. Not adopted: an MCP server that
+> arrives enabled with a client update does not pass the review gate in
+> `rules/best-practices.md` § Security & Privacy.
+
 ## How it works
 
 ```
