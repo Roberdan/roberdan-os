@@ -120,8 +120,18 @@ Code best practices, current 2026.)
 - **Just-in-time retrieval over pre-loading.** Keep pointers (paths, queries, `[[wikilinks]]`) in
   context; pull content on demand (gbrain, grep). Knowledge that applies *sometimes* belongs in a
   skill (progressive disclosure: only name+description load at startup), never in the canon.
-- **Subagents isolate exploration.** Burn search tokens inside the subagent, return a condensed
-  summary; never dump raw exploration into the orchestrator's context.
+- **Delegate by default — the orchestrator keeps conclusions, not transcripts.** Reading to find
+  out is a subagent's job; deciding and editing is yours. Delegate when answering means sweeping
+  files you cannot name in advance, auditing a claim, or reading more than ~3 files; ask for the
+  finding + `file:line` evidence + what was ruled out (≲2k tokens), never the raw dump. Delegate
+  EARLY — a fresh window reasons better than a full one, and past roughly half the window the
+  next exploration goes out by default (if it must stay in, say why in one line). *Why: accuracy
+  falls as context grows even when every needed fact is still present — "context rot"; a subagent
+  spends tens of thousands of tokens and returns 1-2k. Anthropic,* Effective context engineering
+  for AI agents. **Not delegated:** a lookup whose file and symbol you already know; a step
+  dictated by output you just read; anything needing this session's uncommitted state. Delegation
+  never moves a gate — a subagent's report is evidence to check, and only @thor closes a
+  done-gate (§ No False Done).
 - **Cache discipline.** Static content first and byte-stable (no timestamps/volatile state in
   always-loaded files); pick model + effort once, early — mid-session switches invalidate the
   prompt cache and recompute everything.
@@ -236,13 +246,7 @@ the failure mode this rule exists to stop.
 
 ## Moved to the `engineering-reference` skill (loaded on demand, not canon)
 
-None of the below changes what you **decide** — it tells you **how** to do a thing you already
-chose to do. That is the canon's own test for what belongs in a skill.
-
-- **Execution reference** — code style per language · test & mock boundaries · API conventions ·
-  the local CI sequence before push · merge discipline · how to resolve review comments · repo
-  settings & git hooks.
-- **Carded End-to-End** — a requirement that lives in a plan but never becomes a card is not
-  planned. The control is the `kb cover <plan.md>` gate in `test/validate.sh`, never prose.
-- **Documentation & documentation budget** — docstring/CHANGELOG conventions; one living plan, one
-  living handoff, dated artifacts to `docs/archive/`, no build artifacts in git.
+How to do a thing you already chose to do never belongs in the canon. Loaded on demand:
+execution reference (code style, test/mock boundaries, API conventions, local CI before push,
+merge discipline, resolving review comments, repo settings & git hooks) · **Carded End-to-End**
+(gate: `kb cover <plan.md>` in `test/validate.sh`) · documentation & documentation budget.

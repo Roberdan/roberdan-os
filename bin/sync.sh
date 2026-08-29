@@ -282,9 +282,8 @@ emit_copilot() {
   local d="$P/copilot"
   mkdir -p "$d/prompts"
 
-  # copilot-instructions.md → AGENTS.md pointer + the executive-format rule inline (must not
-  # wait behind a pointer). --install symlinks it to ~/.copilot/copilot-instructions.md too
-  # (user-level, every session, no flag; soft — extension systemMessage is the hard-bind path).
+  # copilot-instructions.md → AGENTS.md pointer + executive-format and delegate-by-default rules
+  # inline (must not wait behind a pointer); --install symlinks it to ~/.copilot/ (every session).
   cat > "$d/copilot-instructions.md" <<EOF
 # Copilot instructions → roberdan-os
 
@@ -306,6 +305,7 @@ it louder. Full contract: \`behavior/roberto-mode.md\` § Communicating with Rob
 - Engineering: \`behavior/roberto-mode.md\` — autonomy, evidence-first, done-criteria, quality gate.
 - Voice: \`identity/voice.md\` — drafting/triage in ${FULL_NAME}'s voice.
 - Thinking: \`behavior/thinking-toolkit.md\` — first-principles, Feynman, selective frameworks.
+$(cat "$ROOT/behavior/delegate-by-default.md")
 
 ## Rules
 - \`rules/constitution.md\` · \`rules/best-practices.md\`
