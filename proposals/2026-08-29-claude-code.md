@@ -4,7 +4,9 @@
 
 - Changelog: <https://cdn.jsdelivr.net/gh/anthropics/claude-code@main/CHANGELOG.md> (fetched 2026-08-29).
 - Baseline: `proposals/2026-08-22-claude-code.md` assessed through **v2.1.250** (2026-08-28).
-- New version assessed: **v2.1.251** — the only entry above the baseline in the changelog
+- Release dates: <https://api.github.com/repos/anthropics/claude-code/releases> — **v2.1.251
+  published 2026-08-28T18:19:32Z** (v2.1.250: 2026-08-28T00:49:16Z).
+- New version assessed: **v2.1.251** (2026-08-28) — the only entry above the baseline in the changelog
   (`grep '^## ' CHANGELOG.md` → `2.1.251`, `2.1.250`, `2.1.248`, …). Single release, 74 changelog
   lines; the ~40 UI / Bedrock / Vertex / provider-gateway fixes in it are out of scope for
   roberdan-os and are not itemised below.
@@ -79,11 +81,13 @@ falling back to the literal path when the file does not exist yet (Write of a ne
  fp="$(printf '%s' "$input" | jq -r '.tool_input.file_path // ""')"
 +# Decide on the RESOLVED path: a symlink named *.md pointing at source would otherwise
 +# satisfy the meta/docs carve-out below. Same class as claude-code v2.1.251.
-+if [ -e "$fp" ]; then fp="$(python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$fp" 2>/dev/null || printf '%s' "$fp")"; fi
++if [ -e "$fp" ]; then fp="$(/bin/realpath "$fp" 2>/dev/null || printf '%s' "$fp")"; fi
 ```
 
-(`realpath` is not on stock macOS; `python3` is present and already relied on elsewhere in the repo.)
-A test in `test/` should pin it: symlink `x.md → x.rs` on `main` must be denied. Citation: changelog v2.1.251.
+`/bin/realpath` is an Apple-signed system binary present on stock macOS (verified: `ls -l /bin/realpath`,
+BSD flavour — `-q` only, no GNU long options), so no interpreter start is paid on a hook that fires on
+every edit. A test in `test/` should pin it: symlink `x.md → x.rs` on `main` must be denied.
+Citation: changelog v2.1.251 (2026-08-28).
 
 ### 3. v2.1.251 — new `PreModelSwitch` / `PostModelSwitch` hook events
 
@@ -123,6 +127,16 @@ prefix (`RANDOM=2+2 git push --force`) does not shift the match. Verified by rea
   created with `git worktree add`"* — the factory does not use background sessions or self-created
   worktrees: `grep -n 'worktree\|--bg\|background' factory/run.sh factory/lib.sh` returns only a prose
   line in `factory/lib.sh:126`. No impact.
+- *"Fixed Opus 5 requests failing with 'effort … is not supported when thinking is disabled' when effort
+  was xhigh/max"* — this one touches a canon-declared field, so it was checked rather than skipped:
+  `agents/board.md:5` and `agents/socrates.md:5` are the only two agents declaring `effort: "xhigh"`,
+  and `behavior/thinking-toolkit.md` makes that deliberate. Nothing in the canon or in
+  `~/.claude/settings.json` disables thinking, so the failing combination is never produced. No patch.
+- *"Changed `CLAUDE_CODE_SUBAGENT_MODEL` to set the default subagent model rather than override
+  everything: an agent definition's `model:` and an explicit per-spawn model now take precedence"* —
+  checked: the variable is set nowhere in the repo or in `~/.claude/settings.json`, and all nine
+  `agents/*.md` declare `model:`. The change moves precedence toward what `rules/best-practices.md`
+  § *Subagent models* already requires. No patch.
 - *Spend-limit bar, `/usage`, `/cost`, `/radio`, Remote Control streaming, install size, TUI/tmux/screen
   rendering, Bedrock/Vertex/Foundry gateway fixes* — human-UI or provider surface, no canon change.
 
