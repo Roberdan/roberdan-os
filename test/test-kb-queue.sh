@@ -93,6 +93,43 @@ else
   err "una card creata dopo lo scatto E' PARTITA: un agente puo' crearsi e approvarsi il lavoro"
 fi
 
+printf '\n=== una card bloccata non tiene armato goal-gate ===\n'
+# goal-gate.sh legge `kb queue --restanti`. Una card con `kb block` ha un motivo scritto e
+# aspetta Roberto: non e' lavoro che l'agente puo' fare, quindi non deve contare. Senza questo,
+# ogni sessione nuova ripaga 2-3 muri di testo prima che il FRENO 1 molli. Nei due sensi.
+BQ="$TMP/bq"; mkdir -p "$BQ/todo" "$BQ/doing" "$BQ/done"
+# stderr soppresso: qui si confronta l'output esatto di `--restanti`, e il WARNING di
+# RDA_KANBAN (la board naturale != override) sporcherebbe il match.
+kbq() { RDA_KANBAN="$BQ" RDA_KANBAN_REGISTRY="$TMP/registry-bq" bash "$KBSH" "$@" 2>/dev/null; }
+_rest() { kbq queue bq --restanti | tail -1 | tr -cd '0-9'; }
+_cardq() { cat > "$BQ/todo/$1.md" <<CARD
+---
+title: card $1
+repo: bq
+dod: "una dod"
+acceptance: "il comando stampa il risultato"
+status: todo
+created: 2026-07-30
+---
+CARD
+}
+_cardq BQ1; _cardq BQ2
+kbq queue bq >/dev/null
+[ "$(_rest)" = "2" ] && ok "due card aperte -> restanti = 2" \
+  || err "restanti sbagliato prima del block: $(_rest)"
+kbq block BQ1 "aspetta una decisione di Roberto" >/dev/null
+if [ "$(_rest)" = "1" ]; then
+  ok "bloccata una delle due -> restanti scende a 1 (goal-gate puo' uscire)"
+else
+  err "una card bloccata conta ancora come restante: goal-gate resta armato all'infinito (restanti=$(_rest))"
+fi
+kbq block BQ2 "anche questa aspetta Roberto" >/dev/null
+if [ "$(_rest)" = "0" ]; then
+  ok "tutte bloccate -> restanti = 0 -> condizione terminale di goal-gate"
+else
+  err "con tutte le card bloccate restanti non e' 0: $(_rest)"
+fi
+
 printf '\n=== revoca ===\n'
 
 if _dice "coda revocata" -- kb queue provarepo --stop; then

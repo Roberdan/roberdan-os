@@ -93,6 +93,11 @@ conf_get() {
 FULL_NAME="$(conf_get full_name)"
 FULL_NAME="${FULL_NAME:-the operator}"
 
+# The executive-format rule, written ONCE and reused by every wrapper that needs it inline.
+# Wrappers whose runtime already injects the full contract (Copilot CLI's extension systemMessage,
+# Claude's roberto-plain output style) get this compact form, not a second full copy; the
+# authoritative text stays in behavior/roberto-mode.md between the exec-format markers.
+EXEC_FORMAT_BLURB='**Talk to '"$FULL_NAME"' like an executive — fixed format, every reply** (accessibility commitment, not a style preference; inlined so it binds without following a pointer): (1) **the point**, one sentence, no preamble; (2) **what I need from you** — options + your recommendation, or "Nothing"; (3) **context**, max 3 lines; (4) **detail** (commands, paths, numbers) last; (5) **verified / not verified** — mandatory on any "done" claim. Delete empty sections. No unexplained jargon. Max ~6 lines before the detail.'
 # Extracts a simple YAML frontmatter field (name:/description:) from a file.
 fm() { grep -m1 -E "^$2:" "$1" 2>/dev/null | sed -E "s/^$2:[[:space:]]*//; s/^[\"']//; s/[\"']$//"; }
 
@@ -162,17 +167,20 @@ emit_global_agents_pointer() {
   # ~/GitHub, plus any AGENTS.md-native tool's global instructions dir: codex,
   # opencode). Single source so every installed copy is byte-identical —
   # never hand-copy this text elsewhere.
-  cat <<'EOF'
+  cat <<EOF
 # AGENTS.md → roberdan-os
 
-Thin pointer. Canonical behavior lives in `AGENTS.md` inside `roberdan-os`
-(`~/GitHub/roberdan-os/AGENTS.md`) — read that, do not duplicate it here.
+Thin pointer. Canonical behavior lives in \`AGENTS.md\` inside \`roberdan-os\`
+(\`~/GitHub/roberdan-os/AGENTS.md\`) — read that, do not duplicate it here.
 
-Working in any repo under `~/GitHub`, by default:
+Working in any repo under \`~/GitHub\`, by default:
 - **Loop engineering** (autonomy, evidence-first, commit per phase, verified done) — code and business alike.
 - **Digital twin** kicks in automatically when the output is communication/decision "as Roberto" (draft-not-send for anything external).
-- Agents at the right moment: `@thor` (done-gate), `@rex` (review), `@luca` (security), `@baccio` (architecture), `@socrates` (first-principles), `@wanda` (loop).
-- Human gates are never automated (see `roberdan-os/AGENTS.md#gate-umani`).
+- Agents at the right moment: \`@thor\` (done-gate), \`@rex\` (review), \`@luca\` (security), \`@baccio\` (architecture), \`@socrates\` (first-principles), \`@wanda\` (loop).
+- Human gates are never automated (see \`roberdan-os/AGENTS.md#gate-umani\`).
+
+$EXEC_FORMAT_BLURB
+Full contract: \`roberdan-os/behavior/roberto-mode.md\` § Communicating with Roberto.
 EOF
 }
 
@@ -282,8 +290,7 @@ emit_copilot() {
   local d="$P/copilot"
   mkdir -p "$d/prompts"
 
-  # copilot-instructions.md → AGENTS.md pointer + executive-format and delegate-by-default rules
-  # inline (must not wait behind a pointer); --install symlinks it to ~/.copilot/ (every session).
+  # copilot-instructions.md → AGENTS.md pointer + executive-format/delegate rules inline (must not wait behind a pointer); --install symlinks it to ~/.copilot/.
   cat > "$d/copilot-instructions.md" <<EOF
 # Copilot instructions → roberdan-os
 
@@ -291,15 +298,8 @@ The canonical source of behavior is \`AGENTS.md\` in roberdan-os. Copilot reads 
 thin file: for the full behavior follow \`AGENTS.md\` (Behavior, Rules, Agents,
 Loop Protocol, Human gates).
 
-## Talk to ${FULL_NAME} like an executive — fixed format, every reply
-
-Accessibility commitment, not a style preference. Every reply: (1) **the point** in one
-sentence, no preamble; (2) **what I need from you** — options with their consequences in his
-terms + your recommendation, or "Nothing"; (3) **context** only if needed, max 3 lines;
-(4) **detail** (commands, paths, numbers) at the bottom; (5) **verified / not verified** —
-mandatory on any "done" claim. Delete empty sections, never write "N/A". No unexplained
-jargon. Max ~6 lines before the detail. "I don't understand" = fix the writing, not repeat
-it louder. Full contract: \`behavior/roberto-mode.md\` § Communicating with Roberto.
+$EXEC_FORMAT_BLURB
+Full contract: \`behavior/roberto-mode.md\` § Communicating with Roberto.
 
 ## Behavior
 - Engineering: \`behavior/roberto-mode.md\` — autonomy, evidence-first, done-criteria, quality gate.

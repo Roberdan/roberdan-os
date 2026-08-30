@@ -1087,10 +1087,20 @@ _queue() {
     # cancello di uscita non lo legge nessuno finche' non sbaglia. Una fonte sola, questa.
     *" --restanti "*|*" --remaining "*)
       [ -f "$qf" ] || { echo 0; return 0; }
-      local nrest=0 qid
+      # Una card `blocked` NON conta come "restante": ha un motivo scritto (`kb block`) e
+      # aspetta una decisione umana — un gate di AGENTS.md, non lavoro che l'agente puo' fare.
+      # Senza questo, `kb block` rimette la card in todo/ e goal-gate.sh resta armato: ogni
+      # sessione nuova ripaga 2-3 muri di testo prima che il FRENO 1 (stallo) molli. Il FRENO 1
+      # resta il backstop per le card genuinamente incastrate ma NON bloccate.
+      local nrest=0 qid qcard
       while read -r qid; do
         case "$qid" in ''|\#*) continue ;; esac
-        { [ -e "$KB/todo/$qid.md" ] || [ -e "$KB/doing/$qid.md" ]; } && nrest=$((nrest+1))
+        if   [ -e "$KB/doing/$qid.md" ]; then qcard="$KB/doing/$qid.md"
+        elif [ -e "$KB/todo/$qid.md" ];  then qcard="$KB/todo/$qid.md"
+        else continue
+        fi
+        [ "$(_field "$qcard" status)" = blocked ] && continue
+        nrest=$((nrest+1))
       done < "$qf"
       echo "$nrest"; return 0 ;;
   esac
