@@ -198,10 +198,10 @@ for (const h of ["onSessionStart","onUserPromptSubmitted","onPreToolUse","onPost
 A(cfg.systemMessage && cfg.systemMessage.mode === "append"
   && /verified \/ not verified/i.test(cfg.systemMessage.content || "") && (cfg.systemMessage.content || "").length > 500,
   "join passes the sliced exec-format as a mode:append systemMessage");
-{ const ups = await cfg.hooks.onUserPromptSubmitted({});
-  A(ups && /executive format/i.test(ups.additionalContext || ""),
-    "onUserPromptSubmitted returns the per-turn exec-format reminder"); }
-
+{ const ctx = ((await cfg.hooks.onUserPromptSubmitted({})) || {}).additionalContext || "";
+  // Short once the systemMessage carries the contract, but it must still name verified/not-verified.
+  A(/executive format/i.test(ctx) && /verified \/ not verified/i.test(ctx) && ctx.length < 400,
+    "per-turn reminder: short form, still names verified/not-verified"); }
 const pre = cfg.hooks.onPreToolUse;
 // deny: force push
 let r = await pre({ toolName: "bash", toolArgs: { command: "git push --force origin main" } });

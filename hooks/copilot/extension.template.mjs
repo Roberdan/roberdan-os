@@ -564,14 +564,14 @@ function execFormatSystemMessage() {
     }
 }
 
-// One line that rides on every user turn — a system-message append can be diluted in a very
-// long session, this cannot. Kept short on purpose.
-const EXEC_FORMAT_TURN_REMINDER =
-    'Reply to Roberto in the fixed executive format: (1) the point, one sentence, no preamble; ' +
-    '(2) what I need from you — options + your recommendation, or "Nothing"; (3) context, max 3 ' +
-    'lines, only if needed; (4) detail (commands, paths, numbers) at the bottom; (5) verified / ' +
-    'not verified — mandatory on any "done" claim. Delete empty sections. No unexplained jargon. ' +
-    'Max ~6 lines before the detail.';
+// Rides on every user turn (a systemMessage append can be diluted in a very long session, this
+// cannot) — and is paid EVERY turn, so it has two forms: short when the full contract is already
+// in the systemMessage, long when it is the only carrier. The cheap form is never the fallback.
+const EXEC_FMT_SECTIONS = '(1) the point, (2) what I need from you, (3) context, (4) detail, (5) verified / not verified';
+const EXEC_FMT_TAIL = 'mandatory on any "done" claim. Delete empty sections. No unexplained jargon. Max ~6 lines before the detail.';
+const EXEC_FORMAT_TURN_REMINDER_SHORT = `Roberto's fixed executive format (full contract in the system message): ${EXEC_FMT_SECTIONS} — ${EXEC_FMT_TAIL}`;
+const EXEC_FORMAT_TURN_REMINDER_FULL = `Reply to Roberto in the fixed executive format: ${EXEC_FMT_SECTIONS}. The point is one sentence with no preamble; "what I need from you" carries the options with their consequences + your recommendation, or "Nothing"; context max 3 lines, only if needed; detail (commands, paths, numbers) at the bottom; verified / not verified is ${EXEC_FMT_TAIL}`;
+let execFormatInSystemMessage = false; // false ⇒ the long form, on every unexpected path
 
 // --- hooks -------------------------------------------------------------------
 
@@ -584,9 +584,8 @@ const hooks = {
         return ctx ? { additionalContext: ctx } : undefined;
     },
 
-    // Per-turn reinforcement of the executive response format (see EXEC_FORMAT_TURN_REMINDER).
-    // additionalContext only — never rewrites the user's prompt.
-    onUserPromptSubmitted: async () => ({ additionalContext: EXEC_FORMAT_TURN_REMINDER }),
+    // Per-turn reinforcement of the executive format (see the REMINDER constants). additionalContext only — never rewrites the prompt.
+    onUserPromptSubmitted: async () => ({ additionalContext: execFormatInSystemMessage ? EXEC_FORMAT_TURN_REMINDER_SHORT : EXEC_FORMAT_TURN_REMINDER_FULL }),
 
     onPreToolUse: async (input) => {
         const name = String((input && input.toolName) || "").toLowerCase();
@@ -679,6 +678,7 @@ try {
     // here falls through to the outer catch: extension inert but harmless, which is the contract.
     const systemMessage = execFormatSystemMessage();
     session = await joinSession(systemMessage ? { tools, hooks, systemMessage } : { tools, hooks });
+    execFormatInSystemMessage = Boolean(systemMessage); // after join: a throw leaves the long form
     // The Claude "Stop" analog: after every turn Copilot emits session.idle. We run the
     // advisory gate chain + always-on checkpoint here (throttled + serialized). This can WARN
     // and run side effects, but — per the documented limitation — it cannot block/rewrite the
