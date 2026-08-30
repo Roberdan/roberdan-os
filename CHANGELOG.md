@@ -5,29 +5,11 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 
 ## [v2.39.0] - 2026-08-28
 
-**pkgnet-guard reaches processes that never source a shell rc file** — the hole that kept the
-Defender "REDACTED-INTERNAL-POLICY" toast coming back after v2.37.0.
-
-v2.37.0 delivered the proxy override through `~/.config/roberdan-os/pkgnet.env`, sourced by
-`~/.zshenv`. That covers zsh trees and nothing else. Measured on this machine: Warp starts its
-login shell as `zsh -g --no_rcs` (which suppresses *every* startup file, `.zshenv` included), and
-`gh copilot --yolo` runs its commands as `bash --norc --noprofile -c …`. A Copilot agent doing
-`npm install` in MirrorBuddy therefore had no `npm_config_registry`, the repo's committed
-`.npmrc` (`registry=https://registry.npmjs.org/`) won, and every request hit the blocked host.
-
-- **`launchctl setenv` is now the primary layer.** `bin/pkgnet-guard.sh` seeds
-  `npm_config_registry`, `NPM_CONFIG_REGISTRY`, `PIP_INDEX_URL` and `UV_INDEX_URL` into the user's
-  gui domain, so every process started afterwards inherits them regardless of shell — or of no
-  shell at all. `pkgnet.env` + `.zshenv` stay as the second layer.
-- **`--install-agent`** writes and loads `~/Library/LaunchAgents/com.roberdan.pkgnet-guard.plist`
-  (RunAtLoad + every 30 min). Without it the launchd vars die at reboot and a network change is
-  never noticed.
-- **`--check` now also verifies the launchd vars**, and `bin/toolchain-doctor.sh` check #6 gained
-  a `pkgnet-launchagent` gate that goes `warn` when the agent is not loaded (mutation-tested:
-  bootout → warn, reinstall → ok).
-- **Known limit, by construction:** `launchctl setenv` seeds only *new* processes. Apps already
-  running when the guard applies — a Warp window, a live `gh copilot` session — keep the old
-  environment until they are relaunched.
+**Package-manager network guard moved out of the repo.** The helper that routes local package
+managers through an organization-provided mirror is machine- and employer-specific: it names
+infrastructure that belongs to the network it runs on, not to this canon. It now lives in
+local machine config (`~/.config/roberdan-os/local/`) and is no longer distributed here.
+`bin/bootstrap.sh` and `bin/toolchain-doctor.sh` no longer reference it.
 
 ## [v2.38.1] - 2026-08-28
 
@@ -94,27 +76,10 @@ Solo frontmatter, settings e documentazione: nessun comportamento del codice cam
 - Wiring: `hooks/pre-commit` (blocca, fail-closed se lo script manca), `test/validate.sh`,
   `AGENTS.md § Privacy` (ora **quattro** gate), `docs/privacy-leak-check.md`.
 
-||||||| 72862a5
 ## [v2.37.0] - 2026-08-28
 
-**`pkgnet-guard`: quando la rete aziendale blocca i registry pubblici dei pacchetti,
-instrada npm/pnpm/bun/pip/uv sul proxy autorizzato — automaticamente e solo dove serve.**
-
-- **Il problema.** `~/.npmrc`, `pip.conf` e `uv.toml` globali puntano già al proxy
-  Microsoft, ma un `.npmrc` di progetto committato con `registry=https://registry.npmjs.org/`
-  (alcuni repo OSS lo fanno per la riproducibilità del lockfile — `hve-core`, `MirrorBuddy`)
-  vince sul globale e colpisce l'host bloccato: toast Defender "REDACTED-INTERNAL-POLICY" o TLS
-  reset.
-- **`bin/pkgnet-guard.sh`** (nuovo) sonda la rete. Se i registry pubblici sono irraggiungibili
-  e il proxy risponde, scrive `~/.config/roberdan-os/pkgnet.env` con `export
-  npm_config_registry` / `PIP_INDEX_URL` / `UV_INDEX_URL` verso il proxy — e una variabile
-  d'ambiente batte *qualsiasi* `.npmrc` di progetto. Su una rete non bloccata **cancella** il
-  file: no-op ovunque, niente da disfare.
-- **Sonda solo su richiesta.** Il probe gira in `bin/bootstrap.sh` (step 3d) e in
-  `bin/toolchain-doctor.sh` (check #6), mai all'avvio della shell. `~/.zshenv` fa solo
-  `[ -f … ] && . …` (una riga, inerte se il file non c'è).
-- **`toolchain-doctor` check #6**: rosso se `pkgnet.env` e la rete non concordano; warn se il
-  file esiste ma `~/.zshenv` non lo carica (le shell nuove resterebbero scoperte).
+**Package-manager network guard** (removed from this repo in v2.39.0 — see that entry;
+it is local machine configuration, not part of the canon).
 
 ## [v2.36.3] - 2026-08-27
 

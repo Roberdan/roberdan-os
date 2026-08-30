@@ -52,12 +52,6 @@ EOF
 chmod +x "$HOME/.local/bin/bus"
 echo "  bus wrapper installed at ~/.local/bin/bus → $ROOT/bus/bus.sh"
 
-# 3d) Package-registry guard: on a corporate network that blocks the public
-#     registries, write ~/.config/roberdan-os/pkgnet.env so npm/pnpm/bun/pip/uv
-#     use the authorized proxy. On any other network this removes the file and
-#     is a no-op. .zshenv sources it (printed in Next steps, add by hand).
-bash bin/pkgnet-guard.sh --quiet || true
-
 # 4) Confidential dossier → $RDA_HOME/private (local-only, never in git)
 if [ -n "$DOSSIER" ] && [ -f "$DOSSIER" ]; then
   mkdir -p "$RDA_HOME/private"
@@ -77,10 +71,6 @@ bash test/validate.sh >/dev/null 2>&1 && echo "  validate: ✅ green" || echo " 
 cat <<EOF
 
 == Next steps ==
-0) If step 3d wrote ~/.config/roberdan-os/pkgnet.env (corporate network blocks the
-   public package registries), add this one line to ~/.zshenv so every shell picks
-   it up (idempotent, inert when the file is absent):
-     [ -f "$HOME/.config/roberdan-os/pkgnet.env" ] && . "$HOME/.config/roberdan-os/pkgnet.env"
 1) Hooks (one command, idempotent, backs up settings.json first — this is what makes
    Pause & Resume "always-on"): bash bin/install-hooks.sh --apply
    (dry-run without --apply; regenerate the snippet with bash bin/sync.sh --emit-only)
