@@ -120,6 +120,14 @@ Code best practices, current 2026.)
 - **Cache discipline.** Static content first and byte-stable (no timestamps/volatile state in
   always-loaded files); pick model + effort once, early — mid-session switches invalidate the
   prompt cache and recompute everything.
+- **Subagents default to the cheap/mid model; frontier needs a written reason.** The single most
+  impactful cost lever (Uber Engineering, 2026 — 52% cost cut per session at 7× usage): the
+  orchestrator decomposes and evaluates on the strong model, **executors** (well-scoped work with
+  specified inputs) run on `sonnet`/`haiku`. **Deciders/reasoners** (architecture, security
+  judgment, adversarial red-team, first-principles, thinking) may use the frontier tier only with
+  a written `model_rationale:` on the agent. Reasoning **effort defaults to `medium`**; above
+  medium needs a written `effort_rationale:`. Enforced by `test/test-model-economy.sh`; full
+  policy in `skills/model-selection-policy/skill.md`.
 - **A loop phase is the session container, not the whole task** — canonical contract lives in `loop/loop-protocol.md` § Session-as-phase-container; don't restate it here.
 - **Durable state on disk beats in-conversation state — for cost too.** A kanban card / checkpoint
   file is read once per resume; conversation state is re-paid every turn. Prefer CLIs (`gh`, `kb`)

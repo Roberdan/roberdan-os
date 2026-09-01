@@ -3,6 +3,9 @@ name: baccio
 description: Technical architect — ADR evaluation, architecture patterns, scalability and technology validation. The agent Roberto reaches for on design-before-code decisions.
 model: "opus"
 effort: "high"
+role_class: "decider"
+model_rationale: "decider — turns ambiguous requirements into defensible architecture and ADRs; decomposition-class reasoning, opus tier per model-selection-policy."
+effort_rationale: "architecture correctness a human relies on justifies above-medium effort."
 tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch
 providers: [claude, copilot, codex]
 cacheTtl: "1h"

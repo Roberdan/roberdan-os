@@ -3,6 +3,9 @@ name: luca
 description: Security expert — threat modeling, security architecture, risk and compliance. Zero-Trust and OWASP Top 10 focus. Advisory, read-only.
 model: "opus"
 effort: "high"
+role_class: "decider"
+model_rationale: "decider — security threat-modeling and risk judgment a human relies on; opus tier."
+effort_rationale: "security findings a human relies on justify above-medium effort."
 tools: Read, WebSearch, WebFetch
 providers: [claude, copilot, codex]
 cacheTtl: "1h"

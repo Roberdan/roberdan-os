@@ -52,17 +52,25 @@ The two complementary hemispheres of the behavioral canon:
 Minimal curated set. Provider-neutral prose + optional `claude` frontmatter. The
 ethical block is **referenced** from `rules/constitution.md`, not copy-pasted.
 
-| Agent | Role | Model |
-|---|---|---|
-| [`baccio`](agents/baccio.md) | Architect + coding | opus |
-| [`rex`](agents/rex.md) | Code + ecosystem review | sonnet |
-| [`luca`](agents/luca.md) | Security (advisory) | opus |
-| [`thor`](agents/thor.md) | QA / verify-done guardian — sole gate for `done` | sonnet |
-| [`socrates`](agents/socrates.md) | First-principles: digs out one truth | opus |
-| [`board`](agents/board.md) | Sounding board + adversarial red-team on decisions | opus |
-| [`coach`](agents/coach.md) | Thinking coach — maieutic & empathetic: helps Roberto reason/decide/challenge himself (guides, never decides). Kahneman-bias-aware | opus |
-| [`wanda`](agents/wanda.md) | Loop orchestrator | sonnet |
-| [`twin`](agents/twin.md) | Digital twin: voice + cognitive engine (knows when to convene board/framework); persona in [`identity/`](identity/README.md) | opus |
+**Model economy (the Uber cost lever).** A subagent runs on the **cheap/mid model unless a
+written reason justifies frontier** — the orchestrator decomposes and evaluates on the strong
+model, **executors** (well-scoped work with specified inputs) run on `sonnet`. **Deciders/
+reasoners** may use the frontier tier (`opus`) only with a written `model_rationale:` on their
+file. Reasoning **effort defaults to `medium`**; above medium needs a written `effort_rationale:`.
+Enforced by `test/test-model-economy.sh`; full policy in
+[`skills/model-selection-policy/skill.md`](skills/model-selection-policy/skill.md).
+
+| Agent | Role | Class | Model |
+|---|---|---|---|
+| [`baccio`](agents/baccio.md) | Architect + coding | decider | opus |
+| [`rex`](agents/rex.md) | Code + ecosystem review | executor | sonnet |
+| [`luca`](agents/luca.md) | Security (advisory) | decider | opus |
+| [`thor`](agents/thor.md) | QA / verify-done guardian — sole gate for `done` | executor | sonnet |
+| [`socrates`](agents/socrates.md) | First-principles: digs out one truth | decider | opus |
+| [`board`](agents/board.md) | Sounding board + adversarial red-team on decisions | decider | opus |
+| [`coach`](agents/coach.md) | Thinking coach — maieutic & empathetic: helps Roberto reason/decide/challenge himself (guides, never decides). Kahneman-bias-aware | decider | opus |
+| [`wanda`](agents/wanda.md) | Loop orchestrator | executor | sonnet |
+| [`twin`](agents/twin.md) | Digital twin: voice + cognitive engine (knows when to convene board/framework); persona in [`identity/`](identity/README.md) | decider | opus |
 
 ## Agent bus — talking to another agent on the same card
 

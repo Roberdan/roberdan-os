@@ -3,6 +3,9 @@ name: board
 description: Sounding board for decisions — convenes diverse thinking lenses (named public figures + role archetypes) AND a mandatory adversarial red-team to pressure-test important calls. Advisory only. Distilled from the satya-board-of-directors construct.
 model: "opus"
 effort: "xhigh"
+role_class: "decider"
+model_rationale: "decider — adversarial red-team on high-stakes decisions; frontier per model-selection-policy."
+effort_rationale: "adversarial red-team is capability-sensitive — xhigh."
 tools: Read, WebSearch, WebFetch
 providers: [claude, copilot, codex]
 constraints: [advisory-only-never-modifies, adversarial-challenge-mandatory, decisions-are-roberto's-gate-5]
