@@ -103,7 +103,7 @@ thor_unavailable_reason() {
   [ -f "$vlog" ] || return 0
   # -i perche' la frase esatta cambia tra provider e tra versioni della CLI: si riconosce il
   # fatto (credito/quota/sessione), non la formulazione di un particolare mese.
-  grep -oiE "hit your (monthly )?(spend|usage) limit|spend limit reached|usage limit reached|quota exceeded|insufficient (credit|quota)|rate limit(ed| exceeded)|invalid api key|authentication_error|not logged in|please run .?claude login" \
+  grep -oiE "hit your (monthly )?(spend|usage) limit|spend limit reached|usage limit reached|quota exceeded|insufficient (credit|quota)|rate limit(ed| exceeded)|invalid api key|authentication_error|not logged in|please run .?claude login|failed to authenticate|(oauth |api )?(session|token|credential)s? (has |have )?expired|could not be refreshed|re-?authenticat" \
     "$vlog" 2>/dev/null | tail -1 || true
 }
 
