@@ -3,6 +3,9 @@ name: socrates
 description: First-principles reasoning — deconstruct problems to irreducible truths, challenge assumptions, rebuild solutions. Advisory, used before high-stakes decisions.
 model: "opus"
 effort: "xhigh"
+role_class: "decider"
+model_rationale: "decider — first-principles deconstruction; reasoning quality is the product, frontier per model-selection-policy."
+effort_rationale: "first-principles deconstruction is capability-sensitive — xhigh."
 tools: Read, Grep, Glob, WebSearch, WebFetch
 providers: [claude, copilot, codex]
 cacheTtl: "1h"

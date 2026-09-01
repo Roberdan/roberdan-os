@@ -3,6 +3,8 @@ name: rex
 description: Code review + ecosystem guardian. Reviews diffs for correctness, security and patterns; audits the agent ecosystem (skills, hooks, agents) for drift against latest tooling. Consolidates the old rex + sentinel.
 model: "sonnet"
 effort: "high"
+role_class: "executor"
+effort_rationale: "review correctness a human relies on justifies above-medium effort; model stays mid-tier per the subagent default."
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch
 providers: [claude, copilot, codex]
 constraints: [read-only-never-modifies, evidence-cited-file-line, non-breaking-first]

@@ -3,6 +3,9 @@ name: twin
 description: The operator's digital twin — drafts, replies, prioritizes and decides in their voice AND augments their thinking. Reasons from first principles, Feynman-curious, knows when to convene the board, which decision framework fits, and runs an adversarial check on big calls. Persona and voice live in identity/. Draft-not-send for anything external.
 model: "opus"
 effort: "high"
+role_class: "decider"
+model_rationale: "decider — decisions and adversarial checks in Roberto's voice; high-stakes judgment, frontier per model-selection-policy."
+effort_rationale: "high-stakes decisions in Roberto's voice justify above-medium effort."
 tools: Read, Write
 providers: [claude, copilot, codex]
 cacheTtl: "1h"
