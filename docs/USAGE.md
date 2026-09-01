@@ -174,10 +174,49 @@ That collision is not solvable here; the user-level skill still works everywhere
   instructions; no wrapper, only documented setup commands. See the generated
   `platforms/hermes/README.md` (run `bin/sync.sh --emit-only` first — `platforms/` is not in git).
 
-## Verify the system itself
+## Session waste — the *why*, not the *how much*
+
+`bin/session-waste.sh` reads the session traces this runtime already writes to disk and flags a
+small set of recurring cost wastes, each with an **estimated** impact and a concrete remedy.
+Zero setup, no network, nothing leaves the machine, nothing is written back. It is **silent when
+it finds nothing** — a clean session prints nothing, on purpose (the precheck scar: an alert that
+always fires is noise you learn to skip).
 
 ```
-bash test/validate.sh          # full CI gate: frontmatter, links, drift + snippet-expansion,
+bin/session-waste.sh              # analyse ~/.copilot/session-state/*/events.jsonl
+bin/session-waste.sh --dir DIR    # analyse a specific directory (or a single events.jsonl)
+bin/session-waste.sh --help       # thresholds + env overrides
+```
+
+**Detectors** (each names the trace field it stands on; all impacts are estimates in the trace's
+own units — tokens, nano-AIU, premium requests — never a dollar figure, which is not in the trace):
+
+| detector | fires when | trace field(s) |
+|---|---|---|
+| `model-routing` | a light session (few turns, low output) ran entirely on an expensive (opus) model | `assistant.message.model`, `session.shutdown.modelMetrics[m].{requests.cost,totalNanoAiu,usage.outputTokens}` |
+| `prompt-init-overhead` | fixed prompt (system + tool schemas ≥ 30k tok) is ≥ 60% of context over ≤ 2 user turns | `session.shutdown.{systemTokens,toolDefinitionsTokens,currentTokens}`, `user.message` count |
+| `context-bloat` | a single large tool payload (~20k+ tok) persisted for 8+ later turns, re-billed via cache | `tool.execution_complete.result` size, `assistant.message` turns after it |
+| `cache-expiration` | the same session went cold ≥ 3 times (idle gaps > 30 min, past the ~300s cache TTL), each resume rebuilding a large prefix | interaction timestamps, `session.usage_checkpoint.modelCacheState[].cacheTtlSeconds`, `session.shutdown.{systemTokens,toolDefinitionsTokens}` |
+| `cache-churn` | cache **writes** ≥ **reads** (≥ 50k tok) — the prefix kept being rebuilt instead of reused | `session.shutdown.modelMetrics[m].usage.{cacheReadTokens,cacheWriteTokens}` |
+
+All thresholds are `RDA_SW_*` env overrides (see `--help`).
+
+**Honest limits — what it does NOT see:**
+- **Only Copilot `events.jsonl` is parsed.** Claude (`~/.claude/projects/**/*.jsonl`) and Codex
+  traces carry per-turn model + token usage, but **not** the system-prompt / tool-schema token
+  split that `prompt-init-overhead` and `cache-expiration` lean on. Rather than analyse them with
+  holes (and fake the missing fields), this version deliberately skips them. Adding a
+  Claude-native subset (model-routing + cache-churn from its `usage` block) is a clean follow-up.
+- **Impacts are estimates, labelled as such.** Where a field is absent for a session, that
+  detector is skipped for that session — never filled with a plausible number (the `-` principle
+  from `kb dash`). Cross-model savings (e.g. "sonnet would have been cheaper") are stated as
+  assumptions, because the cheaper tier's exact cost is not in the trace.
+- **No behavioural certainty.** `context-bloat` assumes the payload stayed in the cached prefix;
+  `cache-expiration` assumes the prefix rebuilt after the TTL. Both are the documented Copilot
+  cache behaviour, but the trace does not stamp each re-bill, so the token-turn figures are
+  upper-bound estimates, not invoices.
+
+
                                # shellcheck, leak-check, factory+kb+federated-kb, autofmt
                                # contract, fork-merge proof, eval-pipeline, tool-coverage
 bash test/test-factory-kb.sh   # factory + kb gate assertions only
