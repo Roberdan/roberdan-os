@@ -1,0 +1,14 @@
+# bench-models.tsv — model price ASSUMPTIONS for the cost axis of the Pareto bench.
+#
+# These are PUBLIC LIST PRICES, per million tokens (USD), and they are an ESTIMATE: real billing
+# depends on the plan (a Max subscription bills nothing per token via OAuth — see eval/lib.sh
+# billing-safety note), on cache hits, and on the actual token counts a task consumes. The bench
+# uses these numbers only to turn measured token counts into a comparable cost-per-task figure.
+# The frontier shifts every few weeks (the whole point of the Uber method) — revise this table,
+# do not trust it as fixed. Override the whole file with RDA_BENCH_MODELS=/path/to/table.tsv.
+#
+# Columns (TAB-separated): model_id  input_usd_per_mtok  output_usd_per_mtok
+# Lines starting with '#' and blank lines are ignored.
+claude-opus	15.00	75.00
+claude-sonnet	3.00	15.00
+claude-haiku	0.80	4.00
