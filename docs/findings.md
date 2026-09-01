@@ -262,6 +262,8 @@ _Aggiornato: 2026-08-03._
   di comportamento non si tocca di straforo (`AGENTS.md` § Memory: mai auto-commit su
   `agents/`).
 
+- **2026-09-01 — `test/validate.sh` e' tornato al tetto delle 300 righe e va spezzato, non baselinato in eterno.** Trovato agganciando `test/test-session-waste.sh` (card `260901-185951-2`): validate.sh era a **300 esatte** e le 4 righe della nuova sezione l'hanno portato a 304, quindi e' entrato nella baseline delle 300 righe (`test/file-size-baseline.txt`, quindicesima voce). E' lo stesso destino gia' capitato a `test-copilot-adapter.sh` (dodicesima). La baseline e' il meccanismo giusto per una crescita puntuale e visibile, ma validate.sh e' un **indice**: ogni nuova suite aggiunge ~4 righe, e un indice congelato a 304 costringera' ogni prossima aggiunta a crescere la baseline o a spezzare sotto pressione. Il canone lo dice gia' a chiare lettere nel file stesso (*"validate.sh lo spezza, non lo allarga"*), e nel 2026-08-01 era stato spezzato da 623 a 256 proprio per questo. **La condizione che lo renderebbe una card:** la prossima suite che deve entrare (la sedicesima voce di baseline che tocca validate.sh, oppure il primo `err` "validate.sh e' cresciuto da 304"). Il taglio naturale: estrarre l'indice delle sezioni "8*" (receipts/pending/session-waste/meta-loop) in un `test/validate-tools.sh` sourceato, come gia' fatto con `test/validate-privacy.sh`. Non fatto qui perche' e' un refactor del gate condiviso, fuori dallo scope della card.
+
 - **2026-09-01 — un sub-agente `general-purpose` lanciato SENZA `model` esplicito torna a mani
   vuote, in silenzio.** Trovato delegando le tre card sulle leve Uber (`260901-185951`,
   `-1`, `-2`): tre agenti `general-purpose` avviati col modello di default hanno chiuso il

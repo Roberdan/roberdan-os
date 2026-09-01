@@ -1,6 +1,6 @@
 # Baseline delle 300 righe — file scritti a mano gia' oltre soglia il 2026-07-30.
 # Congelati, non condannati: passano cosi' come sono, ma non possono CRESCERE.
-# file in baseline: 12
+# file in baseline: 13
 # Un file NON in questa lista che supera le 300 righe fa fallire test/test-file-size-ratchet.sh.
 # Si accorcia una riga togliendola; si allarga solo con una decisione visibile in un diff.
 # 2026-07-30, decisione visibile come il file stesso chiede: +39 kb.sh, +62 test-kb-views.sh
@@ -103,6 +103,15 @@
 # dello stub SDK e' condiviso da tutte le sezioni; spezzare duplicherebbe ~50 righe di setup),
 # e la nota della tredicesima resta in piedi: chi tocca l'adattatore per un motivo di
 # PRODOTTO lo spezza, non lo allarga una terza volta.
+# 2026-09-01, quindicesima: validate.sh entra in lista a 304 (era a 300 esatte, non baselinato
+# — stesso caso di test-copilot-adapter.sh la dodicesima). +4 righe per agganciare
+# test/test-session-waste.sh, il primo test di bin/session-waste.sh (il cruscotto anti-sprechi
+# sulle sessioni, card 260901-185951-2). Una suite lanciata da _spawn ma mai attesa da _suite
+# gira e il suo esito viene ignorato: un test rosso non farebbe rosso il gate. Le 4 righe sono
+# la sezione che la attende davvero — commento, section, e l'if _suite che ne raccoglie l'esito
+# (verde/rosso), la stessa forma di ogni altra suite qui sopra. Lo split di validate.sh resta
+# la strada giusta e resta rimandato: e' un refactor del gate condiviso, fuori dallo scope di
+# questa card, ed e' annotato in docs/findings.md perche' non si perda.
 1753 kanban/kb.sh
 1390 test/test-bus.sh
 1133 test/test-bus-mutants.sh
@@ -114,4 +123,5 @@
 446 test/test-kb-views.sh
 344 eval/report.sh
 377 test/test-copilot-adapter.sh
+304 test/validate.sh
 699 hooks/copilot/extension.template.mjs
