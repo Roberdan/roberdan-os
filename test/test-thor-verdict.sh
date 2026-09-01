@@ -92,11 +92,22 @@ printf '\n=== STRUMENTO SPENTO != VERDETTO NEGATIVO (misurato il 2026-08-20) ===
 # spend limit" e zero righe di verifica. Arrivava a chi chiudeva come "@thor ha verificato e
 # dice NO": il registro avrebbe detto che qualcuno aveva guardato e bocciato, e nessuno aveva
 # guardato niente.
+#
+# 2026-09-01, la SECONDA volta, con una formulazione nuova: chiudendo la card 260901-185951
+# `claude` e' uscito 1 con "Failed to authenticate: OAuth session expired and could not be
+# refreshed" — di nuovo zero righe di verifica, e di nuovo `kb` ha stampato "@thor ha
+# verificato e dice NO". Il commento della funzione diceva gia' di riconoscere "il fatto
+# (credito/quota/sessione)", ma nel filtro la sessione non c'era: il codice contraddiceva la
+# propria didascalia. E' la ragione per cui questa lista cresce per FATTI e non per frasi —
+# ogni nuovo modo di dire "lo strumento e' spento" che passa il filtro diventa una bugia
+# scritta su una card, e una bugia sul cancello del `done` e' il difetto piu' caro di tutti.
 for testo in \
   "You've hit your monthly spend limit · raise it at claude.ai/settings/usage" \
   "Error: usage limit reached for this organization" \
   "quota exceeded" \
   "invalid api key" \
+  "Failed to authenticate: OAuth session expired and could not be refreshed" \
+  "Error: token expired, please re-authenticate" \
   "You are not logged in. Please run \`claude login\`"; do
   vlog="$(mktemp)"; printf '%s\n' "$testo" > "$vlog"
   [ -n "$(thor_unavailable_reason "$vlog")" ] \
