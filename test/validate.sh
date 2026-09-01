@@ -22,7 +22,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test
           test-file-size-ratchet test-edge-only test-kb-precheck \
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt \
-          test-receipts test-install-hooks test-pending test-metaloop \
+          test-receipts test-install-hooks test-pending test-metaloop test-session-waste \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
           test-bus-doorbell test-bash-guard test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree \
@@ -212,6 +212,10 @@ if _suite test-install-hooks; then ok "install-hooks merge green (see bash test/
 # --- 8e) approval inbox: kb pending aggregates + counts, digest writes without failing ---
 section "approval inbox — kb pending + digest contract"
 if _suite test-pending; then ok "approval inbox green (see bash test/test-pending.sh)"; else err "test-pending — see bash test/test-pending.sh"; fi
+
+# --- 8e2) session-waste: flags a waste on synthetic traces AND stays SILENT on clean (the scar)
+section "session-waste — rilievi con impatto+rimedio, e silenzio quando non trova nulla"
+if _suite test-session-waste; then ok "session-waste flags a waste E tace su input pulito/vuoto"; else err "test-session-waste — see bash test/test-session-waste.sh"; fi
 
 # --- 8e) meta-loop wired end-to-end (capture -> distill[real class] -> curate promotes) ---
 # The self-improving loop must actually PROMOTE an approved learning, not stall at
