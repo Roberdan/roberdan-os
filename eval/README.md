@@ -271,6 +271,90 @@ pass `--force` to a step to regenerate everything for that step regardless.
 `eval/results/` is gitignored (generated, like `platforms/`) — commit `report.md` by hand if you
 want to keep a dated snapshot; otherwise regenerate on demand.
 
+## The model-choice bench (`eval/bench-*`) — which MODEL, not which canon
+
+Everything above asks *"does the canon change the output?"*. This is a **sibling** concern with a
+different question, and its own files (`eval/bench-*`): **"which MODEL is Pareto-optimal on our own
+real work — and is the expensive one actually worth it?"** It ports the method Uber Engineering
+published (they cut agentic-coding cost per session 52% while usage grew 7x): build the benchmark
+out of the agent's REAL tasks graded by difficulty, run them across models behind one interface,
+score quality AND cost per completed task, and move to the Pareto frontier — which shifts every few
+weeks, so you keep moving. Model choice by judgement is guesswork; benchmarked on your own workload
+it is engineering.
+
+### What it measures
+
+Per model, over the same set of tasks: **quality** (pass rate against each task's acceptance
+criteria), **cost per completed task** (measured tokens × the price table in `bench-models.tsv`),
+**average duration**, and **timeout/error counts**. It then prints a **Pareto table** marking every
+model that is *dominated* (another model is at least as good on every axis) versus on the
+*frontier*. Axes: quality higher-is-better, cost and duration lower-is-better.
+
+### Dry-run is the DEFAULT — and it cannot spend
+
+```
+eval/bench-run.sh                 # dry-run (DEFAULT): full Pareto table from committed fixtures
+eval/bench-run.sh --dry-run       # explicit, same thing
+```
+
+A dry run reads **synthetic** fixtures (`eval/bench-fixtures/dry-run.tsv`) that carry no real card
+content, produces the complete table, and **never calls a model** — accidental spend is impossible
+without an explicit flag. `test/validate.sh` runs exactly this end-to-end (see
+`eval/test-model-bench.sh`) and asserts zero model calls. The committed fixture is deliberately
+shaped like Uber's own finding: `claude-sonnet` matches `claude-opus` on outcome for less money and
+time, so **opus comes out dominated** — the strongest model is often not worth it on your workload.
+
+### How to run a REAL benchmark (needs Roberto's approval)
+
+Real spend is a hard human gate (`AGENTS.md § Human gates` #3). The runner will **not** cross it:
+
+```
+eval/bench-derive.sh                 # 1. derive tasks from REAL closed cards -> gitignored local dir
+eval/bench-run.sh --real             # 2. prints the ESTIMATED cost, then STOPS (exit 3)
+eval/bench-run.sh --real --confirm-spend   # 3. only after Roberto approves the estimate
+```
+
+`bench-derive.sh` turns each closed card in `kanban/done/` into a task (title + Definition of Done +
+acceptance + an inferred difficulty grade). **The derived tasks are card content — Roberto's private
+operational state — so they are gitignored and never committed**, exactly the split `kanban/` already
+uses (the tool is versioned, the data is not). The deriver **refuses** to write anywhere git does not
+ignore, so the 2026-08-24 privacy scar (a generator writing private notes into a tracked area) cannot
+repeat. What ships in this repo is the *deriver and the runner*, never the derived tasks.
+
+### Estimated cost of one real run
+
+Formula: `tasks × Σ_models (tokens_per_task × price_per_token)`. With the committed `bench-models.tsv`
+list prices and the default **30 000 tokens/task/model** assumption (split half input / half output),
+one task across all three models costs **≈ $1.69** (opus $1.35 + sonnet $0.27 + haiku $0.07). So:
+
+| sample size | 3 models, ~30k tok/task | note |
+|---|---|---|
+| 12 cards | **≈ $20** | a first, deliberately small probe |
+| 30 cards | **≈ $51** | still not statistically strong |
+| all ~164 closed cards | **≈ $277** | rarely worth it — sample instead |
+
+**These are ESTIMATES, and an upper bound on *metered* cost.** On a Max-subscription OAuth the
+per-token API charge is $0 (see the billing-safety note in `eval/lib.sh`); real token counts, cache
+hits, and shifting list prices all move the number. `bench-run.sh --real` prints its own estimate for
+the exact task/model set before doing anything.
+
+### Honest limit — read before trusting any Pareto table
+
+- **A handful of cards is not statistically strong.** With ~a dozen tasks and **one run per
+  task-model**, a single sample can land on either side of a model's real output distribution; the
+  frontier you see can flip on a re-run. Treat the table as a **decision aid on your own workload,
+  not a benchmark score** — and re-run it, because the frontier genuinely moves.
+- **Difficulty grading is a crude heuristic.** `bench_grade_difficulty` infers easy/medium/hard from
+  the combined length and clause-count of a card's DoD + acceptance. A short DoD can hide a hard task
+  and a verbose one can restate an easy one — the grade orders tasks roughly, it does not certify
+  their difficulty. (On the current board it skews toward `hard`, because most cards carry long,
+  multi-clause acceptance text.)
+- **Outcome scoring on a real run is only as good as the judge.** Pass/fail against acceptance
+  reuses the same single-judge apparatus as the A/B eval above, and inherits every caveat in the
+  "Caveats" section — self-preference risk, single sample, compliance ≠ Roberto's real preference.
+- **The price table is an assumption, not your invoice.** `bench-models.tsv` is public list prices;
+  your actual plan, cache behavior, and the vendors' next price change all move the cost axis.
+
 ## Directory layout
 
 | Path | What |
@@ -282,6 +366,15 @@ want to keep a dated snapshot; otherwise regenerate on demand.
 | `eval/report.sh` | aggregates verdicts into `eval/results/report.md` |
 | `eval/test-eval-pipeline.sh` | stub-mode end-to-end test of the whole pipeline; wired into `test/validate.sh` |
 | `eval/results/` | generated, gitignored |
+| `eval/bench-lib.sh` | shared helpers for the MODEL bench (reuses `eval/lib.sh`): difficulty grading, the one model-invocation seam, price/fixture locators |
+| `eval/bench-derive.sh` | derives tasks from REAL closed cards into a **gitignored** local dir (the deriver ships, the derived data does not) |
+| `eval/bench-run.sh` | the bench: dry-run (default) emits the Pareto table from fixtures with no spend; `--real --confirm-spend` runs for real |
+| `eval/bench-models.tsv` | committed price ASSUMPTIONS (public list prices) for the cost axis |
+| `eval/bench-fixtures/dry-run.tsv` | committed SYNTHETIC per-(task,model) records — the dry-run's data, no real card content |
+| `eval/test-model-bench.sh` | end-to-end dry-run test asserting **no model is called**; wired into `test/validate.sh` |
+| `eval/bench-tasks-local/`, `eval/bench-results/` | generated, gitignored (derived card content + run records) |
+
+
 
 ## Caveats (see also `eval/report.sh`'s closing section, generated fresh each run)
 

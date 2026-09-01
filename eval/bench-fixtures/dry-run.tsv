@@ -1,0 +1,27 @@
+# dry-run.tsv — SYNTHETIC per-(task,model) result records for the model bench dry-run.
+#
+# THIS FILE IS SYNTHETIC AND CARRIES NO REAL CARD CONTENT. Task ids here (t-easy-01, ...) are
+# invented, not derived from the private kanban board, so this file is safe to commit and lets
+# `bench-run.sh --dry-run` (the DEFAULT) produce a complete Pareto table with ZERO model calls
+# and ZERO spend. A real run replaces these fixture rows with measured records from real tasks.
+#
+# It is shaped to exercise the Pareto logic honestly: sonnet matches opus on outcome for LESS
+# money and time (so opus comes out DOMINATED — the actual shape of Uber's own finding, that the
+# strongest model often is not worth it on your real workload), while haiku is cheapest but fails
+# more (so it stays on the frontier as the low-cost/low-quality corner, not dominated).
+#
+# Columns (TAB-separated): task_id  difficulty  model_id  outcome  duration_s  input_tokens  output_tokens
+#   outcome in { pass | fail | timeout | error }
+# Lines starting with '#' and blank lines are ignored.
+t-easy-01	easy	claude-opus	pass	40	8000	1500
+t-medium-01	medium	claude-opus	pass	90	20000	4000
+t-medium-02	medium	claude-opus	pass	85	18000	3500
+t-hard-01	hard	claude-opus	pass	180	40000	9000
+t-easy-01	easy	claude-sonnet	pass	30	8000	1600
+t-medium-01	medium	claude-sonnet	pass	70	20000	4200
+t-medium-02	medium	claude-sonnet	pass	65	18000	3800
+t-hard-01	hard	claude-sonnet	pass	150	40000	9500
+t-easy-01	easy	claude-haiku	pass	15	8000	1700
+t-medium-01	medium	claude-haiku	pass	40	20000	4500
+t-medium-02	medium	claude-haiku	fail	38	18000	4000
+t-hard-01	hard	claude-haiku	timeout	600	40000	2000

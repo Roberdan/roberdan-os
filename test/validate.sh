@@ -277,13 +277,13 @@ if _suite test-bus-mcp; then ok "the MCP surface dispatches send/read/log only, 
 # afterwards; property 2 ("never writes kanban state") is still checked, in
 # process, by test-bus.sh above.
 
-# --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
-# eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The
-# actual with/without-canon comparison needs a real `claude` binary and Roberto's own machine —
-# what CI can verify is that the harness itself (run-eval.sh -> judge.sh -> report.sh) is
-# mechanically correct, resumable, and blind — see eval/test-eval-pipeline.sh.
+# --- 9) eval/ (stub-mode). eval/ tests whether the canon changes output; bench-* tests which
+# MODEL is Pareto-optimal on real work (Uber #2). CI only proves the harnesses are mechanically
+# correct/blind, and that a bench DRY-RUN builds the full Pareto table with NO model call/spend.
 section "eval/ harness — stub-mode pipeline (run-eval -> judge -> report)"
 if bash eval/test-eval-pipeline.sh >/dev/null 2>&1; then ok "eval harness verified (see bash eval/test-eval-pipeline.sh)"; else err "test-eval-pipeline — see bash eval/test-eval-pipeline.sh"; fi
+section "eval/ model-choice bench — dry-run Pareto table (no model call, no spend)"
+if bash eval/test-model-bench.sh >/dev/null 2>&1; then ok "model bench verified (see bash eval/test-model-bench.sh)"; else err "test-model-bench — see bash eval/test-model-bench.sh"; fi
 
 # --- 10) tool coverage (installed tools only) --------------------------------
 # Wiring can silently rot: Roberto reinstalls Copilot, deletes a pointer, upgrades

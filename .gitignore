@@ -13,6 +13,14 @@ kanban/done/
 # for a new repo cannot arrive untracked-but-committable the way .coda-roberdan-os.md did.
 kanban/.coda-*
 
+# Model-choice bench (eval/bench-*): the DERIVED tasks carry real card content (title + DoD +
+# acceptance of closed cards) and the RESULTS carry per-run records — both are Roberto's private
+# operational state, same split as kanban/ (the deriver/runner are versioned, their DATA is not).
+# bench-derive.sh REFUSES to write anywhere that is not gitignored, so these two entries are load-
+# bearing, not decorative. The committed fixtures (eval/bench-fixtures/) are synthetic and stay in.
+eval/bench-tasks-local/
+eval/bench-results/
+
 # The nested private card repo. `kanban/` holds 69 cards with real names and
 # clients; the card DIRECTORIES above are excluded because this remote is
 # PUBLIC. The nested repo that versions them lives in loco (kb.sh:43-61
