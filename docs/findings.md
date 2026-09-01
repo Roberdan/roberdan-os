@@ -263,3 +263,32 @@ _Aggiornato: 2026-08-03._
   `agents/`).
 
 - **2026-09-01 — `test/validate.sh` e' tornato al tetto delle 300 righe e va spezzato, non baselinato in eterno.** Trovato agganciando `test/test-session-waste.sh` (card `260901-185951-2`): validate.sh era a **300 esatte** e le 4 righe della nuova sezione l'hanno portato a 304, quindi e' entrato nella baseline delle 300 righe (`test/file-size-baseline.txt`, quindicesima voce). E' lo stesso destino gia' capitato a `test-copilot-adapter.sh` (dodicesima). La baseline e' il meccanismo giusto per una crescita puntuale e visibile, ma validate.sh e' un **indice**: ogni nuova suite aggiunge ~4 righe, e un indice congelato a 304 costringera' ogni prossima aggiunta a crescere la baseline o a spezzare sotto pressione. Il canone lo dice gia' a chiare lettere nel file stesso (*"validate.sh lo spezza, non lo allarga"*), e nel 2026-08-01 era stato spezzato da 623 a 256 proprio per questo. **La condizione che lo renderebbe una card:** la prossima suite che deve entrare (la sedicesima voce di baseline che tocca validate.sh, oppure il primo `err` "validate.sh e' cresciuto da 304"). Il taglio naturale: estrarre l'indice delle sezioni "8*" (receipts/pending/session-waste/meta-loop) in un `test/validate-tools.sh` sourceato, come gia' fatto con `test/validate-privacy.sh`. Non fatto qui perche' e' un refactor del gate condiviso, fuori dallo scope della card.
+
+- **2026-09-01 — un sub-agente `general-purpose` lanciato SENZA `model` esplicito torna a mani
+  vuote, in silenzio.** Trovato delegando le tre card sulle leve Uber (`260901-185951`,
+  `-1`, `-2`): tre agenti `general-purpose` avviati col modello di default hanno chiuso il
+  turno dopo 24 secondi con **risposta vuota** — nessun testo, nessun errore, exit pulito — e
+  `git status` sui tre worktree confermava zero file toccati e zero commit. Sollecitati una
+  seconda volta ("hai restituito una risposta vuota, comincia davvero"), stesso esito: turno 2
+  vuoto, disco intatto. Un agente `explore` di controllo, nella stessa sessione e sugli stessi
+  path, ha risposto correttamente (`590affe Merge pull request #54…`), quindi il meccanismo di
+  delega funzionava. Rilanciati gli stessi tre prompt, sugli stessi tre worktree, con
+  `model: claude-opus-4.8` esplicito: tutti e tre hanno cominciato a scrivere codice reale
+  entro pochi minuti.
+  **Perche' e' peggio di un errore:** un fallimento silenzioso e' indistinguibile da "l'agente
+  ha valutato e non c'era niente da fare". Chi delega e poi si fida della risposta chiude il
+  turno convinto di avere un risultato. Qui l'ho scoperto solo perche' la regola di casa e'
+  guardare l'artefatto (`git status`, `git log`) e non il racconto dell'agente — evidence-first
+  ha pagato in modo misurabile: due giri a vuoto scoperti in 30 secondi invece che a valle.
+  **Limite onesto:** un solo campione di configurazione, una sola sessione, un solo host
+  (Copilot CLI 1.0.83-0). Ho osservato una **correlazione** fra "nessun `model` esplicito" e
+  "turno vuoto", non ne ho dimostrato la causa: non so se il default fosse un modello guasto,
+  esaurito, o non instradabile per quel tipo di agente. Non ho provato altri tipi di agente col
+  default, ne' `general-purpose` con un modello economico esplicito.
+  **La condizione che lo renderebbe una card:** che si ripresenti in una seconda sessione, o su
+  un tipo di agente diverso. Allora la regola da scrivere e' doppia, e la seconda meta' conta
+  piu' della prima: (1) chi delega passa sempre un id di modello esplicito
+  (`skills/model-selection-policy` e' il posto giusto, e si sposa con la regola che l'id deve
+  essere l'ultima generazione del suo livello); (2) **una risposta vuota da un sub-agente non e'
+  un risultato** — chi delega verifica l'artefatto prima di trattarla come tale. La (2) tiene
+  anche il giorno che questo particolare guasto sparisce da solo con un aggiornamento dell'host.

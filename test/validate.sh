@@ -21,12 +21,9 @@ ok()      { printf "  ok: %s\n" "$1"; }
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue \
           test-file-size-ratchet test-edge-only test-kb-precheck \
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
-          test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt \
-          test-receipts test-install-hooks test-pending test-metaloop test-session-waste \
-          test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp \
-          test-bus-doorbell test-bash-guard test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
-          test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree \
-          test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup \
+          test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
+          test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bash-guard test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
+          test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-model-economy \
           test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage; do
   _spawn "$_s"
@@ -201,6 +198,9 @@ if _suite test-install-git-hooks; then ok "dal worktree incide il principale, il
 section "install-hooks — due scritture dello stesso comando sono lo stesso comando"
 if _suite test-install-hooks-dedup; then ok "riconosce \$HOME, la tilde e il bash iniziale come la stessa cosa, e NON appiattisce redirezioni, argomenti o script diversi"; else _suite_out test-install-hooks-dedup; err "test-install-hooks-dedup — see bash test/test-install-hooks-dedup.sh"; fi
 
+# --- 8b9) model economy (Uber cost lever): cheap/mid model unless a written reason justifies frontier; effort defaults to medium -> test/test-model-economy.sh
+if _suite test-model-economy; then ok "model economy — executors stay mid-tier; every frontier model and above-medium effort carries a written reason"; else _suite_out test-model-economy; err "test-model-economy — see bash test/test-model-economy.sh"; fi
+
 # --- 8c) loop receipts emitter (schema, append-only, opt-in placement, no pollution) ---
 section "loop receipts — loop/receipt.sh emitter contract"
 if _suite test-receipts; then ok "receipt emitter green (see bash test/test-receipts.sh)"; else err "test-receipts — see bash test/test-receipts.sh"; fi
@@ -281,13 +281,13 @@ if _suite test-bus-mcp; then ok "the MCP surface dispatches send/read/log only, 
 # afterwards; property 2 ("never writes kanban state") is still checked, in
 # process, by test-bus.sh above.
 
-# --- 9) eval/ harness (stub-mode pipeline test) -------------------------------
-# eval/ measures whether the behavioral canon changes agent output (see eval/README.md). The
-# actual with/without-canon comparison needs a real `claude` binary and Roberto's own machine —
-# what CI can verify is that the harness itself (run-eval.sh -> judge.sh -> report.sh) is
-# mechanically correct, resumable, and blind — see eval/test-eval-pipeline.sh.
+# --- 9) eval/ (stub-mode). eval/ tests whether the canon changes output; bench-* tests which
+# MODEL is Pareto-optimal on real work (Uber #2). CI only proves the harnesses are mechanically
+# correct/blind, and that a bench DRY-RUN builds the full Pareto table with NO model call/spend.
 section "eval/ harness — stub-mode pipeline (run-eval -> judge -> report)"
 if bash eval/test-eval-pipeline.sh >/dev/null 2>&1; then ok "eval harness verified (see bash eval/test-eval-pipeline.sh)"; else err "test-eval-pipeline — see bash eval/test-eval-pipeline.sh"; fi
+section "eval/ model-choice bench — dry-run Pareto table (no model call, no spend)"
+if bash eval/test-model-bench.sh >/dev/null 2>&1; then ok "model bench verified (see bash eval/test-model-bench.sh)"; else err "test-model-bench — see bash eval/test-model-bench.sh"; fi
 
 # --- 10) tool coverage (installed tools only) --------------------------------
 # Wiring can silently rot: Roberto reinstalls Copilot, deletes a pointer, upgrades
