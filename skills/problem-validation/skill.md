@@ -52,7 +52,7 @@ This skill sits **upstream** (is the problem worth it?); gstack helps downstream
 
 ## Output
 
-`~/.claude/reports/problem-validation-<topic>-<date>.md`:
+`~/.roberdan-os/reports/problem-validation-<topic>-<date>.md` (host-neutral home — not one CLI's own directory):
 - **Clear recommendation:** build / don't build / refine first — with the why.
 - Evidence from the focus-group, prioritization table, premortem synthesis.
 - **The irreducible truth:** what's the real thing to decide (first-principles style / `@socrates`).
@@ -62,4 +62,6 @@ This skill sits **upstream** (is the problem worth it?); gstack helps downstream
 - **Bias-to-kill:** this skill's default is **skeptical** — it's more valuable to say "not worth it"
   than to confirm. Compose it with `@socrates` (irreducible truth) and `@board` (red-team).
 - It's simulation + framework: **guides the decision, doesn't make it** (human gate).
+- Every stage it orchestrates delegates: model, effort and context per [[model-selection-policy]]
+  (mid class by default; the orchestrating session, not the executors, is what may be frontier).
 - Voice/decision "as Roberto" → composes with the twin ([[twin]]).

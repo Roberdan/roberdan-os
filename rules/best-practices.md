@@ -120,13 +120,15 @@ Code best practices, current 2026.)
 - **Cache discipline.** Static content first and byte-stable (no timestamps/volatile state in
   always-loaded files); pick model + effort once, early — mid-session switches invalidate the
   prompt cache and recompute everything.
-- **Subagents default to the cheap/mid model; frontier needs a written reason.** The single most
+- **Subagents default to the cheap/mid class; frontier needs a written reason.** The single most
   impactful cost lever (Uber Engineering, 2026 — 52% cost cut per session at 7× usage): the
   orchestrator decomposes and evaluates on the strong model, **executors** (well-scoped work with
-  specified inputs) run on `sonnet`/`haiku`. **Deciders/reasoners** (architecture, security
-  judgment, adversarial red-team, first-principles, thinking) may use the frontier tier only with
-  a written `model_rationale:` on the agent. Reasoning **effort defaults to `medium`**; above
-  medium needs a written `effort_rationale:`. Enforced by `test/test-model-economy.sh`; full
+  specified inputs) run mid/cheap. **Deciders/reasoners** (architecture, security judgment,
+  adversarial red-team, first-principles, thinking) may use the frontier class only with a
+  written `model_rationale:` on the agent. Reasoning **effort defaults to `medium`**; above
+  medium needs a written `effort_rationale:`. Classes and ids come from
+  `skills/model-selection-policy/models.tsv` via `bin/models.sh`, never from a name prefix or
+  from memory. Enforced by `test/test-model-economy.sh` + `test/test-model-registry.sh`; full
   policy in `skills/model-selection-policy/skill.md`.
 - **A loop phase is the session container, not the whole task** — canonical contract lives in `loop/loop-protocol.md` § Session-as-phase-container; don't restate it here.
 - **Durable state on disk beats in-conversation state — for cost too.** A kanban card / checkpoint
@@ -197,21 +199,28 @@ goes **outside the working tree** — `~/.<repo>-env-backups/`, `chmod 600` — 
 - Widening `.gitignore` is not the fix. An ignore rule protects this repo, on this machine, for
   the patterns someone thought of; keeping the file outside the tree protects it everywhere.
 
-## Subagent models — always the newest generation of the tier, never a hand-picked old id
+## Subagent models — resolved from the registry, never typed from memory
 
-When you spawn a subagent you **must** pass `model` explicitly, and it must be the **newest
-generation of the tier you chose**. Never leave it to the default (which may be a previous
+When you spawn a subagent you **must** pass `model` explicitly, and it must be the **current
+row of the class you chose**. Never leave it to the default (which may be a previous
 generation) and never type a version number from memory.
 
-**The single source of truth is `copilot_model()` in `bin/sync.sh`** — canon tiers → concrete
-ids (`opus` → `claude-opus-5`, `sonnet` → `claude-sonnet-5`, `haiku` → `claude-haiku-4.5`).
-If you are about to write a concrete id in a tool call, it must match that table, or a newer
-generation you can see in the tool's own model list. When the tool's list shows a higher
-generation than the table, **the list wins and the table gets updated** in the same session.
+**The single source of truth is the reviewed registry
+`skills/model-selection-policy/models.tsv`**, read through `bin/models.sh`:
+`bin/models.sh resolve opus` → `claude-opus-5` (Copilot), `--host claude` → the tier alias
+`opus`. A token the registry has not reviewed **does not resolve** — it is refused, not passed
+through, and it classes as `unknown`, which costs a written rationale exactly like `frontier`.
+The registry is a **snapshot of what a real CLI accepted**, never a claim that a model is
+enabled for your account, and never a price or a quality ranking.
 
-Which tier: read the `model-selection-policy` skill. The rule here is only *how new*, not
-*how big*. If unsure between two generations, **go up** — a previous generation at the same
-tier usually costs the same and reasons worse.
+A family may hold exactly one `current` row, so promoting a newer generation forces demoting
+the old one in the same diff. If a host's own list shows a generation the registry does not
+have, **add a reviewed row** (id, class, the efforts/contexts you verified, where you read
+them) — do not type the id into a tool call and move on.
+
+Which class: read the `model-selection-policy` skill. The rule here is only *how new*, not
+*how big*. If unsure between two generations, **go up** — a previous generation in the same
+class usually costs the same and reasons worse.
 
 *(scar 2026-08-28 — a whole verification pass redone because an id was typed from memory:
 `rules/scars.md` § Stale-model-id)*

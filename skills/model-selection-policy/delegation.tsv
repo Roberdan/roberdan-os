@@ -1,0 +1,8 @@
+# Native Copilot built-ins. Model aliases resolve through models.tsv, not CLI defaults.
+# name	model	effort	context	rationale
+explore	sonnet	medium	default	Code exploration needs synthesis, not just file retrieval.
+task	sonnet	medium	default	Bounded command execution and concise reporting.
+general-purpose	gpt-6-astra	medium	default	Frontier justified for autonomous cross-component integration; use task for bounded execution.
+code-review	opus	medium	default	Frontier justified for independent correctness judgments on changes.
+research	opus	medium	default	Frontier justified for verified synthesis used in human decisions.
+security-review	opus	high	default	Frontier and above-medium effort justified by exploitable-vulnerability assessment.

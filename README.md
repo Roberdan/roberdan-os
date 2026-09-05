@@ -44,6 +44,13 @@ installing. In Copilot, use `/agent` to select a specialist, `/skills` to inspec
 skills, `/model` to see models available to your account, and `/subagents` to inspect delegation
 settings. Restart Copilot after installing the extension.
 
+Model preferences come from one [reviewed registry](skills/model-selection-policy/models.tsv),
+including GPT-6 Astra and current Claude, GPT, Gemini, Grok, and MAI candidates.
+`bin/models.sh agents` shows specialist selections; `bin/copilot-agent.sh baccio` starts the
+architect with its declared options. Applying delegation preferences to existing personal
+settings is a separate opt-in step: see [model setup](docs/USAGE.md#use-the-shared-model-registry).
+No model is declared the cheapest or best without measurements.
+
 Prefer to explore first? Read [`AGENTS.md`](AGENTS.md) and run
 `bash bin/doctor.sh` for a read-only setup report. Installation is not required to contribute.
 For the task CLI, optional Claude hooks, and other clients, see

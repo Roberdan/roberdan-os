@@ -52,17 +52,32 @@ The two complementary hemispheres of the behavioral canon:
 Minimal curated set. Provider-neutral prose + optional `claude` frontmatter. The
 ethical block is **referenced** from `rules/constitution.md`, not copy-pasted.
 
-**Model economy (the Uber cost lever).** A subagent runs on the **cheap/mid model unless a
+**Model economy (the Uber cost lever).** A subagent runs on a **cheap/mid-class model unless a
 written reason justifies frontier** — the orchestrator decomposes and evaluates on the strong
-model, **executors** (well-scoped work with specified inputs) run on `sonnet`. **Deciders/
-reasoners** may use the frontier tier (`opus`) only with a written `model_rationale:` on their
-file. Reasoning **effort defaults to `medium`**; above medium needs a written `effort_rationale:`.
-Enforced by `test/test-model-economy.sh`; full policy in
+model, **executors** (well-scoped work with specified inputs) run mid-class. **Deciders/
+reasoners** may use the frontier class only with a written `model_rationale:` on their file
+(`copilot_model_rationale:` for a Copilot-only pin). Reasoning **effort defaults to `medium`**;
+above medium needs a written `effort_rationale:`. Ids are never typed from memory: they resolve
+from the reviewed registry `skills/model-selection-policy/models.tsv` via `bin/models.sh`, and
+an id it has not reviewed classes as `unknown` — treated exactly like frontier. Enforced by
+`test/test-model-economy.sh` + `test/test-model-registry.sh`; full policy in
 [`skills/model-selection-policy/skill.md`](skills/model-selection-policy/skill.md).
+
+**Every delegation depth, including built-ins.** Choose the best suitable **current** model
+for the actual task, not an inherited host default or simply the cheapest model. Pass `model`
+explicitly on every spawn; pass supported `reasoning_effort` and `context_tier` on Copilot's
+`task` tool. Put this obligation in delegated prompts so grandchildren follow it too.
+`bin/models.sh subagents-json` covers the custom roster **and built-ins** through
+`skills/model-selection-policy/delegation.tsv`, with native `modelPolicy: required`.
+Apply with `bin/models.sh apply-subagents --yes`; ordinary sync does not change personal
+settings. Restart existing sessions and inspect `/subagents`: old agents do not change
+retroactively. A newer runtime listing triggers a registry review, never an invented id
+or an unannounced downgrade. A required profile must be changed deliberately before selecting
+a different model. Capability listings are not proof of comparative quality or price.
 
 | Agent | Role | Class | Model |
 |---|---|---|---|
-| [`baccio`](agents/baccio.md) | Architect + coding | decider | opus |
+| [`baccio`](agents/baccio.md) | Architect + coding | decider | Copilot: gpt-6-astra; Claude: opus |
 | [`rex`](agents/rex.md) | Code + ecosystem review | executor | sonnet |
 | [`luca`](agents/luca.md) | Security (advisory) | decider | opus |
 | [`thor`](agents/thor.md) | QA / verify-done guardian — sole gate for `done` | executor | sonnet |
@@ -226,7 +241,10 @@ Scheduling = **launchd** (fires even with Claude closed). Never auto-commit on `
 Logic in plain markdown, tool-agnostic (wrappers are generated):
 [`verify-done`](skills/verify-done/skill.md) · [`ship`](skills/ship/skill.md) ·
 [`review`](skills/review/skill.md) · [`sync`](skills/sync/skill.md) ·
-[`auto-checkpoint`](skills/auto-checkpoint/skill.md).
+[`auto-checkpoint`](skills/auto-checkpoint/skill.md) ·
+[`engineering-reference`](skills/engineering-reference/skill.md) ·
+[`model-selection-policy`](skills/model-selection-policy/skill.md) ·
+[`long-running-jobs`](skills/long-running-jobs/skill.md).
 
 **Discovery & validation** (understanding *which problems are worth it*, not just solving them — auto-trigger):
 [`premortem`](skills/premortem/skill.md) — "it already failed 6 months from now, why?" (parallel failure-agents) ·
@@ -363,22 +381,33 @@ Full mechanics, honest limits and what each gate deliberately does NOT do:
 
 ## Skill routing
 
-When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
+**Route to a name the host actually declares.** Ask the host for its skill list and match the
+**declared skill name**; never infer availability from a directory prefix, a `gstack:` namespace
+or the fact that a name appears below. Most of these routes come from **gstack, which is
+optional** — on a machine without it they do not exist, and an agent that "invokes" one of them
+burns a turn on a failure. If the name is not declared: **fall back to the canonical equivalent
+and say which one you used.** Never tell Roberto to install something to answer his question.
 
-Key routing rules:
-- Product ideas/brainstorming → invoke /office-hours
-- Strategy/scope → invoke /plan-ceo-review
-- Architecture → invoke /plan-eng-review
-- Design system/plan review → invoke /design-consultation or /plan-design-review
-- Full review pipeline → invoke /autoplan
-- Bugs/errors → invoke /investigate
-- QA/testing site behavior → invoke /qa or /qa-only
-- Code review/diff check → invoke /review
-- Visual polish → invoke /design-review
-- Ship/deploy/PR → invoke /ship or /land-and-deploy
-- Save progress → invoke /context-save
-- Resume context → invoke /context-restore
-- Author a backlog-ready spec/issue → invoke /spec
+| Request | Preferred (if the host declares it) | Fallback — always available here |
+|---|---|---|
+| Product ideas / brainstorming | `office-hours` | [`board`](agents/board.md) + [`focus-group`](skills/focus-group/skill.md) |
+| Strategy / scope | `plan-ceo-review` | [`board`](agents/board.md) (red-team) + [`problem-validation`](skills/problem-validation/skill.md) |
+| Architecture | `plan-eng-review` | [`baccio`](agents/baccio.md) |
+| Design system / plan review | `design-consultation`, `plan-design-review` | [`board`](agents/board.md) |
+| Full review pipeline | `autoplan` | [`review`](skills/review/skill.md) → [`rex`](agents/rex.md) → [`thor`](agents/thor.md) |
+| Bugs / errors | `investigate` | [`socrates`](agents/socrates.md) (root cause) + [`baccio`](agents/baccio.md) |
+| QA / testing behaviour | `qa`, `qa-only` | [`thor`](agents/thor.md) + [`verify-done`](skills/verify-done/skill.md) |
+| Code review / diff check | `review` | [`review`](skills/review/skill.md) + [`rex`](agents/rex.md) |
+| Visual polish | `design-review` | no canonical equivalent — say so, don't fake one |
+| Ship / deploy / PR | `ship`, `land-and-deploy` | [`ship`](skills/ship/skill.md) |
+| Author a backlog-ready spec/issue | `spec` | `kb add` with `dod:` + `acceptance:` |
+
+**Save/resume progress — the canonical path wins, and this is not a preference.** `kb pause` /
+`kb resume` write **durable state on file** that survives a crash, a reboot and a different tool;
+gstack's `context-save` / `context-restore` save **conversation context** for one host. They are
+not substitutes: use `kb` for the work state (always), and `context-save` only *in addition*, for
+the conversation. The [Pause & Resume](#pause--resume-never-lose-work-on-a-breakreboot) contract
+above is the one that binds.
 
 ## GBrain Search Guidance (configured by /sync-gbrain)
 <!-- gstack-gbrain-search-guidance:start -->

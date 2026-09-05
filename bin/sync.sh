@@ -48,9 +48,11 @@
 # Copilot NATIVE custom agents + extension (--install only, GATED on ~/.copilot):
 #   - agents: from each agents/*.md that lists provider `copilot`, generates a Copilot
 #     custom-agent wrapper (platforms/copilot/agents/<name>.md) — description (required),
-#     tools mapped to Copilot aliases, canonical model mapped to a concrete id (falls back
-#     to the session model if unavailable) — and symlinks it into ~/.copilot/agents,
-#     collision-safe (never overwrites a same-named file). Override RDA_COPILOT_AGENTS_DIR.
+#     tools mapped to Copilot aliases, model resolved through the reviewed registry
+#     skills/model-selection-policy/models.tsv (an agent may pin a Copilot-only
+#     `copilot_model:`) — symlinked into ~/.copilot/agents, collision-safe. RDA_COPILOT_AGENTS_DIR.
+#   - subagents.json: the `subagents.agents.<name>` fragment (model/effortLevel/contextTier),
+#     emitted only — applied by `bin/models.sh apply-subagents --yes`, never by --install.
 #   - extension: materializes hooks/copilot/extension.template.mjs (RDA_OS baked at emit
 #     time, env RDA_OS still overrides) and symlinks it to
 #     ~/.copilot/extensions/roberdan-os/extension.mjs — the native binding of the provider-
@@ -114,21 +116,11 @@ yaml_dq() { printf '"%s"' "$(printf '%s' "${1:-}" | sed -e 's/\\/\\\\/g' -e 's/"
 # Copilot custom agents live in ~/.copilot/agents/<name>.md with YAML frontmatter.
 # Authoritative schema (docs.github.com/en/copilot/reference/custom-agents-configuration):
 #   description is REQUIRED; tools is a list of aliases or "*"; model falls back to the
-#   parent session model when the id is unavailable (graceful — see CustomAgentConfig).
-# Canon coarse model tiers -> a concrete Copilot model id. An unavailable id degrades to
-# the session model (documented safety net), so a future rename never hard-breaks an agent.
-# Copilot's id scheme is NOT Anthropic's: dots on the 4.x line (claude-opus-4.8), none on the
-# 5 line. Verified 2026-07-31 by running `copilot -p ... --model <id>`, which rejects an
-# unknown id outright: opus-5 and sonnet-5 both accepted. Haiku's newest is still 4.5.
-copilot_model() {
-  case "$1" in
-    opus)   echo "claude-opus-5" ;;
-    sonnet) echo "claude-sonnet-5" ;;
-    haiku)  echo "claude-haiku-4.5" ;;
-    "")     echo "" ;;
-    *)      echo "$1" ;;   # already a concrete id (contains a version) -> pass through
-  esac
-}
+#   parent session model when the id is unavailable (documented safety net).
+# Model resolution and the reason no effort/context key is emitted here both live in
+# bin/lib-models.sh (§ "why sync.sh emits no effort/context") — one helper, one explanation.
+# shellcheck source=bin/lib-models.sh
+. "$ROOT/bin/lib-models.sh"
 
 # Map ONE canon tool token to a Copilot primary tool alias (case-insensitive compatible
 # aliases per the reference table). Unknown tokens pass through: Copilot ignores unrecognized
@@ -311,7 +303,7 @@ $(cat "$ROOT/behavior/delegate-by-default.md")
 - \`rules/constitution.md\` · \`rules/best-practices.md\`
 EOF
 
-  # Skills as thin .prompt.md files.
+  # Skills as thin .prompt.md files, canon path ABSOLUTE (a prompt runs from the session cwd).
   local s name desc
   for s in $(list "$ROOT/skills" "skill.md" 3); do
     name="$(fm "$s" name)"; desc="$(fm "$s" description)"
@@ -320,7 +312,7 @@ EOF
 
 $desc
 
-Canonical logic: \`skills/$name/skill.md\` in roberdan-os.
+Canonical logic: \`$ROOT/skills/$name/skill.md\`.
 EOF
   done
 
@@ -331,13 +323,15 @@ EOF
   # like settings-hooks.json) so the agent can read it from any cwd. Only agents
   # whose `providers:` includes `copilot` are emitted.
   mkdir -p "$d/agents"
-  local a aname adesc aprov amodel_raw atools_raw amodel atools
+  local a aname adesc aprov atools_raw amodel atools
   for a in $(list "$ROOT/agents" "*.md"); do
     aprov="$(fm "$a" providers)"
     case "$aprov" in *copilot*) : ;; *) continue ;; esac
     aname="$(fm "$a" name)"; adesc="$(fm "$a" description)"
-    amodel_raw="$(fm "$a" model)"; atools_raw="$(fm "$a" tools)"
-    amodel="$(copilot_model "$amodel_raw")"
+    atools_raw="$(fm "$a" tools)"
+    # Registry-resolved (honours a Copilot-only `copilot_model:`); a refused id yields an EMPTY
+    # pin — the agent inherits the session model — rather than a guess.
+    amodel="$(models_agent_model "$a" copilot 2>/dev/null || echo "")"
     atools="$(copilot_tools_array "$atools_raw")"
     {
       echo '---'
@@ -362,6 +356,10 @@ EOF
       echo "\`$ROOT/AGENTS.md\` (canon + human gates). This is a generated wrapper — do not hand-edit."
     } > "$d/agents/$aname.md"
   done
+
+  # The `subagents.agents.<name>` fragment: emitted for review, NEVER applied by --install
+  # (that file is Copilot's). Apply with `bin/models.sh apply-subagents --yes`.
+  bash "$ROOT/bin/models.sh" subagents-json > "$d/subagents.json"
 
   # --- User-scoped native extension (hooks -> Copilot lifecycle + native tools) --
   # Materialized from the canonical template hooks/copilot/extension.template.mjs with the

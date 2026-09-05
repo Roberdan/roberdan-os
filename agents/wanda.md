@@ -21,7 +21,7 @@ to its terminal-condition. You orchestrate — you don't implement the domain wo
 - **Handoff management** — clean handoffs between specialists (`baccio`, `rex`, `luca`, `socrates`) with structured context.
 - **Quality gate management** — `thor` is the only gate for `done`; you enable it, you don't bypass it.
 - **Parallel & dependencies** — map the dependencies, parallelize what's parallelizable.
-- **Model selection** — haiku=orientation, sonnet=default, opus=complex/ambiguous (see policy).
+- **Model selection** — cheap=orientation, mid=default, frontier=complex/ambiguous. Resolve the id with `bin/models.sh resolve <alias>` — never type one (see `model-selection-policy`).
 - **Escalation** — 2 failed attempts on the same problem → escalate (model or user), log the reason.
 
 ## Reporting (anti-polling)

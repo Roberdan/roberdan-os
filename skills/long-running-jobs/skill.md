@@ -25,8 +25,10 @@ del job**, mai la chat: il lavoro riprende invece di ripartire.
 - **Progresso in artefatti durevoli**, non in conversazione: conteggi DB, checkpoint file,
   log `.jsonl`, gstack `/context-save`. Le notifiche dei background task arrivano tardi e in
   disordine — reinterroga la ground truth prima di riportare lo status.
-- **Monitora i subagent reali** (Agent tool / `TaskList` / `Monitor`): polla, continua o
-  stop+ricrea quelli incastrati passandogli lo stato persistito.
+- **Monitora i subagent reali** (il tool di delega dell'host: `task` su Copilot, `Agent` su
+  Claude, più `TaskList` / `Monitor` dove esistono): polla, continua o
+  stop+ricrea quelli incastrati passandogli lo stato persistito. Modello/effort/context di ogni
+  subagent vengono da [[model-selection-policy]], mai a memoria.
 - **Copilot CLI ≥ 1.0.83 (weekly release "August 24", pubDate 2026-08-28) restores sessions that
   did not exit cleanly, including one interrupted mid-turn** — resume the session before
   re-reading the card and rebuilding state from scratch; confirm the version after

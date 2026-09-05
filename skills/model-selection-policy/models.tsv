@@ -1,0 +1,48 @@
+# models.tsv — the reviewed model registry. ONE committed snapshot, read by bin/lib-models.sh.
+#
+# WHAT THIS IS: a snapshot of listed ids and exposed reasoning/context metadata,
+# plus a conservative budget/risk policy class. No paid model call proves these rows.
+# WHAT THIS IS NOT: a live capability probe, a price list, or a quality ranking.
+#   - Runtime availability is per-account and per-flight. An id listed here can still be
+#     refused by the host ("not enabled for you"). Never claim "available" from this file.
+#   - The host's own model *catalog* is bigger than this file on purpose: ids we have not
+#     reviewed stay OUT, so an unknown id is handled conservatively instead of guessed at.
+#   - The `class` column is a BUDGET/RISK policy band, deliberately independent of
+#     brand. It is not "best" and not "cheapest" — this repo holds no price data at all.
+#   - The task/agent tool of a host may expose a DIFFERENT catalog than its `--model` flag
+#     (observed on Copilot CLI 1.0.84-1). A task-only id is never handed to a CLI launcher.
+#
+# HOW TO REFRESH (copilot): `copilot help config` prints the authoritative `model:` id list for
+# the installed CLI. `bin/models.sh snapshot` prints this provenance and the refresh command.
+# Adding a row is a human decision: a new id does not get promoted just because it appeared.
+#
+# COLUMNS (tab-separated, no quoting):
+#   id        concrete model id, exactly as the host CLI accepts it
+#   family    the line this id belongs to; EXACTLY ONE row per family may be `current`
+#   alias     canon tier alias (opus/sonnet/haiku) or `-`
+#   class     frontier | mid | cheap   (budget/risk band; frontier needs a written rationale)
+#   efforts   comma list of reasoning-effort levels, or `none` when the model has no reasoning knob
+#   contexts  comma list of context tiers (default | long_context)
+#   hosts     listing surfaces: copilot (CLI help) | copilot-task (delegation tool metadata)
+#   status    current | legacy
+#   source    provenance of the row
+#
+# Reviewed 2026-09-05: CLI ids from `copilot help config` 1.0.84-1;
+# effort/context capabilities from this session's task tool schema, not from help's id list.
+#
+#id	family	alias	class	efforts	contexts	hosts	status	source
+claude-opus-5	claude-opus	opus	frontier	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+claude-sonnet-5	claude-sonnet	sonnet	mid	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+claude-haiku-4.5	claude-haiku	haiku	cheap	none	default	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+gpt-6-astra	gpt-astra	-	frontier	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+gpt-5.6-sol	gpt-sol	-	frontier	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+gpt-5.6-terra	gpt-terra	-	frontier	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+gpt-5.6-luna	gpt-luna	-	frontier	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+gpt-5.5	gpt-general	-	frontier	low,medium,high,xhigh	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+gpt-5.4	gpt-general	-	mid	low,medium,high,xhigh	default,long_context	copilot,copilot-task	legacy	cli-help+task-schema/2026-09-05
+gpt-5.3-codex	gpt-codex	-	mid	low,medium,high,xhigh	default	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+gpt-5.4-mini	gpt-mini	-	cheap	low,medium,high,xhigh	default	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+gpt-5-mini	gpt-mini	-	cheap	low,medium,high	default	copilot,copilot-task	legacy	cli-help+task-schema/2026-09-05
+gemini-3.8-flash	gemini-flash	-	mid	low,medium,high	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+mai-code-1.1-flash	mai-code-flash	-	cheap	low,medium,high	default	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+grok-4.6	grok	-	frontier	low,medium,high,xhigh	default,long_context	copilot-task	current	task-schema/2026-09-05

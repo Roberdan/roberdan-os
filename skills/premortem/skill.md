@@ -35,8 +35,11 @@ the single most important missing piece, **one question at a time**:
    back and understand what went wrong."* — this is the psychological mechanism, don't skip it.
 2. **Raw premortem:** generate **every** genuine reason it died — specific, anchored to real
    details, a true threat (not an edge case). However many are real: 4 or 9, no padding.
-3. **Parallel deep-dives:** **one agent per reason, all in parallel** (Agent tool, a single
-   message with multiple tool-use blocks). Each agent gets the full context + its reason and produces:
+3. **Parallel deep-dives:** **one subagent per reason, all in parallel** — whatever the host calls
+   its delegation tool (Copilot `task`, Claude `Agent`), issued as a *single* message with multiple
+   tool-use blocks. Model/effort/context come from [[model-selection-policy]], never typed from
+   memory: these are mid-class executors on `medium` effort, `default` context; frontier needs a
+   written reason. Each agent gets the full context + its reason and produces:
    (a) **failure story** (2-3 paragraphs, like a real case study), (b) **underlying assumption**
    (1 sentence), (c) **early-warning signal** (1-2 observable/measurable signs). <300 words, no hedging.
 4. **Synthesis (this is the product):**
@@ -48,13 +51,13 @@ the single most important missing piece, **one question at a time**:
 
 ## Output
 
-- `~/.claude/reports/premortem-<slug>-<date>.md` — full transcript (context, raw reasons, deep-dives, synthesis).
+- `~/.roberdan-os/reports/premortem-<slug>-<date>.md` — full transcript (context, raw reasons, deep-dives, synthesis). Host-neutral home — a single CLI's own directory is not where a cross-host skill writes.
 - Optional visual HTML report (dark, scan-friendly, one card per failure) if the user wants to see one.
 - In chat: 3 sentences max — most likely failure, hidden assumption, most important revision.
 
 ## Notes
 
-- **Always parallel agents** (sequential wastes time and contaminates results). **Always the
+- **Always parallel subagents** (sequential wastes time and contaminates results). **Always the
   "it's already failed" frame**. **Thorough but not padded.** **Don't sugarcoat** — say the
   uncomfortable things before reality does. **Concrete revisions**, doable this week.
 - **Composes with `@board`** (multi-perspective red-team *now*) and with [[problem-validation]]

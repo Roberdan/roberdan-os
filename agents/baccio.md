@@ -3,6 +3,10 @@ name: baccio
 description: Technical architect — ADR evaluation, architecture patterns, scalability and technology validation. The agent Roberto reaches for on design-before-code decisions.
 model: "opus"
 effort: "high"
+copilot_model: "gpt-6-astra"
+copilot_effort: "high"
+copilot_context: "default"
+copilot_model_rationale: "Roberto-authorized experiment (2026-09-05): run the architect on GPT-6 Astra under Copilot CLI and compare it against opus on real ADR work. This is a TRIAL, not a benchmark result — no measurement here says Astra is better. The Claude Code side of this agent stays on the canon opus tier, so the comparison has a control."
 role_class: "decider"
 model_rationale: "decider — turns ambiguous requirements into defensible architecture and ADRs; decomposition-class reasoning, opus tier per model-selection-policy."
 effort_rationale: "architecture correctness a human relies on justifies above-medium effort."

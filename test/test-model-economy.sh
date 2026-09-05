@@ -22,6 +22,8 @@
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
+# shellcheck source=bin/lib-models.sh
+. "$ROOT/bin/lib-models.sh"
 
 FAIL=0
 ok()  { printf '  ok: %s\n' "$1"; }
@@ -30,14 +32,22 @@ err() { printf '  FAIL: %s\n' "$1"; FAIL=1; }
 # One frontmatter scalar, unquoted, from the top block of an agent file.
 fm() { grep -m1 -E "^$2:" "$1" 2>/dev/null | sed -E "s/^$2:[[:space:]]*//; s/^[\"']//; s/[\"']$//"; }
 
-# A model token is MID/CHEAP (no reason needed) iff it is the haiku or sonnet tier — by tier name
-# or by concrete Copilot id. Anything else (opus, a future top tier, an unknown id) is FRONTIER
-# and must justify itself. Erring toward "frontier" is the safe direction: it demands a reason.
+# Is this model token in a budget class that needs a written reason?
+#
+# It used to be a name-prefix guess (`claude-sonnet-*` is cheap, everything else is frontier).
+# That was wrong in both directions the moment the canon stopped being Claude-only: a
+# GPT/Gemini/mai-code id read as "frontier" no matter how cheap it is, and a hypothetical
+# `claude-sonnet-<anything>` read as mid without anyone reviewing it. The class now comes from
+# the reviewed registry, which is brand-independent by construction.
+#
+# UNKNOWN STAYS ON THE STRICT SIDE. An id nobody put in the registry classes as `unknown`, and
+# `unknown` demands a rationale exactly like `frontier` does. Erring toward "needs a reason" is
+# the only safe direction: the failure mode of the other choice is a silent expensive default.
 is_frontier_model() {
-  case "$1" in
-    haiku|sonnet|claude-haiku-*|claude-sonnet-*) return 1 ;;
-    "") return 1 ;;   # no pin -> inherits session model, not a frontier pin
-    *) return 0 ;;
+  [ -z "$1" ] && return 1   # no pin -> inherits the session model, not a frontier pin
+  case "$(models_class "$1")" in
+    cheap|mid) return 1 ;;
+    *) return 0 ;;          # frontier, or unknown-and-therefore-treated-as-frontier
   esac
 }
 
@@ -57,6 +67,8 @@ for a in $(find agents -maxdepth 1 -name '*.md' | LC_ALL=C sort); do
   effort="$(fm "$a" effort)"
   mrat="$(fm "$a" model_rationale)"
   erat="$(fm "$a" effort_rationale)"
+  cmodel="$(fm "$a" copilot_model)"
+  cmrat="$(fm "$a" copilot_model_rationale)"
 
   case "$role" in
     decider|executor) ;;
@@ -74,6 +86,20 @@ for a in $(find agents -maxdepth 1 -name '*.md' | LC_ALL=C sort); do
     fi
   else
     ok "$name: mid/cheap model '${model:-inherit}' ($role) — no reason required"
+  fi
+
+  # The Copilot-only override is a SECOND pin, so it needs its own reason. Sharing the canon
+  # `model_rationale:` would let a pin justified for one model silently cover a different one
+  # on a different host — which is exactly the substitution this whole gate exists to notice.
+  if [ -n "$cmodel" ]; then
+    if models_resolve "$cmodel" copilot >/dev/null 2>&1; then
+      ok "$name: copilot_model '$cmodel' is in the reviewed registry"
+    else
+      err "$name: copilot_model '$cmodel' is not in the reviewed registry (skills/model-selection-policy/models.tsv) — an unreviewed id is not a pin, it is a guess"
+    fi
+    if is_frontier_model "$cmodel" && [ -z "$cmrat" ]; then
+      err "$name: copilot_model '$cmodel' is frontier/unknown class with no copilot_model_rationale"
+    fi
   fi
 
   # The effort knob, same escape.
