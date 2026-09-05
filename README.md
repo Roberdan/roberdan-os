@@ -1,17 +1,60 @@
 # roberdan-os
 
-**One person's agentic operating manual — the behavioral canon, tooling, and guardrails that make
-AI coding agents work the way Roberto D'Angelo works — published as a worked example you can fork.**
+**Your way of working, across AI agents. Copilot CLI first.**
+
+A forkable operating manual for AI-assisted work: shared instructions, specialist agents,
+reusable skills, durable task tracking, and explicit human decisions before consequential actions.
+Built around Roberto D'Angelo's daily workflow; designed to be adapted to yours.
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![validate](https://github.com/Roberdan/roberdan-os/actions/workflows/validate.yml/badge.svg)](https://github.com/Roberdan/roberdan-os/actions/workflows/validate.yml)
 
+[Get started](#getting-started) · [Operator guide](docs/USAGE.md) ·
+[Architecture](ARCHITECTURE.md) · [Contribute](.github/CONTRIBUTING.md) ·
+[Fork it for yourself](docs/QUICKSTART-for-forkers.md)
+
+## Why use it?
+
+- **Keep your workflow when you change models.** Agents share one set of instructions instead
+  of separate, drifting configurations. Copilot CLI is the primary integration; Claude Code
+  and Codex remain supported with the differences documented below.
+- **Delegate without losing the thread.** An architect, reviewer, coordinator, and other
+  specialists work against durable tasks rather than promises buried in a conversation.
+- **Make automation accountable.** Privacy checks, bounded execution, and human approvals
+  complement the instructions. The limits of those controls are stated explicitly.
+- **Make it yours.** Start with `identity/`; adopt the tools you need, without running a server
+  or setting up a personal knowledge database first.
+
+## Getting started
+
+You need Git, Bash, Python 3, and `jq` for the tooling. To use the Copilot integration, install
+and sign in to [GitHub Copilot CLI](https://docs.github.com/copilot/how-tos/use-copilot-agents/use-copilot-cli).
+Model access and billing depend on your account.
+
+```bash
+git clone https://github.com/Roberdan/roberdan-os.git
+cd roberdan-os
+bash bin/sync.sh --emit-only        # preview generated files; no personal config changes
+bash bin/sync.sh --install          # install agents, skills, and the Copilot extension
+copilot
+```
+
+The installer detects Copilot through its configuration directory; run the CLI once before
+installing. In Copilot, use `/agent` to select a specialist, `/skills` to inspect installed
+skills, `/model` to see models available to your account, and `/subagents` to inspect delegation
+settings. Restart Copilot after installing the extension.
+
+Prefer to explore first? Read [`AGENTS.md`](AGENTS.md) and run
+`bash bin/doctor.sh` for a read-only setup report. Installation is not required to contribute.
+For the task CLI, optional Claude hooks, and other clients, see
+[additional setup](#additional-platform-setup) and the [operator guide](docs/USAGE.md).
+
 ## What this actually is
 
-Concretely: **~140 tracked files (~215 on a working machine, incl. local state a clone won't
-have) — Markdown + Bash. No server, no account, no compiled code, no runtime engine.** The
-Markdown is a *behavioral canon* that any [AGENTS.md](https://agents.md)-reading AI
-tool (primarily [Claude Code](https://claude.com/claude-code)) reads to behave as Roberto's
+Concretely: **Markdown instructions, Bash/Python tooling, and a native Copilot extension.
+No hosted service or separate roberdan-os account.** The
+Markdown is a *behavioral canon* — the shared operating instructions — that any
+[AGENTS.md](https://agents.md)-reading AI tool reads to behave as Roberto's
 assistant — how to operate on code (autonomy, evidence-first, done-gates), how to write and decide
 in his voice, when to ask before acting. The Bash is the machinery around it: a gated kanban CLI,
 Claude Code hooks, an install/sync generator, a headless-agent "factory", a privacy leak-gate, and
@@ -30,8 +73,8 @@ This project's own cardinal rule is *"no claim without evidence."* Applied to it
 core genuinely works; some ambitious layers are scaffolding that runs but doesn't yet do the thing
 it advertises. Stated plainly so you can trust the rest.
 
-**Works, verified (the core):**
-- **The canon is read and generated deterministically.** Root `CLAUDE.md` → `AGENTS.md` symlink;
+**Implemented core (with regression coverage):**
+- **The canon is read and generated deterministically.** Root `CLAUDE.md` points to `AGENTS.md`;
   `bin/sync.sh` regenerates every per-tool wrapper from the canon (CI proves it's deterministic).
 - **`kb`** — the gated kanban CLI (view/add/start/finish/pause/resume/lint, cross-repo federation
   read-path). Durable card files, human gate on `todo→doing`, `@thor` gate on `doing→done`.
@@ -67,8 +110,9 @@ it advertises. Stated plainly so you can trust the rest.
 roughly four things are *mechanically* enforced (pre-commit leak gate, bash-guard, deterministic
 generation, CI). The `verify-done` **hook** only warns; the real done-gate is the `@thor` agent.
 
-**Scaffolding — runs, but hasn't produced its output yet (honest gaps):**
-- **`evolve/`** (weekly upstream-changelog watcher): real bounded code, but **has never fired** yet.
+**Optional or deliberately limited paths:**
+- **`evolve/`** (weekly upstream-changelog watcher): drafts proposals; scheduled execution
+  depends on the machine's separate launchd installation, not on cloning this repository.
 - **factory external-CLI dispatch** (multi-tool runners): **dormant by design** — hard-refuses every
   dispatch until an OS-isolation floor lands via a reviewed code edit. Zero external-runner risk today.
 - **Auto-promotion in the meta-loop** (skipping the human `approved:` flip for high-confidence
@@ -98,14 +142,17 @@ opposite.* Not "the canon is proven to work."
 | Kanban / goal ledger | `kanban/` — the `kb` CLI. Card content is gitignored, local-only | real |
 | Agent bus | `bus/` — durable JSONL messages between agent sessions on a card. Carries messages only: it starts nothing and writes no kanban state. `bus/bus-mcp.py` exposes it to agents as four typed MCP tools (register it per client, see below) | real |
 | Agent factory | `factory/` — bounded headless `claude -p` (native path real; external dispatch dormant) | mixed |
-| Meta-loop | `learn/` (capture+classify) + `ontology/` (promote, human-gated) + `evolve/` | learn→ontology real (v2.10.0); evolve not-yet-fired |
+| Meta-loop | `learn/` (capture+classify) + `ontology/` (promote, human-gated) + `evolve/` | optional scheduled tooling; promotion remains human-gated |
 | Eval | [`eval/README.md`](eval/README.md) — A/B + blind judge harness | harness real; result favored no-canon (4–6 over 10 runs) |
 | Install | `bin/bootstrap.sh` · `bin/install-hooks.sh --apply` · `bin/sync.sh --install` · `bin/doctor.sh` (checks what is missing and prints the fix) | real — but `install-hooks.sh` dedups by exact command string, so on a machine whose settings already hold equivalent-but-differently-written entries it would DOUBLE them (`docs/findings.md` #24) |
 | GitHub account router | `bin/gh-shim.sh` → installed as `~/.local/bin/gh` (v2.28.0). Picks the account from the repo's remote owner, one `GH_CONFIG_DIR` per account: **no global active-account state to contend over**. Fails OPEN — anything it does not recognise runs the real `gh` unchanged | real |
 | Per-platform wrappers | `platforms/` — generated by `bin/sync.sh --emit-only`, gitignored, never committed (Claude, Copilot agents + extension, Codex, …) | real |
 | Web bundle | `bin/make-bundle.sh` → pasteable canon (excludes `private/`) | real |
 
-## Getting started
+## Additional platform setup
+
+The Copilot quickstart above does not require Claude Code. These additional commands install
+the task CLI and Claude-specific integration; use them only if you want those parts.
 
 ```
 git clone https://github.com/Roberdan/roberdan-os.git
@@ -136,7 +183,7 @@ the binaries — an installed `kb` that is not on `PATH`, hooks that were never 
 `~/.claude/settings.json`, and the one manual pointer step, are all failures that otherwise happen
 in silence.
 
-Those three commands install the engine with no JSON hand-editing. **One manual step remains**: add
+For the Claude integration, **one manual step remains**: add
 the one-line pointer block that `bootstrap.sh` prints to your *personal* `~/.claude/CLAUDE.md`
 (curated config the engine deliberately never overwrites). Re-run `install-hooks.sh --apply` after
 the hook canon changes — nothing alarms you if the live wiring drifts from the canon.
@@ -188,9 +235,8 @@ place instead of two that can drift apart.
 
 ## Prerequisites
 
-Required: `git`, `jq`, `bash`, `python3` (the eval pipeline needs it — CI won't be fully green
-without it; the leak-check hash tier degrades to a silent WARN-and-skip rather than failing), and
-an AGENTS.md-reading agent CLI (Claude Code is the primary target; Codex, Copilot CLI/VS Code,
+Required for the tooling: `git`, `jq`, `bash`, `python3` (including the eval pipeline), and
+an AGENTS.md-reading agent CLI for agent execution (Copilot CLI is the primary target; Claude Code, Codex, Copilot/VS Code,
 Cursor, opencode, Warp, hermes read the same file natively).
 
 Optional, feature-gated (everything degrades cleanly without them):
@@ -211,6 +257,9 @@ Reading the canon needs none of these — they only power the automation (recall
 
 This is the optional zero-to-working path for semantic recall and code intelligence. The core
 roberdan-os install above remains valid without it.
+
+<details>
+<summary>Expand optional memory installation, indexing, scheduling, and upgrades</summary>
 
 **1. Install gstack, then let its setup workflow configure gbrain.**
 
@@ -331,6 +380,8 @@ Ownership is intentionally split: **roberdan-os** owns the behavioral canon and 
 storage, indexing, retrieval, and autopilot. Never hand-edit that generated block, and do not
 expect `roberdan-os/bin/sync.sh` to regenerate it.
 
+</details>
+
 ## Honest limitations
 
 - **Single-person system, not a framework.** It configures *your* agent tools around one identity.
@@ -343,10 +394,20 @@ expect `roberdan-os/bin/sync.sh` to regenerate it.
   AGENTS.md tools the agents remain prose personas, not invokable.
 - **Full function depends on external, personal tooling** (gbrain, gstack). Without them,
   recall and some skills degrade.
-- **`evolve` hasn't fired yet, and meta-loop auto-promotion is deliberately un-wired** (see the
-  honest map). The `learn→ontology` promotion path itself is real and human-gated as of v2.10.0.
+- **Scheduling is machine-local, and meta-loop auto-promotion is deliberately un-wired.**
+  The `learn→ontology` promotion path requires human approval.
 - **The eval hasn't shown the canon wins — if anything, the opposite.** Small sample, no-canon led
   4–6 across 10 judged runs (4–4 on the core subset), self-flagged stale.
+
+## Contributing
+
+Contributions are welcome, especially reproducible bug reports, Copilot integration fixes,
+cross-platform compatibility tests, and measured model comparisons. You do not need Roberto's
+private data, personal integrations, or a paid model run to improve the scripts and documentation.
+
+Read the [contributor guide](.github/CONTRIBUTING.md) for a local development path, where changes
+belong, and what evidence to include in a pull request. Start small: one reproducible problem,
+one focused change, and documentation that describes what actually happens.
 
 ## Forking
 

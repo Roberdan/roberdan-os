@@ -1,7 +1,9 @@
 # ARCHITECTURE — the layer map
 
 roberdan-os is an **Agentic Digital Twin**: a persistent, versioned representation of how one
-person works, writes, decides and delegates, consumed identically by every AI tool they use.
+person works, writes, decides and delegates, shared across the AI tools they use.
+Copilot CLI is the primary integration; client-specific capabilities remain explicit rather
+than promising identical execution on Claude Code, Codex, and every other client.
 This file maps that idea onto the actual directories — nothing here is aspirational; every row
 points at code or prose that exists and is exercised by `test/validate.sh`.
 
@@ -22,7 +24,7 @@ Everything else is engine — upstream-owned, merge-clean for forks by construct
 | **Execution** | The loop contract, unattended overnight factory, per-tool wrapper generation | [`loop/loop-protocol.md`](loop/loop-protocol.md) · [`factory/`](factory/factory-protocol.md) · [`bin/sync.sh`](bin/sync.sh) · [`skills/`](skills/) · [`hooks/`](hooks/) |
 | **Coordination** | Durable agent-to-agent messages on a per-repo, per-card thread. Pull-only: it delivers into sessions that already exist, never starts one, never writes kanban state | [`bus/bus-protocol.md`](bus/bus-protocol.md) |
 | **Reflection** | Self-improvement that proposes, never self-applies: capture→distill→quarantine, weekly upstream watch | [`learn/`](learn/learn-protocol.md) · [`evolve/`](evolve/evolve-protocol.md) |
-| **Governance** | The seven human gates, 3-tier privacy leak-check, guard hooks, audit trail on gate crossings | [`AGENTS.md § Human gates`](AGENTS.md) · [`test/leak-check.sh`](test/leak-check.sh) · [`hooks/`](hooks/) |
+| **Governance** | Eight human approval boundaries, four complementary privacy checks, guard hooks, audit trail | [`AGENTS.md § Human gates`](AGENTS.md) · [`docs/privacy-leak-check.md`](docs/privacy-leak-check.md) · [`hooks/`](hooks/) |
 | **Metrics** | Does the canon actually change agent output? A/B with-/without-canon + blind pairwise judging | [`eval/`](eval/README.md) |
 
 ## How a request flows
@@ -47,9 +49,9 @@ Operator (or a schedule)
 
 1. **One canon, many runtimes.** `AGENTS.md` is the single source; per-tool wrappers are
    generated (`bin/sync.sh`), never hand-copied, never committed. Drift is a CI failure.
-   Exception by design: Claude Code reads the canon **natively** in-repo via the root
-   `CLAUDE.md → AGENTS.md` symlink (v2.7.0) — no wrapper on that path. Agent frontmatter
-   carries `model:` **and `effort:`** (2026) so cost/quality tiering travels with the canon.
+   Claude Code reads the root `CLAUDE.md` pointer to `AGENTS.md`. Agent sources
+   carry model and reasoning preferences; each adapter must translate them into options
+   its client actually supports, not copy unsupported fields into generated frontmatter.
    Copilot gets a **native adapter** (v2.16.0): generated custom agents + a user-scoped
    extension (`hooks/copilot/extension.template.mjs`) that binds the provider-neutral `hooks/`
    to Copilot lifecycle APIs — operational near-parity, with the completion gate advisory
@@ -60,8 +62,9 @@ Operator (or a schedule)
    written to or deleted.
 2. **Engine/identity split.** Forkers edit `identity/` only; engine files never embed identity.
    See [`docs/plan-2026-07-05-engine-identity-split.md`](docs/plan-2026-07-05-engine-identity-split.md).
-3. **Human gates are not advisory.** The seven gates in `AGENTS.md` are enforced by hooks and
-   discipline, and every crossing is attributable (audit lines, `--by`, `--thor` evidence).
+3. **Human approvals are part of the operating contract.** The eight boundaries in `AGENTS.md`
+   combine mechanical checks with discipline. Audit fields such as `--by` and `--thor` record
+   claims; they are not authentication or proof that approval occurred.
 4. **Evidence over claims.** Nothing is "done" because an agent says so — `@thor` verifies
    against acceptance criteria; the eval harness holds the canon itself to the same standard.
 5. **Local-first privacy.** The dossier and live task content never enter git; embeddings run

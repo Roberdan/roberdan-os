@@ -3,6 +3,60 @@
 Concise reference for running roberdan-os day to day. For the full canon, start at
 [`AGENTS.md`](../AGENTS.md); this doc is the "how do I actually do X" cheat sheet.
 
+## Copilot CLI first
+
+Generate a preview before installing:
+
+```bash
+bash bin/sync.sh --emit-only
+bash bin/sync.sh --install
+```
+
+Copilot must have been started at least once so its configuration directory exists. Installation
+adds generated agents, skills, and the extension without replacing foreign same-named files.
+Restart Copilot to load a newly installed extension. Claude Code and Codex compatibility remains;
+Copilot-first does not mean those clients understand Copilot-specific model IDs or settings.
+
+| In Copilot CLI | Purpose |
+|---|---|
+| `/agent` | Select a generated specialist |
+| `/skills` | Inspect installed skills and their resolved names |
+| `/model` | See the current account's available models and change the session model |
+| `/subagents` | Configure model, reasoning effort, and context for delegated agents |
+| `/usage` | Inspect actual usage, rather than estimated prices |
+| `/limits` | Set an optional spending limit; a model call may overshoot the remaining limit |
+
+### Three independent model choices
+
+The **model** chooses the engine; **effort** sets how deeply it reasons; **context** chooses
+how much input it can hold. More of any one does not automatically improve an answer, and
+larger context or effort may change cost.
+
+For an explicit interactive Astra session on an account that offers it:
+
+```bash
+copilot --model gpt-6-astra --effort medium --context default
+```
+
+The installed CLI exposes these flags, but individual models support different values.
+For native subagent configuration, the corresponding fields are `model`, `effortLevel`, and
+`contextTier` under `subagents.agents.<agent-name>`; `/subagents` is the interactive editor.
+These are **not** custom-agent Markdown frontmatter keys.
+
+When an agent delegates through Copilot's `task` tool, its parameters use different names:
+`model`, `reasoning_effort`, and `context_tier`. Pass only values supported by that tool's current
+model list. A CLI help listing, a delegated tool's listing, and another account can differ.
+The [model-selection policy](../skills/model-selection-policy/skill.md) governs the choice;
+availability alone is not evidence of quality or low cost.
+
+### Skills, prompts, and source files
+
+Edit `skills/<name>/skill.md`, not the installed wrapper. Regenerate with `bin/sync.sh`.
+Copilot CLI invokes installed skills; the generated `platforms/copilot/prompts/*.prompt.md`
+files are companion prompt artifacts, not an alternative automatic CLI installation.
+Agent personas live in `agents/`; generated Copilot wrappers adapt their supported settings.
+Use the resolved names shown by `/skills` when another skill system owns the same name.
+
 ## Kanban (`kb`)
 
 Goal tracking lives in [`kanban/`](../kanban/) as files, not a chat thread — file state is
@@ -135,11 +189,11 @@ In practice, the two you'll hit constantly are `kb start <id> --by roberto` (tod
 `kb finish <id> --thor "<evidence>"` (doing→done) — everything else in the loop runs autonomously
 inside those two gates.
 
-## Other agentic tools
+## Client compatibility and skill collisions
 
 - **Copilot CLI** — skills installed via `bin/sync.sh --install` (symlinked into
-  `~/.copilot/skills/`); gbrain is already registered in its MCP config; `AGENTS.md`
-  is read natively per-repo.
+  `~/.copilot/skills/`); `AGENTS.md` is read natively per-repo. Optional gbrain registration
+  is machine-local: cloning or installing this project does not configure that MCP server.
 
 ### Skill name collisions (v2.31.0)
 
