@@ -40,7 +40,7 @@ current alternative, what would make them say no. Ground in the vault where rele
 | Mode | When | How |
 |---|---|---|
 | **Moderated focus group** | exploring perceptions, surfacing themes, group dynamics | moderator poses prompts, personas respond and **react to each other** (agree/disagree) |
-| **1:1 interviews** | depth, avoiding groupthink, sensitive topics | moderator ↔ one person at a time, in parallel (Agent tool) |
+| **1:1 interviews** | depth, avoiding groupthink, sensitive topics | moderator ↔ one person at a time, in parallel (the host's delegation tool: Copilot `task`, Claude `Agent`) |
 | **Task-based usability test** | testing app/feature/flow | give a concrete task; the persona "tries," reports friction/blockers/confusion, not opinions |
 | **Quant micro-survey** | quick numeric signal | closed questions to all personas → distribution (e.g. 6/8 wouldn't pay) |
 
@@ -48,14 +48,17 @@ current alternative, what would make them say no. Ground in the vault where rele
 
 1. **Setup:** clarify topic, intent (validating a problem? a definition? a hypothesis? usability?),
    audience, and **what counts as success/kill**. Choose the mode. Look for an existing panel.
-2. **Panel:** reuse or generate personas (in parallel if there are many).
+2. **Panel:** reuse or generate personas (in parallel if there are many). Personas and the
+   moderator are **mid-class executors** — model, effort and context per
+   [[model-selection-policy]], resolved with `bin/models.sh`, never typed from memory. A panel
+   is not a reason to spend frontier.
 3. **Session:** the moderator runs it in the chosen mode. Personas stay **in-character**, anchored,
    free to disagree. Group mode: surface real agreements/disagreements.
 4. **Consolidation:** the consolidator produces the report.
 
 ## Output — structured report
 
-`~/.claude/reports/focus-group-<topic>-<date>.md`:
+`~/.roberdan-os/reports/focus-group-<topic>-<date>.md` (host-neutral home — not one CLI's own directory):
 - **Verdict** in 3 lines: does the problem/hypothesis hold up? net signal.
 - **Themes** (ranked by signal strength) with **verbatim quotes** from personas.
 - **Agreements vs disagreements** (where the panel diverges — often the interesting part).

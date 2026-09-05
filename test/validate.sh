@@ -24,7 +24,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bash-guard test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-model-economy \
-          test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
+          test-model-registry test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage; do
   _spawn "$_s"
 done
@@ -200,7 +200,7 @@ if _suite test-install-hooks-dedup; then ok "riconosce \$HOME, la tilde e il bas
 
 # --- 8b9) model economy (Uber cost lever): cheap/mid model unless a written reason justifies frontier; effort defaults to medium -> test/test-model-economy.sh
 if _suite test-model-economy; then ok "model economy — executors stay mid-tier; every frontier model and above-medium effort carries a written reason"; else _suite_out test-model-economy; err "test-model-economy — see bash test/test-model-economy.sh"; fi
-
+if _suite test-model-registry; then ok "model registry — aliases resolve, brand words and unreviewed ids are refused, the launcher really passes --model/--effort/--context"; else _suite_out test-model-registry; err "test-model-registry — see bash test/test-model-registry.sh"; fi
 # --- 8c) loop receipts emitter (schema, append-only, opt-in placement, no pollution) ---
 section "loop receipts — loop/receipt.sh emitter contract"
 if _suite test-receipts; then ok "receipt emitter green (see bash test/test-receipts.sh)"; else err "test-receipts — see bash test/test-receipts.sh"; fi

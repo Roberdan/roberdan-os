@@ -3,7 +3,8 @@
 You've cloned `roberdan-os` and want to run it as *your own* system, not Roberto's. Since
 v2.0.0 this no longer means renaming anything: **everything you change lives in one
 directory, `identity/`** — engine files stay upstream-owned, so `git merge upstream/main`
-stays conflict-free on them forever. Five steps, ~15 minutes.
+avoids mixing your identity changes with upstream engine changes. Five steps; optional personal
+integrations can be added later.
 
 ## 1. Clone and wire the remotes
 
@@ -18,15 +19,18 @@ git remote add origin https://github.com/<you>/my-os.git
 Keeping `upstream` is the point of the v2.0.0 design: you'll pull engine improvements
 from it forever, without merge wars.
 
-## 2. Bootstrap
+## 2. Preview the Copilot-first setup
 
-```
-bin/bootstrap.sh
+```bash
+bash bin/sync.sh --emit-only
 ```
 
-Idempotent, non-destructive — generates the per-tool wrappers, symlinks the agents into
-`~/.claude/agents/`, runs `test/validate.sh`. Never overwrites `~/.claude/CLAUDE.md` or
-`settings.json`; it prints the pointer blocks to add by hand.
+This generates client wrappers without changing your personal configuration. Install and sign
+in to Copilot CLI, then run it once so its configuration directory exists. Finish the identity
+steps below before installing wrappers into your normal workflow.
+
+For the optional task CLI and Claude integration, `bin/bootstrap.sh` also installs local
+commands and Claude agents. It is not required just to use the Copilot adapter.
 
 ## 3. Initialize your identity — the automated part
 
@@ -55,10 +59,12 @@ shell (default `~/.roberdan-os`) — a value, not a file edit.
 
 - Rewrite `identity/voice.md`, `identity/operator.md`, `identity/twin-persona.md` in
   your own words — the banners mark what's still the upstream operator's.
-- Write your own `private/.denylist` and `~/.jane-os/private/<your-profile>.md`
+- Keep your confidential dossier outside the checkout, for example
+  `~/.jane-os/private/<your-profile>.md`
   (confidential dossier, read at runtime by the `twin` agent — see
-  `identity/profile-pointer.md`). Roberto's denylist is meaningless to you; yours
-  doesn't exist yet. See `README.md § Privacy` and `test/leak-check.sh`.
+  `identity/profile-pointer.md`). Configure your privacy checks using
+  [`docs/privacy-leak-check.md`](privacy-leak-check.md); Roberto's private denylist is not
+  distributed with the repository.
 - Run `bin/update-denylist-hashes.sh` before your first commit so CI can leak-check
   without ever holding your confidential terms in plaintext.
 
@@ -68,22 +74,21 @@ only if you care about running the eval against your own canon.
 `claude-ai-skill/roberto-mode/` is a packaged, named artifact — repackage your own if
 you want to ship one.
 
-## 5. Verify — including the merge-clean guarantee
+## 5. Install and verify
 
-```
-bin/install-hooks.sh --apply   # wire the five-event hook set into ~/.claude/settings.json
-                               # (idempotent, non-destructive, backs up first)
-bin/sync.sh --install          # symlinks the skill wrappers into ~/.claude/skills — without
-                               # this, validate's tool-coverage gate FAILS on any machine
-                               # where ~/.claude exists ("run: bash bin/sync.sh --install")
-bash test/validate.sh          # → ✅ ALL GREEN (same gate the real repo runs)
-git status --porcelain         # → only identity/* should appear
-bash test/test-fork-merge.sh   # → proof: identity-only edits merge clean with upstream engine edits
+```bash
+bash bin/sync.sh --install      # generate and install agents, extension, and skills
+bash test/validate.sh           # repository checks; inspect any reported failure
+git status --porcelain         # review every change before committing
+bash test/test-fork-merge.sh    # exercise the identity/engine split
 ```
 
-From now on, `git merge upstream/main` is routine: upstream edits engine files you never
-touched (hard guarantee: zero conflicts there); a conflict can only happen if upstream
-also edits an `identity/*` file you rewrote — rare, small, and localized (soft
-guarantee), versus the old guaranteed 30-file war.
+Restart Copilot, then inspect `/agent`, `/skills`, `/model`, and `/subagents`. For Claude Code,
+optionally run `bash bin/install-hooks.sh --apply` to install its hook set. See the
+[operator guide](USAGE.md) for model configuration and differences between clients.
+
+Keeping personal changes in `identity/` reduces conflicts when merging `upstream/main`.
+Review upstream changes normally: the regression test exercises that separation, not a promise
+that every future merge will be conflict-free.
 
 That's it — you now have your own behavioral canon that stays mergeable with upstream.

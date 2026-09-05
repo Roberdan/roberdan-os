@@ -3,6 +3,32 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.40.0] - 2026-09-05
+
+**Copilot-first model selection, including GPT-6 Astra, across custom and built-in agents.**
+
+### Added
+- A reviewed model registry with host-specific model, reasoning effort and context support.
+  `bin/models.sh` resolves and validates profiles; `bin/copilot-agent.sh` launches specialists
+  with the actual supported CLI flags. Unknown, legacy and wrong-host selections fail explicitly.
+- Native required-model profiles for nine custom agents and six built-ins, including
+  `explore` and `general-purpose`. Explicit settings application preserves unrelated preferences
+  and creates a unique backup; ordinary installation does not overwrite personal settings.
+- Regression coverage for registry consistency, argument handling, generated profiles, settings
+  preservation and cross-platform adapters.
+
+### Changed
+- Baccio uses GPT-6 Astra on Copilot; Claude Code retains its existing tier aliases.
+  Delegating skills now share one selection policy, including recursive delegation instructions.
+- Skill routing checks actual availability; durable work checkpoints remain distinct from
+  optional conversation-context saves. Existing namespacing keeps colliding skills accessible.
+- Copilot onboarding, usage, architecture and contribution guidance now describe the supported
+  installation, model-selection and extension paths.
+
+The registry is a reviewed snapshot, not a benchmark or an account-availability guarantee.
+Existing sessions need restarting after settings application. Third-party skills and the
+Claude-only factory runtime remain under their existing model policies.
+
 ## [v2.39.0] - 2026-08-28
 
 **Package-manager network guard moved out of the repo.** The helper that routes local package

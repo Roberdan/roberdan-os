@@ -14,7 +14,7 @@ durable state, terminal-condition, auto-resume, auto-escalation.
 - **Writes/reads durable state** — `state.db` at a known path + `.agent-state/<task>.jsonl` (append-only cursor).
 - **Defines the terminal-condition** — an empirical check against ground truth, not an estimate.
 - **Enables auto-resume** — on startup, re-reads the state, resumes from the last `done` step.
-- **Enables auto-escalation** — 2 failures on the same problem → opus + log the reason.
+- **Enables auto-escalation** — 2 failures on the same problem → frontier class + log the reason.
 
 ## State (daemon-optional)
 ```
@@ -34,7 +34,7 @@ loop:
   result = execute(step)
   append(cursor, {step, result, evidence})   # checkpoint = 1 commit/phase, evidence-first
   if terminal_condition(): break              # empirical verification (thor / job-specific check)
-  if failed_twice(step): escalate(opus); log(reason)
+  if failed_twice(step): escalate(frontier); log(reason)   # id via bin/models.sh, never typed
   if no_progress(2 passes): STOP; report_wedged(); break
   step += 1
 on each phase end:
