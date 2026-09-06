@@ -29,7 +29,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test
   _spawn "$_s"
 done
 unset _s
-_spawn_serial_group test-sync-install test-copilot-adapter test-skill-name-collision
+_spawn_serial_group test-sync-install test-copilot-adapter test-skill-name-collision test-apple-designer
 
 # --- 1) Frontmatter lint (agenti, skill, card, schema federato) ---------------
 # Le quattro famiglie vivono in test/test-frontmatter.sh: il frontmatter e' il contratto fra un
@@ -149,7 +149,7 @@ if _suite test-skill-name-collision; then ok "skill-name collision: rdos- namesp
 # --- 8a) Copilot native adapter (agents + extension emission/install/load/guards) ---
 section "copilot native adapter — emission, collision-safe install, extension load + guard mapping"
 if _suite test-copilot-adapter; then ok "copilot adapter verified (see bash test/test-copilot-adapter.sh)"; else err "test-copilot-adapter — see bash test/test-copilot-adapter.sh"; fi
-
+if _suite test-apple-designer; then ok "Apple UI mandatory route and wrappers verified"; else _suite_out test-apple-designer; err "test-apple-designer"; fi
 # --- 8b) hooks/autofmt.sh input contract (stdin JSON; the old env-var API was a silent no-op) ---
 section "autofmt hook — stdin JSON input contract"
 if _suite test-autofmt; then ok "autofmt receives files via stdin JSON (see bash test/test-autofmt.sh)"; else err "test-autofmt — see bash test/test-autofmt.sh"; fi

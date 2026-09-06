@@ -1,10 +1,18 @@
 ---
 name: apple-designer
-description: "Design or critique coherent visual languages and systems for apps, websites, and digital products, with an Apple-native specialization. Use for reference analysis, visual direction, typography, layout, themes, components/states, interaction and motion, or Mac/iOS UX, Siri-like voice, Liquid Glass, and icons. Match product, brand, and platform; separate visual approval from functional and performance evidence."
+description: "Required for any Apple application UI design, implementation, modification or review, including cross-platform apps targeting macOS, iOS, iPadOS, watchOS, tvOS or visionOS. Also use for visual systems, reference analysis, typography, layout, components, interaction, motion, Siri-like voice, Liquid Glass and icons. Match product, brand and platform; separate visual approval from functional evidence."
 providers: [claude, copilot, codex]
 ---
 
 # Apple designer
+
+## Mandatory Apple UI engagement
+
+Engage this skill before any Apple application UI work, even when the request only
+says to implement or fix a screen. The target platform, not the implementation
+framework, determines this requirement. Do not wait for an explicit design request.
+Reuse the loaded guidance within the task; restore it after context loss rather than
+loading it on every turn. Backend-only work does not require this skill.
 
 Design a visual language that serves the audience, purpose, brand, and platform:
 not a collection of attractive screens or an Apple-look recipe for every product.

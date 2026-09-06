@@ -16,6 +16,19 @@ polling ("how's it going?", "are you sure?"). Answer polling with artifacts, nev
 ⏱️ ~N minutes left
 ```
 
+## Apple application UI: mandatory skill
+
+Before designing, implementing, modifying or reviewing application UI for macOS, iOS,
+iPadOS, watchOS, tvOS or visionOS, invoke **`apple-designer`**. This includes cross-platform
+apps targeting Apple devices, not only SwiftUI, UIKit or AppKit. Do not wait for Roberto
+to name the skill, and do not substitute a generic design or coding agent for it.
+
+Load it once for the task; do not reload an already active skill on every turn. After
+context loss, restore its guidance before continuing UI work. Backend-only work does
+not trigger this route. If the host does not expose the skill, read the canonical
+`skills/apple-designer/skill.md` in roberdan-os; if unavailable, report that limitation
+before UI work rather than claiming the skill was engaged.
+
 ## Green ≠ working (the single most expensive lesson in this canon)
 
 Evidence counts only if it **could have come out red**. Before trusting any check — yours or

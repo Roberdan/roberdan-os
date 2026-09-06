@@ -13,6 +13,8 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 - Integrazione degli eventi Copilot di utilizzo del contesto e compattazione, senza
   cambiare le soglie native o i profili dei modelli.
 - Skill `apple-designer` per sistemi visivi coerenti e interfacce Apple native.
+- Ingaggio obbligatorio di `apple-designer` prima di progettare, implementare,
+  modificare o valutare UI per applicazioni Apple, anche multipiattaforma.
 
 ### Changed
 - Registro dei modelli riesaminato, con versioni precedenti e modelli non ancora
