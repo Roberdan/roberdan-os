@@ -23,13 +23,24 @@ del job**, mai la chat: il lavoro riprende invece di ripartire.
   e continua. Due pass consecutivi senza progresso = incastrato davvero: STOP, di' cos'è
   bloccato (riga oversize, chiave mancante, lock), non loopare.
 - **Progresso in artefatti durevoli**, non in conversazione: conteggi DB, checkpoint file,
-  log `.jsonl`, gstack `/context-save`. Le notifiche dei background task arrivano tardi e in
-  disordine — reinterroga la ground truth prima di riportare lo status.
+  log `.jsonl`. `kb pause --context` / [[auto-checkpoint]] conservano lo stato del lavoro;
+  gstack `/context-save` e' solo un'aggiunta per la conversazione. Prima di riportare lo
+  status, confronta la notifica con gli artefatti reali.
 - **Monitora i subagent reali** (il tool di delega dell'host: `task` su Copilot, `Agent` su
-  Claude, più `TaskList` / `Monitor` dove esistono): polla, continua o
-  stop+ricrea quelli incastrati passandogli lo stato persistito. Modello/effort/context di ogni
-  subagent vengono da [[model-selection-policy]], mai a memoria.
-- **Copilot CLI ≥ 1.0.83 (weekly release "August 24", pubDate 2026-08-28) restores sessions that
-  did not exit cleanly, including one interrupted mid-turn** — resume the session before
-  re-reading the card and rebuilding state from scratch; confirm the version after
-  `copilot update`, this predates the installed 1.0.82-1.
+  Claude, altri monitor solo se disponibili). Su Copilot attendi la notifica automatica,
+  poi leggi il risultato una volta con l'ID noto: niente polling o riscoperta degli ID.
+  Background solo quando c'e' lavoro indipendente da svolgere; altrimenti delega sincrona.
+  Su host senza notifiche, controlli distanziati secondo durata e progresso attesi.
+  Modello/effort/context vengono da [[model-selection-policy]], mai a memoria.
+- **Prima di compattare:** salva ID, proprietario, ambito, artefatti, ultima osservazione
+  e prossimo controllo dei job nella sezione `pending` della capsula. Dopo la ripresa
+  riconcilia gli ID noti con lo stato reale; non avviare copie di agenti ancora attivi.
+  Processi shell collegati alla sessione per default; sopravvivenza alla chiusura solo
+  quando richiesta esplicitamente e supportata dall'host.
+- **Cancellato non significa annullato:** un timeout, una connessione MCP interrotta o un
+  agente senza risposta non dimostrano che gli effetti non siano avvenuti. Verifica
+  artefatti/stato prima del retry; se l'esito di un'azione non ripetibile resta ignoto,
+  fermati su quel passo. Non uccidere un job sano per liberare contesto.
+- **Ripresa nativa:** usa il recupero sessione dell'host se disponibile, poi rileggi
+  checkpoint e card. Verifica la versione effettiva: non assumere supporto dal nome di
+  un modello. I turni lunghi richiedono checkpoint di fase, non solo quello a fine turno.

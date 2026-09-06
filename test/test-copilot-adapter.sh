@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 # test/test-copilot-adapter.sh — proves the native GitHub Copilot adapter:
-#   A. deterministic emission of copilot agents + extension (mapped frontmatter, baked ROOT)
-#   B. collision-safe install into ~/.copilot/agents + ~/.copilot/extensions/roberdan-os
-#      (fresh symlink, never overwrite, idempotent) and NO writes when ~/.copilot is absent
-#   C. the extension loads (real ESM import via a stubbed @github/copilot-sdk) and registers
-#      the expected namespaced tools + lifecycle hooks
+#   A/B. deterministic emission, collision-safe install; no writes when Copilot is absent
+#   C. real ESM import via a stubbed SDK registers namespaced tools and lifecycle hooks
 #   D. the PreToolUse guard mapping is correct end-to-end: deny/ask on dangerous actions,
 #      allow (undefined) on safe ones, and FAIL-SAFE (ask) when a guard errors — never a
 #      silent success-shaped allow
@@ -153,6 +150,7 @@ printf '%s\n' "$pout2" | grep -q "^SKIP copilot extension: .* già presente" && 
 section "extension load — registers namespaced tools + hooks; guard mapping deny/ask/allow/fail-safe"
 STAGE="$TMP/stage"; mkdir -p "$STAGE/node_modules/@github/copilot-sdk"
 cp "$EXT" "$STAGE/extension.mjs"
+cp "$(dirname "$EXT")/context-recovery.mjs" "$STAGE/context-recovery.mjs"
 cat > "$STAGE/node_modules/@github/copilot-sdk/package.json" <<'JSON'
 { "name": "@github/copilot-sdk", "version": "0.0.0-stub", "exports": { "./extension": "./extension.mjs" } }
 JSON
@@ -372,6 +370,8 @@ done
 [ -z "$missing" ] && ok "goal-gate / bus-doorbell / auto-checkpoint all receive the real session_id" \
   || err "hooks called WITHOUT session_id (state collapses onto 'nosession'):$missing"
 
+# shellcheck source=test/lib-copilot-context.sh
+. "$ROOT/test/lib-copilot-context.sh"
 # --- Result --------------------------------------------------------------
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "test-copilot-adapter: PASS"; exit 0; else echo "test-copilot-adapter: FAIL"; exit 1; fi

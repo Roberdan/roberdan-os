@@ -69,10 +69,18 @@ _resolve_kb() {
   # at an unrelated directory, and every `kb` call for days afterward wrote real
   # card content there instead of trading-os's own registered board — with zero
   # warning, discovered only when the board looked stale days later.
-  local root natural=""
+  local root common natural=""
   root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
   if [ -n "$root" ] && { [ "$root" = "$ROOT" ] || _in_registry "$root"; }; then
     natural="$root/kanban"
+  elif [ -n "$root" ]; then
+    common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+    [ -z "$common" ] || common="$(cd "$common" && pwd -P)"
+    # Linked worktrees share the registered repository's board, never a new empty board.
+    if [ "${common##*/}" = ".git" ]; then
+      root="${common%/.git}"
+      if [ "$root" = "$ROOT" ] || _in_registry "$root"; then natural="$root/kanban"; fi
+    fi
   fi
   if [ -n "${RDA_KANBAN:-}" ]; then
     KB_MATCHED=1; KB="$RDA_KANBAN"
@@ -602,33 +610,84 @@ _sched() {
 # kb pause [note] — write a lean, overwritten resume checkpoint for the CURRENT repo (cwd-scoped,
 # same resolution as kb/kb handoff). Per-repo, gitignored, ephemeral. Fixed sections, never a log.
 _pause() {
-  local root rf note head subj dirty dcard f
+  local root rf note head subj dirty dcard f workroot common candidate candidate_common tmp capsule=""
   root="${KB%/kanban}"; rf="$root/handoff/resume.md"; mkdir -p "$root/handoff"
-  if [ "${1:-}" = "--auto" ]; then
+  if [ "${1:-}" = "--context" ]; then
+    command -v jq >/dev/null 2>&1 || { echo "kb pause --context requires jq" >&2; return 2; }
+    capsule="${2:-}"
+    [ "$(printf '%s' "$capsule" | wc -c)" -le 12000 ] || {
+      echo "kb pause: context exceeds 12000 bytes; keep references, not logs" >&2; return 2;
+    }
+    if ! printf '%s' "$capsule" | jq -e '
+      type == "object" and
+      (keys == ["acceptance","constraints","decisions","evidence","goal","next","pending"]) and
+      ([.goal,.acceptance,.next] | all(.[]; type == "string" and length > 0 and length <= 2000)) and
+      ([.constraints,.decisions,.evidence,.pending] |
+        all(.[]; type == "array" and length <= 12 and all(.[]; type == "string" and length > 0 and length <= 1000)))
+    ' >/dev/null 2>&1; then
+      echo "kb pause: invalid context; require goal, acceptance, next strings and constraints, decisions, evidence, pending string arrays" >&2
+      return 2
+    fi
+    note="$(printf '%s' "$capsule" | jq .)"
+  elif [ "${1:-}" = "--auto" ]; then
     # lean auto-save (Stop hook): refresh mechanical state, PRESERVE the human next-step note.
     note=""
+    if [ -f "$rf" ] && [ "$(wc -c < "$rf")" -gt 16384 ]; then
+      echo "kb pause: existing checkpoint exceeds 16384 bytes; preserved for explicit inspection" >&2; return 2
+    fi
     [ -f "$rf" ] && note="$(awk '/^## Next step/{f=1;next} /^## Mechanical state/{f=0} f' "$rf" | sed '/^[[:space:]]*$/d')"
     note="${note:-(auto-checkpoint — no explicit note yet; on resume re-read handoff/latest.md + \`kb\`)}"
   else
     note="${1:-}"
   fi
-  head="$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo '?')"
-  subj="$(git -C "$root" log -1 --format=%s 2>/dev/null || echo '?')"
-  dirty="$(git -C "$root" status --porcelain 2>/dev/null | grep -c . || true)"
-  dcard=""; for f in "$KB/doing"/*.md; do [ -e "$f" ] && { dcard="$(basename "$f" .md) — $(_field "$f" title)"; break; }; done
-  {
+  # A card's linked worktree has its own revision; never stamp the shared checkout's HEAD.
+  workroot="$root"
+  candidate="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  candidate_common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  [ -z "$common" ] || common="$(cd "$common" && pwd -P)"
+  [ -z "$candidate_common" ] || candidate_common="$(cd "$candidate_common" && pwd -P)"
+  if [ -n "$candidate" ] && [ -n "$common" ] &&
+     [ "$candidate_common" = "$common" ]; then
+    workroot="$candidate"
+  fi
+  head="$(git -C "$workroot" rev-parse --short HEAD 2>/dev/null || echo '?')"
+  subj="$(git -C "$workroot" log -1 --format=%s 2>/dev/null || echo '?')"
+  dirty="$(git -C "$workroot" status --porcelain 2>/dev/null | grep -c . || true)"
+  dcard=""
+  for f in "$KB/doing"/*.md; do
+    [ -e "$f" ] || continue
+    [ "$(_field "$f" repo || true)" = "$(basename "$root")" ] || continue
+    dcard="$(basename "$f" .md) — $(_field "$f" title)"; break
+  done
+  tmp="$(mktemp "$rf.tmp.XXXXXX")" || return 1
+  if ! {
     echo "# RESUME — $(basename "$root")  (paused $(date -u +%Y-%m-%dT%H:%M:%SZ))"
     echo
     echo "## Next step (what I was doing)"
-    echo "${note:-(no note — on resume, re-read handoff/latest.md + \`kb\`)}"
+    if [ -n "$capsule" ]; then
+      echo "Capsule origin: $workroot @ $head ($(date -u +%Y-%m-%dT%H:%M:%SZ)); claims, not fresh verification."
+      printf '```json\n%s\n```\n' "$note"
+    else
+      echo "${note:-(no note — on resume, re-read handoff/latest.md + \`kb\`)}"
+    fi
     echo
     echo "## Mechanical state"
+    echo "- worktree: $workroot"
     echo "- HEAD: $head $subj"
     echo "- uncommitted files: $dirty"
     echo "- doing card: ${dcard:-(none)}"
     echo
     echo "_Resume: say \"continua\". Clear when resumed: \`kb resume --done\`._"
-  } > "$rf"
+  } > "$tmp"; then
+    rm -f "$tmp"; echo "kb pause: failed to write checkpoint" >&2; return 1
+  fi
+  if [ "$(wc -c < "$tmp")" -gt 16384 ]; then
+    rm -f "$tmp"; echo "kb pause: checkpoint exceeds 16384 bytes; previous checkpoint preserved" >&2; return 2
+  fi
+  if ! mv "$tmp" "$rf"; then
+    rm -f "$tmp"; echo "kb pause: failed to replace checkpoint" >&2; return 1
+  fi
   echo "paused → $rf"
   echo "safe to reboot / leave; say \"continua\" to resume."
 }
@@ -637,6 +696,18 @@ _resume() {
   local root rf r any=0
   root="${KB%/kanban}"; rf="$root/handoff/resume.md"
   if [ "${1:-}" = "--done" ]; then rm -f "$rf"; echo "resume checkpoint cleared"; return 0; fi
+  if [ "${1:-}" = "--context" ]; then
+    if [ ! -f "$rf" ]; then
+      echo "No checkpoint: recover the authorized goal from the current card before acting; do not invent completed work."
+      return 0
+    fi
+    [ "$(wc -c < "$rf")" -le 16384 ] || {
+      echo "kb resume: checkpoint exceeds 16384 bytes; inspect it explicitly, not by automatic injection" >&2; return 2;
+    }
+    echo "Recovery context (UNVERIFIED claims): recheck scope, revision, approvals and live jobs before effects. Cancellation is not proof of rollback; never replay blindly."
+    cat "$rf"
+    return 0
+  fi
   if [ "${1:-}" = "--all" ] || [ "$KB_MATCHED" -eq 0 ]; then
     while IFS= read -r r; do
       [ -n "$r" ] && [ -f "$r/handoff/resume.md" ] && { echo "=== $(basename "$r") ==="; cat "$r/handoff/resume.md"; echo; any=1; }
@@ -1313,7 +1384,7 @@ case "$cmd" in
   dispatch) bash "$ROOT/factory/dispatch-runner.sh" "$@" ;;   # restricted external-CLI dispatcher (DORMANT — always refuses)
   all|g) _board --all ;;           # aggregated board across the registry (id + repo + summary)
   handoff) _handoff ;;             # per-repo (in a repo) or aggregated live state
-  pause) _pause "${1:-}" ;;         # write a resume checkpoint (safe to leave)
+  pause) _pause "$@" ;;            # write a resume checkpoint (safe to leave)
   resume) _resume "${1:-}" ;;       # read it (--all aggregates, --done clears)
   list|ls)                         # plain vertical list
     echo "TO DO:";  _list todo

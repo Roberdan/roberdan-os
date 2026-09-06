@@ -365,11 +365,11 @@ EOF
   # Materialized from the canonical template hooks/copilot/extension.template.mjs with the
   # repo root baked in as the RDA_OS default (deterministic; a runtime RDA_OS env still wins,
   # keeping forks portable). The installed symlink points here, so the extension tracks the
-  # canon automatically — no hand-copied JS to drift.
   mkdir -p "$d/extension/roberdan-os"
   if [ -f "$ROOT/hooks/copilot/extension.template.mjs" ]; then
     sed "s|__RDA_OS_DEFAULT__|$ROOT|g" "$ROOT/hooks/copilot/extension.template.mjs" \
       > "$d/extension/roberdan-os/extension.mjs"
+    cp "$ROOT/hooks/copilot/context-recovery.mjs" "$d/extension/roberdan-os/context-recovery.mjs"
   fi
 }
 
