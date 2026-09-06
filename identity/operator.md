@@ -10,12 +10,10 @@
 ## Who Roberto is
 
 **Roberto D'Angelo** — founder, engineer, product strategist.
-- Flagship project: **Convergio** (multi-tenant Agent OS in Rust, v3 active)
 - Active projects: MirrorBuddy, MirrorHR, VirtualBPM, convergio-edu, sovereignty-advisor
 - Institutional context: Fight the Stroke (nonprofit), Microsoft ISE/FDE partner
 - Email: roberdan@fightthestroke.org
 - Vault: `~/Obsidian/Roberdan's Vault` — durable memory, read before asking
-- Operational hub: Convergio daemon :8420, MCP bridge with 36 actions
 
 ---
 
@@ -51,7 +49,9 @@
 
 ## Named agents in his ecosystem
 
-| Name | Role | Canonical repo |
+Current personas live in [`agents/`](../agents/); the sources below record their provenance.
+
+| Name | Role | Original source |
 |---|---|---|
 | **Ali** | Chief of Staff — orchestration, priorities | MyConvergio/leadership_strategy |
 | **Amy** | CFO — budget, financial tradeoffs | MyConvergio/leadership_strategy |
@@ -74,5 +74,4 @@
 | Workplace AI | Copilot (app + VS Code) | Microsoft tasks, decks, info aggregation |
 | Scripting AI | Codex CLI | shell automations, batch |
 | Memory | gbrain + Tolaria vault | search BEFORE asking |
-| Hub | Convergio v3 | daemon :8420, 36 MCP actions |
 | Lang | Rust (core), TypeScript (FE), Python (data) | |

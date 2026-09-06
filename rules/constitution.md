@@ -31,8 +31,7 @@ meaning to the work — agents always honor them, they are non-negotiable.
 by Default, Inclusive Defaults, Feedback Loops Everywhere, Ethical Guardrails, Hybrid
 Workforce Orchestration, Data Gravity Flows to Insight) are the agents' contract: they
 live in [`behavior/roberto-mode.md`](../behavior/roberto-mode.md) § Agentic Manifesto.
-*"This document is the contract. The daemon is the witness. If they disagree, the
-daemon is the bug."*
+*"This document is the contract. Execution must follow it and leave verifiable evidence."*
 
 ---
 

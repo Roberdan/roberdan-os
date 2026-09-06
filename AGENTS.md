@@ -161,7 +161,7 @@ Roberto promotes it.)* **(3) A DEMONSTRATED live exposure overrides the cap**, a
 "an attacker could…" is a risk, and a cap that yields to *might* is not a cap. Every PR states
 its own round count (`review-budget.sh line <card>`): a number that has to be written down makes
 the eighteenth round embarrassing to type, which prose never has.
-The loop is reliable without a daemon; Convergio is an **optional** observer, never a single point of failure.
+The loop is reliable without a daemon: durable file state and empirical checks carry it.
 
 **Goal tracking = [`kanban/`](kanban/) (durable, auditable, token-bounded, GATED — default).**
 Card-files in `todo/ doing/ done/`. Fast CLI: **`kb`** (`kb` view · `kb add "<title>" --repo <r> [dod] [acc]` ·

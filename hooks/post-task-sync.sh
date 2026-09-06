@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stop / SubagentStop hook — regenerate per-platform wrappers + privacy leak-check.
-# (It does NOT sync the vault or Convergio — that's the /sync skill's job.)
+# (It does NOT reconcile vault and in-repo docs — that's the /sync skill's job.)
 # Mechanizes the end-of-task refresh: regenerates the per-platform wrappers from the canon
 # on disk so the local ~/.claude/etc. stay fresh. Never blocks (exit 0). Never pushes.
 #

@@ -6,8 +6,6 @@
 #
 #   - open PRs on the current repo
 #   - orphan agent worktrees (ghosts after kill or reaper)
-#   - rogue copilot/claude runners spawned by convergio dispatcher
-#   - stale `agent_processes.status='running'` rows in convergio DB
 #   - uncommitted changes on the main checkout
 #
 # Output is intentionally short — one line per finding, prefixed
@@ -19,8 +17,8 @@
 # deployments are verified." This hook makes that claim impossible
 # without first noticing the open work.
 #
-# Non-blocking: every step has `|| true` so a transient `gh` or
-# `sqlite3` error never interrupts the user's flow. Exit 0 always.
+# Non-blocking: a transient command error never interrupts the user's
+# flow. Exit 0 always.
 
 set +e
 
@@ -57,30 +55,6 @@ if [ -d ".claude/worktrees" ]; then
   wt_count=$(find .claude/worktrees -maxdepth 1 -type d -name 'agent-*' 2>/dev/null | wc -l | tr -d ' ')
   if [ "$wt_count" -gt 0 ]; then
     emit "$wt_count agent worktree(s) still present under .claude/worktrees/"
-  fi
-fi
-
-# 4. Convergio runners spawned by the dispatcher (rogue or active).
-copilot_count=$(pgrep -f "copilot.*--allow-all" 2>/dev/null | wc -l | tr -d ' ')
-if [ "$copilot_count" -gt 0 ]; then
-  emit "$copilot_count copilot runner(s) alive — verify they belong to a live convergio task"
-fi
-
-# 5. Stale agent_processes rows in convergio state.db (rows marked
-#    running with no matching live PID).
-db=$HOME/.convergio/v3/state.db
-if [ -f "$db" ] && command -v sqlite3 >/dev/null 2>&1; then
-  running_pids=$(sqlite3 "$db" \
-    "SELECT pid FROM agent_processes WHERE status='running' AND pid IS NOT NULL;" 2>/dev/null)
-  if [ -n "$running_pids" ]; then
-    stale=0
-    while IFS= read -r pid; do
-      [ -z "$pid" ] && continue
-      kill -0 "$pid" 2>/dev/null || stale=$((stale + 1))
-    done <<< "$running_pids"
-    if [ "$stale" -gt 0 ]; then
-      emit "$stale stale agent_processes row(s) in state.db (pid dead, status='running')"
-    fi
   fi
 fi
 

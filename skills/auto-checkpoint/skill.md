@@ -16,14 +16,12 @@ durable state, terminal-condition, auto-resume, auto-escalation.
 - **Enables auto-resume** — on startup, re-reads the state, resumes from the last `done` step.
 - **Enables auto-escalation** — 2 failures on the same problem → frontier class + log the reason.
 
-## State (daemon-optional)
+## State (no daemon required)
 ```
-state store:  ~/.convergio/v3/state.db  (if present)
-              ~/.roberdan-os/state.db    (fallback)
+state store:  ~/.roberdan-os/state.db
 cursor:       .agent-state/<task>.jsonl  (gitignored, 1 record/step + evidence)
 timestamp:    RFC3339
 ```
-Convergio, if active, **reads** the same state — optional observer, never a dependency.
 
 ## Loop (pseudo)
 ```
@@ -38,7 +36,7 @@ loop:
   if no_progress(2 passes): STOP; report_wedged(); break
   step += 1
 on each phase end:
-  post_task_sync()                             # vault + cvg + repo
+  reconcile_vault_and_repo_docs()              # manual /sync skill, not the wrapper hook
 ```
 
 ## Per-platform driver
