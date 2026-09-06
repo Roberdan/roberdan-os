@@ -292,3 +292,20 @@ _Aggiornato: 2026-08-03._
   essere l'ultima generazione del suo livello); (2) **una risposta vuota da un sub-agente non e'
   un risultato** — chi delega verifica l'artefatto prima di trattarla come tale. La (2) tiene
   anche il giorno che questo particolare guasto sparisce da solo con un aggiornamento dell'host.
+- **2026-09-06 — `toolArgsOf` in the Copilot native extension assumes JSON; `apply_patch`-style
+  freeform payloads log a parse warning instead of parsing.** Found while closing card
+  `260906-163511` (bounded long-session recovery): after the host's hook processor was repaired
+  live (upstream `github/copilot-cli#4590`, mitigated this session via `session.rpc.plugins.reload`
+  with `reloadHooks: true`, not permanently patched), the extension's own log showed a real
+  `onPreToolUse` invocation whose `toolArgs` was a freeform `*** Begin ...` patch body, not JSON.
+  `toolArgsOf` (`hooks/copilot/extension.template.mjs`) catches the `JSON.parse` failure and
+  returns `{}` — no crash, matches the existing tested "unparseable toolArgs -> no crash, no
+  override" behavior — but a tool that reaches `onPreToolUse` with a body `toolArgsOf` cannot
+  parse gets **empty args**, and `apply_patch` is not in `WRITE_TOOLS`/`SHELL_TOOLS`, so no guard
+  runs on it either way. Not a regression of the recovery work and not a failed reconnection —
+  the native reconnect and the callback firing are independently confirmed live in the same log.
+  **Honest limit:** single parser read, one occurrence, not yet determined whether this affects
+  guard *protection* (a write path bypassing main-guard) or is purely cosmetic diagnostics.
+  **The condition that would make it a card:** confirming `apply_patch` (or another freeform-arg
+  tool) is a real write path that should be in `WRITE_TOOLS`/`SHELL_TOOLS` and currently is not —
+  that would be a guard-coverage gap, not a parsing nicety.
