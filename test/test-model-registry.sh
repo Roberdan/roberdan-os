@@ -88,6 +88,16 @@ refuses "'gpt-6-astra' capitalised"         $M resolve GPT-6-ASTRA
 refuses "an invented id"                    $M resolve gpt-7-nova
 refuses "an empty token"                    $M resolve ""
 refuses "an unknown host"                   $M resolve opus --host gemini-cli
+for legacy in claude-opus-4.8 claude-opus-4.7 claude-opus-4.6 claude-sonnet-4.6 \
+              gemini-3.7-flash gemini-3.6-flash gemini-3.5-flash mai-code-1-flash-picker grok-4.5; do
+  [ "$(models_status "$legacy")" = legacy ] || err "$legacy lost its legacy designation"
+  refuses "reviewed older generation $legacy" $M resolve "$legacy" --host copilot-task
+done
+for deferred in claude-fable-5.1 claude-fable-5 claude-opus-4.8-fast kimi-k3 kimi-k2.7-code \
+                gpt-5.6-sol-fast hydrafusion; do
+  [ "$($M class "$deferred")" = unknown ] || err "$deferred was promoted without review"
+  refuses "catalog-only model $deferred" $M resolve "$deferred"
+done
 
 # --- C) knob validation -------------------------------------------------------------------
 section "knobs — an effort/context the model does not have is refused, never forwarded"
@@ -100,7 +110,7 @@ refuses "long_context on a default-only model"            $M validate --model gp
 refuses "an effort above what the model offers"           $M validate --model gemini-3.8-flash --effort max
 refuses "an effort level the CLI does not parse"          $M validate --model gpt-6-astra --effort extreme
 refuses "a context tier the CLI does not parse"           $M validate --model gpt-6-astra --context huge
-# `none` and `minimal` are host levels but no reviewed model declares them: the registry, not
+# `minimal` is a host level but Astra does not declare it: the registry, not
 # the flag parser, has the last word. This is the difference between "the CLI accepts it" and
 # "this model has it", and conflating the two is how a knob silently does nothing.
 refuses "a host level no reviewed model declares"         $M validate --model gpt-6-astra --effort minimal
