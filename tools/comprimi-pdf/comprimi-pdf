@@ -1,0 +1,150 @@
+#!/bin/zsh
+# Comprime uno o più PDF con Ghostscript, come fa Acrobat.
+# Il risultato resta accanto all'originale, con " compressed" aggiunto al nome.
+# L'originale non viene mai toccato.
+#
+# Uso:  comprimi-pdf [-q qualita] [--avvisa] file1.pdf [file2.pdf ...]
+#       qualita: schermo | ebook (predefinita) | stampa | massima
+#       --avvisa: avvisa all'inizio e alla fine (notifica, suono, file evidenziato
+#                 nel Finder). Serve quando parte dal menu del Finder, dove
+#                 altrimenti non si vedrebbe niente per minuti.
+
+emulate -L zsh
+setopt no_nomatch
+
+typeset PRESET=/ebook
+typeset -i AVVISA=0
+typeset -a FILES
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -q|--qualita|--quality)
+      case "$2" in
+        schermo|screen)   PRESET=/screen   ;;
+        ebook)            PRESET=/ebook    ;;
+        stampa|print)     PRESET=/printer  ;;
+        massima|prepress) PRESET=/prepress ;;
+        *) print -u2 "Qualità sconosciuta: $2 (usa schermo, ebook, stampa, massima)"; return 1 ;;
+      esac
+      shift 2 ;;
+    --avvisa) AVVISA=1; shift ;;
+    -h|--help)
+      print "Uso: comprimi-pdf [-q schermo|ebook|stampa|massima] [--avvisa] file.pdf ..."
+      return 0 ;;
+    *) FILES+=("$1"); shift ;;
+  esac
+done
+
+if (( ${#FILES} == 0 )); then
+  print -u2 "Serve almeno un file PDF."
+  return 1
+fi
+
+typeset GS
+GS=$(command -v gs) || { print -u2 "Ghostscript non è installato: brew install ghostscript"; return 1; }
+
+avvisa() {
+  (( AVVISA )) || return 0
+  local titolo=$1 testo=$2
+  local -a opzioni=(--titolo "$titolo" --testo "$testo")
+  [[ -n ${3:-} ]] && opzioni+=(--apri "$3")
+  "$HOME/.local/bin/avvisa" "${opzioni[@]}" >/dev/null
+}
+
+suona() {
+  (( AVVISA )) || return 0
+  afplay "$1" >/dev/null 2>&1 &
+}
+
+if (( AVVISA )); then
+  if (( ${#FILES} == 1 )); then
+    avvisa "Comprimo il PDF" "«${FILES[1]:t}» — un file grande può richiedere qualche minuto."
+  else
+    avvisa "Comprimo ${#FILES} PDF" "Può richiedere qualche minuto."
+  fi
+fi
+
+typeset f out dir base
+typeset -i byte_in byte_out errori=0 fatti=0
+typeset -a PRODOTTI
+typeset RIEPILOGO=""
+
+for f in "${FILES[@]}"; do
+  if [[ ! -f "$f" ]]; then
+    print -u2 "Non trovo: $f"
+    RIEPILOGO+="Non trovo ${f:t}. "
+    (( errori++ )); continue
+  fi
+  if [[ "${f:l}" != *.pdf ]]; then
+    print -u2 "Non è un PDF, lo salto: $f"
+    RIEPILOGO+="${f:t} non è un PDF. "
+    (( errori++ )); continue
+  fi
+
+  dir=${f:h}
+  base=${${f:t}:r}
+  out="$dir/$base compressed.pdf"
+
+  # Se esiste già, numera invece di sovrascrivere.
+  typeset -i n=2
+  while [[ -e "$out" ]]; do
+    out="$dir/$base compressed $n.pdf"
+    (( n++ ))
+  done
+
+  if ! "$GS" -q -dNOPAUSE -dBATCH -dSAFER \
+        -sDEVICE=pdfwrite \
+        -dPDFSETTINGS=$PRESET \
+        -dCompatibilityLevel=1.5 \
+        -dDetectDuplicateImages=true \
+        -dCompressFonts=true \
+        -sOutputFile="$out" "$f"; then
+    print -u2 "Compressione fallita: $f"
+    rm -f "$out"
+    RIEPILOGO+="${f:t}: non è riuscita. "
+    (( errori++ )); continue
+  fi
+
+  if [[ ! -s "$out" ]]; then
+    print -u2 "Il file prodotto è vuoto, lo elimino: $f"
+    rm -f "$out"
+    RIEPILOGO+="${f:t}: il risultato era vuoto. "
+    (( errori++ )); continue
+  fi
+
+  byte_in=$(stat -f%z "$f")
+  byte_out=$(stat -f%z "$out")
+
+  # Se non ha guadagnato niente, dillo invece di lasciare un file inutile più grande.
+  if (( byte_out >= byte_in )); then
+    print "${f:t}: era già compresso al massimo, il nuovo file sarebbe più grande. Tolto."
+    rm -f "$out"
+    RIEPILOGO+="${f:t}: era già compresso al massimo. "
+    continue
+  fi
+
+  printf '%s: %.1f MB → %.1f MB (−%d%%)  →  %s\n' \
+    "${f:t}" $(( byte_in / 1048576.0 )) $(( byte_out / 1048576.0 )) \
+    $(( 100 - byte_out * 100 / byte_in )) "${out:t}"
+
+  RIEPILOGO+=$(printf '%s: %.1f MB → %.1f MB (−%d%%). ' \
+    "${f:t}" $(( byte_in / 1048576.0 )) $(( byte_out / 1048576.0 )) \
+    $(( 100 - byte_out * 100 / byte_in )))
+  PRODOTTI+=("$out")
+  (( fatti++ ))
+done
+
+if (( AVVISA )); then
+  [[ -z $RIEPILOGO ]] && RIEPILOGO="Nessun file elaborato."
+  if (( errori > 0 )); then
+    avvisa "Non è andata" "$RIEPILOGO" "${PRODOTTI[1]:-}"
+    suona /System/Library/Sounds/Basso.aiff
+  else
+    avvisa "Fatto" "$RIEPILOGO" "${PRODOTTI[1]:-}"
+    suona /System/Library/Sounds/Glass.aiff
+  fi
+  # Il segnale che non dipende da permessi: il file nuovo, selezionato nel Finder.
+  (( ${#PRODOTTI} > 0 )) && open -R "${PRODOTTI[1]}" >/dev/null 2>&1
+fi
+
+return $(( errori > 0 ))

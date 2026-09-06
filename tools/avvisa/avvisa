@@ -1,0 +1,12 @@
+#!/bin/zsh
+emulate -L zsh
+if (( $# == 0 )); then
+  print -u2 'Uso: avvisa --titolo "Titolo" --testo "Messaggio" [--apri percorso-o-URL] [--suono]'
+  exit 2
+fi
+app="$HOME/Applications/Avvisa.app/Contents/MacOS/Avvisa"
+if [[ ! -x "$app" ]]; then
+  print -u2 "Avvisa non è disponibile in ~/Applications/Avvisa.app."
+  exit 127
+fi
+exec "$app" "$@"

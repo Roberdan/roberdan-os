@@ -11,3 +11,4 @@
 # Prima di aggiungere una riga qui, chiediti chi ha scritto quei file. Se non li hai scritti
 # tu, la riga giusta non e' qui: e' `git rm --cached` piu' la casa fuori da git
 # (~/.roberdan-os/private/brain/). Vedi docs/privacy-leak-check.md.
+tools
