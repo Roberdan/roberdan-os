@@ -3,6 +3,32 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.42.0] - 2026-09-06
+
+**Recupero delle sessioni lunghe, skill aggiornate e configurazione locale semplificata.**
+
+### Added
+- Checkpoint di recupero limitati e validati, con obiettivo, vincoli, decisioni,
+  riferimenti alle prove, lavori pendenti e prossima azione.
+- Integrazione degli eventi Copilot di utilizzo del contesto e compattazione, senza
+  cambiare le soglie native o i profili dei modelli.
+- Skill `apple-designer` per sistemi visivi coerenti e interfacce Apple native.
+
+### Changed
+- Registro dei modelli riesaminato, con versioni precedenti e modelli non ancora
+  valutati esplicitamente distinti; profili richiesti invariati.
+- Skill twin, checkpoint e lavori lunghi allineate al comportamento effettivo dei
+  runtime, con pulizia prudente delle sole cartelle di lavoro concluse.
+- `resource-export` passa dall'elenco delle skill da disattivare a quello delle
+  skill disponibili nel proprio progetto. Lo script non viene eseguito al commit.
+- Rimossi i riferimenti operativi alle dipendenze Convergio e Serena ritirate.
+
+### Notes
+- Il ripristino del gestore degli eventi sblocca la sessione Copilot corrente;
+  il difetto del produttore `github/copilot-cli#4590` non e' corretto da questa versione.
+- La copertura degli strumenti di modifica con input libero resta una segnalazione
+  separata in `docs/findings.md`.
+
 ## [v2.41.0] - 2026-09-06
 
 **Strumenti locali per il Mac: comprimere un PDF dal Finder, ed essere avvisati quando ha finito.**
