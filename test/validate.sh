@@ -19,7 +19,7 @@ ok()      { printf "  ok: %s\n" "$1"; }
 . "$ROOT/test/lib-suites.sh"
 
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue \
-          test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery \
+          test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery test-verify-done \
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bash-guard test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
@@ -117,8 +117,8 @@ if [ $? -eq 0 ]; then ok "federated kb + dispatcher gates green"; else
   printf '%s\n' "$_fedkb_out" | grep -iE '===|ok:|err|FAIL|got:|outside=|inside=|rc=' | sed 's/^/    /'
   err "test-federated-kb failed (output above)"
 fi
-
 if _suite test-context-recovery; then ok "context recovery storage verified"; else _suite_out test-context-recovery; err "test-context-recovery"; fi
+if _suite test-verify-done; then ok "release-merge version check verified"; else _suite_out test-verify-done; err "test-verify-done"; fi
 # A module that exists but has no live entry-path is not "wired" — dormancy must
 # come from REFUSAL (preflight #5/#8), not from being unreachable. This check FAILS
 # if `kb dispatch` no longer routes to an executable dispatch-runner.sh.

@@ -31,6 +31,10 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 - La copertura degli strumenti di modifica con input libero resta una segnalazione
   separata in `docs/findings.md`.
 
+### Fixed
+- Il controllo finale riconosce l'aggiornamento di versione anche quando arriva
+  tramite una PR integrata, senza nascondere modifiche locali o versioni mancanti.
+
 ## [v2.41.0] - 2026-09-06
 
 **Strumenti locali per il Mac: comprimere un PDF dal Finder, ed essere avvisati quando ha finito.**
