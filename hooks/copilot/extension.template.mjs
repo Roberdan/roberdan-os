@@ -1,11 +1,7 @@
 // roberdan-os — native GitHub Copilot CLI extension (TEMPLATE).
 //
-// This is the CANONICAL source. `bin/sync.sh` materializes it into
-// platforms/copilot/extension/roberdan-os/extension.mjs, substituting
-// __RDA_OS_DEFAULT__ with the repo's absolute path at emit time (deterministic,
-// mirrors the settings-hooks.json $ROOT expansion). `--install` symlinks the
-// emitted file to ~/.copilot/extensions/roberdan-os/extension.mjs, so the live
-// extension tracks the canon automatically — no hand-copied JS to drift.
+// Canonical source: sync.sh emits extension.mjs plus context-recovery.mjs, baking ROOT.
+// --install symlinks the emitted extension into ~/.copilot/extensions/roberdan-os/.
 //
 // What it does — translate the provider-neutral hooks/ into Copilot lifecycle APIs:
 //   onSessionStart     -> hooks/context-inject.sh  (inject fresh durable context)
@@ -15,6 +11,8 @@
 //   session.idle       -> the Claude "Stop" chain (pre-completion-gate, verify-done,
 //                         goal-gate, post-task-sync, auto-checkpoint) as WARN + always-on
 //                         checkpoint
+//   session.usage_info -> checkpoint once at measured 65% utilization (no model output)
+//   session.compaction_start/complete -> checkpoint + bounded recovery before the next tool/prompt
 //   onSessionEnd       -> final auto-checkpoint
 // Plus safe, namespaced native tools (kanban view/actions, pause, resume, verify-done,
 // doctor). The kanban gates (todo->doing needs --by, doing->done needs @thor evidence)
@@ -27,32 +25,25 @@
 // (checkpoint, sync), but it CANNOT hold back a premature "done" claim the way the Claude
 // Stop hook's blocking output can. verify-done / pre-completion-gate / goal-gate remain
 // advisory here: goal-gate's exit 2 is read as a warning to surface, never as a turn block.
-// This is the ONE remaining behavioral difference from Claude Code, and it is a platform
-// limit, not a wiring gap.
 //
 // RESPONSE SHAPING (added 2026-08-27, @github/copilot-sdk >= 1.0.11): the Claude "output
 // style" analog. joinSession() now accepts `systemMessage` — we APPEND the executive response
-// format (sliced from behavior/roberto-mode.md) so it binds at the model level every session,
-// with a plain no-systemMessage retry so an older runtime never costs us the extension. It is
-// reinforced per turn by onUserPromptSubmitted (a system-message append can still be diluted
-// in a very long session; a per-turn line cannot). This shapes the reply UP FRONT; it still
-// does not BLOCK a bad reply after the fact — that limitation above stands.
+// format from behavior/roberto-mode.md, reinforced per turn by onUserPromptSubmitted.
+// No second join/retry: two readers would corrupt the stdio channel. This shapes replies
+// up front, but cannot block a bad final message after the fact.
 //
-// CONTEXT-PRESSURE TELEMETRY — deliberately NOT built (verified 2026-07-12 against
-// @github/copilot-sdk@1.0.6 types): the hooks wired here DO carry more than working-dir/tool
-// name/args/error (e.g. onSessionStart's sessionId/initialPrompt, onPostToolUse's toolResult),
-// but none of that is a *validated* token/usage field. `toolResult.toolTelemetry` is an
-// untyped bag — a proxy at best, not a verified correlation to context size — so there is no
-// stable signal to build a "context getting heavy" warning on. No threshold is implemented.
-// Revisit only if a future SDK version adds a real, typed usage field, AND any such signal
-// must stay measurement-only / zero-context-output (never injected into model context, never
-// auto-triggers /new, never blocks a user) per rules/best-practices.md.
+// Copilot 1.0.84-1 generated/session-events.d.ts exposes typed root usage and compaction
+// events. Pressure only saves local state; it never emits a warning into model context,
+// changes models/thresholds, calls /new, or starts another turn. Native compaction remains
+// the host's responsibility. Event callbacks cannot delay compaction: the semantic capsule
+// must already have been saved at phase boundaries. Successful compaction rehydrates it once.
 
 import { joinSession } from "@github/copilot-sdk/extension";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { createContextRecovery } from "./context-recovery.mjs";
 
 // Repo root: a runtime RDA_OS env wins (portable across forks / relocations); otherwise the
 // path baked at emit time. Never throws if it's wrong — every hook degrades to a no-op.
@@ -128,6 +119,7 @@ let chainRunning = false;
 let lastChainRun = 0;
 
 let session;
+const contextRecovery = createContextRecovery({ hooksDirectory: HOOKS, runScript, runKb, hookPayload, diag });
 
 // The joined session's own id. Claude Code passes `session_id` in every hook payload, and BOTH
 // hooks/goal-gate.sh and hooks/bus-doorbell.sh key their per-session state on it, falling back
@@ -577,6 +569,7 @@ let execFormatInSystemMessage = false; // false ⇒ the long form, on every unex
 
 const hooks = {
     onSessionStart: async (input) => {
+        contextRecovery.rememberDirectory(input);
         const ci = join(HOOKS, "context-inject.sh");
         if (!existsSync(ci)) return undefined;
         const { stdout } = await runScript(ci, "", input && input.workingDirectory);
@@ -585,7 +578,11 @@ const hooks = {
     },
 
     // Per-turn reinforcement of the executive format (see the REMINDER constants). additionalContext only — never rewrites the prompt.
-    onUserPromptSubmitted: async () => ({ additionalContext: execFormatInSystemMessage ? EXEC_FORMAT_TURN_REMINDER_SHORT : EXEC_FORMAT_TURN_REMINDER_FULL }),
+    onUserPromptSubmitted: async (input) => {
+        const recovery = await contextRecovery.takeRecovery(contextRecovery.rememberDirectory(input));
+        const format = execFormatInSystemMessage ? EXEC_FORMAT_TURN_REMINDER_SHORT : EXEC_FORMAT_TURN_REMINDER_FULL;
+        return { additionalContext: recovery ? `${format}\n${recovery}` : format };
+    },
 
     onPreToolUse: async (input) => {
         const name = String((input && input.toolName) || "").toLowerCase();
@@ -593,27 +590,29 @@ const hooks = {
         // Forward the session's working directory so the guards resolve the correct repo/branch
         // even when a relative path is supplied and the extension's own cwd differs (a relative
         // path with a cwd mismatch would otherwise let main-guard resolve no repo and fail OPEN).
-        const cwd = (input && input.workingDirectory) || process.cwd();
+        const cwd = contextRecovery.rememberDirectory(input);
+        const recovery = await contextRecovery.takeRecovery(cwd);
+        const finish = (decision) => recovery ? { ...decision, additionalContext: recovery } : decision;
         // Sensitive knowledge never leaves the machine: refuse host-native memory writes
         // outright. This is a hard deny (not "ask") because there is no legitimate case —
         // the durable store is the local vault, and a prompt would only invite a mistake.
         if (MEMORY_TOOLS.has(name)) {
-            return {
+            return finish({
                 permissionDecision: "deny",
                 permissionDecisionReason:
                     `roberdan-os: '${name}' writes to a vendor-hosted memory store. Durable memory stays local — ` +
                     `write a note under ~/Obsidian/Roberdan's Vault/agent-learnings/ instead (type: agent-learning).`,
-            };
+            });
         }
         if (WRITE_TOOLS.has(name)) {
             const fp = writePathOf(args);
-            return await applyGuard("main-guard.sh", { tool_input: { file_path: String(fp) } }, cwd);
+            return finish(await applyGuard("main-guard.sh", { tool_input: { file_path: String(fp) } }, cwd));
         }
         if (SHELL_TOOLS.has(name)) {
             const cmd = args.command || args.cmd || "";
-            return await applyGuard("bash-guard.sh", { tool_input: { command: String(cmd) } }, cwd);
+            return finish(await applyGuard("bash-guard.sh", { tool_input: { command: String(cmd) } }, cwd));
         }
-        return undefined;
+        return finish(undefined);
     },
 
     onPostToolUse: async (input) => {
@@ -684,8 +683,9 @@ try {
     // and run side effects, but — per the documented limitation — it cannot block/rewrite the
     // final assistant message that has already been produced.
     session.on("session.idle", () => {
-        runStopChain(process.cwd()).catch((e) => diag("session.idle:runStopChain", e));
+        runStopChain(contextRecovery.directory).catch((e) => diag("session.idle:runStopChain", e));
     });
+    contextRecovery.register(session);
     try {
         await session.log("roberdan-os extension loaded (agents, guards, kanban tools, always-on checkpoint).", {
             ephemeral: true,

@@ -169,6 +169,18 @@ over-engineer. "assicurati" / "verifica bene" / "qualità" / "scala a opus" → 
 
 ## Adding or promoting a model
 
+**2026-09-06 review:** the complete CLI/task catalog was compared with the registry. Older
+generations with exposed capability metadata are recorded as `legacy`, not promoted. The
+registry header names every deferred id and why it remains refused (missing capability
+metadata or unreviewed task fit). Astra / Opus 5 / Sonnet 5 profiles are unchanged. Listing a
+new model is not evidence of better quality, latency, or price.
+
+**Long sessions:** context pressure is not a reason to downgrade the model or reasoning effort,
+switch to `auto`, or buy a larger window. First checkpoint and reduce the working set using
+[[auto-checkpoint]]. Keep required profiles; send bounded, self-contained tasks to fresh agents
+only for independent work. A long window is justified by irreducible task input, not accumulated
+logs. Change a profile only after representative outcome evidence, never a synthetic dry-run.
+
 A new id appearing in a host's list is **not** a promotion. Add a reviewed row to `models.tsv`:
 id, family, class, the efforts and contexts you actually verified, and where you read them. A
 family may hold **exactly one `current` row**, so promoting a new generation forces demoting the

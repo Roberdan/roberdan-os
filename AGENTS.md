@@ -198,6 +198,14 @@ tool and this protocol are versioned.
   work scar). `kb finish` **refuses** while it holds uncommitted or unmerged work and removes it
   when clean, so a closed card leaves nothing behind. Escapes cost a written reason on the card:
   `--no-worktree "<why>"` (non-code card) · `--keep-worktree "<why>"` (review still open).
+- **Clean workspaces are part of completion, including after resume/compaction.** Track the
+  exact worktree paths owned by the task in its checkpoint. Before closing, inspect them:
+  no live job/agent using the path, no changes or untracked/ignored data to preserve, and
+  all commits contained in the intended integration branch. Then use `kb finish` for card
+  worktrees, or `git worktree remove <exact-path>` and `git branch -d <owned-branch>`.
+  Never use force, recursive deletion, or a blanket cleanup of other sessions' worktrees.
+  If ownership, activity, data or integration is uncertain, retain it with a reason and
+  exact next check; "clean" never means discarding the last copy of work.
 - **Gate `doing → done`:** **`@thor` validates** against the acceptance criteria with **evidence**
   (`kb finish … --thor "<commit/test/output>"`) — never a rubber-stamp.
   **Same honest limit as `--by`:** `--thor` is a discipline gate, not a security boundary — the
