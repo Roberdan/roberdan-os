@@ -51,4 +51,5 @@ if grep -qF 'commits with files > 300 lines' "$REFERENCE"; then
   FAIL=1
 fi
 
+bash "$ROOT/test/test-pre-completion-gate.sh" || FAIL=1
 exit "$FAIL"

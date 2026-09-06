@@ -25,7 +25,7 @@ PARK=(
   gstack-landing-report gstack-open-gstack-browser gstack-pair-agent
   gstack-plan-ceo-review gstack-plan-design-review gstack-plan-devex-review
   gstack-plan-tune gstack-qa-only gstack-retro gstack-setup-browser-cookies
-  gstack-setup-deploy gstack-skillify gstack-connect-chrome resource-export
+  gstack-setup-deploy gstack-skillify gstack-connect-chrome
 )
 
 # Repo-specific: they only make sense inside these repos, so that is where they live.
@@ -36,6 +36,7 @@ SCOPED=(
   "gstack-ios-fix:MirrorBuddy,MirrorScopio"
   "gstack-ios-qa:MirrorBuddy,MirrorScopio"
   "gstack-ios-sync:MirrorBuddy,MirrorScopio"
+  "resource-export:VirtualBPMFy27"
 )
 
 MODE="apply"

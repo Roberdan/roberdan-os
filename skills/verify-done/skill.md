@@ -29,7 +29,7 @@ not done.)
 ## The 3 mandatory conditions
 1. **Evidence** — concrete artifacts attached: commit SHA, PR link, file path, test output.
 2. **Verified empirically** — actually tested, not estimated. Show the output, not the estimate.
-3. **Systems in sync** — vault (Obsidian) + Convergio twin plan + in-repo docs aligned.
+3. **Systems in sync** — vault (Obsidian) + in-repo docs aligned where present.
 
 ## Zero-progress screen (cheapest check, run it FIRST)
 Before the checklist: **did any durable state actually change since the task started?**
@@ -59,8 +59,8 @@ cheap predicate catches the majority of them.
 | "It's secure" | security scan |
 | "It's deployed" | confirmed deploy |
 
-**Claims without evidence are rejected.** In Convergio: only `thor` sets `done`
-(executors propose `submitted`). See [`agents/thor.md`](../../agents/thor.md).
+**Claims without evidence are rejected.** Only `thor` validates completion;
+executors provide evidence for review. See [`agents/thor.md`](../../agents/thor.md).
 
 ## If you got it wrong
 Acknowledge, fix, don't justify:

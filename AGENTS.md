@@ -161,7 +161,7 @@ Roberto promotes it.)* **(3) A DEMONSTRATED live exposure overrides the cap**, a
 "an attacker could…" is a risk, and a cap that yields to *might* is not a cap. Every PR states
 its own round count (`review-budget.sh line <card>`): a number that has to be written down makes
 the eighteenth round embarrassing to type, which prose never has.
-The loop is reliable without a daemon; Convergio is an **optional** observer, never a single point of failure.
+The loop is reliable without a daemon: durable file state and empirical checks carry it.
 
 **Goal tracking = [`kanban/`](kanban/) (durable, auditable, token-bounded, GATED — default).**
 Card-files in `todo/ doing/ done/`. Fast CLI: **`kb`** (`kb` view · `kb add "<title>" --repo <r> [dod] [acc]` ·
@@ -387,6 +387,19 @@ Full mechanics, honest limits and what each gate deliberately does NOT do:
 
 ---
 
+## Apple application UI: mandatory skill
+
+Before designing, implementing, modifying or reviewing application UI for macOS, iOS,
+iPadOS, watchOS, tvOS or visionOS, invoke **`apple-designer`**. This includes cross-platform
+apps targeting Apple devices, not only SwiftUI, UIKit or AppKit. Do not wait for Roberto
+to name the skill, and do not substitute a generic design or coding agent for it.
+
+Load it once for the task; do not reload an already active skill on every turn. After
+context loss, restore its guidance before continuing UI work. Backend-only work does
+not trigger this route. If the host does not expose the skill, read the canonical
+`skills/apple-designer/skill.md` in roberdan-os; if unavailable, report that limitation
+before UI work rather than claiming the skill was engaged.
+
 ## Skill routing
 
 **Route to a name the host actually declares.** Ask the host for its skill list and match the
@@ -398,6 +411,7 @@ and say which one you used.** Never tell Roberto to install something to answer 
 
 | Request | Preferred (if the host declares it) | Fallback — always available here |
 |---|---|---|
+| Apple application UI (mandatory before UI work) | `apple-designer` | [`apple-designer`](skills/apple-designer/skill.md) |
 | Product ideas / brainstorming | `office-hours` | [`board`](agents/board.md) + [`focus-group`](skills/focus-group/skill.md) |
 | Strategy / scope | `plan-ceo-review` | [`board`](agents/board.md) (red-team) + [`problem-validation`](skills/problem-validation/skill.md) |
 | Architecture | `plan-eng-review` | [`baccio`](agents/baccio.md) |

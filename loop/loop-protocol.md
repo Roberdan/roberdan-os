@@ -15,7 +15,7 @@ session:            a loop phase is the session unit — /compact continues it, 
 terminal-condition: <job-specific empirical check — e.g. "cargo test green + CI #N pass">
 checkpoint:         1 commit per phase, evidence-first message (SHA/PR/CI in every update)
 escalation:         2 failed attempts on the same problem → opus, log the reason
-sync-on-iteration:  post-task-sync (vault + cvg + repo) at the end of EVERY phase
+sync-on-iteration:  /sync (manual vault + in-repo docs reconciliation) at EVERY phase end
 resume:             read the state at startup, resume from the last done step, never redo
 stuck:              2 passes with no progress → STOP, report what's wedged, don't loop
 review-budget:      declared BEFORE round 1 (default 2, hard cap 3) — a review loop whose
@@ -24,9 +24,8 @@ review-budget:      declared BEFORE round 1 (default 2, hard cap 3) — a review
 
 ## Components
 
-### 1. Durable state (daemon-optional)
-- **State store:** SQLite at a known path — `~/.convergio/v3/state.db` if present, otherwise
-  `~/.roberdan-os/state.db`. RFC3339 timestamps.
+### 1. Durable state (no daemon required)
+- **State store:** SQLite at a known path — `~/.roberdan-os/state.db`. RFC3339 timestamps.
 - **Per-task cursor:** `.agent-state/<task>.jsonl` (append-only) — one record per step with
   outcome and evidence. `.agent-state/` is gitignored.
 - **Tool receipts, not just next-steps:** every durable checkpoint carries *what ran and what
@@ -38,8 +37,7 @@ review-budget:      declared BEFORE round 1 (default 2, hard cap 3) — a review
   discipline. Placement is opt-in-safe: in-repo `.agent-state/` only where the repo already
   ignores it, else `$RDA_HOME/state/receipts/<repo>/` (proof: `test/test-receipts.sh`).
   Phase-commit messages + kb card audit lines remain receipts too.
-- Readable both by hooks and by Convergio if active. **The loop doesn't depend on the daemon:**
-  Convergio is an optional observer that *reads* the same state file, never a single point of failure.
+- **The loop doesn't depend on a daemon:** hooks and agents read durable state directly.
 
 ### 2. Terminal-condition (empirical verification)
 Never "should work." The end condition is a check against **ground truth**:

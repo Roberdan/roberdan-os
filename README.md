@@ -426,13 +426,11 @@ scaffolds your `identity/` (dry-run by default), then you rewrite the prose in y
 `RDA_HOME=~/.<you>-os`. You inherit a working canon + `kb` + hooks + eval harness; the memory/recall
 and meta-loop automation require rebuilding the external tooling above.
 
-## Relationship to Convergio
+## Independent runtime
 
-[Convergio](https://github.com/Roberdan/convergio) is the same philosophy at platform scale —
-evidence-first discipline, done-gates, human gates on irreversible actions, enforced by a Rust daemon
-with hash-chained audit. roberdan-os is the personal-scale instance of those principles. Convergio is
-the municipality; roberdan-os is one citizen's house built to the same codes. Neither depends on the
-other — Convergio is an optional observer of the loop, never a single point of failure.
+roberdan-os uses durable file state, empirical verification and human approval for irreversible
+actions. It does not use the retired Convergio platform runtime or its database.
+ConvergioEdu2030 remains an active, separate project; this retirement does not apply to it.
 
 ## Privacy
 

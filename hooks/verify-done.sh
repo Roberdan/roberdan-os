@@ -47,7 +47,7 @@ fi
 # 3. Last commit on main without a version/changelog bump
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
-  LAST=$(git log -1 --name-only --pretty=format: 2>/dev/null)
+  LAST=$(git diff-tree --root --no-commit-id --name-only -r -m --first-parent HEAD 2>/dev/null)
   if ! printf '%s' "$LAST" | grep -qiE '(VERSION|CHANGELOG)'; then
     WARN+="• last commit on $BRANCH without a VERSION/CHANGELOG update\n"
   fi

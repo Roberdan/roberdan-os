@@ -30,7 +30,7 @@ Every checkpoint is an **evidence-first** update:
 
 ## State
 Durable state on file at a known path (SQLite/jsonl). The loop **doesn't depend** on
-a daemon: Convergio, if active, is just an optional observer reading the same state.
+a daemon; resume and verification use that durable state directly.
 
 ## Human gates
 Never automates the [human gates](../AGENTS.md#human-gates): merges to `main` with

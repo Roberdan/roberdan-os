@@ -24,6 +24,8 @@ fields. Never put confidential notes in a public working tree.
 - Save only conclusions, constraints and evidence references. Keep raw tool output in
   files and retrieve bounded ranges on demand. Delegate independent investigations to
   fresh contexts with explicit scope, required model profile and a bounded result.
+- At phase ends, reconcile the vault and repository docs manually with [[sync]];
+  regenerating platform wrappers is not memory reconciliation.
 
 ## Recovery capsule
 
