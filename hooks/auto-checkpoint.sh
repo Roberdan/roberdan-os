@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # hooks/auto-checkpoint.sh — Stop hook. After every agent turn, keep the pause/resume checkpoint
-# current so an unannounced crash/reboot loses nothing. Lean by construction: `kb pause --auto`
+# current to reduce work lost on an unannounced crash/reboot. Lean: `kb pause --auto`
 # overwrites one file (handoff/resume.md), refreshing only mechanical state and PRESERVING the
 # human next-step note. Never fail the turn — guard everything, always exit 0.
 #
@@ -8,10 +8,10 @@
 # snippet platforms/claude/settings-hooks.json (bin/sync.sh --emit-only regenerates it;
 # bootstrap's "Manual steps" point at it).
 KB="${RDA_KB:-$HOME/GitHub/roberdan-os/kanban/kb.sh}"
-[ -x "$KB" ] || exit 0
+[ -x "$KB" ] || { echo "auto-checkpoint: kb unavailable at $KB" >&2; exit 0; }
 # kb resolves the current repo from cwd (registered board) else falls back to roberdan-os —
 # same resolution as `kb`/`kb handoff`. --auto is fast (git rev-parse/status) and self-guarded.
-bash "$KB" pause --auto >/dev/null 2>&1 || true
+bash "$KB" pause --auto >/dev/null || echo "auto-checkpoint: save failed; previous checkpoint not refreshed" >&2
 # Mechanical per-turn receipt into the loop cursor (loop/receipt.sh decides the safe target:
 # in-repo .agent-state/ only where it's already ignored, else $RDA_HOME/state/receipts/).
 # This is the automatic emitter behind loop-protocol § tool receipts — zero agent discipline.

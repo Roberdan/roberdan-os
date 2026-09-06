@@ -21,6 +21,8 @@ kb start <id> --by roberto [--no-worktree "<why>"]      # GATE: todo->doing (+ t
 kb finish <id> --thor "<ev>" [--by <chi>] [--keep-worktree "<why>"]  # GATE: doing->done (worktree must be clean)
 kb pause "<next step>"               # lean per-repo checkpoint handoff/resume.md (overwritten;
                                      #   a Stop hook runs `kb pause --auto` after every turn)
+kb pause --context '<JSON>'           # bounded recovery capsule (auto-checkpoint skill schema)
+kb resume --context                  # checkpoint only; no board/history enumeration
 kb resume [--done]                   # show checkpoint + live backlog | clear when resumed
 kb pending [--count]                 # approval inbox: todo + unapproved learning + non-bot PRs
                                      #   across all registered repos. --count = fast LOCAL total
@@ -80,6 +82,17 @@ guardava una card nel momento in cui la prendi in mano.*
   - **When @thor is unavailable, say who verified instead:** `kb finish <id> --by <chi> --thor
     "<evidence>"`. `--by` records the real verifier and skips the automatic @thor run; the
     evidence still goes in `--thor`, always. Both are needed — `--by` alone is refused.
+
+## Bounded recovery in long sessions
+
+`pause --context` accepts `goal`, `acceptance`, `next` strings plus `constraints`,
+`decisions`, `evidence`, `pending` string arrays. Save exact job/agent IDs, unresolved
+approvals and artifact revisions, not logs. Input is limited to 12000 bytes; the full
+checkpoint to 16384 bytes. Invalid or oversized writes preserve the old file. Replacement
+is atomic. `--auto` preserves the capsule and its origin revision; mechanical HEAD/dirty
+state describes the current linked worktree when it belongs to the board's repository.
+Newer HEAD does not revalidate old evidence. `resume --context` executes no job and grants
+no approval. Full contract: `skills/auto-checkpoint/skill.md`.
 
 ## `start` when you BEGIN, not retrospectively (so `doing` means something)
 **`kb start` goes at the *start* of the work, not at the end.** The point of `doing` is to show

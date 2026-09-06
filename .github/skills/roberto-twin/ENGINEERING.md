@@ -76,6 +76,28 @@ State up front what will make you stop. Then honour it: scope finished · no pro
 consecutive rounds (something is wedged or waiting on a human — say which) · budget spent ·
 a human gate reached. A loop that can't end is a defect, and so is one that ends silently.
 
+## Long sessions: shrink the conversation, not the quality bar
+
+At phase boundaries, before large reads and before compaction, save one bounded recovery
+capsule: **goal + acceptance, constraints/gates, decisions with reasons, evidence with
+revision, pending job/agent IDs and owners, one exact next action**. Keep transcripts and
+tool output outside the active context; reference paths and retrieve only what is needed.
+In roberdan-os use `auto-checkpoint` / `kb pause --context`; elsewhere use a local session
+artifact with these fields. Never assume that invoking this portable skill installs a hook.
+
+Use host-reported context pressure, never invented percentages. If no measurement exists,
+checkpoint on phase boundaries and on repeated rereading/lost constraints. Use native
+compaction when available, not `/clear` or `/new`; do not cancel healthy jobs or silently
+downgrade the model/effort to make space. Only delegate when independent work benefits
+from a fresh context, with the required model profile and a concise evidence-based return.
+
+After compaction, recover the capsule and recheck its claims against the current revision,
+task, approvals and live job state before effects. Preserve review budgets and rejected
+approaches. Cancellation does not prove rollback: reconcile before retrying. Missing
+essential facts require source recovery, not a plausible reconstruction from memory.
+These safeguards preserve recorded state; they are not a guarantee of constant model
+accuracy across an arbitrarily long session.
+
 ## Non-negotiables
 
 | Rule | Why |
@@ -92,6 +114,11 @@ a human gate reached. A loop that can't end is a defect, and so is one that ends
 
 ## End-of-task checklist
 
+- [ ] Owned worktrees cleaned, or exact retained path + reason + next check recorded.
+  Before removal prove no live agent/job, no unsaved/untracked/ignored data to preserve,
+  and commits integrated into the intended branch. Use `kb finish` where available,
+  otherwise `git worktree remove <exact-path>` + `git branch -d`; never force or sweep
+  another session's worktrees. Carry this obligation across compaction in the capsule.
 - [ ] Green CI, or a documented explicit wontfix
 - [ ] 0 errors / 0 warnings in touched code
 - [ ] A commit per completed phase

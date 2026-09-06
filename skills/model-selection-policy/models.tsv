@@ -27,8 +27,16 @@
 #   status    current | legacy
 #   source    provenance of the row
 #
-# Reviewed 2026-09-05: CLI ids from `copilot help config` 1.0.84-1;
+# Reviewed 2026-09-06: CLI ids from `copilot help config` 1.0.84-1;
 # effort/context capabilities from this session's task tool schema, not from help's id list.
+# All 27 CLI ids and the 26 task ids were compared; the union is 31 ids.
+# Nine older task-described models are now recorded as legacy, NOT promoted or selected.
+# Explicitly deferred (remain unknown/refused; do not invent capability metadata):
+#   CLI only: claude-fable-5.1, claude-fable-5, claude-opus-4.8-fast, kimi-k3, kimi-k2.7-code
+#     Reason: no per-model effort/context schema on the task surface in this session.
+#   Task only: gpt-5.6-sol-fast, hydrafusion
+#     Reason: distinct variants with no reviewed task-fit evidence; no profile change justified.
+# Existing current rows/aliases and required subagent profiles are intentionally unchanged.
 #
 #id	family	alias	class	efforts	contexts	hosts	status	source
 claude-opus-5	claude-opus	opus	frontier	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
@@ -46,3 +54,12 @@ gpt-5-mini	gpt-mini	-	cheap	low,medium,high	default	copilot,copilot-task	legacy	
 gemini-3.8-flash	gemini-flash	-	mid	low,medium,high	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
 mai-code-1.1-flash	mai-code-flash	-	cheap	low,medium,high	default	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
 grok-4.6	grok	-	frontier	low,medium,high,xhigh	default,long_context	copilot-task	current	task-schema/2026-09-05
+claude-opus-4.8	claude-opus	-	frontier	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	legacy	cli-help+task-schema/2026-09-06
+claude-opus-4.7	claude-opus	-	frontier	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	legacy	cli-help+task-schema/2026-09-06
+claude-opus-4.6	claude-opus	-	frontier	low,medium,high,xhigh,max	default,long_context	copilot-task	legacy	task-schema/2026-09-06
+claude-sonnet-4.6	claude-sonnet	-	mid	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	legacy	cli-help+task-schema/2026-09-06
+gemini-3.7-flash	gemini-flash	-	mid	low,medium,high	default,long_context	copilot,copilot-task	legacy	cli-help+task-schema/2026-09-06
+gemini-3.6-flash	gemini-flash	-	mid	minimal,low,medium,high	default,long_context	copilot,copilot-task	legacy	cli-help+task-schema/2026-09-06
+gemini-3.5-flash	gemini-flash	-	mid	minimal,low,medium,high	default,long_context	copilot,copilot-task	legacy	cli-help+task-schema/2026-09-06
+mai-code-1-flash-picker	mai-code-flash	-	cheap	low,medium,high	default	copilot,copilot-task	legacy	cli-help+task-schema/2026-09-06
+grok-4.5	grok	-	frontier	low,medium,high	default,long_context	copilot,copilot-task	legacy	cli-help+task-schema/2026-09-06
