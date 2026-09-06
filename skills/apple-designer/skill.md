@@ -1,34 +1,42 @@
 ---
 name: apple-designer
-description: "Design or redesign native Apple apps with a coherent product experience, not just a beautiful component. Use for Mac/iOS product UX, Siri-like voice interfaces, Liquid Glass, themes, app icons, and native navigation. Establish visual direction cheaply, implement in Swift, and separate visual approval from functional and energy evidence."
+description: "Design or critique coherent visual languages and systems for apps, websites, and digital products, with an Apple-native specialization. Use for reference analysis, visual direction, typography, layout, themes, components/states, interaction and motion, or Mac/iOS UX, Siri-like voice, Liquid Glass, and icons. Match product, brand, and platform; separate visual approval from functional and performance evidence."
 providers: [claude, copilot, codex]
 ---
 
 # Apple designer
 
-Beautiful Apple apps combine a complete product, native behavior, and restraint.
-An isolated luminous voice orb is not an app; a chat-clone layout is not the only
-way to make an assistant useful. Design the session and navigation before its jewel.
+Design a visual language that serves the audience, purpose, brand, and platform:
+not a collection of attractive screens or an Apple-look recipe for every product.
+An isolated luminous orb is not an app; design navigation and the task before its jewel.
 This skill supplies domain guidance, not permission to spend, ship, or declare done.
 The owner approves subjective direction; Thor remains the final quality gate.
+
+**Routing:** sections 1-2 and 7 apply to every surface. Read
+[visual-language.md](visual-language.md) for reference analysis, system grammar, and critique.
+Sections 3-4 specialize in native Apple apps; sections 5-6 apply when motion, voice,
+or attachments are in scope. Do not add those features just because they appear here.
+For non-Apple work, keep the project's platform, framework, tools, and existing system.
+Coordinate only host-declared specialists (for example, web design/accessibility or
+artifact-building skills); read their contracts and pass the agreed direction to them.
+Do not impose Swift, Siri, Liquid Glass, or a particular palette on another platform.
 
 ## 1. Establish the product and the evidence boundary
 
 - Read the existing app and its instructions. Preserve working flows and shared state.
 - Ask a first question only when its answer changes the product, cost, or risk:
-  for example, a menu-bar companion versus a document-centered workspace.
+  for example, a glanceable companion versus a dense expert workspace.
   Offer a recommendation; do not ask the owner to choose libraries or corner radii.
-- Identify supported devices, minimum OS, available SDK, runtime, input methods,
-  essential tasks, privacy limits, and what already has visual approval.
+- Identify audience, purpose, brand, content, supported devices, input methods,
+  essential tasks, privacy limits, accessibility needs, and existing visual approval.
 - Write a compact acceptance list in the existing task artifact, not a new manifesto.
-  Include opening a session, navigating history, asking by text/voice, stopping,
-  attaching context if supported, and recovering from failures.
-- Read current official Apple guidance on every invocation; do not freeze this skill
-  to a remembered release. Record source URL/date, Xcode version, SDK version,
-  deployment target, and runtime device/OS separately.
-  Use `xcodebuild -version` and `xcodebuild -showsdks` when installed.
-- Apple documentation outranks third-party summaries. Confirm API availability and
-  signatures against official docs and the installed SDK before using examples.
+  Include entry, navigation, the primary task, its result, and failure recovery.
+- Read current official target-platform guidance on every invocation; record source
+  URL/date, toolchain/framework, supported targets, and actual runtime separately.
+  For Apple apps, check Xcode/SDK versions and deployment target; use
+  `xcodebuild -version` and `xcodebuild -showsdks` when installed.
+- Official platform documentation outranks summaries. Confirm API availability and
+  signatures against current docs and installed tools before using examples.
   If a source or device is unavailable, record the gap instead of inventing proof.
 
 **Gate:** the essential journey and evidence needed to demonstrate it are explicit.
@@ -38,32 +46,37 @@ Resolve unknowns that affect implementation before building the visual treatment
 
 - Offer two or three distinct, low-cost directions before many code iterations,
   unless a direction is already approved. Change composition and hierarchy, not
-  merely the color of the same orb. Reuse existing assets and approved local tools.
+  merely color: compare density, typography, navigation, and interaction vocabulary.
+  Reuse existing assets and approved local tools.
   External generation or paid tools require approval; mockups need not cost money.
-- Each direction shows the full app: navigation, primary content, composer,
-  voice presence, attachment entry, and a representative populated session.
-  Include a compact/adaptive view if that is part of the product.
+- Deconstruct references with the linked method: separate observed design rules
+  from inferred intent. Transfer useful principles, not someone else's identity.
+- Each direction shows navigation, realistic content, the primary action, and
+  representative responsive and failure states, not only a polished empty screen.
 - Label each artifact **static illustrative render**, **interactive prototype**,
-  or **functional native UI**. A render proves neither native APIs nor behavior.
+  or **functional UI** (native only when true). A render proves neither APIs nor behavior.
   Synthetic motion is a **demo**, not evidence of an audio pipeline.
-- Explain the tradeoff in one sentence per direction and recommend one.
+- Explain product/brand fit and tradeoffs in legibility, task speed, accessibility,
+  distinctiveness, and implementation/performance cost; recommend one direction.
   Obtain subjective visual approval before expanding implementation. If approval
   is unavailable, leave the alternatives for review; do not invent approval.
 - After agreement, choose cosmetic implementation details autonomously.
   Reopen direction only for a material discovery, not every spacing adjustment.
 
-One useful direction, not a mandatory template: a quiet native sidebar, coherent
-content surface, sculptural luminous presence, and selective Liquid Glass controls.
-Restrain ambient color so light feels integrated rather than sprayed over everything.
-Laguna, Iris, Ambra, and Rosa are example palettes, not prescribed taste or branding.
-Keep personal accent and system/light/dark appearance independently understandable.
+For an Apple voice companion, one optional direction is a quiet sidebar, sculptural
+luminous presence, selective glass controls, and restrained ambient light.
+Laguna, Iris, Ambra, and Rosa are palette examples, never a universal house style.
+An editorial site or dense operations tool may need an entirely different language.
 
-**Gate:** retain the chosen reference, its approval, and a short direction contract
-(hierarchy, navigation, light, material, color, motion). Judge later work against it.
+**Gate:** agree a short direction contract: audience/task, hierarchy, visual rules,
+component/state grammar, constraints, and anti-goals. Implement semantic tokens in
+the existing system, not scattered one-off values. Retain approval in the existing
+task record; create a durable design-system document only when requested or required
+by project conventions. Do not generate unsolicited markdown files.
 
-## 3. Build the whole native experience
+## 3. Apple specialization: build the whole native experience
 
-- Swift and native Apple frameworks are the priority. Use SwiftUI system controls,
+- For native Apple apps, Swift and native frameworks are the priority. Use SwiftUI controls,
   San Francisco system typography, SF Symbols, and real native materials.
   AppKit/UIKit integration is appropriate when the platform needs it.
   HTML, Electron, or a CSS-rendered surface is not a native substitute.
@@ -73,7 +86,7 @@ Keep personal accent and system/light/dark appearance independently understandab
 - Use native navigation appropriate to the platform: for example,
   `NavigationSplitView` for a Mac sidebar and `NavigationStack` for a narrow flow.
   Keep history, settings, new session, and recovery reachable without hunting.
-- Text, voice, optional transcript, and attachment context are views of one session.
+- When present, text, voice, transcript, and attachment context share one session.
   Switching input mode or compact/full window must not reset messages, selected
   sources, active response, or cancellation state. Make persistence policy explicit.
 - A hidden transcript is a presentation choice, not discarded context.
@@ -88,9 +101,10 @@ Keep personal accent and system/light/dark appearance independently understandab
 **Gate:** demonstrate the complete journey in a native vertical slice before polishing
 an isolated visual component. Existing behavior must remain usable.
 
-## 4. Use glass and icons honestly
+## 4. Apple specialization: use glass and icons honestly
 
-Liquid Glass belongs selectively to controls and navigation over coherent content.
+When appropriate to the agreed Apple direction, glass belongs selectively to controls
+and navigation over coherent content. Its presence alone is not a quality standard.
 Do not turn every paragraph, chat bubble, and panel into competing translucent glass.
 Prefer system-provided treatment before adding custom effects.
 
@@ -123,9 +137,12 @@ A build with SDK 26 is not runtime proof on OS 27; label that gap explicitly.
 **Gate:** material and icon claims name the real APIs, source assets, supported target,
 and actual rendered result. Availability, compilation, and runtime remain distinct.
 
-## 5. Make voice motion meaningful and economical
+## 5. Make interaction and motion meaningful and economical
 
-- Give listening a receptive character, processing a thoughtful character, and
+- Every transition should orient, acknowledge, or explain an actual state change.
+  Define timing, interruption, focus, and reduced-motion behavior consistently;
+  remove ornamental motion that competes with reading or task completion.
+- For voice, give listening a receptive character, processing a thoughtful character, and
   speaking an expressive character. Include idle, interruption, cancellation,
   permission failure, and error. Never use color alone to distinguish states.
 - Preserve continuity across transitions and interruptions; avoid resetting the
@@ -135,9 +152,9 @@ and actual rendered result. Availability, compilation, and runtime remain distin
   Processing reflects actual request state, not a fabricated response countdown.
 - Synthetic envelopes and timer-driven demonstrations must be clearly labeled demos
   and kept separate from the production signal path. Silence must look like silence.
-- Honor Reduce Motion and Reduce Transparency, increase-contrast preferences,
-  Dynamic Type where supported, VoiceOver labels/state, and platform hit-target sizes.
-  Check keyboard access and contrast in light, dark, and each custom accent palette.
+- Honor platform accessibility preferences, screen readers, text scaling, keyboard
+  access, and hit-target sizes. On Apple this includes Reduce Motion/Transparency,
+  increased contrast, Dynamic Type, and VoiceOver. Check every appearance/accent.
 - Suspend decorative animation when its actual owning window is hidden, minimized,
   or backgrounded, and under low-power or thermal constraints. An app-wide active
   flag alone does not prove that a particular window is visible.
@@ -145,16 +162,16 @@ and actual rendered result. Availability, compilation, and runtime remain distin
   an explicitly continuing audio task just to stop decoration.
 - Avoid perpetual idle timers. Prefer event-driven updates and bounded animation;
   resume from actual state without duplicating observers or audio subscriptions.
-- Measure on-device CPU/GPU work, frame pacing, and energy with available Apple tools
+- Measure on-device CPU/GPU work, frame pacing, and energy with target-platform tools
   under a stated workload and baseline. Record device, OS, duration, and settings.
   Never infer "60 fps", battery life, or efficiency from code or a simulator alone.
 
-**Gate:** real audio drives the real interface; accessibility and window lifecycle
-are exercised. Visual appeal, responsiveness, and energy are separate findings.
+**Gate:** real events (and real audio for voice) drive the interface; accessibility
+and window/page lifecycle are exercised. Appeal, responsiveness, and energy differ.
 
 ## 6. Treat attachments as a capability, not decoration
 
-- Use native import and drag/drop where appropriate; show selected items, preview,
+- Use target-platform import and drag/drop where appropriate; show selected items, preview,
   processing progress, removal, unsupported-type errors, and size-limit errors.
   State which capabilities are actually supported; do not promise formats/providers
   without exercising the configured extraction/model path.
@@ -169,7 +186,7 @@ are exercised. Visual appeal, responsiveness, and energy are separate findings.
 - Obtain explicit approval for cloud transfer, associated cost, and the retention/
   deletion policy before transmitting content. Name what leaves the device and why.
   Implement that policy; removing a preview is not proof that remote data was deleted.
-- Preserve native permission/security-scoped access lifetimes as required.
+- Preserve platform permissions (including Apple security-scoped access) as required.
   Do not silently expand filesystem access or upload private sample documents.
 
 **Gate:** demonstrate import through a grounded answer and removal/error handling,
@@ -182,10 +199,10 @@ Prefer accessibility-tree inspection; use screenshots when visuals require them.
 No AppleScript, forced foreground activation, or process-killing workarounds.
 For a simple file open, use a dedicated file-opening tool, not UI automation.
 
-- [ ] Show the actual app at the target size, compact/full and Mac/iOS as scoped.
-- [ ] Compare hierarchy, glass, light, icon, and motion with the approved direction.
-- [ ] Exercise navigation and one session across text, voice, transcript, attachments.
-- [ ] Exercise denial, silence, interruption, retry, unsupported input, and cancellation.
+- [ ] Show the real artifact at target sizes, content density, and input modes.
+- [ ] Apply the linked critique rubric against the approved direction and system.
+- [ ] Exercise navigation and primary task across all in-scope surfaces/modes.
+- [ ] Exercise empty, loading, error, offline, permission, retry, and cancellation states.
 - [ ] Check accessibility, appearance/accent contrast, and owning-window suspension.
 - [ ] Record on-device performance/energy measurements or explicitly mark unavailable.
 - [ ] Run existing relevant build/tests; distinguish build SDK from observed runtime.
@@ -194,12 +211,14 @@ Hand off the source/project paths, chosen reference, build command/result, runti
 device/OS, concise screenshots or recording, and observed journey/error outcomes.
 Include audio-signal evidence, accessibility findings, measurement conditions,
 and unresolved limitations when those capabilities are in scope.
+Name observed strengths and defects, not unsupported "master designer" or generic
+"Apple-quality" claims. Visual preference is not proof of usability or performance.
 Do not include private screenshots, transcripts, or documents in reusable guidance.
 Separate **owner visual approval**, **functional evidence**, and **energy evidence**.
 Show the app before any done claim; submit the evidence to Thor for the final gate.
 This checklist is not a substitute for that independent judgment.
 
-## Official sources to recheck
+## Apple sources to recheck when targeting Apple
 
 - [Design updates](https://developer.apple.com/design/whats-new/) and [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/)
 - [Custom Liquid Glass](https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views) and [GlassEffectContainer](https://developer.apple.com/documentation/swiftui/glasseffectcontainer)
