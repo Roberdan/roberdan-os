@@ -3,6 +3,27 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.41.0] - 2026-09-06
+
+**Strumenti locali per il Mac: comprimere un PDF dal Finder, ed essere avvisati quando ha finito.**
+
+### Added
+- `tools/comprimi-pdf`: comprime un PDF con Ghostscript accanto all'originale, senza toccarlo,
+  e scarta il risultato se viene piu' grande. Su documenti scansionati toglie il 90-95%
+  (misurato: 24,7 MB -> 1,75 MB e 237,5 MB -> 16,3 MB, pagine intatte).
+- `tools/comprimi-pdf/Comprimi PDF.workflow`: la voce **Azioni rapide -> Comprimi PDF** nel menu
+  del Finder. La chiave che la manda li' invece che sotto «Servizi» e' `NSIconName`.
+- `tools/avvisa`: notificatore proprio, perche' `osascript display notification` viene attribuito
+  a «Editor di script» e cliccare la notifica apriva quella finestra. Al clic mostra il file
+  prodotto nel Finder.
+- `tools/installa.sh`: rimette tutto in piedi su un Mac nuovo con un comando solo, collegando i
+  comandi al repository invece di duplicarli.
+
+### Notes
+- L'icona si disegna a pixel esatti: lasciando fare a `NSImage`, su uno schermo Retina esce al
+  doppio e `iconutil` scarta le misure piccole. L'icona nei banner delle notifiche resta pero'
+  vuota: causa non ancora trovata.
+
 ## [v2.40.0] - 2026-09-05
 
 **Copilot-first model selection, including GPT-6 Astra, across custom and built-in agents.**
