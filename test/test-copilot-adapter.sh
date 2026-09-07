@@ -162,7 +162,10 @@ export async function joinSession(cfg) {
     // the extension's per-session hook payload cannot be asserted.
     sessionId: "rda-test-session",
     on(evt, cb) { (globalThis.__H ??= {})[evt] = cb; return () => {}; },
-    log: async () => {}, send: async () => {}, sendAndWait: async () => ({}), workspacePath: undefined, rpc: {},
+    log: async (text) => { (globalThis.__LOG ??= []).push(text); },
+    send: async () => { throw Error("extension must not start model turns"); },
+    sendAndWait: async () => { throw Error("extension must not start model turns"); },
+    workspacePath: undefined, rpc: {},
   };
 }
 JS
@@ -189,7 +192,7 @@ for (const n of ["roberdanos_kanban","roberdanos_pause","roberdanos_resume","rob
 A(names.every((n) => n.startsWith("roberdanos_")), "all tool names are roberdanos_-namespaced (globally unique)");
 
 // hook registration
-for (const h of ["onSessionStart","onUserPromptSubmitted","onPreToolUse","onPostToolUse","onPostToolUseFailure","onSessionEnd"])
+for (const h of ["onSessionStart","onUserPromptSubmitted","onPreToolUse","onPostToolUse","onPostToolUseFailure","onSessionEnd","onAgentStop"])
   A(typeof cfg.hooks[h] === "function", "hook " + h + " registered");
 
 // response shaping: exec-format reaches Copilot two ways, both must stay wired
@@ -311,13 +314,8 @@ runs=$(wc -l < "$COUNTER" | tr -d ' ')
 [ "$runs" = "1" ] && ok "chain ran exactly once for 3 rapid idles (throttle/dedup works)" \
   || err "chain ran $runs times for 3 rapid idles — expected 1 (dedup/throttle broken)"
 
-# F) Claude-parity of the hook WIRING — BEHAVIORAL, not a grep. The two hooks below were each
-# wired on the Claude side (Stop chain / PostToolUse matcher "*") and silently absent on the
-# Copilot side for weeks: a parity gap is invisible precisely because both sides "work".
-#   - goal-gate.sh must RUN in the idle chain (it is Claude's only blocking Stop hook; here it
-#     can only warn, but its content — the authorized queue is not finished — must not be lost).
-#   - bus-doorbell.sh must RUN on EVERY tool, including read-only ones (Claude matcher is "*"),
-#     otherwise a review-only session never hears the bell.
+# F) Old hosts that never deliver onAgentStop still get an explicit idle warning.
+# The doorbell must run on every tool, including read-only tools.
 section "Claude parity — goal-gate in the idle chain, bus-doorbell on every tool"
 PAR_OS="$TMP/parity-os"; mkdir -p "$PAR_OS/hooks"
 GG="$TMP/parity-goalgate"; BD="$TMP/parity-doorbell"; : > "$GG"; : > "$BD"
@@ -372,6 +370,8 @@ done
 
 # shellcheck source=test/lib-copilot-context.sh
 . "$ROOT/test/lib-copilot-context.sh"
+# shellcheck source=test/lib-copilot-continuity.sh
+. "$ROOT/test/lib-copilot-continuity.sh"
 # --- Result --------------------------------------------------------------
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "test-copilot-adapter: PASS"; exit 0; else echo "test-copilot-adapter: FAIL"; exit 1; fi

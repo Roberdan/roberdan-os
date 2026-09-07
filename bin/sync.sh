@@ -58,9 +58,9 @@
 #     ~/.copilot/extensions/roberdan-os/extension.mjs — the native binding of the provider-
 #     neutral hooks/ (context-inject, main/bash guards, autofmt, always-on checkpoint) plus
 #     namespaced tools (kanban/pause/resume/verify-done/doctor). Override RDA_COPILOT_EXT_DIR.
-#   Honest limit: Copilot's session.idle/onSessionEnd fire AFTER the final assistant message
-#   is produced, so the emulated Stop chain WARNs + runs side effects but cannot BLOCK a
-#   premature "done" the way the Claude Stop hook can — operational near-parity, documented.
+#   Copilot 1.0.84-1 onAgentStop maps the existing queue gate to bounded native continuation.
+#   Idle/end remain advisory saves, not executors; older hosts without that callback only warn.
+#   No callback retracts a final message or survives runtime exit.
 # Global AGENTS.md pointer install (--install only): writes ~/.codex/AGENTS.md,
 # ~/.config/opencode/AGENTS.md and ~/GitHub/AGENTS.md for tools DETECTED as
 # installed, never overwriting an existing file. RDA_POINTER_HOME overrides
