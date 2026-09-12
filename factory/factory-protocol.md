@@ -111,13 +111,15 @@ and `acceptance:` fields:
 
 Always set `dir:` explicitly for tasks outside roberdan-os — the default is scoped to roberdan-os
 itself, not the whole `~/GitHub` tree, since auto mode approves routine writes inside whatever
-`--add-dir` points at. What auto mode would ask about (a destructive git command, for instance) is
-**denied**, not allowed: `--permission-prompts none` turns every would-be prompt into a refusal, so
-an unattended run never hangs and never gets a blanket yes. Measured 2026-09-12 on v2.1.269: an
-additive task (write a file + a test) ran to exit 0; in a direct `claude -p --output-format json` run
-`git commit --amend` came back in `permission_denials` (classifier: "Git Destructive"), and through
-`factory/run.sh` the same amend was refused with the repo history left unchanged. Not a sandbox: a task that *explicitly*
-asks to delete a file can still get it approved. Queue only tasks you would approve by hand.
+`--add-dir` points at. What auto mode would ask about is **denied**, not allowed:
+`--permission-prompts none` turns every would-be prompt into a refusal, so an unattended run never
+hangs and never gets a blanket yes. **Which** commands get denied is the auto-mode classifier's
+judgment, not a fixed list: it weighs the task text and context, and it can change between releases.
+Measured 2026-09-12: `git commit --amend` on a throwaway local repo was denied in 2 runs (v2.1.269, similar
+prompts) and allowed in 5 (launchd and foreground, v2.1.269 and v2.1.270, one identical prompt). The only deterministic blocks are
+the hooks — `hooks/bash-guard.sh` refuses `git push --force` / `--no-verify` every time. Not a
+sandbox, and not a denylist: a task that *explicitly* asks for a risky action can still get it
+approved. Queue only tasks you would approve by hand.
 
 ## Guardrails (autonomous ≠ reckless)
 
