@@ -221,7 +221,7 @@ section "factory: context-primer content actually reaches the prompt sent to cla
 FAC6="$TMP/factory-primer"; mkdir -p "$FAC6/queue" "$FAC6/bin"
 cat > "$FAC6/bin/claude" <<'EOF'
 #!/usr/bin/env bash
-# invoked as: claude -p "<prompt>" --dangerously-skip-permissions --add-dir <dir>
+# invoked as: claude -p "<prompt>" --model <m> --permission-mode auto --permission-prompts none --add-dir <dir>
 printf '%s' "$2" > "${CAPTURE_PROMPT:?}"
 exit 0
 EOF
@@ -331,7 +331,7 @@ FAC7="$TMP/factory-verify-pass"; KB7="$TMP/kanban-verify-pass"
 mkdir -p "$FAC7/queue" "$FAC7/bin" "$KB7/doing"
 cat > "$FAC7/bin/claude" <<'EOF'
 #!/usr/bin/env bash
-# invoked as: claude -p "<prompt>" --dangerously-skip-permissions --add-dir <dir>
+# invoked as: claude -p "<prompt>" --model <m> --permission-mode auto --permission-prompts none --add-dir <dir>
 case "$2" in
   *"You are acting as @thor"*) echo "VERDICT: PASS — files exist, tests pass" ;;
 esac
@@ -491,10 +491,10 @@ CAPARGV1="$TMP/argv-default.txt"
 env -i PATH="$FACM1/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM1" RDA_HANDOFF=/dev/null CAPTURE_ARGV="$CAPARGV1" \
   bash factory/run.sh >/dev/null 2>&1
-if [ -f "$CAPARGV1" ] && grep -A1 -x -- '--model' "$CAPARGV1" | grep -qx 'sonnet'; then
-  ok "task without model: gets --model sonnet"
+if [ -f "$CAPARGV1" ] && grep -A1 -x -- '--model' "$CAPARGV1" | grep -qx 'sonnet' && grep -A1 -x -- '--permission-mode' "$CAPARGV1" | grep -qx 'auto' && grep -A1 -x -- '--permission-prompts' "$CAPARGV1" | grep -qx 'none' && ! grep -q -- '--dangerously-skip-permissions' "$CAPARGV1" factory/run.sh factory/lib.sh; then
+  ok "task without model: gets --model sonnet, auto mode, --permission-prompts none (never skip-permissions)"
 else
-  err "task without model: did not get --model sonnet (argv: $(cat "$CAPARGV1" 2>/dev/null | tr '\n' ' '))"
+  err "task without model: did not get --model sonnet + --permission-mode auto + --permission-prompts none, or skip-permissions is back (argv: $(cat "$CAPARGV1" 2>/dev/null | tr '\n' ' '))"
 fi
 
 section "factory: model policy — model: opus in frontmatter passes --model opus"
@@ -567,10 +567,10 @@ CAPVERIFYARGV="$TMP/argv-verify.txt"
 env -i PATH="$FACM4/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM4" RDA_KANBAN="$KBM4" RDA_HANDOFF=/dev/null CAPTURE_VERIFY_ARGV="$CAPVERIFYARGV" \
   bash factory/run.sh >/dev/null 2>&1
-if [ -f "$CAPVERIFYARGV" ] && grep -A1 -x -- '--model' "$CAPVERIFYARGV" | grep -qx 'sonnet'; then
-  ok "thor-verify pass always uses --model sonnet, even when the task itself used model: opus"
+if [ -f "$CAPVERIFYARGV" ] && grep -A1 -x -- '--model' "$CAPVERIFYARGV" | grep -qx 'sonnet' && grep -A1 -x -- '--permission-mode' "$CAPVERIFYARGV" | grep -qx 'auto' && grep -A1 -x -- '--permission-prompts' "$CAPVERIFYARGV" | grep -qx 'none' && ! grep -q -- '--dangerously-skip-permissions' "$CAPVERIFYARGV" factory/run.sh factory/lib.sh; then
+  ok "thor-verify pass always uses --model sonnet, even when the task itself used model: opus — in auto mode with --permission-prompts none"
 else
-  err "thor-verify pass did not use --model sonnet (argv: $(cat "$CAPVERIFYARGV" 2>/dev/null | tr '\n' ' '))"
+  err "thor-verify pass did not use --model sonnet + --permission-mode auto + --permission-prompts none (argv: $(cat "$CAPVERIFYARGV" 2>/dev/null | tr '\n' ' '))"
 fi
 
 # ---------------------------------------------------------------------------

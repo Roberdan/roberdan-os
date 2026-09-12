@@ -8,8 +8,8 @@ RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 FACTORY="${RDA_FACTORY:-$RDA_HOME/factory}"
 Q="$FACTORY/queue"; DONE="$FACTORY/done"; LOG="$FACTORY/logs"; FAILED="$FACTORY/failed"; STATE="$FACTORY/state"
 mkdir -p "$Q" "$DONE" "$LOG" "$FAILED" "$STATE"
-# Default scoped to roberdan-os, not all of ~/GitHub: --dangerously-skip-permissions grants
-# write access to whatever --add-dir points at, so an unscoped task must not get the whole tree.
+# Default scoped to roberdan-os, not all of ~/GitHub: auto mode approves routine writes inside
+# whatever --add-dir points at, so an unscoped task must not get the whole tree.
 DEFAULT_DIR="${RDA_FACTORY_WORKDIR:-$HOME/GitHub/roberdan-os}"
 MAX="${RDA_FACTORY_MAX:-8}"
 DEFAULT_TIMEOUT="${RDA_FACTORY_TIMEOUT:-1800}"
@@ -76,15 +76,19 @@ run_task() {
   set +e
   # cd into $dir first — see the comment in verify_card() for why: --add-dir alone leaves
   # the process's actual cwd at wherever run.sh was launched from, not the task's dir.
+  # Auto mode + --permission-prompts none (Claude Code v2.1.259) instead of skipping permissions:
+  # routine work is still approved, but what the classifier would ask about is DENIED instead of
+  # allowed — a mechanical limit, where the old flag left only the AGENTS.md prose. A headless run
+  # cannot answer a prompt, so "none" turns every would-be prompt into a refusal, never a hang.
   local rc
   if [ ! -d "$dir" ]; then
     { echo "[factory] FATAL: dir '$dir' does not exist"; } >> "$log"
     rc=2
   elif [ -n "$TIMEOUT_BIN" ]; then
-    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$full" --model "$model" --dangerously-skip-permissions --add-dir "$dir" ) > "$log" 2>&1
+    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$full" --model "$model" --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$log" 2>&1
     rc=$?
   else
-    ( cd "$dir" && "$CLAUDE" -p "$full" --model "$model" --dangerously-skip-permissions --add-dir "$dir" ) > "$log" 2>&1
+    ( cd "$dir" && "$CLAUDE" -p "$full" --model "$model" --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$log" 2>&1
     rc=$?
   fi
   set -e

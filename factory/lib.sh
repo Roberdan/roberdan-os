@@ -141,10 +141,10 @@ verifica non avvenuta e la card resta aperta."
   elif [ -n "$TIMEOUT_BIN" ]; then
     # Verify pass is QA, not authorship — always sonnet, never scaled to opus and never
     # influenced by RDA_FACTORY_MODEL/per-task model: (those govern the authoring pass only).
-    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$vprompt" --model sonnet --dangerously-skip-permissions --add-dir "$dir" ) > "$vlog" 2>&1
+    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$vprompt" --model sonnet --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$vlog" 2>&1
     vrc=$?
   else
-    ( cd "$dir" && "$CLAUDE" -p "$vprompt" --model sonnet --dangerously-skip-permissions --add-dir "$dir" ) > "$vlog" 2>&1
+    ( cd "$dir" && "$CLAUDE" -p "$vprompt" --model sonnet --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$vlog" 2>&1
     vrc=$?
   fi
   set -e
