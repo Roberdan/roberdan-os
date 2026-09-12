@@ -114,8 +114,9 @@ itself, not the whole `~/GitHub` tree, since auto mode approves routine writes i
 `--add-dir` points at. What auto mode would ask about (a destructive git command, for instance) is
 **denied**, not allowed: `--permission-prompts none` turns every would-be prompt into a refusal, so
 an unattended run never hangs and never gets a blanket yes. Measured 2026-09-12 on v2.1.269: an
-additive task (write a file + a test) ran to exit 0; `git commit --amend` came back in
-`permission_denials` (classifier: "Git Destructive"). Not a sandbox: a task that *explicitly*
+additive task (write a file + a test) ran to exit 0; in a direct `claude -p --output-format json` run
+`git commit --amend` came back in `permission_denials` (classifier: "Git Destructive"), and through
+`factory/run.sh` the same amend was refused with the repo history left unchanged. Not a sandbox: a task that *explicitly*
 asks to delete a file can still get it approved. Queue only tasks you would approve by hand.
 
 ## Guardrails (autonomous ≠ reckless)
