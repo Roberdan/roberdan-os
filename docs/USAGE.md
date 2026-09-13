@@ -168,6 +168,10 @@ root-session user prompt; punctuation is allowed, but longer sentences are not p
 Aborts and rejected tools are not natural stops; already printed replies cannot be retracted.
 For diagnosis, inspect the `roberdan-os` extension log: `onAgentStop` records the decision.
 An extension shown as loaded is not proof of a subsequent automatic turn.
+**Current verification limit (CLI 1.0.84-5):** the native callback returned `block`,
+but the monitored live session did not start a root turn within 90 seconds.
+Automatic continuation is therefore **not verified**; keep using explicit resume
+and do not rely on this draft change for unattended work.
 
 **Federation (multi-repo boards):**
 
