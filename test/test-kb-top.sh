@@ -47,6 +47,22 @@ v() { awk -F'\t' -v k="$1" '$1==k{print $2; exit}' "$SNAP"; }
 [ "$(v branch)" = "card/x" ] && ok "il ramo e' quello della copia in cui stai" || fail "ramo: $(v branch)"
 
 echo "== il disegno non paga mai un comando lento =="
+mkdir -p "$REPO/bus"
+cat > "$REPO/bus/bus.sh" <<'SH'
+printf '260913-150759\tarchitect\t3\n260913-150759\tqa-gate\t3\n260913-150759\tsecurity\t3\n260913-150759\tsol-gate\t3\n'
+SH
+(cd "$WT" && RDA_KANBAN="$REPO/kanban" bash "$ROOT/kanban/snapshot.sh" "$SNAP" >/dev/null 2>&1)
+[ "$(v bus)" = "12" ] && ok "somma 12 consegne non lette, senza includere i numeri delle card" \
+  || fail "conteggio bus corrotto: $(v bus)"
+printf 'exit 0\n' > "$REPO/bus/bus.sh"
+(cd "$WT" && RDA_KANBAN="$REPO/kanban" bash "$ROOT/kanban/snapshot.sh" "$SNAP" >/dev/null 2>&1)
+[ "$(v bus)" = "0" ] && ok "bus vuoto con successo significa zero" || fail "bus vuoto: $(v bus)"
+printf 'printf "invalid output\\n"\n' > "$REPO/bus/bus.sh"
+(cd "$WT" && RDA_KANBAN="$REPO/kanban" bash "$ROOT/kanban/snapshot.sh" "$SNAP" >/dev/null 2>&1)
+[ "$(v bus)" = "-" ] && ok "formato bus inatteso non inventa zero" || fail "formato bus inatteso: $(v bus)"
+printf 'exit 1\n' > "$REPO/bus/bus.sh"
+(cd "$WT" && RDA_KANBAN="$REPO/kanban" bash "$ROOT/kanban/snapshot.sh" "$SNAP" >/dev/null 2>&1)
+[ "$(v bus)" = "-" ] && ok "bus fallito resta sconosciuto, non zero" || fail "bus fallito: $(v bus)"
 # Sul codice, non a cronometro. `git rev-parse` una volta sola all'avvio e' ammesso: serve a
 # sapere di quale progetto e' la fotografia, costa millisecondi e non e' nel ciclo.
 ciclo="$(sed -n '/^while :; do/,/^done/p' "$ROOT/kanban/top.sh")"

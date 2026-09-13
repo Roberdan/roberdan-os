@@ -214,7 +214,7 @@ draw() {
     line
   fi
 
-  printf "${D}"; wrap "  " "$(v bus) messaggi fra agenti"
+  printf "${D}"; wrap "  " "$(v bus) letture in attesa fra agenti"
   wrap "  " "$(v richieste_oggi) richieste oggi · $(v unita_oggi) unita"; printf "${R}"
   if [ "$age" -gt $((EVERY*4)) ]; then
     printf "${Y}"; wrap "  " "foto di $(dur "$age") fa"; printf "${R}"

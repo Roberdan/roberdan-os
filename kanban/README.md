@@ -200,6 +200,8 @@ puo' restituire 80 colonne se i suoi flussi di uscita sono rediretti. La prova
 `test/test-kb-top-pty.py`, inclusa nella suite, ridimensiona un terminale Unix reale
 40 → 24 → 60 colonne e 12 righe, verifica i frame prodotti e l'uscita con `q`.
 Non sostituisce il controllo visivo nella finestra dell'emulatore usato dall'utente.
+Le letture in attesa sommano le consegne per destinatario: tre messaggi inviati
+a quattro ruoli contano dodici letture. Un errore di raccolta mostra `-`, non zero.
 
 ### `kb ask` — i pezzi della richiesta, perche' non se ne perda uno
 
