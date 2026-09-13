@@ -27,7 +27,9 @@ RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 W=34; H=40
 term_size() {
   local c r
-  c="$(tput cols 2>/dev/null || echo 0)"; r="$(tput lines 2>/dev/null || echo 0)"
+  # macOS tput perde la misura con stdout catturato e stderr rediretto; stty legge stdin.
+  if [ -t 0 ]; then read -r r c <<<"$(stty size 2>/dev/null || printf '0 0')"
+  else c="$(tput cols 2>/dev/null || echo 0)"; r="$(tput lines 2>/dev/null || echo 0)"; fi
   [ "${c:-0}" -gt 0 ] 2>/dev/null || c=35
   [ "${r:-0}" -gt 0 ] 2>/dev/null || r=41
   W="${RDA_TOP_WIDTH:-$((c-1))}"; [ "$W" -lt 20 ] && W=20
@@ -62,7 +64,7 @@ hdr()  { local l="$1" r="${2:-}"; printf "${B}%s${R}${D}%*s${R}\n" "$l" $((W-${#
 # Due modi di accorciare, perche' sono due cose diverse.
 # `fit` e' per le stringhe che una macchina ha prodotto (un comando, un percorso): mandarle a
 # capo non le rende piu' leggibili, quindi si tagliano e si dice che sono tagliate con "…".
-fit() { local t="$1" m=$((W-4)); [ "$m" -lt 8 ] && m=8
+fit() { local t="$1" m="${2:-$((W-4))}"; [ "$m" -lt 8 ] && m=8
         if [ "${#t}" -le "$m" ]; then printf '%s' "$t"; else printf '%s…' "${t:0:$((m-1))}"; fi; }
 # `wrap` e' per le frasi scritte da una persona: si va a capo SULLE PAROLE. Tagliare una parola
 # a meta' — "salva archivio card sul repo p" — non e' una riga corta, e' una riga sbagliata, ed
@@ -124,7 +126,7 @@ draw() {
   else
     printf "${B}${C}%s${R}\n" "$(fit "$REPO")"; printf "  ${D}%s${R}\n" "$(fit "$branch")"
   fi
-  [ "$here" != "$REPO" ] && printf "  ${D}sei in: %s${R}\n" "$(fit "$here")"
+  [ "$here" != "$REPO" ] && printf "  ${D}sei in: %s${R}\n" "$(fit "$here" "$((W-10))")"
   line
 
   # --- LAVORO ---------------------------------------------------------------------------

@@ -3,6 +3,15 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.45.1 — 2026-09-13
+
+### Fixed
+
+- `kb top` legge la dimensione effettiva del terminale su macOS anche durante il
+  ridimensionamento; il nome della copia di lavoro rispetta lo spazio disponibile.
+- Prova interattiva con terminale Unix ridimensionabile, senza dipendenze aggiuntive:
+  larghezza, altezza, ridisegno, uscita `q` e ripristino delle impostazioni.
+
 ## 2.45.0 — 2026-09-13
 
 ### `film-director`: si decide che film e', prima di girare

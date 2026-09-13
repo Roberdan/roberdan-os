@@ -136,6 +136,7 @@ else
   ok "non stampa mai un prezzo che nessuno sa convertire"
 fi
 
+python3 "$ROOT/test/test-kb-top-pty.py" || fail "terminale interattivo: resize, ridisegno, uscita"
 echo ""
 if [ "$FAILS" -eq 0 ]; then echo "test-kb-top: ✅ ALL GREEN"; else
   echo "--- disegno prodotto (per capire il rosso senza un altro giro) ---"; printf '%s\n' "$d2"

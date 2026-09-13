@@ -195,6 +195,12 @@ disegna** — verificato sul codice in `test/test-kb-top.sh`, non a cronometro, 
 a cronometro passa sulla macchina veloce e mente sull'altra. La raccolta si rinfresca in
 sottofondo quando la foto invecchia.
 
+La dimensione interattiva si legge dal terminale con `stty size`: su macOS `tput`
+puo' restituire 80 colonne se i suoi flussi di uscita sono rediretti. La prova
+`test/test-kb-top-pty.py`, inclusa nella suite, ridimensiona un terminale Unix reale
+40 → 24 → 60 colonne e 12 righe, verifica i frame prodotti e l'uscita con `q`.
+Non sostituisce il controllo visivo nella finestra dell'emulatore usato dall'utente.
+
 ### `kb ask` — i pezzi della richiesta, perche' non se ne perda uno
 
 ```
