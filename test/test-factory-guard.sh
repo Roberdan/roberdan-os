@@ -43,6 +43,10 @@ expect deny 'gh api repos/Roberdan/x/pulls --method POST -f title=t'
 echo "=== denied: rewriting or deleting history ==="
 expect deny 'git commit --amend --allow-empty -m rewritten'
 expect deny 'git commit -a --amend --no-edit'
+expect deny 'git commit --am --allow-empty -m x'
+expect deny 'git "commit" --amend'
+expect deny 'git commit --am"end" -m x'
+expect deny 'git pu\sh origin main'
 expect deny 'git rebase -i HEAD~3'
 expect deny 'git reset --hard HEAD~1'
 expect deny 'git filter-branch --tree-filter x HEAD'
@@ -86,8 +90,8 @@ settings="$(bash -c 'source "$1/factory/lib.sh"; printf %s "$FACTORY_SETTINGS"' 
 cmdline="$(printf '%s' "$settings" | jq -r '.hooks.PreToolUse[] | select(.matcher=="Bash") | .hooks[].command' 2>/dev/null)"
 [ "$cmdline" = "bash \"$GUARD\"" ] && ok "FACTORY_SETTINGS is valid JSON and runs $GUARD" \
   || err "FACTORY_SETTINGS does not wire the guard (got: $cmdline)"
-sites="$(grep -hc -- '-p "\$[a-z]*" --model [^ ]* --permission-mode auto --permission-prompts none --settings "\$FACTORY_SETTINGS"' "$ROOT/factory/run.sh" "$ROOT/factory/lib.sh" | paste -sd+ - | bc)"
-total="$(grep -hc -- '"\$CLAUDE" -p ' "$ROOT/factory/run.sh" "$ROOT/factory/lib.sh" | paste -sd+ - | bc)"
+sites="$(grep -hc -- '-p "\$[a-z]*" --model [^ ]* --permission-mode auto --permission-prompts none --settings "\$FACTORY_SETTINGS"' "$ROOT"/factory/*.sh | paste -sd+ - | bc)"
+total="$(grep -hc -- '"\$CLAUDE" -p ' "$ROOT"/factory/*.sh | paste -sd+ - | bc)"
 [ "$total" -ge 4 ] && [ "$sites" = "$total" ] && ok "all $total claude -p launch sites pass --settings \"\$FACTORY_SETTINGS\"" \
   || err "only $sites of $total claude -p launch sites load the guard"
 

@@ -24,7 +24,9 @@ deny() {
 }
 command -v jq >/dev/null 2>&1 || deny "factory-guard: jq missing, refusing every Bash command in an unattended run."
 cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // ""')"
-norm="$(printf '%s' "$cmd" | tr -s ' \t\n\r' ' ')"
+# Quote and backslash CHARACTERS are deleted (not the quoted text): `git "commit" --am"end"` and
+# `git\ push` run exactly like the plain spelling, so they must read like it too.
+norm="$(printf '%s' "$cmd" | tr -d "\"'\\\\" | tr -s ' \t\n\r' ' ')"
 
 why="Unattended factory run: pushing, rewriting git history and forced deletion are Roberto's gates. Leave it as a proposal in your report instead."
 # `git`, optionally followed by global options (-C dir, -c k=v, --git-dir=...), then the subcommand.
@@ -32,7 +34,7 @@ G='(^|[^[:alnum:]_./-])git(([[:space:]]+-[Cc][[:space:]]+[^[:space:]]+)|([[:spac
 hit() { printf '%s' "$norm" | grep -qE -- "$1"; }
 
 hit "${G}push([[:space:]]|$)"                                   && deny "git push refused. $why"
-hit "${G}commit([[:space:]].*)?[[:space:]]--amend"               && deny "git commit --amend refused. $why"
+hit "${G}commit([[:space:]].*)?[[:space:]]--am(e|en|end)?([[:space:]=]|$)"               && deny "git commit --amend refused. $why"
 hit "${G}(rebase|filter-branch|filter-repo|replace)([[:space:]]|$)" && deny "git history rewrite refused. $why"
 hit "${G}reset([[:space:]].*)?[[:space:]]--(hard|keep|merge)"    && deny "git reset --hard refused. $why"
 hit "${G}clean([[:space:]].*)?[[:space:]]-[[:alpha:]]*f"         && deny "git clean -f refused. $why"
