@@ -21,4 +21,13 @@ if [ -x "$RCPT" ]; then
   dirty="$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
   bash "$RCPT" session "turn-checkpoint" 0 "$head_sha" "dirty=$dirty" >/dev/null 2>&1 || true
 fi
+
+# Pulizia A MONTE delle copie di lavoro: appena un ramo viene integrato la sua copia non ha piu'
+# niente dentro e sparisce al primo turno successivo. E' cio' che evita di riarrivare alle 99
+# copie abbandonate del 2026-09-13 — quelle andavano chiuse da chi le aveva aperte, e "chi le
+# aveva aperte" era una sessione finita da giorni. Silenziosa, in sottofondo, ambito ristretto al
+# repo corrente, un giro ogni 20 minuti al massimo. Si spegne con RDA_NO_AUTOSWEEP=1.
+WTS="${RDA_WORKTREE_SWEEP:-$HOME/GitHub/roberdan-os/kanban/worktree-sweep.sh}"
+[ -r "$WTS" ] && ( bash "$WTS" autosweep >/dev/null 2>&1 & ) >/dev/null 2>&1
+
 exit 0

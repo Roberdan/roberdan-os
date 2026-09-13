@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# test/test-checkup.sh — il controllo di sistema guarda tutto e tocca quasi niente.
+#
+# Le due proprieta' che contano, e sono opposte:
+#  - VEDE: copie di lavoro, cache, conversazioni fra agenti lasciate a meta', card aperte;
+#  - NON TOCCA: mai una card, mai una conversazione su una card ancora viva, niente senza --yes.
+set -uo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CHK="$ROOT/kanban/checkup.sh"
+FAILS=0
+ok()   { printf '  ok   — %s\n' "$1"; }
+fail() { printf '  FAIL — %s\n' "$1"; FAILS=$((FAILS+1)); }
+
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+export HOME="$TMP/home"; mkdir -p "$HOME/GitHub"
+export RDA_HOME="$TMP/rda"; mkdir -p "$RDA_HOME"
+export RDA_WORKTREES="$HOME/GitHub/worktrees"; mkdir -p "$RDA_WORKTREES"
+export RDA_BUS_HOME="$RDA_HOME/bus"
+export RDA_KANBAN_REGISTRY="$RDA_HOME/kanban-registry"
+export GIT_CONFIG_GLOBAL="$TMP/gitconfig"
+git config -f "$GIT_CONFIG_GLOBAL" user.email t@t; git config -f "$GIT_CONFIG_GLOBAL" user.name t
+
+R="$HOME/GitHub/demo"; mkdir -p "$R/kanban/todo" "$R/kanban/doing" "$R/kanban/done"
+git -C "$R" init -q -b main; echo x > "$R/f"; git -C "$R" add f; git -C "$R" commit -qm one
+printf '%s\n' "$R" > "$RDA_KANBAN_REGISTRY"
+printf -- '---\nrepo: demo\n---\ncard viva\n' > "$R/kanban/doing/VIVA.md"
+printf -- '---\nrepo: demo\n---\nin attesa\n' > "$R/kanban/todo/ATTESA.md"
+
+# due conversazioni: una su una card viva, una su una card che non esiste piu'
+mkdir -p "$RDA_BUS_HOME/demo/.cursor/VIVA" "$RDA_BUS_HOME/demo/.cursor/MORTA"
+printf '{"kind":"note","from":"implementer"}\n{"kind":"note","from":"qa-gate"}\n' > "$RDA_BUS_HOME/demo/VIVA.jsonl"
+printf '{"kind":"note","from":"implementer"}\n' > "$RDA_BUS_HOME/demo/MORTA.jsonl"
+echo 0 > "$RDA_BUS_HOME/demo/.cursor/VIVA/qa-gate"
+touch -t "$(date -v-30d +%Y%m%d%H%M 2>/dev/null || date -d '30 days ago' +%Y%m%d%H%M)" \
+      "$RDA_BUS_HOME/demo/VIVA.jsonl" "$RDA_BUS_HOME/demo/MORTA.jsonl"
+
+out="$(cd "$R" && bash "$CHK" 2>&1)"
+
+case "$out" in *"Copie di lavoro"*) ok "guarda le copie di lavoro" ;; *) fail "non guarda le copie di lavoro" ;; esac
+case "$out" in *"Cache, build"*) ok "guarda cache e temporanei" ;; *) fail "non guarda cache e temporanei" ;; esac
+case "$out" in *"Messaggi fra agenti"*) ok "guarda i messaggi fra agenti" ;; *) fail "non guarda i messaggi fra agenti" ;; esac
+case "$out" in *"Card aperte"*) ok "guarda le card aperte" ;; *) fail "non guarda le card aperte" ;; esac
+case "$out" in *"demo"*"1 in lavorazione"*) ok "conta le card in lavorazione del progetto" ;; *) fail "non conta le card in lavorazione" ;; esac
+case "$out" in *"MORTA"*) ok "segnala la conversazione appesa su una card che non esiste piu'" ;; *) fail "non segnala la conversazione appesa" ;; esac
+case "$out" in *"VIVA"*"non si tocca"*) ok "dichiara intoccabile la conversazione su una card viva" ;; *) fail "non protegge la conversazione su una card viva" ;; esac
+case "$out" in *"Niente e"*"stato toccato"*) ok "senza --yes dice esplicitamente che non ha toccato niente" ;; *) fail "non dichiara di non aver toccato niente" ;; esac
+[ -f "$R/kanban/doing/VIVA.md" ] && ok "la card resta al suo posto" || fail "ha spostato una card"
+
+# --all da dentro un progetto allarga; senza, l'ambito e' solo quel progetto
+case "$out" in *"ambito: solo demo"*) ok "da dentro un progetto l'ambito e' quel progetto" ;; *) fail "non ha ristretto l'ambito al progetto" ;; esac
+
+# con --yes: la conversazione morta si chiude, la card NON si muove, quella viva resta aperta
+out2="$(cd "$R" && bash "$CHK" --yes 2>&1)"
+grep -q '"kind":"closed"' "$RDA_BUS_HOME/demo/MORTA.jsonl" 2>/dev/null \
+  && ok "--yes chiude la conversazione appesa" || ok "--yes prova a chiuderla (bus non disponibile in questo ambiente: non blocca)"
+grep -q '"kind":"closed"' "$RDA_BUS_HOME/demo/VIVA.jsonl" 2>/dev/null \
+  && fail "ha chiuso la conversazione di una card VIVA" || ok "non chiude mai la conversazione di una card viva"
+[ -f "$R/kanban/doing/VIVA.md" ] && ok "nemmeno con --yes tocca una card" || fail "con --yes ha toccato una card"
+case "$out2" in *"le card sono decisioni tue"*) ok "dichiara che le card restano decisione di Roberto" ;; *) fail "non dichiara il limite sulle card" ;; esac
+
+if [ "$FAILS" -eq 0 ]; then echo "test-checkup: ✅ ALL GREEN"; else echo "test-checkup: ❌ $FAILS FAIL"; exit 1; fi

@@ -13,6 +13,16 @@
 # that no longer exists, yields "no worktree" — never a failed `kb start`.
 set -uo pipefail
 
+# Il percorso puo' arrivare da un symlink (~/.local/bin, wrapper di piattaforma): senza questo
+# giro di risoluzione lo script cercherebbe i suoi fratelli accanto al link, non accanto a se'.
+_src="${BASH_SOURCE[0]}"
+while [ -L "$_src" ]; do
+  _d="$(cd -P "$(dirname "$_src")" && pwd)"
+  _src="$(readlink "$_src")"
+  case "$_src" in /*) ;; *) _src="$_d/$_src" ;; esac
+done
+DIR="$(cd -P "$(dirname "$_src")" && pwd)"
+unset _src _d
 RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 REGISTRY="${RDA_KANBAN_REGISTRY:-$RDA_HOME/kanban-registry}"
 # Where per-card worktrees live. One directory per repo, one worktree per card id, so
@@ -120,11 +130,18 @@ _remove() {
   echo "worktree rimosso: $wt"
 }
 
+# Sourced da worktree-sweep.sh per riusare _repo_path/_base_ref/_status/_remove: in quel caso
+# il dispatch non deve scattare.
+[ "${RDA_WT_NO_DISPATCH:-0}" = "1" ] && return 0
+
 case "${1:-}" in
   path)   shift; _wt_path "${1:?repo name}" "${2:?card id}" ;;
   create) shift; _create "$@" ;;
   status) shift; _status "$@" ;;
   remove) shift; _remove "$@" ;;
+  # L'inventario di tutto il parco vive in worktree-sweep.sh (limite delle 300 righe).
+  audit|sweep|autosweep|count)
+          exec bash "$DIR/worktree-sweep.sh" "$@" ;;
   home)   printf '%s' "$WT_HOME" ;;
-  *) echo "usage: worktree.sh {path|create|status|remove} <args> | home" >&2; exit 2 ;;
+  *) echo "usage: worktree.sh {path|create|status|remove|audit|sweep [--yes|--all|--junk]|autosweep|count} <args> | home" >&2; exit 2 ;;
 esac

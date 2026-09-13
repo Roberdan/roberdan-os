@@ -96,4 +96,24 @@ if [ -x "$HOME/.local/bin/kb" ]; then
     echo "  Quello che nasce dopo NON è autorizzato: resta per Roberto, ed è l'unica cosa che vuole vedere."
   fi
 fi
+
+# Copie di lavoro rimaste in giro: un CONTATORE, non un elenco e non una pulizia. Il 2026-09-13
+# ce n'erano 99 vive, di 4 repo, nessuna chiusa da chi l'aveva aperta — invisibili perche'
+# nessuna schermata le nominava mai. Una riga a ogni sessione e' cio' che mancava; la rimozione
+# resta un comando che qualcuno digita, mai un effetto dell'apertura di una sessione.
+# La pulizia A MONTE invece parte qui in sottofondo (autosweep, solo il repo corrente): cio' che
+# e' stato integrato mentre non c'eri sparisce senza che nessuno debba ricordarsene.
+[ -r "$ROOT/kanban/worktree-sweep.sh" ] && ( bash "$ROOT/kanban/worktree-sweep.sh" autosweep >/dev/null 2>&1 & ) >/dev/null 2>&1
+_wt="$ROOT/kanban/worktree.sh"
+if [ -r "$_wt" ]; then
+  # --cached: LEGGE un numero gia' calcolato. Contarlo davvero costa ~10s, e un'attesa del
+  # genere a ogni apertura di sessione verrebbe tolta entro la settimana.
+  _n="$(bash "$_wt" count --cached 2>/dev/null || echo 0)"
+  if [ "${_n:-0}" -gt 0 ] 2>/dev/null; then
+    echo
+    echo "### 🧹 $_n copie di lavoro sono rimaste in giro e non hanno piu' niente dentro."
+    echo "  Guardare tutto il sistema: \`kb checkup\` — solo queste: \`kb wt\` (con \`--yes\` le toglie)."
+  fi
+fi
+
 exit 0
