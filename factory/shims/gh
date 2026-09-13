@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# factory/shims/gh — see factory/shims/git for why this exists and what it does not cover.
+# Refuses the GitHub write actions AGENTS.md reserves to Roberto: publishing (PRs, releases),
+# repository administration and any authenticated write through `gh api`.
+# Reads: `gh pr view`, `gh run list`, `gh api` GETs — a factory task must be able to look.
+set -euo pipefail
+
+refuse() {
+  printf 'factory-shim: %s refused.\n' "$1" >&2
+  printf 'Unattended factory run: publishing and repo administration are gates reserved to Roberto.\n' >&2
+  printf 'Leave it as a proposal in your report instead.\n' >&2
+  exit 97
+}
+
+args=("$@")
+sub="${args[0]:-}"
+a1="${args[1]:-}"
+
+case "$sub" in
+  pr)
+    case "$a1" in create|merge|close|edit|comment|review|ready|reopen|lock|unlock) refuse "gh pr $a1" ;; esac
+    ;;
+  issue)
+    case "$a1" in create|close|edit|comment|delete|transfer|reopen|pin|unpin|lock|unlock) refuse "gh issue $a1" ;; esac
+    ;;
+  release)  refuse "gh release $a1" ;;
+  repo)
+    case "$a1" in create|delete|edit|rename|archive|unarchive|fork|deploy-key|sync) refuse "gh repo $a1" ;; esac
+    ;;
+  secret|variable|ssh-key|gpg-key|auth) refuse "gh $sub $a1" ;;
+  workflow)
+    case "$a1" in run|enable|disable) refuse "gh workflow $a1" ;; esac
+    ;;
+  run)
+    case "$a1" in cancel|rerun|delete) refuse "gh run $a1" ;; esac
+    ;;
+  cache)
+    case "$a1" in delete) refuse "gh cache delete" ;; esac
+    ;;
+  api)
+    # Any non-GET method is a write. `-f/-F/--field` without an explicit method implies POST.
+    prev=""
+    for x in "${args[@]}"; do
+      case "$prev" in
+        -X|--method)
+          case "$x" in GET|HEAD|get|head) : ;; *) refuse "gh api -X $x (write)" ;; esac
+          ;;
+      esac
+      case "$x" in
+        --method=*|-X=*)
+          case "${x#*=}" in GET|HEAD|get|head) : ;; *) refuse "gh api ${x} (write)" ;; esac
+          ;;
+        -f|-F|--field|--raw-field|--input) refuse "gh api with a request body (implies POST)" ;;
+      esac
+      prev="$x"
+    done
+    ;;
+esac
+
+self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+real=""
+IFS=':' read -r -a path_entries <<<"${PATH:-}"
+for d in ${path_entries[@]+"${path_entries[@]}"}; do
+  [ -n "$d" ] || d="."
+  resolved="$(cd "$d" 2>/dev/null && pwd || echo "$d")"
+  [ "$resolved" = "$self_dir" ] && continue
+  [ -f "$d/gh" ] && [ -x "$d/gh" ] && { real="$d/gh"; break; }
+done
+if [ -z "$real" ]; then
+  for p in /opt/homebrew/bin/gh /usr/local/bin/gh /usr/bin/gh; do
+    [ -x "$p" ] && { real="$p"; break; }
+  done
+fi
+[ -n "$real" ] || { printf 'factory-shim: no real gh found on PATH.\n' >&2; exit 127; }
+
+exec "$real" "$@"

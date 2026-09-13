@@ -30,7 +30,7 @@ fake_thor() { printf '#!/usr/bin/env bash\nprintf "%s\\n"\n' "$1" > "$TMP/thor-v
 # kb invoca "$ROOT/kanban/thor-verify.sh": si lavora su una COPIA del repo per non toccarlo.
 REPO="$TMP/repo"; mkdir -p "$REPO/kanban" "$REPO/factory"
 cp "$ROOT/kanban/kb.sh" "$REPO/kanban/"; cp -R "$ROOT/kanban/"*.sh "$REPO/kanban/" 2>/dev/null || true
-cp "$ROOT/factory/lib.sh" "$REPO/factory/" 2>/dev/null || true
+cp "$ROOT/factory/lib.sh" "$ROOT/factory/engine.sh" "$REPO/factory/" 2>/dev/null || true
 KBC="$REPO/kanban/kb.sh"
 
 # --- 1. PASS: thor dice si', la card si chiude e il verdetto FINISCE sulla card -------------

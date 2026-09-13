@@ -26,21 +26,37 @@ section() {
   ' "$file"
 }
 
-# --- claude binary resolution (identical pattern to factory/run.sh) ------------------------
+# --- default engine binary resolution (identical pattern to factory/lib.sh) -----------------
+# Roberto's directive, 2026-09-13: automated work must never spend the Claude budget, so the
+# DEFAULT engine here is GitHub Copilot CLI, exactly as in the factory. Claude is still one
+# env var away — `RDA_EVAL_AGENT_CMD="claude -p"` — because an A/B of the canon has to be able
+# to run on any tool; it is simply no longer what you get by not choosing.
 # In --stub mode the caller (a test harness, see eval/test-eval-pipeline.sh) is expected to
-# have already prepended a temp bin/ dir with a fake `claude` script onto PATH, exactly the
+# have already prepended a temp bin/ dir with a fake engine script onto PATH, exactly the
 # way test/test-factory-kb.sh stubs factory/run.sh. --stub does not change resolution itself —
 # it only relaxes the FATAL exit into a clearer message and stamps a "STUB MODE" banner into
 # saved outputs so nobody mistakes a stub run for a real one.
-eval_resolve_claude() {
+EVAL_ENGINE="${RDA_EVAL_ENGINE:-copilot}"
+eval_resolve_claude() {   # historical name, kept: every caller still spells it this way
   local c
-  c="$(command -v claude 2>/dev/null || true)"
+  c="$(command -v "$EVAL_ENGINE" 2>/dev/null || true)"
   if [ -z "$c" ] || [ ! -x "$c" ]; then
-    for p in "$HOME/.local/bin/claude" /opt/homebrew/bin/claude "$HOME/.bun/bin/claude" /usr/local/bin/claude; do
+    for p in "$HOME/.local/bin/$EVAL_ENGINE" "/opt/homebrew/bin/$EVAL_ENGINE" "$HOME/.bun/bin/$EVAL_ENGINE" "/usr/local/bin/$EVAL_ENGINE"; do
       [ -x "$p" ] && { c="$p"; break; }
     done
   fi
   printf '%s' "$c"
+}
+
+# The default engine's own flags, in one place so run-eval/judge/bench cannot drift apart.
+# copilot: --allow-all-tools is required for non-interactive mode; there is no blanket
+# permission flag anywhere here any more.
+eval_engine_flags() {
+  local root="$1"
+  case "$EVAL_ENGINE" in
+    copilot) printf '%s\n' --allow-all-tools --add-dir "$root" --log-level none -s ;;
+    *)       printf '%s\n' --permission-mode auto --permission-prompts none --add-dir "$root" ;;
+  esac
 }
 
 # BILLING SAFETY — identical rationale to factory/run.sh: in `-p` headless mode an
@@ -94,10 +110,11 @@ eval_invoke_agent() {
       printf '%s' "$prompt" | $RDA_EVAL_AGENT_CMD > "$outfile" 2>&1
     fi
   else
+    local -a flags; IFS=$'\n' read -r -d '' -a flags < <(eval_engine_flags "$root"; printf '\0')
     if [ -n "$timeout_bin" ]; then
-      "$timeout_bin" "$timeout_s" "$claude_bin" -p "$prompt" --dangerously-skip-permissions --add-dir "$root" > "$outfile" 2>&1
+      "$timeout_bin" "$timeout_s" "$claude_bin" -p "$prompt" "${flags[@]}" > "$outfile" 2>&1
     else
-      "$claude_bin" -p "$prompt" --dangerously-skip-permissions --add-dir "$root" > "$outfile" 2>&1
+      "$claude_bin" -p "$prompt" "${flags[@]}" > "$outfile" 2>&1
     fi
   fi
   rc=$?

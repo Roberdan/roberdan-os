@@ -43,9 +43,24 @@ dir="${2:-}"
 tmo="${3:-1200}"   # 600s non bastava su una card grossa: misurato il 2026-07-31
 vlog="${4:-${TMPDIR:-/tmp}/thor-verify-$card-$$.log}"
 
-# Il boccone amaro: thor gira come un processo `claude` separato. Se non c'e', non si finge.
-CLAUDE="${CLAUDE:-$(command -v claude 2>/dev/null || true)}"
-[ -n "$CLAUDE" ] || { printf 'SKIP\tbinario claude non trovato: @thor non e eseguibile su questa macchina\n' ; exit 0; }
+# Il boccone amaro: thor gira come un processo separato, sul motore della fabbrica. Se quel
+# binario non c'e', non si finge — e dal 2026-09-13 il motore di default e' `copilot`, perche'
+# il lavoro non presidiato non deve mai spendere il budget Claude (direttiva di Roberto).
+# Il source di factory/lib.sh arriva piu' sotto: qui si risolve solo il nome giusto da cercare.
+# $RDA_ENGINE_BIN (o lo storico $CLAUDE) vince sulla ricerca nel PATH: e' l'unico modo per
+# puntare @thor a un binario finto in un test, o a una build specifica a mano.
+_engine="${RDA_FACTORY_ENGINE:-copilot}"
+ENGINE_BIN="${RDA_ENGINE_BIN:-${CLAUDE:-}}"
+[ -n "$ENGINE_BIN" ] && [ -x "$ENGINE_BIN" ] || ENGINE_BIN="$(command -v "$_engine" 2>/dev/null || true)"
+if [ -z "$ENGINE_BIN" ]; then
+  for _p in "$HOME/.local/bin/$_engine" "/opt/homebrew/bin/$_engine" "$HOME/.bun/bin/$_engine" "/usr/local/bin/$_engine"; do
+    [ -x "$_p" ] && { ENGINE_BIN="$_p"; break; }
+  done
+fi
+[ -n "$ENGINE_BIN" ] || { printf 'SKIP\tbinario %s non trovato: @thor non e eseguibile su questa macchina\n' "$_engine" ; exit 0; }
+CLAUDE="$ENGINE_BIN"          # nome storico, ancora letto da chi non e' stato aggiornato
+RDA_ENGINE_BIN="$ENGINE_BIN"  # nome attuale: letto da factory_engine_bin() dopo il source
+export RDA_ENGINE_BIN
 
 # La ricorsione e il modo ovvio di sbagliare: thor che chiude una card chiamando kb finish che
 # chiama thor. Il flag e" ereditato dai figli e taglia la catena al primo giro.

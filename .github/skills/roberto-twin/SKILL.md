@@ -43,8 +43,25 @@ one giant reveal at the end. Missing commits is one of his named complaints.
 trusting any check, answer "what would this print if the thing were broken?" If you can't say,
 it isn't evidence.
 
-**4. Report answer-first**, in plain words, then what you need from him (or explicitly:
-nothing), then evidence as a short tail.
+**4. Report in the fixed four-part format** — an accessibility commitment, not a style
+preference, and it applies to *every* reply, not only the final one:
+
+1. **Stato** — where the work actually stands, opening with one sentence and no preamble. Every
+   finished item carries its proof marker **inline**: *"fatto e provato"* (you ran it and saw it
+   work) or *"fatto, non ancora provato"*. A bare "done" is never acceptable.
+2. **Sto facendo** — the one thing in your hands right now, and roughly how long it takes.
+3. **Manca** — what is left, as a short numbered list, in order.
+4. **Mi serve da te** — the decision or action you need, with the options and their consequences
+   *in his terms* (cost, risk, what happens each way) and **your recommendation first**. If you
+   need nothing: "Nulla."
+
+Detail — commands, paths, SHAs, numbers, test output — goes in a short tail at the bottom, never
+inside the four sections. An **empty section is deleted, not filled with "N/A"**. Max ~6 lines
+before the detail. **No unexplained jargon**: say what a term means in the same sentence when he
+will read it. Never ask him to choose between implementation details — decide, and say what you
+decided; bring him only choices that change the result, the cost or the risk *for him*, max 3,
+recommendation first. **"I don't understand" is feedback about the writing, not the reader**:
+re-say it simpler and *differently*, never the same words louder.
 
 Anything repeatable or multi-step: **write one script that does it end-to-end and run it**,
 rather than executing by hand step by step.

@@ -559,10 +559,10 @@ function execFormatSystemMessage() {
 // Rides on every user turn (a systemMessage append can be diluted in a very long session, this
 // cannot) — and is paid EVERY turn, so it has two forms: short when the full contract is already
 // in the systemMessage, long when it is the only carrier. The cheap form is never the fallback.
-const EXEC_FMT_SECTIONS = '(1) the point, (2) what I need from you, (3) context, (4) detail, (5) verified / not verified';
-const EXEC_FMT_TAIL = 'mandatory on any "done" claim. Delete empty sections. No unexplained jargon. Max ~6 lines before the detail.';
+const EXEC_FMT_SECTIONS = '(1) Stato, (2) Sto facendo, (3) Manca, (4) Mi serve da te';
+const EXEC_FMT_TAIL = 'every finished item marked inline "fatto e provato" or "fatto, non ancora provato" — never a bare "done". Detail (commands, paths, numbers) in a short tail at the bottom. Delete empty sections. No unexplained jargon. Max ~6 lines before the detail.';
 const EXEC_FORMAT_TURN_REMINDER_SHORT = `Roberto's fixed executive format (full contract in the system message): ${EXEC_FMT_SECTIONS} — ${EXEC_FMT_TAIL}`;
-const EXEC_FORMAT_TURN_REMINDER_FULL = `Reply to Roberto in the fixed executive format: ${EXEC_FMT_SECTIONS}. The point is one sentence with no preamble; "what I need from you" carries the options with their consequences + your recommendation, or "Nothing"; context max 3 lines, only if needed; detail (commands, paths, numbers) at the bottom; verified / not verified is ${EXEC_FMT_TAIL}`;
+const EXEC_FORMAT_TURN_REMINDER_FULL = `Reply to Roberto in the fixed executive format: ${EXEC_FMT_SECTIONS}. "Stato" opens with one sentence, no preamble, and states where the work actually stands; "Sto facendo" is the one thing in hand right now; "Manca" is the remaining steps, numbered, in order; "Mi serve da te" carries the options with their consequences + your recommendation first, or "Nulla". In "Stato", ${EXEC_FMT_TAIL}`;
 let execFormatInSystemMessage = false; // false ⇒ the long form, on every unexpected path
 
 // --- hooks -------------------------------------------------------------------

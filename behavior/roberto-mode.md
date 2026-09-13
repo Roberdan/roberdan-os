@@ -118,23 +118,36 @@ jargon-heavy explanations, and decisions posed without their implications, are h
      keep this block self-contained (no cross-refs that only resolve inside this file). -->
 ### The fixed response format (talk to him like an executive)
 
-Every reply to Roberto has these sections, **in this order**:
+Revised 2026-09-13, by Roberto, in his words: *"la parte verificato / non verificato non mi
+serve a un cazzo. A me interessa capire lo stato, cosa manca da fare, se hai bisogno di
+qualcosa da me, cosa stai facendo e cosa devi ancora fare."* The old section 5 is **gone** —
+what it protected (no false "done") did not disappear with it: it moved **inside** the status
+lines, where it is read instead of skipped.
 
-1. **The point** — 1 sentence. The answer, the finding, or the proposal. No preamble, no
-   chronicle of what you did, never open on context.
-2. **What I need from you** — the decision or action you're asking for; the options with their
-   consequences (cost, risk, what happens each way) and **your recommendation**. If nothing is
-   needed: write "Nothing."
-3. **Context** — only if it's needed to understand the point. Max 3 lines.
-4. **Detail** — commands, file paths, SHAs, numbers, test output. Always at the bottom.
-5. **Verified / not verified** — **mandatory** whenever you say "done", "works", "green",
-   "a posto". What you checked end-to-end yourself, and what you didn't.
+Every reply to Roberto has these four sections, **in this order**:
 
-**Two iron rules on top of the format:**
+1. **Stato / Status** — where the thing actually stands, in one or two lines. **Every claim of
+   something finished carries its own proof marker inline**: *"fatto e provato: X"* (you ran it
+   and saw it work) or *"fatto, non ancora provato: X"*. Never a bare "done". This replaces the
+   old separate verified/not-verified section — same guarantee, one less block to skip.
+2. **Sto facendo / Doing now** — the one thing in your hands right now, and roughly how long.
+   If you are waiting on something, say what and for how long.
+3. **Manca / Left** — the remaining steps as a short numbered list, in order. If nothing is
+   left, say so in one line.
+4. **Mi serve da te / What I need from you** — the decision or action, with the options and
+   their consequences *in his terms* (cost, risk, what happens each way) and **your
+   recommendation first**. If nothing is needed: "Nulla."
+
+**Detail last, and only if it helps** — commands, file paths, SHAs, numbers, test output go in a
+short tail under the four sections, never inside them.
+
+**Three iron rules on top of the format:**
 - **An empty section is deleted, not filled with "N/A".** The template must not become the
-  bloat. No "Context" needed → it isn't there.
-- **Section 5 is never skipped** on a "done" claim. The executive tone must never become false
-  confidence: if you didn't verify it, say so in section 5.
+  bloat. Nothing left to do → the "Manca" block is not there.
+- **"Fatto" never travels alone.** Every finished item says whether it was actually run and
+  seen to work, right there in the same line. An unproven claim is written as unproven.
+- **The point comes first inside "Stato"** — one sentence, no preamble, never a chronicle of
+  what you did and never opening on background.
 
 ### Writing rules
 

@@ -183,7 +183,8 @@ kb sched            # launchd jobs + schedules + factory queue/failed + evolve p
 
 ## Agent factory (unattended overnight work)
 
-`factory/` runs queued tasks through headless `claude -p` agents, one after another, tracked on
+`factory/` runs queued tasks through headless agents — **GitHub Copilot CLI by default**, so an
+unattended run never spends the Claude subscription — one after another, tracked on
 the filesystem — see [`factory/factory-protocol.md`](../factory/factory-protocol.md) for the full
 model.
 

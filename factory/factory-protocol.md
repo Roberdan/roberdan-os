@@ -1,9 +1,16 @@
 # factory — autonomous agent factory (Convergio's job, without Convergio)
 
-Runs queued tasks through **headless Claude Code agents**, one after another, unattended and
-resumable — the "agent factory" that keeps going while you sleep. Built on the current architecture
-only: `claude -p` (headless) + a durable file queue + `launchd` + the loop-protocol. No daemon, no
-Convergio, daemon-optional.
+Runs queued tasks through **headless agents**, one after another, unattended and resumable —
+the "agent factory" that keeps going while you sleep. Built on the current architecture only:
+one headless CLI (`-p` mode) + a durable file queue + `launchd` + the loop-protocol. No daemon,
+no Convergio, daemon-optional.
+
+**Engine: GitHub Copilot CLI by default** (`FACTORY_ENGINE=copilot`, since 2026-09-13). Roberto's
+rule is that unattended work never spends the Claude subscription, so every launch site in
+`factory/` and `eval/` goes through the single `launch_agent()` in `factory/lib.sh`. Copilot also
+brings a **native deny list** Claude has no equivalent for: `--deny-tool 'shell(git push)'`
+overrides `--allow-all-tools` (verified live), which is the third guard layer below.
+`FACTORY_ENGINE=claude` switches back deliberately — it is never the default and never implicit.
 
 > Unrelated to **Warp Factories** (Early Access since Warp 2026.08.18), which is Warp's own
 > cloud build infrastructure plus a built-in Factory MCP server. Not adopted: an MCP server that
@@ -23,7 +30,8 @@ Convergio, daemon-optional.
 
 - `factory/enqueue.sh "<task text or file>" [name]` — add a task to the queue.
 - `factory/run.sh` — process the queue: for each task, dispatch a headless agent
-  (`claude -p "<task>" --model <sonnet|opus> --permission-mode auto --permission-prompts none --add-dir <dir>`),
+  (`copilot -p "<task>" --model <claude-sonnet-5|claude-opus-5> --allow-all-tools --deny-tool ... --add-dir <dir>`;
+  with `FACTORY_ENGINE=claude`: `claude -p "<task>" --model <sonnet|opus> --permission-mode auto --permission-prompts none --add-dir <dir>`),
   capture the log. See "Model policy" below for how `<sonnet|opus>` is chosen.
   **A task only reaches `done/` on exit 0.** On failure it is requeued once (attempt 2/2); if
   it fails again it moves to `failed/` with `escalate: true` — never silently marked done.
@@ -54,9 +62,9 @@ model: sonnet                  # optional: sonnet (default) | opus — see "Mode
 
 ### Model policy — always sonnet, scale to opus on need, never the account default
 
-`run.sh` always passes an explicit `--model` to `claude -p` — it never lets the process fall
+`run.sh` always passes an explicit `--model` to the engine — it never lets the process fall
 through to the account's interactive default model. That default is whatever Roberto's account
-happens to be set to at the time (it has been the pricier Fable), and `claude -p` silently
+happens to be set to at the time (it has been the pricier Fable), and a headless `-p` run silently
 inherits it when `--model` is omitted; an unattended factory must not ride that default.
 
 - **Default: `sonnet`** for every task unless overridden.
@@ -71,7 +79,9 @@ inherits it when `--model` is omitted; an unattended factory must not ride that 
   override are clamped through this allowlist before reaching the `claude` command line. An
   unrecognized value (typo, empty string, `fable`, `haiku`, anything else) is clamped to
   `sonnet` and logged as `[factory] WARN model '<x>' not allowed (sonnet|opus only) — clamped to
-  sonnet` — it is never passed through raw and never causes the task itself to fail.
+  sonnet` — it is never passed through raw and never causes the task itself to fail. The aliases
+  are mapped to the engine's real ids by `engine_model()` (copilot: `sonnet`=claude-sonnet-5,
+  `opus`=claude-opus-5), so the allowlist keeps working unchanged across engines.
 - **The headless @thor verification pass always uses `sonnet`**, unconditionally — it is QA
   (compare evidence against `dod:`/`acceptance:`), not authorship, so it never scales to opus and
   is unaffected by `model:` or `RDA_FACTORY_MODEL`.
@@ -117,9 +127,32 @@ hangs and never gets a blanket yes. **Which** commands get denied is the auto-mo
 judgment, not a fixed list: it weighs the task text and context, and it can change between releases.
 Measured 2026-09-12: `git commit --amend` on a throwaway local repo was denied in 2 runs (v2.1.269, similar
 prompts) and allowed in 5 (launchd and foreground, v2.1.269 and v2.1.270, one identical prompt). The only deterministic blocks are
-the hooks — `hooks/bash-guard.sh` refuses `git push --force` / `--no-verify` every time. Not a
-sandbox, and not a denylist: a task that *explicitly* asks for a risky action can still get it
-approved. Queue only tasks you would approve by hand.
+the hooks. So every factory run also loads **`hooks/factory-guard.sh`** through `--settings` (both
+the task run and the @thor verify run): a fixed list that denies, every time, `git push`, history
+rewrites (`commit --amend`, `rebase`, `reset --hard`, `filter-branch`, ref/reflog/stash deletion),
+`git clean -f`, `branch -D`, `--no-verify`, `rm -rf` in any flag order, `find -delete` and `gh`
+write actions (PR create/merge, releases, repo edits, `gh api` writes). It reads the raw command,
+quotes included, so `bash -c "git push"` is caught too. `factory/run.sh` refuses to start if the
+guard file is missing, because a hook whose script is gone errors out and lets the command through.
+Interactive sessions never load it.
+
+**Second layer — `factory/shims/{git,gh,rm}`, first on the agent's `PATH`.** The guard above reads
+the command as *text*, so it can only refuse spellings it recognises, and @thor out-spelled it three
+times in a row on the same command: `git commit --am"end"`, `/usr/bin/git push`,
+`git${IFS}commit${IFS}--amend`, `{git,commit,--amend}`. Each of those is the shell rewriting the
+text before anything executes, so chasing them one regex at a time cannot end. The shims sit on the
+other side of that line: they are ordinary `git`/`gh`/`rm` executables that inspect `"$@"` **after**
+the shell has finished expanding, refuse the same fixed list with exit 97, and `exec` the real
+binary for everything else. A new spelling is not a new bypass, and the coverage extends to shapes
+no text match can see: a script written to a file and then run, a `python`/`node` subprocess, a
+command built from variables. `run.sh` exits 126 if any shim is missing or not executable — one
+layer gone is an unguarded run, not a degraded one.
+
+**Neither layer alone is honest, which is why there are two**: the shims are blind to a call that
+skips `PATH` (`/usr/bin/git push`), and that is exactly the spelling the text guard catches; the
+guard is blind to everything the shell rewrites, and that is exactly what the shims catch. Still
+not a sandbox: a copy of the binary under another name, or a language runtime doing the equivalent
+work in-process, passes both. Queue only tasks you would approve by hand.
 
 ## Guardrails (autonomous ≠ reckless)
 

@@ -48,12 +48,11 @@ bench_invoke_model() {
     RDA_BENCH_MODEL="$model" eval_invoke_agent "$prompt" "$outfile" "$root" "$timeout_s" "$timeout_bin" "$claude_bin"
     rc=$?
   else
+    local -a flags; IFS=$'\n' read -r -d '' -a flags < <(eval_engine_flags "$root"; printf '\0')
     if [ -n "$timeout_bin" ]; then
-      "$timeout_bin" "$timeout_s" "$claude_bin" -p "$prompt" --model "$model" \
-        --dangerously-skip-permissions --add-dir "$root" > "$outfile" 2>&1
+      "$timeout_bin" "$timeout_s" "$claude_bin" -p "$prompt" --model "$model" "${flags[@]}" > "$outfile" 2>&1
     else
-      "$claude_bin" -p "$prompt" --model "$model" \
-        --dangerously-skip-permissions --add-dir "$root" > "$outfile" 2>&1
+      "$claude_bin" -p "$prompt" --model "$model" "${flags[@]}" > "$outfile" 2>&1
     fi
     rc=$?
   fi

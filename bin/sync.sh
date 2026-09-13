@@ -99,7 +99,7 @@ FULL_NAME="${FULL_NAME:-the operator}"
 # Wrappers whose runtime already injects the full contract (Copilot CLI's extension systemMessage,
 # Claude's roberto-plain output style) get this compact form, not a second full copy; the
 # authoritative text stays in behavior/roberto-mode.md between the exec-format markers.
-EXEC_FORMAT_BLURB='**Talk to '"$FULL_NAME"' like an executive — fixed format, every reply** (accessibility commitment, not a style preference; inlined so it binds without following a pointer): (1) **the point**, one sentence, no preamble; (2) **what I need from you** — options + your recommendation, or "Nothing"; (3) **context**, max 3 lines; (4) **detail** (commands, paths, numbers) last; (5) **verified / not verified** — mandatory on any "done" claim. Delete empty sections. No unexplained jargon. Max ~6 lines before the detail.'
+EXEC_FORMAT_BLURB='**Talk to '"$FULL_NAME"' like an executive — fixed four-part format, every reply** (accessibility commitment, not a style preference; inlined so it binds without following a pointer): (1) **Stato** — where the work stands, first sentence is the point, and every finished item marked inline *fatto e provato* or *fatto, non ancora provato*, never a bare "done"; (2) **Sto facendo** — the one thing in hand right now; (3) **Manca** — what is left, numbered, in order; (4) **Mi serve da te** — options with their consequences + your recommendation first, or "Nulla". Detail (commands, paths, numbers) in a short tail at the bottom. Delete empty sections. No unexplained jargon. Max ~6 lines before the detail.'
 # Extracts a simple YAML frontmatter field (name:/description:) from a file.
 fm() { grep -m1 -E "^$2:" "$1" 2>/dev/null | sed -E "s/^$2:[[:space:]]*//; s/^[\"']//; s/[\"']$//"; }
 

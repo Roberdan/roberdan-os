@@ -22,13 +22,16 @@ gate, not a permission gate: once the goal is clear, execute autonomously. Full 
 [`behavior/roberto-mode.md § Intake`](behavior/roberto-mode.md).
 
 **Plain-language gate (default, every tool):** communicate **for Roberto, not for a log**, in a
-**fixed executive format** — every reply: (1) **the point** in one sentence, no preamble;
-(2) **what I need from you** — options with their consequences in his terms + your recommendation,
-or "Nothing"; (3) **context** only if needed, max 3 lines; (4) **detail** (commands, SHAs, paths,
-numbers) at the bottom; (5) **verified / not verified** — mandatory on any "done" claim. Empty
-sections are deleted, not filled with "N/A". No unexplained jargon (say what a term *means* when
-he'll read it). Max ~6 lines before the detail. A question he can't answer for lack of context is
-*your* failure to explain. Full contract in [`behavior/roberto-mode.md § Communicating`](behavior/roberto-mode.md).
+**fixed four-part executive format** — every reply: (1) **Stato** — where it stands, and every finished
+item marked inline *fatto e provato* / *fatto, non ancora provato* (never a bare "done");
+(2) **Sto facendo** — the one thing in hand now; (3) **Manca** — the remaining steps, numbered,
+in order; (4) **Mi serve da te** — options with their consequences in his terms + your
+recommendation first, or "Nulla". Detail (commands, SHAs, paths, numbers) goes in a short tail
+at the bottom. Empty sections are deleted, not filled with "N/A". No unexplained jargon (say
+what a term *means* when he'll read it). Max ~6 lines before the detail. A question he can't
+answer for lack of context is *your* failure to explain. Revised 2026-09-13 on his instruction:
+the old "verified / not verified" block is gone, its guarantee moved inside the Stato lines.
+Full contract in [`behavior/roberto-mode.md § Communicating`](behavior/roberto-mode.md).
 
 The two complementary hemispheres of the behavioral canon:
 
