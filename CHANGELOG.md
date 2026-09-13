@@ -3,7 +3,7 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
-## 2.47.0 — 2026-09-13
+## 2.48.0 — 2026-09-13
 
 ### Added
 
@@ -15,12 +15,29 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   o riavvio, nessuna nuova autorizzazione, ripiego solo consultivo sui client
   senza il callback nativo.
 
+## 2.47.0 — 2026-09-13
+
+### Added
+
+- Optional `instagram-reel-preview` skill: local, video-based Reel covers and
+  Instagram-style post frames, with white outer spacing, readable headlines,
+  source protection and an explicit output language.
+- Approved Fightthestroke logo and `fightthestroke` publisher defaults, with
+  provenance and logo integrity checks; subjects remain distinct from the publisher.
+- Separate optional skill catalog and selective packaging/installation, excluded
+  from global synchronization. Includes renderer and installer regression tests.
+
 ## 2.46.1 — 2026-09-13
 
 ### Fixed
 
 - `kb top` legge la dimensione effettiva del terminale su macOS anche durante il
   ridimensionamento; il nome della copia di lavoro rispetta lo spazio disponibile.
+- Su Linux, misurare il terminale dentro il segnale di ridimensionamento mandava in
+  stallo per sempre il ridisegno (interrompeva una lettura bloccata proprio mentre
+  toccava il terminale): ora il segnale si limita a segnare "e' cambiata la misura",
+  e il ciclo principale la applica — corretto e provato su macOS e su Linux (Ubuntu
+  24.04, l'ambiente reale dei controlli automatici).
 - Prova interattiva con terminale Unix ridimensionabile, senza dipendenze aggiuntive:
   larghezza, altezza, ridisegno, uscita `q` e ripristino delle impostazioni.
 - Il contatore delle letture fra agenti somma solo le consegne, non concatena

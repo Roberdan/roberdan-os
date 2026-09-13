@@ -103,7 +103,10 @@ for l in sys.stdin:
     l=l.rstrip(chr(10))
     if len(l)>24: print("   >>", len(l), repr(l))'; fi
 grep -q 'tput cols' "$ROOT/kanban/top.sh" && ok "la larghezza la chiede al terminale, non e' un numero fisso" || fail "la larghezza e' ancora fissa"
-grep -q "trap 'term_size' WINCH" "$ROOT/kanban/top.sh" && ok "e la ri-legge quando ridimensioni il riquadro" || fail "non si accorge del ridimensionamento"
+# Il trap non misura piu' il terminale direttamente (farlo dentro un segnale che interrompe
+# una `read -t` mandava in stallo la lettura su Linux, vedi commento in top.sh): si limita
+# a segnare che e' arrivato un ridimensionamento, e il ciclo principale lo applica.
+grep -q "trap 'RESIZED=1' WINCH" "$ROOT/kanban/top.sh" && ok "e la ri-legge quando ridimensioni il riquadro" || fail "non si accorge del ridimensionamento"
 
 echo "== il ridisegno sta fermo: niente sfarfallio, niente scorrimento =="
 # Pulire tutto lo schermo a ogni giro fa sfarfallare, e un disegno alto una riga piu' del

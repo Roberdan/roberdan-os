@@ -25,18 +25,41 @@ RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 # La misura del riquadro, ri-letta a ogni ridimensionamento (segnale WINCH). Fuori da un
 # terminale (prove, script) non c'e' niente da misurare: 34 colonne, il valore storico.
 W=34; H=40
+# Se fd 0 e' un terminale si decide UNA SOLA VOLTA qui, prima di entrare nel ciclo: chiesto
+# di nuovo dentro un trap WINCH mentre il ciclo e' fermo su `read -t`, lo stesso controllo
+# (`[ -t 0 ]`, e persino `stty size` sul descrittore 0) puo' rispondere onestamente "non e'
+# un terminale" anche quando lo e' davvero — misurato, stesso processo, stesso terminale,
+# esito diverso a seconda del momento in cui arriva il segnale. La domanda "e' interattivo?"
+# non cambia mai durante la vita dello script: chiesta una volta sola, fuori da quella
+# finestra instabile, la risposta e' quella giusta per tutta la sessione.
+IS_TTY=0; [ -t 0 ] && IS_TTY=1
 term_size() {
-  local c r
-  # macOS tput perde la misura con stdout catturato e stderr rediretto; stty legge stdin.
-  if [ -t 0 ]; then read -r r c <<<"$(stty size 2>/dev/null || printf '0 0')"
-  else c="$(tput cols 2>/dev/null || echo 0)"; r="$(tput lines 2>/dev/null || echo 0)"; fi
+  local c r out
+  if [ "$IS_TTY" = 1 ]; then
+    # macOS tput perde la misura con stdout catturato e stderr rediretto; `/dev/tty` e' il
+    # terminale di controllo del processo, stabile anche quando il ciclo principale la
+    # richiede di nuovo dopo un ridimensionamento.
+    out="$(stty size </dev/tty 2>/dev/null)"
+    if [ -n "$out" ]; then read -r r c <<<"$out"; else c=0; r=0; fi
+  else
+    c="$(tput cols 2>/dev/null || echo 0)"; r="$(tput lines 2>/dev/null || echo 0)"
+  fi
   [ "${c:-0}" -gt 0 ] 2>/dev/null || c=35
   [ "${r:-0}" -gt 0 ] 2>/dev/null || r=41
   W="${RDA_TOP_WIDTH:-$((c-1))}"; [ "$W" -lt 20 ] && W=20
   H="${RDA_TOP_HEIGHT:-$r}"
 }
 term_size
-trap 'term_size' WINCH
+# Il trap NON misura nulla: su Linux, aprire il terminale (`stty size </dev/tty`) proprio
+# mentre interrompe una `read -t` bloccata sullo stesso descrittore — dentro un ciclo che
+# ha appena letto da un heredoc — manda in stallo per sempre quella `read`, misurato con un
+# caso minimo isolato (stesso script, stesso segnale, la sola differenza e' il tocco al
+# terminale dentro il trap). Il trap si limita a segnare "e' arrivato un ridimensionamento";
+# la misura vera la richiede il ciclo principale, fuori da quella finestra instabile — al
+# massimo attesa fino al prossimo giro (la `read -t` interrotta dal segnale comunque ritorna
+# subito, quindi in pratica e' immediata).
+RESIZED=0
+trap 'RESIZED=1' WINCH
 EVERY="${RDA_TOP_REFRESH:-15}"     # ogni quanti secondi si rinfresca la fotografia
 ONCE=0; [ -t 1 ] || ONCE=1
 case "${1:-}" in --once) ONCE=1 ;; esac
@@ -235,6 +258,7 @@ printf '\033[?25l\033[2J'
 # (\033[K), e alla fine si pulisce quel che resta sotto (\033[J). E non si scrive mai
 # sull'ultima riga del riquadro: e' scrivere li' che fa scorrere un terminale.
 while :; do
+  [ "$RESIZED" = 1 ] && { RESIZED=0; term_size; }
   refresh_if_stale
   out="$(draw)"
   printf '\033[H'
