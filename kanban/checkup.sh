@@ -54,7 +54,16 @@ ONLY="$(_scope)"
 _hr() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 # L'ora di modifica di un file: `stat -f` e' BSD (macOS), `stat -c` e' GNU (Linux/CI). Qui gira
 # in tutti e due i posti, e un referto che su CI stampa 0 giorni per tutto non e' un referto.
-_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+# Trappola vera, costata due giri di CI: su GNU `stat -f` ESISTE ma vuol dire "--file-system",
+# e con %m stampa il punto di mount ("/"). Quindi non basta provare le due forme in ordine: il
+# primo tentativo RIESCE e risponde una sciocchezza. Si accetta solo una risposta fatta di cifre.
+_mtime() {
+  local v
+  v="$(stat -c %Y "$1" 2>/dev/null)"
+  case "$v" in ''|*[!0-9]*) v="$(stat -f %m "$1" 2>/dev/null)" ;; esac
+  case "$v" in ''|*[!0-9]*) v=0 ;; esac
+  printf '%s' "$v"
+}
 
 _giorni_fa() { # <epoch> -> giorni interi
   awk -v t="${1:-0}" -v n="$(date +%s)" 'BEGIN{ if(t<=0){print 0} else {printf "%d", (n-t)/86400} }'
