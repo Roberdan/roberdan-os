@@ -3,6 +3,16 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.43.1] - 2026-09-13
+
+### Fixed
+- `kb checkup`: sul Mac di Roberto le prime due sezioni (copie di lavoro, cache) non partivano
+  — stampavano un errore di shell al posto del contenuto. Espandere una lista vuota e' un
+  errore nel bash di macOS (3.2) e non in quello della macchina di prova (5), quindi il
+  controllo automatico era verde e sulla sua macchina era rotto. La suite guardava i titoli
+  delle sezioni, non il loro contenuto: ora verifica anche che nessuna sezione muoia, e
+  senza la correzione diventa rossa (provato).
+
 ## [v2.43.0] - 2026-09-13
 
 **La fabbrica non spende piu' il budget Claude, il sistema si guarda addosso, e le risposte

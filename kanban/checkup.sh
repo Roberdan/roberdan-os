@@ -77,13 +77,17 @@ fi
 
 # --- 1) copie di lavoro ------------------------------------------------------------------
 _hr "1. Copie di lavoro"
+# ${ARR[@]} su un array VUOTO e' un "unbound variable" sotto `set -u` in bash 3.2 — che e' il
+# bash di macOS, cioe' la macchina di Roberto. In CI (bash 5) la stessa riga passa: il referto
+# usciva verde e sul suo Mac le sezioni 1 e 2 non partivano. La forma ${ARR[@]+"${ARR[@]}"} e'
+# l'unica che vuol dire "espandi se esiste" in entrambi i dialetti.
 FLAGS=(); [ "$APPLY" = "1" ] && FLAGS+=(--yes); [ "$ALL" = "1" ] && FLAGS+=(--all)
-bash "$DIR/worktree-sweep.sh" sweep "${FLAGS[@]}" | sed 's/^/  /'
+bash "$DIR/worktree-sweep.sh" sweep ${FLAGS[@]+"${FLAGS[@]}"} | sed 's/^/  /'
 
 # --- 2) cache, build, temporanei ---------------------------------------------------------
 _hr "2. Cache, build e temporanei"
 JFLAGS=(); [ "$APPLY" = "1" ] && JFLAGS+=(--yes); [ -n "$ONLY" ] && JFLAGS+=(--only "$ONLY")
-bash "$DIR/junk.sh" "${JFLAGS[@]}" | sed 's/^/  /'
+bash "$DIR/junk.sh" ${JFLAGS[@]+"${JFLAGS[@]}"} | sed 's/^/  /'
 
 # --- 3) conversazioni fra agenti lasciate a meta' ----------------------------------------
 # Una conversazione e' "appesa" quando e' ancora aperta, nessuno la tocca da giorni, e la card
