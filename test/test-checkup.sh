@@ -31,8 +31,10 @@ mkdir -p "$RDA_BUS_HOME/demo/.cursor/VIVA" "$RDA_BUS_HOME/demo/.cursor/MORTA"
 printf '{"kind":"note","from":"implementer"}\n{"kind":"note","from":"qa-gate"}\n' > "$RDA_BUS_HOME/demo/VIVA.jsonl"
 printf '{"kind":"note","from":"implementer"}\n' > "$RDA_BUS_HOME/demo/MORTA.jsonl"
 echo 0 > "$RDA_BUS_HOME/demo/.cursor/VIVA/qa-gate"
-touch -t "$(date -v-30d +%Y%m%d%H%M 2>/dev/null || date -d '30 days ago' +%Y%m%d%H%M)" \
-      "$RDA_BUS_HOME/demo/VIVA.jsonl" "$RDA_BUS_HOME/demo/MORTA.jsonl"
+# Invecchiate con una data FISSA nel passato: `date -v` e' BSD, `date -d` e' GNU, e una suite
+# che calcola "30 giorni fa" in modo diverso sui due sistemi e' esattamente come questa e' andata
+# rossa su Linux restando verde sul Mac. Una costante non ha dialetti.
+touch -t 202501010000 "$RDA_BUS_HOME/demo/VIVA.jsonl" "$RDA_BUS_HOME/demo/MORTA.jsonl"
 
 out="$(cd "$R" && bash "$CHK" 2>&1)"
 
@@ -66,6 +68,6 @@ if [ "$FAILS" -eq 0 ]; then
 else
   echo "--- referto prodotto dal checkup (per capire il rosso senza un altro giro) ---"
   printf '%s\n' "$out"
-  echo "--- bash: $BASH_VERSION · date: $(date -v-1d +%Y 2>/dev/null || echo 'GNU') ---"
+  echo "--- bash: $BASH_VERSION ---"
   echo "test-checkup: ❌ $FAILS FAIL"; exit 1
 fi
