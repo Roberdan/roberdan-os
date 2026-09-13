@@ -1,9 +1,15 @@
 # factory — autonomous agent factory (Convergio's job, without Convergio)
 
-Runs queued tasks through **headless Claude Code agents**, one after another, unattended and
+Runs queued tasks through **headless agent CLIs**, one after another, unattended and
 resumable — the "agent factory" that keeps going while you sleep. Built on the current architecture
-only: `claude -p` (headless) + a durable file queue + `launchd` + the loop-protocol. No daemon, no
-Convergio, daemon-optional.
+only: a headless `-p` agent call + a durable file queue + `launchd` + the loop-protocol. No daemon,
+no Convergio, daemon-optional.
+
+**Which CLI runs the pass is decided in one place: [`factory/agent-cli.sh`](agent-cli.sh).** The
+default is the **Copilot CLI**; `claude` is the fallback, and `RDA_AGENT_CLI=copilot|claude|<path>`
+forces either. It became one file on 2026-09-13, the morning `claude` hit its monthly spend limit
+and the @thor gate stopped producing *any* verdict — a single hardcoded provider in five files is
+a single point of failure for the whole loop, not just for one run.
 
 > Unrelated to **Warp Factories** (Early Access since Warp 2026.08.18), which is Warp's own
 > cloud build infrastructure plus a built-in Factory MCP server. Not adopted: an MCP server that
@@ -23,7 +29,9 @@ Convergio, daemon-optional.
 
 - `factory/enqueue.sh "<task text or file>" [name]` — add a task to the queue.
 - `factory/run.sh` — process the queue: for each task, dispatch a headless agent
-  (`claude -p "<task>" --model <sonnet|opus> --permission-mode auto --permission-prompts none --add-dir <dir>`),
+  (`<cli> -p "<task>" --model <sonnet|opus> --add-dir <dir>` plus that CLI's own non-interactive
+  permission flags — `--allow-all-tools` on copilot, `--permission-mode auto --permission-prompts none`
+  on claude; see `factory/agent-cli.sh`),
   capture the log. See "Model policy" below for how `<sonnet|opus>` is chosen.
   **A task only reaches `done/` on exit 0.** On failure it is requeued once (attempt 2/2); if
   it fails again it moves to `failed/` with `escalate: true` — never silently marked done.
@@ -54,10 +62,13 @@ model: sonnet                  # optional: sonnet (default) | opus — see "Mode
 
 ### Model policy — always sonnet, scale to opus on need, never the account default
 
-`run.sh` always passes an explicit `--model` to `claude -p` — it never lets the process fall
+`run.sh` always passes an explicit `--model` — it never lets the process fall
 through to the account's interactive default model. That default is whatever Roberto's account
-happens to be set to at the time (it has been the pricier Fable), and `claude -p` silently
+happens to be set to at the time (it has been the pricier Fable), and a headless `-p` call silently
 inherits it when `--model` is omitted; an unattended factory must not ride that default.
+`sonnet`/`opus` are the names of the *intent*: `rda_agent_model` translates them into the chosen
+CLI's real model id (`claude-sonnet-5` / `claude-opus-5` on copilot), so a rename at the provider
+is one line here and not a search across the repo.
 
 - **Default: `sonnet`** for every task unless overridden.
 - **Per-task override**: set `model: opus` in a task's frontmatter for tasks that genuinely need

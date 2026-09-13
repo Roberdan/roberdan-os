@@ -18,7 +18,7 @@ ok()      { printf "  ok: %s\n" "$1"; }
 # shellcheck source=test/lib-suites.sh
 . "$ROOT/test/lib-suites.sh"
 
-for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue \
+for _s in test-agent-cli test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue \
           test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery test-verify-done \
           test-kb-root-resolution test-kb-start-worktree-cause test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
@@ -183,9 +183,9 @@ if _suite test-gh-shim; then ok "sceglie la cartella dal remote, il -R vince sul
 section "lucchetto bus — un orfano si riusa, un proprietario vivo si rispetta"
 if _suite test-bus-lock; then ok "riusa il lucchetto di un processo morto, rifiuta quello di uno vivo, e aspetta prima di dichiarare orfano un lucchetto senza PID"; else _suite_out test-bus-lock; err "test-bus-lock — see bash test/test-bus-lock.sh"; fi
 
-# --- 8b6) come si legge il verdetto di @thor. Due volte in un giorno il gate ha rifiutato una
-# verifica RIUSCITA, e tutte e due le volte rilanciare identico e' bastato: la lezione peggiore.
-section "verdetto di @thor — tollerante sulla forma, inflessibile sul contenuto"
+# --- 8b6) chi esegue @thor (dal 2026-09-13 copilot di default, dopo che il limite di spesa di claude ha reso il cancello ineseguibile) e come se ne legge il verdetto: due volte in un giorno il gate ha rifiutato una verifica RIUSCITA, e tutte e due le volte rilanciare identico e' bastato — la lezione peggiore.
+section "@thor — chi lo esegue, e come si legge il suo verdetto"
+if _suite test-agent-cli; then ok "il CLI agentico si risolve con copilot come default, con le opzioni del fornitore scelto e il lavoro nella cartella dichiarata"; else _suite_out test-agent-cli; err "test-agent-cli — see bash test/test-agent-cli.sh"; fi
 if _suite test-thor-verdict; then ok "legge il verdetto anche in grassetto o con altri separatori, non ne inventa dove non c'e', e dice diverso un turno finito senza verdetto da un processo morto"; else _suite_out test-thor-verdict; err "test-thor-verdict — see bash test/test-thor-verdict.sh"; fi
 
 # --- 8b7) il controllo git installato deve sopravvivere alla cartella da cui lo si installa.

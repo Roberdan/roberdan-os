@@ -41,14 +41,25 @@ bench_grade_difficulty() {
 # NB: never called on a dry-run — the dry-run path reads fixtures and never reaches here.
 bench_invoke_model() {
   local model="$1" prompt="$2" outfile="$3" root="$4" timeout_s="$5" timeout_bin="$6" claude_bin="$7"
-  local rc=0
+  local rc=0 kind=""
   set +e
   if eval_agent_configured; then
     # Non-claude agent: it owns its own model dialect; we only surface the requested id to it.
     RDA_BENCH_MODEL="$model" eval_invoke_agent "$prompt" "$outfile" "$root" "$timeout_s" "$timeout_bin" "$claude_bin"
     rc=$?
   else
-    if [ -n "$timeout_bin" ]; then
+    # Il nome del modello arriva dalla tabella dei prezzi ed e' gia' nel dialetto del fornitore:
+    # non si traduce qui, si sceglie solo il dialetto delle OPZIONI del CLI risolto.
+    kind="$(eval_agent_kind "$claude_bin")"
+    if [ "$kind" = "copilot" ]; then
+      if [ -n "$timeout_bin" ]; then
+        "$timeout_bin" "$timeout_s" "$claude_bin" -p "$prompt" --model "$model" \
+          --allow-all-tools --add-dir "$root" --no-color > "$outfile" 2>&1
+      else
+        "$claude_bin" -p "$prompt" --model "$model" \
+          --allow-all-tools --add-dir "$root" --no-color > "$outfile" 2>&1
+      fi
+    elif [ -n "$timeout_bin" ]; then
       "$timeout_bin" "$timeout_s" "$claude_bin" -p "$prompt" --model "$model" \
         --dangerously-skip-permissions --add-dir "$root" > "$outfile" 2>&1
     else

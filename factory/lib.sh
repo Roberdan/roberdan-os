@@ -10,6 +10,12 @@
 #   CLAUDE, TIMEOUT_BIN  (verify_card)   and   KB  (verify_card / note_card).
 # The Node 1 lock primitives are fully self-contained.
 
+# --- quale CLI agentica esegue i passaggi headless ----------------------------
+# La scelta del fornitore non sta qui: sta in factory/agent-cli.sh, unico posto dove e' scritta.
+# Dal 2026-09-13 il default e' copilot (vedi quel file per il perche'). Qui si sorge e basta.
+# shellcheck source=/dev/null
+. "$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-cli.sh"
+
 # --- kanban frontmatter helpers (used by verify_card/note_card + run.sh) ------
 frontmatter() { sed -n '/^---$/,/^---$/p' "$1"; }
 # shellcheck disable=SC2015
@@ -103,12 +109,12 @@ thor_unavailable_reason() {
   [ -f "$vlog" ] || return 0
   # -i perche' la frase esatta cambia tra provider e tra versioni della CLI: si riconosce il
   # fatto (credito/quota/sessione), non la formulazione di un particolare mese.
-  grep -oiE "hit your (monthly )?(spend|usage) limit|spend limit reached|usage limit reached|quota exceeded|insufficient (credit|quota)|rate limit(ed| exceeded)|invalid api key|authentication_error|not logged in|please run .?claude login|failed to authenticate|(oauth |api )?(session|token|credential)s? (has |have )?expired|could not be refreshed|re-?authenticat" \
+  grep -oiE "hit your (monthly )?(spend|usage) limit|spend limit reached|usage limit reached|quota exceeded|insufficient (credit|quota)|rate limit(ed| exceeded)|premium request|monthly (premium )?request|entitlement|invalid api key|authentication_error|not logged in|please run .?(claude|copilot) login|please (sign|log) in|failed to authenticate|(oauth |api )?(session|token|credential)s? (has |have )?expired|could not be refreshed|re-?authenticat" \
     "$vlog" 2>/dev/null | tail -1 || true
 }
 
 verify_card() {
-  local cid="$1" dir="$2" tmo="$3" vlog="$4" cf="" dod="" acc="" vprompt="" vrc=0 verdict="" _tv_unavail=""
+  local cid="$1" dir="$2" tmo="$3" vlog="$4" cf="" dod="" acc="" vprompt="" vrc=0 verdict="" _tv_unavail="" _vk=""
   for c in todo doing "done"; do [ -e "$KB/$c/$cid.md" ] && cf="$KB/$c/$cid.md"; done
   if [ -z "$cf" ]; then
     printf 'FAIL\tcard %s not found in kanban/ for verification\n' "$cid"
@@ -134,17 +140,20 @@ verifica non avvenuta e la card resta aperta."
   # process's cwd. Without this, "current directory" in a prompt silently resolves to
   # wherever run.sh itself was launched from (the roberdan-os repo root) instead of the
   # task's declared dir — found live: a probe task wrote its output file into this repo
-  # instead of its intended workdir. Subshell so the cd doesn't leak into the rest of run.sh.
+  # instead of its intended workdir. Il cd sta dentro rda_agent_run, in una subshell.
   if [ ! -d "$dir" ]; then
     { echo "[factory] FATAL: dir '$dir' does not exist"; } >> "$vlog"
     vrc=2
-  elif [ -n "$TIMEOUT_BIN" ]; then
+  else
     # Verify pass is QA, not authorship — always sonnet, never scaled to opus and never
     # influenced by RDA_FACTORY_MODEL/per-task model: (those govern the authoring pass only).
-    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$vprompt" --model sonnet --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$vlog" 2>&1
-    vrc=$?
-  else
-    ( cd "$dir" && "$CLAUDE" -p "$vprompt" --model sonnet --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$vlog" 2>&1
+    # `sonnet` e' il nome dell'INTENZIONE: agent-cli.sh lo traduce nel modello vero del CLI
+    # scelto (claude-sonnet-5 su copilot, sonnet su claude).
+    _vk="${AGENT_KIND:-}"
+    [ -n "$_vk" ] || { IFS=$'\t' read -r _vk _ <<<"$(rda_agent_resolve)"; }
+    [ -n "$_vk" ] || _vk=claude
+    rda_agent_run "$_vk" "$CLAUDE" "$(rda_agent_model "$_vk" sonnet)" "$dir" "$vprompt" \
+      "$TIMEOUT_BIN" "$tmo" > "$vlog" 2>&1
     vrc=$?
   fi
   set -e

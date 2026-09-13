@@ -34,7 +34,7 @@ BOARD="$FED/kanban"
 
 REPO="$TMP/repo"; mkdir -p "$REPO/kanban" "$REPO/factory"
 cp "$ROOT/kanban/"*.sh "$REPO/kanban/"
-cp "$ROOT/factory/lib.sh" "$REPO/factory/"
+cp "$ROOT/factory/lib.sh" "$ROOT/factory/agent-cli.sh" "$REPO/factory/"
 
 # L'unico pezzo finto: un `claude` che dichiara la propria cwd dentro il verdetto.
 FAKE="$TMP/fake-claude"
@@ -95,7 +95,7 @@ fi
 # Si rimette la riga esatta del difetto e si pretende che il blocco 1 TORNI rosso. Se questo
 # resta verde, il blocco 1 non stava provando niente.
 MUT="$TMP/mutato"; mkdir -p "$MUT/kanban" "$MUT/factory"
-cp "$REPO/kanban/"*.sh "$MUT/kanban/"; cp "$REPO/factory/lib.sh" "$MUT/factory/"
+cp "$REPO/kanban/"*.sh "$MUT/kanban/"; cp "$REPO/factory/lib.sh" "$REPO/factory/agent-cli.sh" "$MUT/factory/"
 _mutate() { sed -e 's|^dir="\${2:-}"|dir="${2:-$ROOT}"|' "$1" > "$1.new" && mv "$1.new" "$1"; }
 _mutate "$MUT/kanban/thor-verify.sh"
 if ! grep -q 'dir="\${2:-\$ROOT}"' "$MUT/kanban/thor-verify.sh"; then

@@ -100,8 +100,9 @@ it advertises. Stated plainly so you can trust the rest.
   deny/ask, fail-safe on error), autofmt, and an always-on pause/resume checkpoint — plus namespaced
   tools (`roberdanos_kanban/pause/resume/verify-done/doctor`). Its completion gate is **advisory**
   (Copilot can't block an already-produced final response — see limitations).
-- **factory** — bounded headless `claude -p` runs (timeout, model clamp, OAuth billing). Bounded,
-  **not OS-sandboxed** (auto mode with `--permission-prompts none`, scoped to one dir).
+- **factory** — bounded headless agent runs (timeout, model clamp, OAuth billing); Copilot CLI by
+  default since 2026-09-13, `claude` as fallback (`factory/agent-cli.sh`). Bounded,
+  **not OS-sandboxed** (non-interactive permissions, scoped to one dir).
 - **eval harness** — a real with/without-canon A/B + blind-judge pipeline. CI-gated. (See the
   caveat on its *results* below.)
 - **Self-improving meta-loop** (`learn/` → `ontology/`) — as of v2.10.0 it actually promotes:

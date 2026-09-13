@@ -26,21 +26,32 @@ section() {
   ' "$file"
 }
 
-# --- claude binary resolution (identical pattern to factory/run.sh) ------------------------
-# In --stub mode the caller (a test harness, see eval/test-eval-pipeline.sh) is expected to
-# have already prepended a temp bin/ dir with a fake `claude` script onto PATH, exactly the
-# way test/test-factory-kb.sh stubs factory/run.sh. --stub does not change resolution itself —
-# it only relaxes the FATAL exit into a clearer message and stamps a "STUB MODE" banner into
-# saved outputs so nobody mistakes a stub run for a real one.
+# --- risoluzione del CLI agentico (unica fonte: factory/agent-cli.sh) -----------------------
+# In --stub mode il chiamante (un'armatura di test, vedi eval/test-eval-pipeline.sh) ha gia'
+# messo in testa al PATH una cartella bin/ con un finto `claude`, esattamente come fa
+# test/test-factory-kb.sh con factory/run.sh. --stub non cambia la risoluzione: rende solo
+# l'uscita FATAL un messaggio piu' chiaro e timbra "STUB MODE" negli output salvati, perche'
+# nessuno scambi una corsa finta per una vera.
+#
+# Il nome della funzione resta `eval_resolve_claude` per compatibilita' (la chiamano judge.sh,
+# run-eval.sh, bench-run.sh e i loro test), ma dal 2026-09-13 quello che risolve e' "il CLI
+# agentico configurato", con copilot come default. Stampa il binario; il tipo si rilegge dal
+# nome del file, come fa agent-cli.sh per i percorsi espliciti.
+# shellcheck source=factory/agent-cli.sh
+. "$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../factory" && pwd)/agent-cli.sh"
+
 eval_resolve_claude() {
-  local c
-  c="$(command -v claude 2>/dev/null || true)"
-  if [ -z "$c" ] || [ ! -x "$c" ]; then
-    for p in "$HOME/.local/bin/claude" /opt/homebrew/bin/claude "$HOME/.bun/bin/claude" /usr/local/bin/claude; do
-      [ -x "$p" ] && { c="$p"; break; }
-    done
-  fi
-  printf '%s' "$c"
+  local kind="" bin=""
+  IFS=$'\t' read -r kind bin <<<"$(rda_agent_resolve)"
+  printf '%s' "${bin:-}"
+}
+
+# eval_agent_kind BINARIO -> copilot|claude, dedotto dal nome del file
+eval_agent_kind() {
+  case "$(basename "${1:-}")" in
+    *copilot*) printf 'copilot' ;;
+    *)         printf 'claude'  ;;
+  esac
 }
 
 # BILLING SAFETY — identical rationale to factory/run.sh: in `-p` headless mode an
@@ -94,7 +105,15 @@ eval_invoke_agent() {
       printf '%s' "$prompt" | $RDA_EVAL_AGENT_CMD > "$outfile" 2>&1
     fi
   else
-    if [ -n "$timeout_bin" ]; then
+    # Percorso "CLI risolto da noi". I due fornitori non condividono le opzioni: copilot non ha
+    # --dangerously-skip-permissions, la sua modalita' non interattiva e' --allow-all-tools.
+    if [ "$(eval_agent_kind "$claude_bin")" = "copilot" ]; then
+      if [ -n "$timeout_bin" ]; then
+        "$timeout_bin" "$timeout_s" "$claude_bin" -p "$prompt" --allow-all-tools --add-dir "$root" --no-color > "$outfile" 2>&1
+      else
+        "$claude_bin" -p "$prompt" --allow-all-tools --add-dir "$root" --no-color > "$outfile" 2>&1
+      fi
+    elif [ -n "$timeout_bin" ]; then
       "$timeout_bin" "$timeout_s" "$claude_bin" -p "$prompt" --dangerously-skip-permissions --add-dir "$root" > "$outfile" 2>&1
     else
       "$claude_bin" -p "$prompt" --dangerously-skip-permissions --add-dir "$root" > "$outfile" 2>&1

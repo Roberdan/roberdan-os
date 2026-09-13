@@ -18,19 +18,23 @@ HANDOFF="${RDA_HANDOFF:-$HOME/GitHub/roberdan-os/handoff/latest.md}"
 KB="${RDA_KANBAN:-$HOME/GitHub/roberdan-os/kanban}"
 MAX_ATTEMPTS=2
 
+# QUALE CLI AGENTICA. La scelta sta in factory/agent-cli.sh — dal 2026-09-13 il default e'
+# copilot. Si sorge PRIMA di lib.sh perche' serve gia' qui per risolvere il binario; lib.sh lo
+# sorge a sua volta (idempotente: sono solo definizioni di funzione).
+# BASH_SOURCE-relative perche' sotto launchd la cwd e' estranea.
+# shellcheck source=factory/agent-cli.sh
+source "$(dirname "${BASH_SOURCE[0]}")/agent-cli.sh"
+IFS=$'\t' read -r AGENT_KIND CLAUDE <<<"$(rda_agent_resolve)"
+[ -n "${CLAUDE:-}" ] && [ -x "$CLAUDE" ] || { echo "[factory] FATAL: nessun CLI agente trovato (copilot o claude)" >&2; exit 127; }
+
 # BILLING SAFETY (verified w/ Claude Code docs): in `-p` headless mode, an
 # ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN is ALWAYS used → per-token API billing.
 # Unset both so auth falls through to the Max subscription OAuth (no API charges).
-unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN 2>/dev/null || true
-
-# locate the real claude binary (launchd has a minimal PATH; the interactive alias is unavailable)
-CLAUDE="$(command -v claude 2>/dev/null || true)"
-if [ -z "$CLAUDE" ] || [ ! -x "$CLAUDE" ]; then
-  for p in "$HOME/.local/bin/claude" /opt/homebrew/bin/claude "$HOME/.bun/bin/claude" /usr/local/bin/claude; do
-    [ -x "$p" ] && { CLAUDE="$p"; break; }
-  done
+# Vale solo per il runner claude: su copilot quelle variabili non c'entrano, e toglierle
+# all'ambiente di un task che magari le usa sarebbe un effetto collaterale non richiesto.
+if [ "$AGENT_KIND" = "claude" ]; then
+  unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN 2>/dev/null || true
 fi
-[ -n "$CLAUDE" ] && [ -x "$CLAUDE" ] || { echo "[factory] FATAL: claude binary not found" >&2; exit 127; }
 
 # `timeout` is GNU coreutils, not built into macOS /usr/bin — under launchd's minimal PATH
 # it is just as missing as `claude` was. Resolve it the same way, with a portable fallback.
@@ -76,19 +80,15 @@ run_task() {
   set +e
   # cd into $dir first — see the comment in verify_card() for why: --add-dir alone leaves
   # the process's actual cwd at wherever run.sh was launched from, not the task's dir.
-  # Auto mode + --permission-prompts none (Claude Code v2.1.259) instead of skipping permissions:
-  # routine work is still approved, but what the classifier would ask about is DENIED instead of
-  # allowed — a mechanical limit, where the old flag left only the AGENTS.md prose. A headless run
-  # cannot answer a prompt, so "none" turns every would-be prompt into a refusal, never a hang.
+  # Il cd e le opzioni per-fornitore (compresi i permessi non interattivi) stanno in
+  # rda_agent_run, factory/agent-cli.sh: qui si dice solo COSA eseguire, non con quale CLI.
   local rc
   if [ ! -d "$dir" ]; then
     { echo "[factory] FATAL: dir '$dir' does not exist"; } >> "$log"
     rc=2
-  elif [ -n "$TIMEOUT_BIN" ]; then
-    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$full" --model "$model" --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$log" 2>&1
-    rc=$?
   else
-    ( cd "$dir" && "$CLAUDE" -p "$full" --model "$model" --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$log" 2>&1
+    rda_agent_run "$AGENT_KIND" "$CLAUDE" "$(rda_agent_model "$AGENT_KIND" "$model")" \
+      "$dir" "$full" "$TIMEOUT_BIN" "$tmo" > "$log" 2>&1
     rc=$?
   fi
   set -e

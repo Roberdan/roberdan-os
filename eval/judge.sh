@@ -48,7 +48,7 @@ else
       echo "[judge] FATAL (--stub): no claude resolvable on PATH — put a fake claude on PATH first" >&2
       echo "        (or set RDA_EVAL_AGENT_CMD to stub a different agent CLI instead.)" >&2
     else
-      echo "[judge] FATAL: no claude binary found. Use --stub only for pipeline testing, or set" >&2
+      echo "[judge] FATAL: nessun CLI agente trovato (copilot o claude). Use --stub only for" >&2
       echo "        RDA_EVAL_AGENT_CMD to drive a different headless agent CLI instead." >&2
     fi
     exit 127

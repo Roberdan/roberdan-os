@@ -104,9 +104,9 @@ else
       echo "       already prepended a fake claude script to PATH (see eval/test-eval-pipeline.sh)." >&2
       echo "       (or set RDA_EVAL_AGENT_CMD to stub a different agent CLI instead.)" >&2
     else
-      echo "[eval] FATAL: no claude binary found. Run with --stub only after putting a fake claude" >&2
-      echo "       on PATH for pipeline testing; for a REAL run, install Claude Code, or set" >&2
-      echo "       RDA_EVAL_AGENT_CMD to drive a different headless agent CLI instead." >&2
+      echo "[eval] FATAL: nessun CLI agente trovato (copilot o claude). Run with --stub only after" >&2
+      echo "       putting a fake CLI on PATH for pipeline testing; for a REAL run install the" >&2
+      echo "       Copilot CLI (default) or Claude Code, or set RDA_EVAL_AGENT_CMD." >&2
     fi
     exit 127
   fi

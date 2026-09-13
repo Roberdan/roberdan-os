@@ -67,6 +67,10 @@ if in_doing S1 && ! in_done S1; then ok "SKIP: la card resta in doing (non si ch
 #     kanban/thor-verify.sh, chiamandolo con un verify_card finto.
 FAKELIB="$TMP/fakerepo"; mkdir -p "$FAKELIB/kanban" "$FAKELIB/factory"
 cp "$ROOT/kanban/thor-verify.sh" "$FAKELIB/kanban/"
+# agent-cli.sh e' il file che decide QUALE CLI agentica esegue il passaggio: thor-verify.sh lo
+# sorge prima di tutto, quindi il finto repo deve averlo. Quello vero, non uno stub: se la
+# risoluzione cambia, questa suite lo deve sentire.
+cp "$ROOT/factory/agent-cli.sh" "$FAKELIB/factory/"
 printf 'verify_card() { printf "FAIL\\tunparseable thor-verify output (exit=124) — see /tmp/x.log\\n"; }\n' > "$FAKELIB/factory/lib.sh"
 tvout="$(CLAUDE=/bin/echo bash "$FAKELIB/kanban/thor-verify.sh" QUALSIASI 2>/dev/null || true)"
 case "$tvout" in

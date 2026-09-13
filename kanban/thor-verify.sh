@@ -43,9 +43,16 @@ dir="${2:-}"
 tmo="${3:-1200}"   # 600s non bastava su una card grossa: misurato il 2026-07-31
 vlog="${4:-${TMPDIR:-/tmp}/thor-verify-$card-$$.log}"
 
-# Il boccone amaro: thor gira come un processo `claude` separato. Se non c'e', non si finge.
-CLAUDE="${CLAUDE:-$(command -v claude 2>/dev/null || true)}"
-[ -n "$CLAUDE" ] || { printf 'SKIP\tbinario claude non trovato: @thor non e eseguibile su questa macchina\n' ; exit 0; }
+# Il boccone amaro: thor gira come un processo CLI separato — un secondo agente, non questo. Se
+# non c'e' nessun CLI agentico, non si finge. Quale CLI lo decide factory/agent-cli.sh: dal
+# 2026-09-13 il default e' copilot, dopo che il limite di spesa mensile di claude ha reso il
+# cancello ineseguibile a meta' mattina e le card sono rimaste ferme in doing.
+# shellcheck source=/dev/null
+. "$ROOT/factory/agent-cli.sh" 2>/dev/null || { printf 'SKIP\tfactory/agent-cli.sh non caricabile: @thor non e eseguibile\n'; exit 0; }
+IFS=$'\t' read -r AGENT_KIND AGENT_BIN <<<"$(rda_agent_resolve)"
+[ -n "${AGENT_BIN:-}" ] || { printf 'SKIP\tnessun CLI agente trovato (copilot o claude): @thor non e eseguibile su questa macchina\n' ; exit 0; }
+# CLAUDE resta valorizzato: e' il nome con cui factory/lib.sh e i test conoscono il binario.
+CLAUDE="$AGENT_BIN"
 
 # La ricorsione e il modo ovvio di sbagliare: thor che chiude una card chiamando kb finish che
 # chiama thor. Il flag e" ereditato dai figli e taglia la catena al primo giro.
@@ -55,9 +62,9 @@ fi
 export RDA_IN_THOR_VERIFY=1
 
 TIMEOUT_BIN="$(command -v gtimeout 2>/dev/null || command -v timeout 2>/dev/null || true)"
-# shellcheck disable=SC2034  # KB/CLAUDE/TIMEOUT_BIN sono letti da factory/lib.sh dopo il source
+# shellcheck disable=SC2034  # KB/CLAUDE/AGENT_* /TIMEOUT_BIN sono letti da factory/lib.sh dopo il source
 KB="${RDA_KANBAN:-$ROOT/kanban}"
-export CLAUDE TIMEOUT_BIN KB
+export CLAUDE AGENT_KIND AGENT_BIN TIMEOUT_BIN KB
 
 # shellcheck source=/dev/null
 . "$ROOT/factory/lib.sh" 2>/dev/null || { printf 'SKIP\tfactory/lib.sh non caricabile: la verifica headless non e disponibile\n'; exit 0; }

@@ -213,7 +213,7 @@ echo "[bench] --confirm-spend given: proceeding with a REAL benchmark run." >&2
 eval_unset_billing_env
 CLAUDE=""; eval_agent_configured || CLAUDE="$(eval_resolve_claude)"
 if ! eval_agent_configured && { [ -z "$CLAUDE" ] || [ ! -x "$CLAUDE" ]; }; then
-  echo "[bench] FATAL: no agent CLI resolvable (install Claude Code or set RDA_EVAL_AGENT_CMD)." >&2
+  echo "[bench] FATAL: no agent CLI resolvable (install the Copilot CLI or Claude Code, or set RDA_EVAL_AGENT_CMD)." >&2
   exit 127
 fi
 TIMEOUT_BIN="$(eval_resolve_timeout)"

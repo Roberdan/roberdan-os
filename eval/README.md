@@ -193,9 +193,9 @@ numbers.
 
 ## Tool independence — `RDA_EVAL_AGENT_CMD`
 
-By default this harness drives headless Claude Code (`claude -p "$prompt"
---dangerously-skip-permissions --add-dir "$ROOT"`, resolved the same way `factory/run.sh` resolves
-it) for all three headless calls it makes: condition A generation, condition B generation, and
+By default this harness drives whichever agent CLI `factory/agent-cli.sh` resolves — the Copilot
+CLI first, `claude` as fallback — with that CLI's own non-interactive permission flags and
+`--add-dir "$ROOT"`, for all three headless calls it makes: condition A generation, condition B generation, and
 the blind judge (`eval/judge.sh`). That hardcodes the eval to one tool, which contradicts the
 tool-independence goal the rest of this system aims for (`AGENTS.md` is meant to work with any
 coding agent, not just Claude Code).
