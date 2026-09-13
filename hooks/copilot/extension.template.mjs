@@ -3,27 +3,13 @@
 // Canonical source: sync.sh emits extension.mjs plus context-recovery.mjs, baking ROOT.
 // --install symlinks the emitted extension into ~/.copilot/extensions/roberdan-os/.
 //
-//   onSessionStart     -> hooks/context-inject.sh  (inject fresh durable context)
-//   onPreToolUse       -> hooks/main-guard.sh + hooks/bash-guard.sh (allow/ask/deny)
-//   onPostToolUse      -> hooks/bus-doorbell.sh (every tool) + hooks/autofmt.sh (after edits)
-//   onPostToolUseFailure -> ephemeral observability log (no hidden success)
-//   onAgentStop        -> goal-gate exit 2 becomes native bounded continuation
-//   session.idle       -> advisory checks + checkpoint; goal-gate fallback on older hosts
-//   session.usage_info -> checkpoint once at measured 65% utilization (no model output)
-//   session.compaction_start/complete -> checkpoint + bounded recovery before the next tool/prompt
-//   onSessionEnd       -> final auto-checkpoint
-// Plus safe, namespaced native tools (kanban view/actions, pause, resume, verify-done,
-// doctor). The kanban gates (todo->doing needs --by, doing->done needs @thor evidence)
-// are enforced by kb.sh itself — these tools never bypass them.
+// Shell hooks own context, tool guards, checkpoints and kanban gates; tools never bypass them.
+// onAgentStop alone requests native bounded continuation; idle is advisory with an older-host fallback.
+// Usage/compaction events save and recover context; session end makes a final checkpoint.
 //
-// Copilot CLI 1.0.84-1 types.d.ts AgentStopHookOutput supports {decision:"block", reason}:
-// the runtime enqueues a follow-up on a natural root stop, not on abort/rejected tools.
-// It does not retract the final message, survive CLI exit or override the host's block cap.
-// Registration is not execution evidence. Until onAgentStop is observed, idle only warns.
-// The existing authorized queue is the only mechanically tracked goal; prose is not a queue.
-//
-// Response shaping appends the canonical executive format; compaction saves/recovers state.
-// Neither changes models/thresholds or starts a turn. Phase capsules must already be saved.
+// Native stop support was checked against CLI 1.0.84-5 AgentStopHookOutput.
+// Registration is not execution evidence. Only the authorized queue is mechanically tracked.
+// See docs/USAGE.md for installation, explicit pause commands and runtime limitations.
 
 import { joinSession } from "@github/copilot-sdk/extension";
 import { spawn } from "node:child_process";
