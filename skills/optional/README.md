@@ -9,6 +9,10 @@ No optional skill is added to `AGENTS.md` or an always-on routing rule.
 |---|---|---|
 | [instagram-reel-preview](instagram-reel-preview/SKILL.md) | Local 1080x1920 covers and post-style wrappers | Opt-in |
 
+This skill defaults to the explicitly approved `fightthestroke` publisher and
+actual FTS logo; see its [branding provenance](instagram-reel-preview/BRANDING.md).
+Other publishers require an explicit override. No logo binary ships in the package.
+
 From the repository root:
 
 ```bash
@@ -36,7 +40,7 @@ Focused checks (no broad sync or live installation):
 
 ```bash
 bash test/test-optional-skills.sh
-python3 -m unittest discover -s test -p 'test_instagram_reel_preview.py' -v
+python3 -m unittest discover -s test -p 'test_instagram_reel_preview*.py' -v
 ```
 
 Use Python 3.10 or newer. Renderer tests need the skill's declared Pillow dependency, ffmpeg on PATH and a

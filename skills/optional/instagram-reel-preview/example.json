@@ -5,6 +5,8 @@
   "title_lines": ["A SMALL CHANGE.", "WHAT HAPPENS NEXT?"],
   "subtitle": "Replace with a detail supported by the transcript.",
   "display_name": "Supplied display name",
+  "publisher": "fightthestroke",
+  "publisher_logo": "/path/to/local/cache/approved-fts-logo.png",
   "locale": "en",
   "cta": "WATCH THE VIDEO",
   "reels_label": "REELS",

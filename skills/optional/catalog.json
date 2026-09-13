@@ -5,8 +5,10 @@
       "description": "Local Reel covers and Instagram-inspired post framing; no uploads.",
       "files": [
         "SKILL.md",
+        "BRANDING.md",
         "render.py",
         "graphics.py",
+        "branding.py",
         "storage.py",
         "requirements.txt",
         "example.json"

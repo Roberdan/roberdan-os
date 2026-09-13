@@ -1,6 +1,7 @@
 """Local drawing primitives; every text region has a hard bounding box."""
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+from branding import place_logo
 
 SIZE = (1080, 1920)
 INK = (17, 22, 24)
@@ -82,7 +83,12 @@ def reels_icon(draw: ImageDraw.ImageDraw, x: int, y: int) -> None:
     draw.polygon([(x + 25, y + 31), (x + 25, y + 52), (x + 43, y + 41)], fill="white")
 
 
-def cover(photo: Image.Image, config: dict, typeface: Typography) -> Image.Image:
+def cover(
+    photo: Image.Image,
+    config: dict,
+    typeface: Typography,
+    logo: Image.Image | None = None,
+) -> Image.Image:
     focus = (config["focus_x"], config["focus_y"])
     image = ImageOps.fit(photo, SIZE, centering=focus).filter(
         ImageFilter.GaussianBlur(40)
@@ -103,9 +109,12 @@ def cover(photo: Image.Image, config: dict, typeface: Typography) -> Image.Image
         upper = max(0, 1 - y / 500) * 0.75
         draw.line((0, y, 1080, y), fill=(*INK, round(255 * max(lower * 0.985, upper))))
     image = Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
+    if logo is not None:
+        place_logo(image, logo, (80, 120, 190, 230))
+    typeface.text(image, config["publisher"], (212, 125, 704, 174), 34, 24, body=True)
     if config.get("project_label"):
         typeface.text(
-            image, config["project_label"], (80, 130, 700, 220), 36, 24, body=True
+            image, config["project_label"], (212, 187, 704, 230), 30, 24, body=True
         )
     badge = gradient((270, 116))
     image.paste(badge, (734, 120))
@@ -192,11 +201,17 @@ def actions(draw: ImageDraw.ImageDraw) -> None:
 
 
 def post(
-    card: Image.Image, config: dict, typeface: Typography, avatar: Image.Image | None
+    card: Image.Image,
+    config: dict,
+    typeface: Typography,
+    avatar: Image.Image | None,
+    logo: Image.Image | None = None,
 ) -> tuple[Image.Image, dict]:
     output = Image.new("RGB", SIZE, "white")
     draw = ImageDraw.Draw(output)
-    if avatar is None:
+    if logo is not None:
+        place_logo(output, logo, (40, 51, 136, 147))
+    elif avatar is None:
         draw.ellipse((48, 61, 124, 137), outline=INK, width=3)
         draw.ellipse((75, 76, 97, 98), outline=INK, width=3)
         draw.arc((60, 99, 112, 143), 185, 355, fill=INK, width=3)
@@ -205,13 +220,11 @@ def post(
         mask = Image.new("L", (76, 76), 0)
         ImageDraw.Draw(mask).ellipse((0, 0, 75, 75), fill=255)
         output.paste(thumb, (48, 61), mask)
-    typeface.text(
-        output, config["display_name"], (148, 65, 945, 110), 34, 24, INK, True
-    )
+    typeface.text(output, config["publisher"], (148, 65, 945, 110), 34, 24, INK, True)
+    subject = config["display_name"]
     if config.get("project_label"):
-        typeface.text(
-            output, config["project_label"], (148, 117, 945, 154), 26, 20, INK, True
-        )
+        subject = f"{config['project_label']} / {subject}"
+    typeface.text(output, subject, (148, 117, 945, 154), 26, 20, INK, True)
     draw = ImageDraw.Draw(output)
     for x in (986, 1005, 1024):
         draw.ellipse((x, 89, x + 7, 96), fill=INK)

@@ -17,6 +17,7 @@ except ImportError:
     )
 
 from graphics import MARGIN, Typography, cover, post
+from branding import FTS_LOGO_URL, FTS_PUBLISHER, read_logo, validate_publisher
 from storage import (
     check_destination,
     local_file,
@@ -28,6 +29,7 @@ from storage import (
 )
 
 DEFAULTS = {
+    "publisher": FTS_PUBLISHER,
     "style": "reel-cover",
     "locale": "en",
     "photo_fit": "cover",
@@ -35,6 +37,8 @@ DEFAULTS = {
     "focus_y": 0.5,
 }
 FIELDS = {
+    "publisher",
+    "publisher_logo",
     "style",
     "video",
     "cover_input",
@@ -46,9 +50,11 @@ FIELDS = {
     "font",
     "sans_font",
     "avatar",
+    "publisher_logo",
     "locale",
     "cta",
     "reels_label",
+    "publisher_logo",
     "output_dir",
     "output_name",
     "photo_fit",
@@ -165,13 +171,21 @@ def validate(config: dict) -> None:
         raise ValueError(
             "Existing covers preserve their copy; omit title/subtitle/timestamp"
         )
+    validate_publisher(config)
 
 
 def render(config: dict, revise: bool = False, config_file: Path | None = None) -> dict:
     config = {**DEFAULTS, **config}
     validate(config)
     paths = {}
-    for key in ("video", "cover_input", "font", "sans_font", "avatar"):
+    for key in (
+        "video",
+        "cover_input",
+        "font",
+        "sans_font",
+        "avatar",
+        "publisher_logo",
+    ):
         if config.get(key):
             paths[key] = local_file(config[key])
     if config_file:
@@ -185,6 +199,13 @@ def render(config: dict, revise: bool = False, config_file: Path | None = None) 
                     f"Cannot load {key}: {paths[key]}; supply a TTF/OTF font"
                 ) from error
     sources = {path: sha256(path) for path in paths.values()}
+    logo = None
+    if "publisher_logo" in paths:
+        logo = read_logo(
+            paths["publisher_logo"],
+            config["publisher"],
+            sources[paths["publisher_logo"]],
+        )
     output, manifest = output_paths(
         config["output_dir"], config["output_name"], list(sources)
     )
@@ -199,10 +220,16 @@ def render(config: dict, revise: bool = False, config_file: Path | None = None) 
         "locale": config["locale"],
         "official_embed": False,
         "engagement_counts": None,
+        "publisher": config["publisher"],
+        "subject": config["display_name"],
+        "publisher_logo_sha256": sources.get(paths.get("publisher_logo")),
+        "publisher_logo_url": (
+            FTS_LOGO_URL if config["publisher"] == FTS_PUBLISHER else None
+        ),
     }
     if "video" in paths:
         photo = read_frame(paths["video"], config["timestamp"])
-        card = cover(photo, config, typeface)
+        card = cover(photo, config, typeface, logo)
         metadata.update(
             timestamp=config["timestamp"],
             photo_fit=config["photo_fit"],
@@ -220,7 +247,7 @@ def render(config: dict, revise: bool = False, config_file: Path | None = None) 
     typeface.regions = []
     if config["style"] == "instagram-post":
         avatar = read_image(paths["avatar"]) if "avatar" in paths else None
-        card, placement = post(card, config, typeface, avatar)
+        card, placement = post(card, config, typeface, avatar, logo)
         metadata["cover_placement"] = placement
         metadata["controls"] = ["ellipsis", "heart", "comment", "share", "bookmark"]
     metadata["cover_text_regions"] = cover_regions

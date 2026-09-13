@@ -11,11 +11,18 @@ embed. Do not change source videos, approved covers, or another task's scripts.
 No account, online service, API key, transcription model download or upload is
 needed by the renderer.
 
+**Default publisher: `fightthestroke`, always with the actual approved FTS logo.**
+Only an explicit request for another publisher permits an override. Subject names
+are subjects, never account owners. Read [BRANDING.md](BRANDING.md) for the approved
+source URL, pinned hash and safe local cache/download. Supply `--publisher-logo`;
+missing or mismatched FTS artwork fails rather than drawing initials or a substitute.
+Keep the logo whole and proportional: no redraw, recoloring, stretching or clipping.
+
 ## Evidence before copy
 
 1. Establish the actual local source, intended audience, display name, output
    directory and locale. Do not infer claims, identity or project branding from
-   filenames. Project labels are optional and supplied, never mandatory branding.
+   filenames. Publisher defaults to FTS; project labels remain optional and supplied.
 2. Extract a local contact sheet at useful timestamps and **inspect it visually**.
    Choose an expressive real frame: eyes open, face in focus, sane headroom,
    no accidental gesture or obscured features. Inspect the selected frame at full
@@ -68,6 +75,7 @@ python3 "$SKILL_DIR/render.py" \
   --video "/path/to/source.mp4" --timestamp 12.5 \
   --title-line "A SMALL CHANGE." --title-line "WHAT HAPPENS NEXT?" \
   --subtitle "A transcript-supported detail." --display-name "Supplied name" \
+  --publisher-logo "/path/to/local/cache/approved-fts-logo.png" \
   --font "/path/to/headline.ttf" --sans-font "/path/to/body.ttf" \
   --output-dir "/path/to/user/output" --output-name preview-new.jpg
 ```
@@ -85,7 +93,7 @@ request. Do not use it just to clear a filename collision.
 | Style | Result |
 |---|---|
 | `reel-cover` (default) | Real frame, dark legibility gradient, short headline/support, name badge, Reels icon, CTA; thick orange/pink/purple gradient border and white outer space |
-| `instagram-post` | The entire cover proportionally reduced between a supplied-name/avatar header with ellipsis and heart/comment/share/bookmark outlines below; no crop, overlap, handle, verification badge or engagement counts |
+| `instagram-post` | The entire cover proportionally reduced between the approved-logo/publisher header with ellipsis and heart/comment/share/bookmark outlines below; no crop, overlap, invented handle, verification badge or engagement counts |
 
 Cover margins are **48 px left/right, 85 px top, 86 px bottom** at 1080x1920.
 The bordered card is 984x1749, so two full-size covers placed side by side have
@@ -99,13 +107,15 @@ For `instagram-post`, use the video options above with
 ```bash
 python3 "$SKILL_DIR/render.py" --style instagram-post \
   --cover-input "/path/to/approved-cover.jpg" --display-name "Supplied name" \
+  --publisher-logo "/path/to/local/cache/approved-fts-logo.png" \
   --font "/path/to/body.ttf" --output-dir "/path/to/user/output" \
   --output-name preview-post.jpg
 ```
 
-Optional `--avatar /path/to/supplied-avatar.jpg` and
-`--project-label "Supplied label"` add only those real supplied assets/text.
-Without an avatar the wrapper draws a neutral silhouette, not a fake person.
+Optional `--project-label "Supplied label"` adds supplied text next to the subject,
+not a replacement account. The header publisher remains `fightthestroke`.
+Only an explicitly requested different `--publisher` permits other branding or an
+optional `--avatar`; a neutral silhouette is never allowed in the default FTS preset.
 Do not supply headline/subtitle/timestamp with an existing cover. Every pixel of
 the input cover is represented through scaling into a 984x1480 maximum area,
 not cropped. Smaller text will therefore become smaller; inspect at phone size.
@@ -116,10 +126,11 @@ official embed. Do not describe the controls as functional.
 
 `--help` lists all flags; JSON uses underscore names. Required video keys:
 `video`, `timestamp` (seconds), `title_lines`, `subtitle`, `display_name`, `font`,
-`output_dir`, `output_name`. Wrapper input replaces video/copy keys with
+`output_dir`, `output_name`, plus `publisher_logo` for the FTS default. Wrapper input replaces video/copy keys with
 `cover_input`. Common optional keys: `style`, `sans_font` (same font when absent),
 `locale` (`en`), `cta` (`WATCH THE VIDEO`), `reels_label` (`REELS`),
-`project_label`, `avatar` (post only), `photo_fit` (`cover` or `contain`),
+`project_label`, `publisher` (defaults to `fightthestroke`; explicit override only),
+`publisher_logo` (approved local original), `avatar` (non-FTS post only), `photo_fit` (`cover` or `contain`),
 `focus_x`, `focus_y` (0..1 crop centering; defaults 0.5).
 
 Text shrinks only within readable limits, then fails with **Text overflow**.
@@ -130,7 +141,8 @@ silently, or claim multilingual glyph coverage without inspecting the output.
 
 Keep outputs in the explicit user-selected folder (normally beside their media,
 never in this skill's source). Filenames are safe `.jpg` basenames. Each output
-has a `.jpg.json` provenance sidecar containing input SHA-256 hashes, timestamp,
+has a `.jpg.json` provenance sidecar containing input/logo SHA-256 hashes, publisher,
+subject, approved FTS source URL when applicable, timestamp,
 drawn text/bounds and scaling geometry. Inputs are read-only and rehashed before
 publication. Hashes prove identity, not editorial accuracy.
 

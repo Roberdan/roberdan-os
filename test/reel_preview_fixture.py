@@ -75,6 +75,7 @@ class PreviewFixture(unittest.TestCase):
         self.output = tempfile.TemporaryDirectory(dir=self.root)
         self.addCleanup(self.output.cleanup)
         self.config = dict(
+            publisher="Example publisher",
             video=str(self.video),
             timestamp=0.2,
             title_lines=["A SMALL CHANGE.", "WHAT NEXT?"],

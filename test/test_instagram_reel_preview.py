@@ -78,7 +78,7 @@ class PreviewTests(PreviewFixture):
         with Image.open(Path(self.output.name) / "preview.jpg") as image:
             self.assertEqual((image.size, image.mode), ((1080, 1920), "RGB"))
         text = [r["text"] for r in result["wrapper_text_regions"]]
-        self.assertEqual(text, ["Sample", "Local demo"])
+        self.assertEqual(text, ["Example publisher", "Local demo / Sample"])
         self.assertIsNone(result["engagement_counts"])
         self.assertFalse(result["official_embed"])
         self.assertEqual(
@@ -103,6 +103,7 @@ class PreviewTests(PreviewFixture):
         result = render.render(
             dict(
                 style="instagram-post",
+                publisher="Example publisher",
                 cover_input=str(source),
                 display_name="Sample",
                 font=self.font,
