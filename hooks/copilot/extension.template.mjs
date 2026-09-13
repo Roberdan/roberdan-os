@@ -3,14 +3,12 @@
 // Canonical source: sync.sh emits extension.mjs plus context-recovery.mjs, baking ROOT.
 // --install symlinks the emitted extension into ~/.copilot/extensions/roberdan-os/.
 //
-// What it does — translate the provider-neutral hooks/ into Copilot lifecycle APIs:
 //   onSessionStart     -> hooks/context-inject.sh  (inject fresh durable context)
 //   onPreToolUse       -> hooks/main-guard.sh + hooks/bash-guard.sh (allow/ask/deny)
 //   onPostToolUse      -> hooks/bus-doorbell.sh (every tool) + hooks/autofmt.sh (after edits)
 //   onPostToolUseFailure -> ephemeral observability log (no hidden success)
-//   session.idle       -> the Claude "Stop" chain (pre-completion-gate, verify-done,
-//                         goal-gate, post-task-sync, auto-checkpoint) as WARN + always-on
-//                         checkpoint
+//   onAgentStop        -> goal-gate exit 2 becomes native bounded continuation
+//   session.idle       -> advisory checks + checkpoint; goal-gate fallback on older hosts
 //   session.usage_info -> checkpoint once at measured 65% utilization (no model output)
 //   session.compaction_start/complete -> checkpoint + bounded recovery before the next tool/prompt
 //   onSessionEnd       -> final auto-checkpoint
@@ -18,25 +16,14 @@
 // doctor). The kanban gates (todo->doing needs --by, doing->done needs @thor evidence)
 // are enforced by kb.sh itself — these tools never bypass them.
 //
-// HONEST LIMITATION (operational near-parity, not bit-for-bit Claude Stop parity):
-// Copilot exposes session.idle / onSessionEnd AFTER a turn's final assistant message is
-// already produced. There is no proven Copilot hook that can BLOCK or REWRITE that final
-// response. So the "Stop" chain here can WARN (via session.log) and run side effects
-// (checkpoint, sync), but it CANNOT hold back a premature "done" claim the way the Claude
-// Stop hook's blocking output can. verify-done / pre-completion-gate / goal-gate remain
-// advisory here: goal-gate's exit 2 is read as a warning to surface, never as a turn block.
+// Copilot CLI 1.0.84-1 types.d.ts AgentStopHookOutput supports {decision:"block", reason}:
+// the runtime enqueues a follow-up on a natural root stop, not on abort/rejected tools.
+// It does not retract the final message, survive CLI exit or override the host's block cap.
+// Registration is not execution evidence. Until onAgentStop is observed, idle only warns.
+// The existing authorized queue is the only mechanically tracked goal; prose is not a queue.
 //
-// RESPONSE SHAPING (added 2026-08-27, @github/copilot-sdk >= 1.0.11): the Claude "output
-// style" analog. joinSession() now accepts `systemMessage` — we APPEND the executive response
-// format from behavior/roberto-mode.md, reinforced per turn by onUserPromptSubmitted.
-// No second join/retry: two readers would corrupt the stdio channel. This shapes replies
-// up front, but cannot block a bad final message after the fact.
-//
-// Copilot 1.0.84-1 generated/session-events.d.ts exposes typed root usage and compaction
-// events. Pressure only saves local state; it never emits a warning into model context,
-// changes models/thresholds, calls /new, or starts another turn. Native compaction remains
-// the host's responsibility. Event callbacks cannot delay compaction: the semantic capsule
-// must already have been saved at phase boundaries. Successful compaction rehydrates it once.
+// Response shaping appends the canonical executive format; compaction saves/recovers state.
+// Neither changes models/thresholds or starts a turn. Phase capsules must already be saved.
 
 import { joinSession } from "@github/copilot-sdk/extension";
 import { spawn } from "node:child_process";
@@ -119,17 +106,12 @@ let chainRunning = false;
 let lastChainRun = 0;
 
 let session;
+let agentStopObserved = false;
+let userPauseRequested = false;
 const contextRecovery = createContextRecovery({ hooksDirectory: HOOKS, runScript, runKb, hookPayload, diag });
 
-// The joined session's own id. Claude Code passes `session_id` in every hook payload, and BOTH
-// hooks/goal-gate.sh and hooks/bus-doorbell.sh key their per-session state on it, falling back
-// to the literal string "nosession" when it is absent. Calling them without it is therefore not
-// a cosmetic omission: every Copilot session on the machine collapses onto ONE shared state key,
-// so one repo's doorbell stamp and one repo's goal-gate retry/stall counters overwrite another's
-// (@thor reproduced both). `sessionId` is a readonly field on the joined session object
-// (copilot-sdk session.d.ts) and is available from joinSession() onwards; before the join
-// resolves there is no session to speak of, so an empty string is the honest answer and the
-// hooks' own "nosession" fallback applies exactly as it does on Claude with an unknown session.
+// Queue counters and doorbell stamps require the joined session's readonly sessionId;
+// omitting it collapses every session onto the hooks' shared "nosession" fallback.
 function sessionId() {
     try {
         return String((session && session.sessionId) || "");
@@ -266,7 +248,13 @@ async function applyGuard(scriptRel, stdinObj, cwd) {
     return undefined; // "allow" or unknown -> defer to Copilot's own permission flow
 }
 
-// --- the Stop chain (advisory on idle) ---------------------------------------
+async function warn(where, message) {
+    try {
+        await session.log(`[roberdan-os ${where}]\n${message}`, { level: "warning" });
+    } catch (e) {
+        diag(`${where}:session.log`, e);
+    }
+}
 
 async function runStopChain(cwd) {
     const now = Date.now();
@@ -274,25 +262,18 @@ async function runStopChain(cwd) {
     chainRunning = true;
     lastChainRun = now;
     try {
-        // Advisory gates first: surface anything that would make a "done" claim premature.
-        // goal-gate.sh is the Claude Stop chain's ONLY blocking hook (exit 2 = don't close the
-        // turn). Copilot cannot block an already-emitted final message, so here it is demoted to
-        // the same WARN channel as the others — but its *content* (the authorized queue is not
-        // finished, here is the next card) is exactly what would otherwise be lost, and losing it
-        // is the difference between "the loop keeps going" and the multi-hour silences that
-        // goal-gate.sh was measured on. Its reason is written to stderr on exit 2, which
-        // runScript already captures, so no special-casing of the exit code is needed.
+        // Do not consume queue retry/stall counters twice on hosts delivering onAgentStop.
         for (const rel of ["pre-completion-gate.sh", "verify-done.sh", "goal-gate.sh"]) {
+            if (rel === "goal-gate.sh" && (agentStopObserved || userPauseRequested)) continue;
             const p = join(HOOKS, rel);
             if (!existsSync(p)) continue;
             const { stdout, stderr } = await runScript(p, hookPayload(cwd), cwd);
             const msg = `${stdout || ""}${stderr || ""}`.trim();
             if (msg) {
-                try {
-                    await session.log(`[roberdan-os ${rel}]\n${msg}`, { level: "warning" });
-                } catch (e) {
-                    diag(`runStopChain:session.log(${rel})`, e);
-                }
+                const limit = rel === "goal-gate.sh"
+                    ? "Continuation NOT enforced: onAgentStop has not been observed. This idle warning cannot restart work; a checkpoint is not an executor.\n"
+                    : "";
+                await warn(rel, limit + msg);
             }
         }
         // Side effects: opt-in wrapper regen (self-gated by RDA_AUTOSYNC) + always-on checkpoint.
@@ -579,6 +560,9 @@ const hooks = {
 
     // Per-turn reinforcement of the executive format (see the REMINDER constants). additionalContext only — never rewrites the prompt.
     onUserPromptSubmitted: async (input) => {
+        if ((!input.sessionId || input.sessionId === sessionId()) && typeof input.prompt === "string") {
+            userPauseRequested = /^(?:stop|pause|pausa|fermati|metti in pausa|devo andare|vado)[.!?\s]*$/iu.test(input.prompt.trim());
+        }
         const recovery = await contextRecovery.takeRecovery(contextRecovery.rememberDirectory(input));
         const format = execFormatInSystemMessage ? EXEC_FORMAT_TURN_REMINDER_SHORT : EXEC_FORMAT_TURN_REMINDER_FULL;
         return { additionalContext: recovery ? `${format}\n${recovery}` : format };
@@ -658,9 +642,44 @@ const hooks = {
     },
 
     onSessionEnd: async (input) => {
-        // Final always-on checkpoint so an exit/crash loses at most the current turn.
+        // Best effort on graceful exit; crashes may never deliver this callback.
         const p = join(HOOKS, "auto-checkpoint.sh");
         if (existsSync(p)) await runScript(p, hookPayload(input && input.workingDirectory), input && input.workingDirectory);
+        return undefined;
+    },
+
+    onAgentStop: async (input) => {
+        if (input && input.sessionId && input.sessionId !== sessionId()) return undefined;
+        agentStopObserved = true;
+        const cwd = contextRecovery.rememberDirectory(input);
+        const checkpoint = join(HOOKS, "auto-checkpoint.sh");
+        if (existsSync(checkpoint)) {
+            const saved = await runScript(checkpoint, hookPayload(cwd), cwd);
+            if (saved.code !== 0 || saved.stderr) await warn("checkpoint", saved.stderr || `exit ${saved.code}`);
+        }
+        if (userPauseRequested) {
+            diag("onAgentStop", JSON.stringify({ sessionId: sessionId(), decision: "allow", paused: true }));
+            return undefined;
+        }
+        const gate = join(HOOKS, "goal-gate.sh");
+        if (!existsSync(gate)) {
+            await warn("continuation", "No queue continuation check installed; unfinished work is NOT protected. Checkpointing cannot restart it.");
+            return undefined;
+        }
+        const { code, stdout, stderr } = await runScript(gate, hookPayload(cwd), cwd);
+        const reason = `${stdout || ""}${stderr || ""}`.trim();
+        diag("onAgentStop", JSON.stringify({
+            sessionId: sessionId(), gateExit: code, decision: code === 2 && reason ? "block" : "allow",
+        }));
+        if (code === 2 && reason) {
+            return {
+                decision: "block",
+                reason: "Observed onAgentStop: continue the authorized queue in this live CLI runtime only. " +
+                    "Respect human gates, two no-progress rounds and the restart budget; no shutdown/reboot survival.\n" + reason,
+            };
+        }
+        if (code !== 0) await warn("continuation", `Queue continuation could not be evaluated (exit ${code}); no restart requested. ${reason}`);
+        else if (reason) await warn("continuation", `Continuation stopped (queue brake): ${reason}`);
         return undefined;
     },
 };
@@ -668,21 +687,13 @@ const hooks = {
 // --- join --------------------------------------------------------------------
 
 try {
-    // Response shaping: pass the executive-format systemMessage. Verified against the bundled
-    // SDK on this machine — JoinSessionConfig does NOT omit `systemMessage` (only
-    // onPermissionRequest + extensionSdkPath are), and resumeSessionForExtension forwards it in
-    // the session.resume RPC. NO retry-without-systemMessage: every joinSession() builds a fresh
-    // stdio connection with no singleton guard, so a second call after the first has connected
-    // would put two readers on one stdin — corrupting the CLI's JSON-RPC channel. A rejection
-    // here falls through to the outer catch: extension inert but harmless, which is the contract.
+    // Join once: retrying would put two JSON-RPC readers on stdin. A rejected join stays inert.
     const systemMessage = execFormatSystemMessage();
     session = await joinSession(systemMessage ? { tools, hooks, systemMessage } : { tools, hooks });
     execFormatInSystemMessage = Boolean(systemMessage); // after join: a throw leaves the long form
-    // The Claude "Stop" analog: after every turn Copilot emits session.idle. We run the
-    // advisory gate chain + always-on checkpoint here (throttled + serialized). This can WARN
-    // and run side effects, but — per the documented limitation — it cannot block/rewrite the
-    // final assistant message that has already been produced.
-    session.on("session.idle", () => {
+    // Idle remains advisory. Only the typed onAgentStop return asks the runtime to continue.
+    session.on("session.idle", (event) => {
+        if (event && event.agentId) return;
         runStopChain(contextRecovery.directory).catch((e) => diag("session.idle:runStopChain", e));
     });
     contextRecovery.register(session);

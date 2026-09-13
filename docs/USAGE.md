@@ -14,7 +14,8 @@ bash bin/sync.sh --install
 
 Copilot must have been started at least once so its configuration directory exists. Installation
 adds generated agents, skills, and the extension without replacing foreign same-named files.
-Restart Copilot to load a newly installed extension. Claude Code and Codex compatibility remains;
+Restart Copilot to load the generated extension, or ask the running CLI to reload extensions.
+Claude Code and Codex compatibility remains;
 Copilot-first does not mean those clients understand Copilot-specific model IDs or settings.
 
 | In Copilot CLI | Purpose |
@@ -154,6 +155,19 @@ kb pause "<next step>"   # write the lean per-repo checkpoint handoff/resume.md 
 kb resume                # print the pending checkpoint + the live backlog (todo + doing)
 kb resume --done         # clear the checkpoint once truly resumed
 ```
+
+**Copilot continuation while the CLI stays open:** the generated extension uses the SDK's
+native `onAgentStop` callback. When `goal-gate.sh` finds unfinished, already-authorized
+queue work, it requests another turn in the **same session**. Saving a checkpoint alone
+does not start an executor, and older clients without this callback remain advisory-only.
+It does not launch a factory, survive CLI exit/reboot, or authorize new cards or spending.
+Queue completion, lack of authorization, stalled progress, restart limits, and the existing
+off switches release the stop. A standalone `stop`, `pause`, `pausa`, `fermati`,
+`metti in pausa`, `devo andare`, or `vado` also suppresses continuation until the next
+root-session user prompt; punctuation is allowed, but longer sentences are not parsed.
+Aborts and rejected tools are not natural stops; already printed replies cannot be retracted.
+For diagnosis, inspect the `roberdan-os` extension log: `onAgentStop` records the decision.
+An extension shown as loaded is not proof of a subsequent automatic turn.
 
 **Federation (multi-repo boards):**
 

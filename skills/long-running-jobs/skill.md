@@ -14,6 +14,11 @@ and `~/.copilot/skills/long-running-jobs/` going forward.
 
 Agenti e comandi background si interrompono, scadono, stallano. La cura è lo **stato durevole
 del job**, mai la chat: il lavoro riprende invece di ripartire.
+Lo stato rende possibile la ripresa, non la avvia. Prima di promettere lavoro dopo il turno,
+osserva l'esecutore reale e registra ID, obiettivo, ultima osservazione, dipendenza dal runtime
+e condizioni di arresto nella capsula esistente: contratto di continuazione in `AGENTS.md`.
+Una schedule attiva vale solo per il suo obiettivo e finche' il runtime la sostiene; niente
+promesse di sopravvivenza a chiusura, reboot, crediti esauriti o permessi revocati.
 
 - **Verifica alla terminal condition, non al singolo run.** Job ripristinabili (embeddings,
   batch sync, indexing, migrazioni): mai "done" dopo un run — controlla lo stato del job
