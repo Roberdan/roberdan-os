@@ -276,6 +276,7 @@ Logic in plain markdown, tool-agnostic (wrappers are generated):
 [`review`](skills/review/skill.md) · [`sync`](skills/sync/skill.md) ·
 [`auto-checkpoint`](skills/auto-checkpoint/skill.md) ·
 [`engineering-reference`](skills/engineering-reference/skill.md) ·
+[`linear-ui`](skills/linear-ui/skill.md) (Linear-inspired workspaces; preserve product and platform) ·
 [`model-selection-policy`](skills/model-selection-policy/skill.md) ·
 [`long-running-jobs`](skills/long-running-jobs/skill.md).
 
@@ -446,6 +447,7 @@ and say which one you used.** Never tell Roberto to install something to answer 
 | QA / testing behaviour | `qa`, `qa-only` | [`thor`](agents/thor.md) + [`verify-done`](skills/verify-done/skill.md) |
 | Code review / diff check | `review` | [`review`](skills/review/skill.md) + [`rex`](agents/rex.md) |
 | Visual polish | `design-review` | no canonical equivalent — say so, don't fake one |
+| Linear-inspired workspace UI | `linear-ui` | [`linear-ui`](skills/linear-ui/skill.md); complements, never replaces, required platform guidance |
 | Ship / deploy / PR | `ship`, `land-and-deploy` | [`ship`](skills/ship/skill.md) |
 | Author a backlog-ready spec/issue | `spec` | `kb add` with `dod:` + `acceptance:` |
 
