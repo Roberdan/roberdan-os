@@ -94,7 +94,7 @@ if _suite test-kb-diet; then ok "i tre freni rifiutano il caso cattivo E lascian
 # parte — ed e' asserita li' dentro.
 section "kanban — coda autorizzata (Roberto approva la lista, non le card una per una)"
 if _suite test-kb-queue; then ok "la coda cammina da sola E si ferma su cio' che e' nato dopo"; else err "test-kb-queue — see bash test/test-kb-queue.sh"; fi
-for _p in "test-worktree-sweep|lo spazzino toglie solo le copie di lavoro senza niente dentro, e dice perche' tiene le altre" "test-junk-clean|cache e temporanei: si toglie solo cio' che git dichiara rigenerabile, mai un .env ne' dati" "test-checkup|il controllo di sistema vede tutto e non tocca mai una card"; do if _suite "${_p%%|*}"; then ok "${_p#*|}"; else err "${_p%%|*} — see bash test/${_p%%|*}.sh"; fi; done; unset _p
+for _p in "test-worktree-sweep|lo spazzino toglie solo le copie di lavoro senza niente dentro, e dice perche' tiene le altre" "test-junk-clean|cache e temporanei: si toglie solo cio' che git dichiara rigenerabile, mai un .env ne' dati" "test-checkup|il controllo di sistema vede tutto e non tocca mai una card"; do if _suite "${_p%%|*}"; then ok "${_p#*|}"; else _suite_out "${_p%%|*}" | tail -25; err "${_p%%|*} — see bash test/${_p%%|*}.sh"; fi; done; unset _p
 
 # Le tre domande da fare a una card PRIMA di eseguirla. La direzione che conta di piu' e' il
 # SILENZIO: un avviso che compare sempre e' rumore, e il giorno che dice il vero nessuno lo legge.
