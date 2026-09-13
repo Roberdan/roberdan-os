@@ -3,6 +3,16 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.46.0 — 2026-09-13
+
+### Added
+
+- `linear-ui`: metodo riutilizzabile per interfacce compatte ispirate a Linear,
+  con menu coerenti, azioni adattive e verifiche su tutte le superfici.
+  Preserva brand, temi, palette, piattaforma e comportamento del prodotto;
+  integra le indicazioni Apple senza sostituirle. Include criteri espliciti
+  per accessibilita', risultati reali, esportazioni e adozione versionata.
+
 ## 2.45.0 — 2026-09-13
 
 ### `film-director`: si decide che film e', prima di girare
