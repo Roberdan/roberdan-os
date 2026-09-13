@@ -9,6 +9,11 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 
 - `kb top` legge la dimensione effettiva del terminale su macOS anche durante il
   ridimensionamento; il nome della copia di lavoro rispetta lo spazio disponibile.
+- Su Linux, misurare il terminale dentro il segnale di ridimensionamento mandava in
+  stallo per sempre il ridisegno (interrompeva una lettura bloccata proprio mentre
+  toccava il terminale): ora il segnale si limita a segnare "e' cambiata la misura",
+  e il ciclo principale la applica — corretto e provato su macOS e su Linux (Ubuntu
+  24.04, l'ambiente reale dei controlli automatici).
 - Prova interattiva con terminale Unix ridimensionabile, senza dipendenze aggiuntive:
   larghezza, altezza, ridisegno, uscita `q` e ripristino delle impostazioni.
 - Il contatore delle letture fra agenti somma solo le consegne, non concatena
