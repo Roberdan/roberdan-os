@@ -3,6 +3,51 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.44.0 — 2026-09-13
+
+### `kb top`: lo stato non si chiede piu', si guarda
+
+Una finestrella stretta (~34 colonne) che sta di lato e **si aggiorna da sola ogni 2 secondi**:
+card in corso e da quanto, agenti e sotto-agenti vivi con **l'ultimo comando che hanno davvero
+lanciato**, ramo e cose non salvate, copie di lavoro con quanto hanno dentro, ultimi controlli
+automatici. Ristretta al progetto in cui stai. `kb top --once` per una stampa sola.
+
+Nasce da una cosa detta oggi: chiedere "come va, cosa manca, quali copie sono aperte" e doverlo
+chiedere **ogni volta**. La risposta non era mai sbagliata, era sempre *su richiesta* — e una
+risposta su richiesta di stato non e' stato.
+
+### `kb ask`: i pezzi della richiesta, spuntati sotto gli occhi di chi l'ha fatta
+
+`kb ask set|add|doing|done|list|clear` scrive l'elenco dei pezzi di una richiesta parlata, e la
+finestrella li mostra spuntati o no. Risponde all'altra frase di oggi: *"mi manda ancora piu' in
+bestia quando gli agenti si scordano di fare pezzi di quello che gli ho chiesto"*.
+**Limite dichiarato:** l'elenco lo scrive l'agente, quindi e' una disciplina e non una barriera —
+cio' che cambia e' che una dimenticanza diventa **una riga che manca sullo schermo** invece di un
+silenzio. La sezione non compare mai se nessuno ha scritto niente: un elenco inventato proprio li'
+sarebbe il difetto peggiore di tutti, e la prova lo verifica in entrambe le direzioni.
+
+### Due proprieta' verificate sul codice, non a cronometro
+
+Raccolta (`snapshot.sh`) e disegno (`top.sh`) sono separati apposta: il ciclo di disegno **non
+lancia mai un comando lento** — niente rete, niente database, niente git — perche' una finestrella
+che si ridisegna ogni 2s si impalla appena la rete rallenta. `test/test-kb-top.sh` (24 controlli,
+provati capaci di fallire su due classi diverse) lo verifica leggendo il codice: una prova a
+cronometro passa sulla macchina veloce e mente sull'altra.
+
+E dove non c'e' una misura si stampa `-`, mai una stima plausibile. La spesa e' in **unita' del
+motore** e non porta simbolo di valuta: per un giorno faceva "$373833.34", che non era una cifra
+sbagliata ma una cifra **senza significato**.
+
+### Difetti trovati costruendo, e corretti
+
+- Da dentro una copia di lavoro il progetto veniva letto come la copia stessa: 4 sezioni su 6
+  restavano vuote **sembrando "tutto a posto"**. Ora si risale sempre al checkout principale.
+- `bus count` che non stampa niente quando i messaggi sono zero diventava `-` ("non lo so"):
+  silenzio con successo vuol dire **zero**, ed e' una cosa diversa.
+- Un carattere accentato attaccato a `$VAR` veniva inghiottito nel nome della variabile su
+  bash 3.2, che e' la versione che gira sul Mac. Terza volta questa settimana che bash 3.2
+  distingue il verde della CI dal rosso della macchina vera.
+
 ## [v2.43.1] - 2026-09-13
 
 ### Fixed
