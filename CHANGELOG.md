@@ -3,6 +3,17 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.46.1 — 2026-09-13
+
+### Fixed
+
+- `kb top` legge la dimensione effettiva del terminale su macOS anche durante il
+  ridimensionamento; il nome della copia di lavoro rispetta lo spazio disponibile.
+- Prova interattiva con terminale Unix ridimensionabile, senza dipendenze aggiuntive:
+  larghezza, altezza, ridisegno, uscita `q` e ripristino delle impostazioni.
+- Il contatore delle letture fra agenti somma solo le consegne, non concatena
+  i numeri delle card; errori di raccolta non vengono mostrati come zero.
+
 ## 2.46.0 — 2026-09-13
 
 ### Added
