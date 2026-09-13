@@ -60,6 +60,13 @@ grep -q '"kind":"closed"' "$RDA_BUS_HOME/demo/VIVA.jsonl" 2>/dev/null \
 [ -f "$R/kanban/doing/VIVA.md" ] && ok "nemmeno con --yes tocca una card" || fail "con --yes ha toccato una card"
 case "$out2" in *"le card sono decisioni tue"*) ok "dichiara che le card restano decisione di Roberto" ;; *) fail "non dichiara il limite sulle card" ;; esac
 
+# Le sezioni devono PRODURRE qualcosa, non solo avere un titolo. Il 2026-09-13 le prime due
+# stampavano "FLAGS[@]: unbound variable" sul Mac di Roberto (bash 3.2: espandere un array
+# vuoto sotto `set -u` e' un errore) mentre in CI (bash 5) erano verdi — e questa suite era
+# verde in entrambi, perche' guardava solo i titoli. Un titolo senza contenuto non e' un controllo.
+case "$out$out2" in *"unbound variable"*) fail "una sezione muore con un errore di shell" ;; *) ok "nessuna sezione muore con un errore di shell" ;; esac
+case "$out$out2" in *"checkup.sh: line "*) fail "checkup.sh stampa un errore di riga" ;; *) ok "checkup.sh non stampa errori di riga" ;; esac
+
 # Quando fallisce, il referto che ha prodotto viene stampato: una suite che dice solo "rosso"
 # costa un giro di CI intero per scoprire cosa ha visto, e questa e' gia' andata rossa su Linux
 # mentre era verde sul Mac (stat BSD vs GNU).
