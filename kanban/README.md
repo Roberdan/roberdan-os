@@ -122,6 +122,55 @@ last copy of that work). Two escapes, both written onto the card, never silent:
 `--no-worktree "<why>"` at start (a decision, an approval, anything that is not code) and
 `--keep-worktree "<why>"` at finish (e.g. a review still open).
 
+## `kb checkup` — il controllo di tutto il sistema (e lo spazzino)
+
+`kb finish` chiude solo le copie di lavoro **nate da una card**. Il 2026-09-13 ne esistevano
+**99** vive su 4 repo: create da agenti, da sessioni manuali, da altri strumenti, e mai chiuse —
+perche' chi le aveva aperte era una sessione finita da giorni. Non erano rotte: erano
+**invisibili**, nessuna schermata le nominava. La risposta e' per **stato, non per proprieta'**:
+non conta chi l'ha creata, conta se contiene qualcosa da perdere. Cosi' vale anche per cio' che
+lascera' domani uno strumento che oggi non esiste.
+
+```sh
+kb checkup                # referto completo: non tocca NIENTE
+kb checkup --yes          # applica le pulizie proposte (approvazione esplicita)
+kb wt                     # solo le copie di lavoro   ·  kb wt --yes per rimuoverle
+kb wt --junk              # solo cache/build/temporanei ·  --yes per toglierli
+```
+
+**Quattro sezioni, una regola sola** — referto di default, rimozione solo con `--yes`, e solo di
+cio' che non ha niente da perdere:
+
+1. **Copie di lavoro** — si rimuove solo cio' che e': pulito, senza file non tracciati, senza
+   commit che il ramo base non contiene (un **PR gia' integrato** conta come integrato: senza
+   questo controllo uno squash-merge sembrerebbe per sempre lavoro non salvato), non di una card
+   in corso, non la cartella in cui sei. Tutto il resto resta, **col motivo scritto**.
+2. **Cache, build e temporanei** — si tocca solo cio' che e' **ignorato da git** (quindi
+   rigenerabile per dichiarazione del repo) **E** ha un nome noto (`node_modules`, `__pycache__`,
+   `.venv`, `dist`, `.DS_Store`…). Le due condizioni **insieme**: "ignorato" da solo
+   cancellerebbe un `.env` o dei dati messi li' apposta. Si passa sempre da `git clean`, mai da
+   `rm -rf`.
+3. **Messaggi fra agenti** — conversazioni ancora aperte, ferme da giorni, su card che non sono
+   piu' in lavorazione. Chiuderle non cancella niente (`bus log` legge il filo per intero): per
+   questo e' l'unica azione che puo' essere automatica senza rischio. Una conversazione con
+   messaggi non letti su una card **viva** non si tocca mai.
+4. **Card aperte, repo per repo** — quante in lavorazione, quante in attesa, quali ferme da piu'
+   di 3 giorni. Qui **non si tocca niente, nemmeno con `--yes`**: una card e' una decisione di
+   Roberto, e "ferma" non vuol dire "da buttare" — vuol dire "guardala".
+
+**Ambito automatico:** dentro `roberdan-os` guarda **tutti** i repo (li' stai facendo
+manutenzione del parco); dentro un progetto guarda **solo quel progetto** (li' stai lavorando).
+`--all` forza tutto da qualunque posto.
+
+**A monte, perche' non si riarrivi a 99:** `autosweep` gira **a ogni fine turno** e a inizio
+sessione, in sottofondo, ristretto al repo corrente — appena un ramo viene integrato la sua copia
+non ha piu' niente dentro e sparisce, senza che nessuno debba ricordarsene. Un giro ogni 20
+minuti al massimo (`RDA_WT_AUTOSWEEP_MIN`), si spegne con `RDA_NO_AUTOSWEEP=1`, e la rete di
+sicurezza notturna e' `scheduling/com.roberdan.rda-worktrees.plist` (03:10, tutti i repo).
+
+Provato da `test/test-worktree-sweep.sh`, `test/test-junk-clean.sh`, `test/test-checkup.sh` —
+meta' delle asserzioni verifica che **rifiuti**, non che rimuova.
+
 ## Cards that already exist — nothing breaks, and two things can be recovered
 Every field above is **optional**: a card written before any of this simply shows `-` where a
 measurement is missing, and both gates behave exactly as they did. Two things, though, are already

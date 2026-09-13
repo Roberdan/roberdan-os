@@ -223,6 +223,17 @@ tool and this protocol are versioned.
   can grow without burning tokens. Bare **`kb`** (a human typed it) adds the dashboard: start time
   and elapsed per DOING card, duration + spend + what was done per DONE card, all in local time —
   and prints `-` wherever it has no measurement, never a plausible number (`kb dash`).
+- **`kb checkup` — il sistema si guarda addosso, e non tocca niente senza un sì.** Un comando
+  solo per: copie di lavoro rimaste in giro, cache/build/temporanei, conversazioni fra agenti
+  lasciate a metà, card aperte per progetto. Referto di default, pulizia solo con `--yes`, e
+  solo di ciò che non ha niente da perdere; **le card non si toccano mai, nemmeno con `--yes`**.
+  Ambito automatico: dentro roberdan-os guarda tutti i repo, dentro un progetto solo quello
+  (`--all` forza). *Misurato il 2026-09-13: 99 copie di lavoro vive su 4 repo, 45 GB di cache,
+  11 conversazioni appese — niente di rotto, solo invisibile.* La risposta è per **stato, non
+  per proprietà**: non conta chi ha creato una copia, conta se contiene qualcosa da perdere —
+  così vale anche per ciò che lascerà domani uno strumento che oggi non esiste. **A monte**,
+  `autosweep` gira a ogni fine turno sul repo corrente: appena un ramo è integrato la sua copia
+  sparisce da sola. Dettagli e limiti onesti: `kanban/README.md § kb checkup`.
 - **Meta-card budget** (at most 1 active self-improvement card while an external-facing card waits
   in `todo/`) → `kanban/README.md § Meta-card budget`. Discipline norm, not a `kb.sh` gate.
 

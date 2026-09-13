@@ -7,6 +7,7 @@ OS-level scheduler (fires even with Claude closed). Cron-swappable. See [`docs/a
 | `com.roberdan.rda-evolve` | weekly (Sat 02:00, launchd catch-up if the Mac is off) | `evolve/watch.sh` → kanban cards |
 | `com.roberdan.rda-learn` | daily (02:30) | `learn/distill.sh` + `ontology/curate.sh` |
 | `com.roberdan.rda-factory` | nightly (01:00) — plist lives in [`factory/`](../factory/) | `factory/run.sh` (queued headless tasks) |
+| `com.roberdan.rda-worktrees` | daily (03:10) | `kanban/worktree-sweep.sh sweep --yes` → rimuove le copie di lavoro che non hanno piu' niente dentro (log `/tmp/rda-worktrees.log`). La pulizia *a monte* gira gia' a ogni fine turno (`hooks/auto-checkpoint.sh` → `autosweep`, ambito: repo corrente): questo job e' la rete di sicurezza sui repo che nessuno ha aperto |
 | `com.roberdan.rda-pending-digest` | twice daily (09:00 + 18:00) | `bin/pending-digest.sh` → macOS notification + `~/.roberdan-os/pending-digest.txt` when something waits on Roberto (see `kb pending`) |
 
 ## Install

@@ -103,6 +103,13 @@
 # dello stub SDK e' condiviso da tutte le sezioni; spezzare duplicherebbe ~50 righe di setup),
 # e la nota della tredicesima resta in piedi: chi tocca l'adattatore per un motivo di
 # PRODOTTO lo spezza, non lo allarga una terza volta.
+# 2026-09-13, sedicesima: +1 validate.sh per agganciare le tre suite dello spazzino di sistema
+# (copie di lavoro, cache/temporanei, controllo completo). UNA riga per TRE suite: sono scritte
+# come un ciclo su una lista "nome|messaggio" invece di tre righe if/then, perche' questo file
+# porta scritto quattro volte "validate.sh si spezza, non si allarga" e una riga in piu' e' il
+# minimo che test-validate-wiring consente (ogni suite lanciata DEVE avere il suo referto).
+# Lo split resta il lavoro giusto, e resta non fatto: una card che dice "aggancia tre suite" non
+# si trasforma in un refactor del gate.
 # 2026-09-01, quindicesima: validate.sh entra in lista a 304 (era a 300 esatte, non baselinato
 # — stesso caso di test-copilot-adapter.sh la dodicesima). +4 righe per agganciare
 # test/test-session-waste.sh, il primo test di bin/session-waste.sh (il cruscotto anti-sprechi
@@ -123,5 +130,5 @@
 446 test/test-kb-views.sh
 344 eval/report.sh
 377 test/test-copilot-adapter.sh
-304 test/validate.sh
+305 test/validate.sh
 699 hooks/copilot/extension.template.mjs

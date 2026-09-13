@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- worktree sweep — daily (03:10). Removes ONLY the working copies that have nothing left to
+     lose: no unsaved change, no untracked file, no commit missing from the base branch (or a
+     merged PR), not owned by a card in doing, not the folder someone is standing in. Anything
+     else it leaves alone and writes down why, in /tmp/rda-worktrees.log.
+     WHY it exists: on 2026-09-13 there were 99 live worktrees across 4 repos, none closed by
+     whoever opened it — `kb start`/`kb finish` only ever governed the ones born from a card.
+     The answer is by STATE, not by ownership, so it also collects what tomorrow's tool leaves.
+     Install: cp in ~/Library/LaunchAgents/ + launchctl load. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.roberdan.rda-worktrees</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>"$HOME/GitHub/roberdan-os/kanban/worktree.sh" sweep --yes</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>10</integer></dict>
+  </array>
+  <key>StandardOutPath</key><string>/tmp/rda-worktrees.log</string>
+  <key>StandardErrorPath</key><string>/tmp/rda-worktrees.log</string>
+  <key>RunAtLoad</key><false/>
+</dict>
+</plist>

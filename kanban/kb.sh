@@ -1372,7 +1372,11 @@ case "$cmd" in
   wt)                              # per-card worktrees: attach an existing one, or inspect
     case "${1:-}" in
       attach) shift; _wt_attach "${1:-}" "${2:-}" ;;
-      *) echo "usage: kb wt attach <card-id> <path>" >&2; exit 2 ;;
+      # Senza argomenti (o con --yes): inventario di TUTTE le copie di lavoro, non solo quelle
+      # nate da una card. Referto di default; rimuove solo con --yes, e solo cio' che non ha
+      # nulla da perdere. Il 2026-09-13 ce n'erano 99 vive che nessun comando nominava mai.
+      ""|--yes|--all) bash "$ROOT/kanban/worktree.sh" sweep "$@" ;;
+      *) echo "usage: kb wt [--yes] | kb wt attach <card-id> <path>" >&2; exit 2 ;;
     esac ;;
   repo|status) _repo_view "${1:?repo name required (kb repo <name>)}" ;;  # per-repo dashboard: git + PRs + cards
   pending|inbox) _pending "$@" ;;  # the approval inbox: everything waiting on Roberto (--count = fast total)
@@ -1735,6 +1739,10 @@ case "$cmd" in
   plan)    _plan_show "${1:-}" ;;
   cover)   _cover "${1:-}" ;;
   sched)   _sched ;;
+  # checkup — il controllo di TUTTO il sistema in un comando: copie di lavoro, cache e
+  # temporanei, conversazioni fra agenti lasciate a meta', card aperte per progetto.
+  # Referto di default; con --yes applica le pulizie proposte. Le card non si toccano mai.
+  checkup) bash "$ROOT/kanban/checkup.sh" "$@" ;;
 
   *) usage ;;
 esac
