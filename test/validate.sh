@@ -20,7 +20,7 @@ ok()      { printf "  ok: %s\n" "$1"; }
 
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue \
           test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery test-verify-done \
-          test-kb-root-resolution test-kb-start-worktree-cause test-worktree-sweep test-junk-clean test-checkup test-nested-board-notice \
+          test-kb-root-resolution test-kb-start-worktree-cause test-worktree-sweep test-junk-clean test-checkup test-twin-export-drift test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-model-economy \
@@ -94,7 +94,7 @@ if _suite test-kb-diet; then ok "i tre freni rifiutano il caso cattivo E lascian
 # parte — ed e' asserita li' dentro.
 section "kanban — coda autorizzata (Roberto approva la lista, non le card una per una)"
 if _suite test-kb-queue; then ok "la coda cammina da sola E si ferma su cio' che e' nato dopo"; else err "test-kb-queue — see bash test/test-kb-queue.sh"; fi
-for _p in "test-worktree-sweep|lo spazzino toglie solo le copie di lavoro senza niente dentro, e dice perche' tiene le altre" "test-junk-clean|cache e temporanei: si toglie solo cio' che git dichiara rigenerabile, mai un .env ne' dati" "test-checkup|il controllo di sistema vede tutto e non tocca mai una card"; do if _suite "${_p%%|*}"; then ok "${_p#*|}"; else _suite_out "${_p%%|*}" | tail -25; err "${_p%%|*} — see bash test/${_p%%|*}.sh"; fi; done; unset _p
+for _p in "test-worktree-sweep|lo spazzino toglie solo le copie di lavoro senza niente dentro, e dice perche' tiene le altre" "test-junk-clean|cache e temporanei: si toglie solo cio' che git dichiara rigenerabile, mai un .env ne' dati" "test-checkup|il controllo di sistema vede tutto e non tocca mai una card" "test-twin-export-drift|la skill twin esportata non resta indietro rispetto al canone"; do if _suite "${_p%%|*}"; then ok "${_p#*|}"; else _suite_out "${_p%%|*}" | tail -25; err "${_p%%|*} — see bash test/${_p%%|*}.sh"; fi; done; unset _p
 
 # Le tre domande da fare a una card PRIMA di eseguirla. La direzione che conta di piu' e' il
 # SILENZIO: un avviso che compare sempre e' rumore, e il giorno che dice il vero nessuno lo legge.

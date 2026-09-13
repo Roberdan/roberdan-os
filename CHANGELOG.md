@@ -3,6 +3,59 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## [v2.43.0] - 2026-09-13
+
+**La fabbrica non spende piu' il budget Claude, il sistema si guarda addosso, e le risposte
+a Roberto cambiano forma.**
+
+### Added
+- `kb checkup` — controllo di tutto il sistema in un comando: copie di lavoro rimaste in
+  giro, cache e temporanei, conversazioni fra agenti lasciate a meta', card aperte per
+  progetto. Referto di default, pulizia solo con `--yes`, e solo di cio' che non ha nulla
+  da perdere. Le card non si toccano mai, nemmeno con `--yes`.
+- Pulizia *a monte* delle copie di lavoro (`autosweep`): a ogni fine turno e a inizio
+  sessione, sul solo repo corrente — appena un ramo e' integrato la sua copia sparisce.
+  Rete di sicurezza notturna: `scheduling/com.roberdan.rda-worktrees.plist`.
+- Barriera a tre strati per le esecuzioni non presidiate della fabbrica: filtri di comando
+  (`factory/shims/`), lista di rifiuto nativa del motore, hook deterministico. Riscrittura
+  della storia, pubblicazione e cancellazioni forzate vengono rifiutate anche quando il
+  comando e' scritto in modo da eludere un controllo testuale.
+- Suite di prova nuove: `test-factory-shim`, `test-factory-engine`, `test-worktree-sweep`,
+  `test-junk-clean`, `test-checkup`.
+
+### Changed
+- **Il motore della fabbrica e' GitHub Copilot**, non piu' Claude: le esecuzioni automatiche
+  non consumano il budget Claude di Roberto. Un unico punto di avvio (`launch_agent`),
+  motore e modello configurabili (`FACTORY_ENGINE`, `RDA_ENGINE_BIN`).
+- **Formato fisso delle risposte a Roberto**: Stato · Sto facendo · Manca · Mi serve da te.
+  La sezione "verificato / non verificato" sparisce come blocco separato e diventa una prova
+  scritta dentro ogni riga di stato ("fatto e provato" / "fatto, non ancora provato").
+  Vale ovunque: ogni chat, ogni progetto, ogni strumento.
+- I controlli di sicurezza della fabbrica vengono verificati **prima** del motore, cosi' una
+  macchina senza motore installato risponde ancora "mancano le protezioni" e non un errore
+  qualsiasi.
+
+### Fixed
+- La skill "gemello" installata su Claude e Copilot era una **copia** ferma al 21 agosto: nel
+  giorno in cui il formato di risposta e' cambiato, in ogni progetto continuava a insegnare
+  quello vecchio. Ora e' un collegamento al repo (non puo' piu' restare indietro) e
+  `test-twin-export-drift` sorveglia l'altra meta' del problema (l'esportazione che resta
+  indietro rispetto al canone).
+- Un'attivita' fallita ora finisce davvero fra le fallite: il codice di uscita di una
+  funzione non interrompe piu' l'intera esecuzione.
+- Ora di modifica dei file letta correttamente su macOS e su Linux (su Linux la forma BSD
+  *riusciva* rispondendo il punto di mount, e ogni file risultava vecchio zero giorni).
+- Esportazione della skill twin allineata al canone: formato esecutivo e lente dell'era AI
+  erano rimasti fermi al 21 agosto.
+- Il formato di risposta ora e' scritto *dentro* le istruzioni globali (`~/.claude/CLAUDE.md`),
+  non piu' solo dietro un rimando: vale anche nelle sessioni che il canone non lo caricano.
+
+### Notes
+- Misurato il 2026-09-13, prima di questa versione: 99 copie di lavoro vive su 4 progetti,
+  45,6 GB di cache e build, 11 conversazioni fra agenti aperte su card non piu' in
+  lavorazione. Niente di rotto — solo invisibile. Le 100 copie che contengono lavoro non
+  integrato restano intatte: nessuna cancellazione senza un si esplicito di Roberto.
+
 ## [v2.42.0] - 2026-09-06
 
 **Recupero delle sessioni lunghe, skill aggiornate e configurazione locale semplificata.**

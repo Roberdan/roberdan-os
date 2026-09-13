@@ -484,15 +484,7 @@ if [ "$MODE" = "install" ]; then
     echo "It stays deliberately this short: ~/.claude/CLAUDE.md is resident context in EVERY"
     echo "project, and under ~/GitHub the committed ~/GitHub/CLAUDE.md already carries the detail):"
     echo "---8<---"
-    cat <<'EOF'
-<!-- roberdan-os:begin -->
-## roberdan-os — canonical behavior (default, every session)
-
-Full canon: `~/GitHub/roberdan-os/AGENTS.md` — read it for any non-trivial work (default =
-loop + roberto-mode; twin for voice; human gates never automated). Under `~/GitHub` the
-`~/GitHub/CLAUDE.md` pointer already carries the same rules in detail.
-<!-- roberdan-os:end -->
-EOF
+    cat "$ROOT/bin/claude-global-block.md"
     echo "--->8---"
   fi
 

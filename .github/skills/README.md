@@ -17,9 +17,20 @@ the canon changes meaningfully, re-derive it rather than assuming it's still in 
 | Surface | How to install |
 |---|---|
 | **Copilot Cowork / Copilot coding agent** | Already live for this repo (skills load from `.github/skills/`). For another repo: copy the `roberto-twin/` folder into that repo's `.github/skills/`. |
-| **Copilot CLI / VS Code, personal scope** | `cp -R .github/skills/roberto-twin ~/.copilot/skills/` — available in every project. |
-| **Claude Code** | `cp -R .github/skills/roberto-twin ~/.claude/skills/` |
+| **Copilot CLI / VS Code, personal scope** | `ln -s "$PWD/.github/skills/roberto-twin" ~/.copilot/skills/` — available in every project, and it follows the repo. |
+| **Claude Code** | `ln -s "$PWD/.github/skills/roberto-twin" ~/.claude/skills/` |
 | **claude.ai (upload)** | use `claude-ai-skill/` instead — that export is tuned for a sandbox with no repo. |
+
+**Link, don't copy — this is a scar, not a preference.** Both personal installs were plain
+`cp -R` copies made on 2026-08-21. On 2026-09-13 the reply format changed in the canon, the
+export here was updated, and the two installed copies kept teaching the old format for the
+rest of the day — in *every* project, which is exactly the surface this skill exists to cover.
+A copy has nothing that keeps it current; a symlink cannot drift. `test/test-twin-export-drift.sh`
+guards the other half (the export itself falling behind `AGENTS.md`).
+
+If you made copies before this note, replace them: `rm -rf ~/.claude/skills/roberto-twin` then
+the `ln -s` above. Leaving a stale copy *next to* the link is worse than either — two
+directories declaring `name: roberto-twin` is a name collision, and the host silently keeps one.
 
 ### How it activates
 
