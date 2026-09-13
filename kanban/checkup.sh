@@ -52,6 +52,10 @@ _scope() {
 ONLY="$(_scope)"
 
 _hr() { printf '\n\033[1m%s\033[0m\n' "$1"; }
+# L'ora di modifica di un file: `stat -f` e' BSD (macOS), `stat -c` e' GNU (Linux/CI). Qui gira
+# in tutti e due i posti, e un referto che su CI stampa 0 giorni per tutto non e' un referto.
+_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+
 _giorni_fa() { # <epoch> -> giorni interi
   awk -v t="${1:-0}" -v n="$(date +%s)" 'BEGIN{ if(t<=0){print 0} else {printf "%d", (n-t)/86400} }'
 }
@@ -95,7 +99,7 @@ for repodir in "$BUS_HOME"/*/; do
     [ -f "$log" ] || continue
     card="$(basename "$log" .jsonl)"
     grep -q '"kind":"closed"' "$log" 2>/dev/null && continue        # gia' chiusa
-    eta="$(_giorni_fa "$(stat -f %m "$log" 2>/dev/null || echo 0)")"
+    eta="$(_giorni_fa "$(_mtime "$log")")"
     # non letti: messaggi totali meno il cursore piu' avanzato fra i ruoli coinvolti
     tot="$(grep -c . "$log" 2>/dev/null || echo 0)"
     piu_indietro="$tot"
@@ -159,7 +163,7 @@ while IFS= read -r repo_path; do
   for f in "$repo_path/kanban/doing"/*.md; do
     [ -f "$f" ] || continue
     case "$(basename "$f")" in _*) continue ;; esac
-    eta="$(_giorni_fa "$(stat -f %m "$f" 2>/dev/null || echo 0)")"
+    eta="$(_giorni_fa "$(_mtime "$f")")"
     [ "$eta" -ge "$FERME_GIORNI" ] && printf '      ferma da %s giorni: %s\n' "$eta" "$(basename "$f" .md)"
   done
 done <<EOF
