@@ -680,7 +680,7 @@ try {
     // Idle remains advisory. Only the typed onAgentStop return asks the runtime to continue.
     session.on("session.idle", (event) => {
         if (event && event.agentId) return;
-        runStopChain(contextRecovery.directory).catch((e) => diag("session.idle:runStopChain", e));
+        return runStopChain(contextRecovery.directory).catch((e) => diag("session.idle:runStopChain", e));
     });
     contextRecovery.register(session);
     try {

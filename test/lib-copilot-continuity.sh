@@ -43,8 +43,7 @@ assert.match(r.reason, /live CLI runtime only/);
 assert.match(r.reason, /kb next/);
 assert.match(readFileSync(process.env.RDA_TEST_GATE_CALLS,"utf8"), /rda-test-session/);
 assert.ok(readFileSync(process.env.RDA_TEST_SAVES,"utf8").includes(repo), "save before continuation");
-globalThis.__H["session.idle"]();
-await new Promise(resolve => setTimeout(resolve, 600));
+await globalThis.__H["session.idle"]();
 assert.equal(calls(), 1, "idle must not consume a second queue retry");
 for (const prompt of ["stop", "pausa!", "fermati", "metti in pausa", "devo andare", "vado"]) {
     await hooks.onUserPromptSubmitted({workingDirectory:repo, prompt, sessionId:"rda-test-session"});
@@ -85,11 +84,9 @@ rmSync(join(process.env.RDA_HOME,"goal-gate.off"));
 hooks = await load();
 await hooks.onUserPromptSubmitted({workingDirectory:repo});
 const beforeChild = calls();
-globalThis.__H["session.idle"]({agentId:"child"});
-await new Promise(resolve => setTimeout(resolve, 100));
+await globalThis.__H["session.idle"]({agentId:"child"});
 assert.equal(calls(), beforeChild, "child idle cannot advance parent queue counters");
-globalThis.__H["session.idle"]();
-await new Promise(resolve => setTimeout(resolve, 600));
+await globalThis.__H["session.idle"]();
 assert.match(logs(), /Continuation NOT enforced/);
 assert.match(logs(), /checkpoint is not an executor/);
 for (const code of [3, 2]) {
