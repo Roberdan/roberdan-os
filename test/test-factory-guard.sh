@@ -32,6 +32,13 @@ expect deny 'git push'
 expect deny 'git -C /tmp/repo push origin HEAD'
 expect deny 'git -c core.hooksPath=/dev/null push'
 expect deny 'bash -c "git push origin main"'
+expect deny '/usr/bin/git push'
+expect deny './git commit --amend'
+expect deny 'command git push'
+expect deny '(git push)'
+expect deny '$(git push)'
+expect deny 'git -C "my dir" push'
+expect deny "git -C 'my dir' commit --amend"
 expect deny 'cd repo && git push -u origin feat'
 expect deny 'gh pr merge 12 --merge'
 expect deny 'gh pr create --fill'
@@ -83,6 +90,14 @@ expect allow 'gh pr view 12'
 expect allow 'gh api repos/Roberdan/x/pulls'
 expect allow 'bash test/validate.sh'
 expect allow 'npm run format'
+expect allow 'git commit -m "fix: push handling"'
+expect allow 'git commit -m "amend the docs"'
+expect allow 'git log --grep=push'
+expect allow 'git checkout push-branch'
+expect allow 'ls .git && cat .gitignore'
+# Out of scope by design (see the guard's header): shell expansion builds the command at run
+# time, so no text match can see it. Pinned as ALLOW so nobody mistakes this for coverage.
+expect allow 'GIT=git; $GIT push'
 
 echo "=== wiring: both factory launch paths load the guard ==="
 # shellcheck source=factory/lib.sh

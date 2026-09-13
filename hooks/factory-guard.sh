@@ -12,8 +12,11 @@
 #     is caught; `git commit -m "never git push"` is a false positive, and in a factory run
 #     the price is one refused command, not an annoyed human switching the guard off;
 #   - everything here is deny, never ask: a headless run has nobody to ask.
-# Not a sandbox: a script written to a file and then run, or a python/node subprocess, does
-# not pass through this text. It removes the direct path, not every path.
+# Not a sandbox. Three shapes never pass through this text, by construction: a script written
+# to a file and then run, a python/node subprocess, and shell expansion that builds the command
+# at run time (`GIT=git; $GIT push`). In scope: the command as typed — bare or path-qualified
+# binary, global options, quotes/backslashes, subshells, `bash -c`, `sudo`/`env`/`command`.
+# It removes the direct path, not every path.
 # Requires `jq`; without it the guard fails CLOSED.
 set -euo pipefail
 
@@ -24,18 +27,22 @@ deny() {
 }
 command -v jq >/dev/null 2>&1 || deny "factory-guard: jq missing, refusing every Bash command in an unattended run."
 cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // ""')"
-# Quote and backslash CHARACTERS are deleted (not the quoted text): `git "commit" --am"end"` and
-# `git\ push` run exactly like the plain spelling, so they must read like it too.
+# The command is read twice, and a rule that matches EITHER reading denies:
+#   norm  — quote and backslash CHARACTERS deleted (not the quoted text): `git "commit" --am"end"`,
+#           `git\ push` and `bash -c "git push"` run like the plain spelling, so they read like it;
+#   joined — whitespace inside a quoted string becomes `_`, so `git -C "my dir" push` keeps its
+#           option argument as ONE token and the subcommand after it is still found.
 norm="$(printf '%s' "$cmd" | tr -d "\"'\\\\" | tr -s ' \t\n\r' ' ')"
+joined="$(printf '%s' "$cmd" | awk 'BEGIN{RS="\001"} {q="";o=""; for(i=1;i<=length($0);i++){c=substr($0,i,1); if(q==""&&(c=="\""||c=="\x27")){q=c;continue} if(q!=""&&c==q){q="";continue} if(q!=""&&c~/[ \t\n]/)c="_"; o=o c} printf "%s",o}' | tr -d '\\' | tr -s ' \t\n\r' ' ')"
 
 why="Unattended factory run: pushing, rewriting git history and forced deletion are Roberto's gates. Leave it as a proposal in your report instead."
-# `git`, optionally followed by global options (-C dir, -c k=v, --git-dir=...), then the subcommand.
-G='(^|[^[:alnum:]_./-])git(([[:space:]]+-[Cc][[:space:]]+[^[:space:]]+)|([[:space:]]+--?[[:alnum:]-]+(=[^[:space:]]+)?))*[[:space:]]+'
-hit() { printf '%s' "$norm" | grep -qE -- "$1"; }
+# `git` — bare or path-qualified (/usr/bin/git, ./git) — optionally followed by global options (-C dir, -c k=v, --git-dir=...), then the subcommand.
+G='(^|[^[:alnum:]_-])git(([[:space:]]+-[Cc][[:space:]]+[^[:space:]]+)|([[:space:]]+--?[[:alnum:]-]+(=[^[:space:]]+)?))*[[:space:]]+'
+hit() { printf '%s\n%s' "$norm" "$joined" | grep -qE -- "$1"; }
 
-hit "${G}push([[:space:]]|$)"                                   && deny "git push refused. $why"
-hit "${G}commit([[:space:]].*)?[[:space:]]--am(e|en|end)?([[:space:]=]|$)"               && deny "git commit --amend refused. $why"
-hit "${G}(rebase|filter-branch|filter-repo|replace)([[:space:]]|$)" && deny "git history rewrite refused. $why"
+hit "${G}push([^[:alnum:]_-]|$)"                                   && deny "git push refused. $why"
+hit "${G}commit([[:space:]].*)?[[:space:]]--am(e|en|end)?([^[:alnum:]_-]|$)"               && deny "git commit --amend refused. $why"
+hit "${G}(rebase|filter-branch|filter-repo|replace)([^[:alnum:]_-]|$)" && deny "git history rewrite refused. $why"
 hit "${G}reset([[:space:]].*)?[[:space:]]--(hard|keep|merge)"    && deny "git reset --hard refused. $why"
 hit "${G}clean([[:space:]].*)?[[:space:]]-[[:alpha:]]*f"         && deny "git clean -f refused. $why"
 hit "${G}branch([[:space:]].*)?[[:space:]](-D|--delete[[:space:]].*--force|--force[[:space:]].*--delete)" && deny "forced branch deletion refused. $why"
