@@ -170,8 +170,10 @@ For diagnosis, inspect the `roberdan-os` extension log: `onAgentStop` records th
 An extension shown as loaded is not proof of a subsequent automatic turn.
 **Current verification limit (CLI 1.0.84-5):** the native callback returned `block`,
 but the monitored live session did not start a root turn within 90 seconds.
-Automatic continuation is therefore **not verified**; keep using explicit resume
-and do not rely on this draft change for unattended work.
+A matching follow-up was subsequently delivered as a queued message in the same
+session, after task completion. This demonstrates deferred delivery, **not prompt
+execution**: do not promise an immediate restart or rely on it for time-sensitive
+unattended work.
 
 **Federation (multi-repo boards):**
 
