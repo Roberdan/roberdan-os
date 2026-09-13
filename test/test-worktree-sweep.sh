@@ -12,6 +12,12 @@ FAILS=0
 ok()   { printf '  ok   — %s\n' "$1"; }
 fail() { printf '  FAIL — %s\n' "$1"; FAILS=$((FAILS+1)); }
 
+# Fotografia della cartella VERA delle copie di lavoro, presa PRIMA di dirottare HOME. Una
+# suite gira sulla macchina di Roberto: se sbaglia una variabile scrive nel suo parco vero, e
+# lo scopre lui guardando l'editor. E' successo il 2026-09-13 — una riga rimasta indietro
+# creava "$ROOT/../fake", cioe' ~/GitHub/worktrees/roberdan-os/fake, a ogni esecuzione.
+REAL_HOME="$HOME"
+REAL_WT_BEFORE="$(ls -1 "$REAL_HOME/GitHub/worktrees"/*/ 2>/dev/null | sort)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 export HOME="$TMP/home"; mkdir -p "$HOME/GitHub"
 export RDA_WORKTREES="$HOME/GitHub/worktrees"
@@ -39,7 +45,6 @@ CARD="$(mk carded)"
 UNTRACKED_ONLY="$(mk untracked)"; echo z > "$UNTRACKED_ONLY/scratch"
 
 # una card in doing che rivendica $CARD: e' il posto dove qualcuno sta lavorando ADESSO
-mkdir -p "$ROOT/../fake" 2>/dev/null || true
 BOARD="$TMP/board"; mkdir -p "$BOARD/doing"
 printf -- '---\nrepo: demo\nworktree: %s\n---\n' "$CARD" > "$BOARD/doing/carded.md"
 export RDA_KANBAN="$BOARD"
@@ -90,5 +95,9 @@ CLEAN4="$(mk clean4)"
 rm -f "$RDA_HOME"/autosweep-*
 RDA_NO_AUTOSWEEP=1 bash -c "cd '$REPO' && bash '$WT' autosweep >/dev/null 2>&1"
 [ -d "$CLEAN4" ] && ok "RDA_NO_AUTOSWEEP=1 lo spegne davvero" || fail "ha pulito anche con RDA_NO_AUTOSWEEP=1"
+
+REAL_WT_AFTER="$(ls -1 "$REAL_HOME/GitHub/worktrees"/*/ 2>/dev/null | sort)"
+[ "$REAL_WT_BEFORE" = "$REAL_WT_AFTER" ] && ok "la suite non ha toccato il parco vero delle copie di lavoro" \
+  || fail "la suite ha creato o tolto qualcosa in $REAL_HOME/GitHub/worktrees"
 
 if [ "$FAILS" -eq 0 ]; then echo "test-worktree-sweep: ✅ ALL GREEN"; else echo "test-worktree-sweep: ❌ $FAILS FAIL"; exit 1; fi
