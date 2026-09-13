@@ -3,6 +3,29 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.45.0 — 2026-09-13
+
+### `film-director`: si decide che film e', prima di girare
+
+La skill che dirige i filmati di prodotto impara due cose, scritte dopo che un filmato da
+hackathon era fallito tre volte di fila.
+
+**Il mondo, scelto prima del copione** (`two-worlds.md`). Quasi ogni filmato-dimostrazione
+fallisce prima del primo fotogramma, perche' nessuno ha deciso **che tipo di filmato e'**: ne
+esce un ibrido, troppa voce fuori campo per essere un filmato di prodotto, troppe schede di
+funzionalita' per essere un intervento parlato. Due mondi, mai mescolati — se li si vuole
+entrambi si fanno **due filmati dallo stesso girato**, mai uno solo che tiene il piede in due
+scarpe. La scelta e' del proprietario, prima che si scriva una riga.
+
+**Le riprese dell'interfaccia** (`capture-product-ui.md`). Tutti e tre i fallimenti tornavano
+allo stesso punto: il girato era **troppo piccolo, inquadrato male, o della cosa sbagliata** — e
+ogni volta il sintomo sembrava un problema di regia. Non lo era. Da un'immagine piccola non si
+puo' entrare dentro, tagliare, riempire lo schermo: ne esce per forza una carrellata di
+diapositive. Regola: si gira **al doppio della risoluzione finale, oppure non si comincia**. E
+la trappola meno ovvia, quella che sembra la mossa giusta: allargare la finestra a dismisura
+per avere un'immagine grande da' una colonna sottile in mezzo a un mare di fondo vuoto —
+tecnicamente ad alta risoluzione, cinematograficamente inutile.
+
 ## 2.44.0 — 2026-09-13
 
 ### `kb top`: lo stato non si chiede piu', si guarda

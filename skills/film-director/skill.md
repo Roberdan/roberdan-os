@@ -27,7 +27,9 @@ uploaded, published or submitted without an explicit human instruction.
 
 | Read when | File |
 |---|---|
+| Before the script — deciding what kind of film this is | [two-worlds.md](two-worlds.md) |
 | Always — planning shots, structure, the cut | [shot-grammar.md](shot-grammar.md) |
+| Filming a product, a website or an app | [capture-product-ui.md](capture-product-ui.md) |
 | Generating footage with Sora 2 on Azure | [sora-azure.md](sora-azure.md) |
 | Assembling, compositing UI, sound, delivery | [assembly-and-sound.md](assembly-and-sound.md) |
 
@@ -42,17 +44,25 @@ Never open a render tool before step 3 is signed off.
 
 1. **Brief.** Audience, one sentence of intent, runtime, where it will be watched, what the
    viewer must feel and do. Judging criteria if it is a competition entry.
-2. **Script.** Narration written for the ear, not the page. Every factual claim carries a
+2. **Choose the world** — Apple or TED ([two-worlds.md](two-worlds.md)). The owner decides,
+   you recommend. A film that has not chosen will hedge, and a hedged film is a slideshow.
+3. **Script.** Narration written for the ear, not the page. Every factual claim carries a
    source; anything not shipped is visibly marked as roadmap. Read it aloud against a stopwatch
    — narration length sets runtime, not the other way round.
-3. **Shot list** as JSON (schema in shot-grammar.md), then `node scripts/lint-shotlist.mjs`.
+4. **Shot list** as JSON (schema in shot-grammar.md), then `node scripts/lint-shotlist.mjs`.
    **A shot list that fails the linter is not a shot list.** Fix the direction, never the linter.
-4. **Acquire.** Real footage first (screen recordings, camera, existing assets), generation
+5. **Acquire.** Real footage first (screen recordings, camera, existing assets), generation
    second, motion design third. Generated footage is the atmosphere layer; the product is
-   always the real product.
-5. **Assemble picture** against the narration timing. Cut on motion, not on sentences.
-6. **Sound.** Six layers (assembly-and-sound.md). This is where "expensive" is decided.
-7. **Delivery gate.** `scripts/delivery-gate.sh` must pass, plus a human look at a contact
+   always the real product. For anything on a screen, follow
+   [capture-product-ui.md](capture-product-ui.md) and run its three verification checks —
+   capture scripts report success while producing unusable files.
+6. **Assemble picture** against the narration timing. Cut on motion, not on sentences.
+7. **Sound.** Six layers (assembly-and-sound.md). This is where "expensive" is decided.
+8. **Adversarial review before the master, not after.** Two independent red teams, different
+   models, identical hostile brief, each asked for a ranked kill-list and a one-paragraph
+   verdict. Where they converge, act without debating. Where they differ, it is the owner's
+   call. This costs an hour and has never once failed to find something disqualifying.
+9. **Delivery gate.** `scripts/delivery-gate.sh` must pass, plus a human look at a contact
    sheet sampled **at cut points and mid-transition**, not only at beat centres.
 
 ## Ten rules that survive every project
@@ -74,7 +84,29 @@ Never open a render tool before step 3 is signed off.
 10. **Measure, don't claim.** Duration, loudness, average shot length, caption legibility and
     factual sourcing are all verified with commands before anyone says "done".
 
-## Honesty rules specific to film
+## Lessons paid for the hard way
+
+Each of these cost at least one rejected cut. They are not principles — they are scars.
+
+- **A slideshow is a footage problem before it is a directing problem.** When the source
+  captures are small, the only way to fill a frame is to show the whole thing, statically.
+  You cannot direct your way out of thumbnails. Fix acquisition first.
+- **A tiny shot count is the diagnosis, not a measurement error.** Dissolve-heavy cuts
+  under-report scene changes, so the instinct is to distrust the number. Trust it: seven shots
+  in two minutes *is* a slide deck, whatever it feels like in the timeline.
+- **Never delegate acquisition without verifying the files yourself.** An agent reporting
+  "captured 6 scenes at 2560x1440" is not evidence. `ffprobe` is evidence, a contact sheet you
+  looked at is evidence.
+- **The product must arrive in the first ten seconds** in either world. Every rejected version
+  of every film opened with the metaphor.
+- **"Make it like Apple" means fewer things on screen, not more expensive things on screen.**
+  Deconstruct references into observed rule / inferred purpose / adaptation / uncertainty;
+  transfer principles, never identity.
+- **One genuine interaction outranks any amount of beautiful marketing site.** If the film
+  cannot show the thing working, it is a brand film, and it should be sold as one.
+- **Language is a deliverable.** Check it as a fact, with a word count, not as an impression.
+
+
 
 Film technique is persuasion, which makes it easy to lie by implication. In any film that
 represents real work:
