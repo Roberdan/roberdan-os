@@ -37,6 +37,85 @@ Executable, not prose:
 - `scripts/lint-shotlist.mjs` — rejects a shot list that would render as a slideshow.
 - `scripts/sora-azure.sh` — verified Azure Sora 2 adapter (create / poll / download / remix).
 - `scripts/delivery-gate.sh` — measured pass/fail on the finished master.
+- `scripts/preflight.mjs` — local execution, timing, pilot and durable-job consistency guard.
+
+## Operational preflight (before delegation or new paid generation)
+
+One owner, one authoritative absolute manifest path, one output directory, one revision.
+Inspect that directory before declaring deliverables absent. Freeze the narration recording
+and timing before delegating timed edits; queued changes become one new owner-controlled
+revision, not repeated rewrites. The actual rendering worker must run the probe below and
+the parent must inspect its receipt before assigning work. An author-only agent cannot
+render: a tool listing or an authored command is not execution evidence.
+
+Use a **prototype** first: the simplest real 10–15 second assembly, including video, voice
+and captions. At most **two generated clips total** may be acquired without an existing
+pilot. Do not build an elaborate renderer or launch a full batch first. **Production**
+requires that MP4 to pass ffprobe and a named human's written caption, privacy, legibility
+and voice review, bound to the exact media hashes. Audio presence is not proof of narration;
+caption aesthetics and privacy cannot be proved by a Boolean. Existing delivery and owner
+approval gates still apply to the finished film.
+
+Manifest JSON, version 1 (all file references are `{ "path": "/absolute/canonical/file",
+"sha256": "<SHA-256 of bytes>" }`; paths must exist, be readable and owned by the local user):
+
+```json
+{
+  "version": 1, "owner": "Roberto", "revision": "r1", "worker": "render-worker",
+  "phase": "prototype", "outputDir": "/absolute/film/output",
+  "narration": {"path": "/absolute/film/voice.wav", "sha256": "..."},
+  "timing": {"path": "/absolute/film/timing.json", "sha256": "..."},
+  "executionReview": {"path": "/absolute/film/worker-review.json", "sha256": "..."}
+}
+```
+
+`timing.json` contains `narrationSha256`, `revision`, `durationSeconds` (matching ffprobe,
+within 0.1 s), and named `lockedBy`. This is the fixed narration, not a planned duration.
+Run `node scripts/preflight.mjs probe /absolute/manifest.json` **in the actual worker**.
+It executes a child Node process, writes and reads a challenge in the output directory,
+and persists `.film-worker-probe.json` plus its challenge file. The parent reads both,
+then writes `worker-review.json` with `probeSha256`, `reviewedBy`, and written `notes`;
+hash that review into `executionReview`. Re-probe and re-review after timing, worker or
+revision changes. Do not delegate rendering until `check /absolute/manifest.json` passes.
+
+For `phase: "production"`, add `pilot`, `captions`, `pilotReview` file references.
+The review JSON contains `pilotSha256`, `narrationSha256`, `captionsSha256`,
+`timingSha256`, `revision`, `reviewedBy`, and written `captions`, `privacy`,
+`legibility`, `voice` observations. Watch the actual pilot with those captions and voice;
+the CLI checks bytes/structure and review linkage, not whether the reviewer was truthful.
+
+At every planning/render/review cycle, run `observe /absolute/manifest.json /absolute/pilot.mp4`
+for a new inspectable 10–15 s audio/video artifact, or `observe /absolute/manifest.json -`
+if none was produced. Two consecutive no-progress observations block expansion. Repeated
+or previously seen hashes are not new progress. Stop auxiliary passes, inspect the blocker,
+and produce a small new artifact; never reset the ledger to escape the stop.
+
+The Azure adapter requires explicit `FILM_MANIFEST=/absolute/manifest.json` and a unique
+`FILM_REQUEST_KEY=shot-01-r1` for **create/shot/remix only**. These are not spending
+approval: obtain human approval separately. `shot` also requires an absolute output path
+directly inside `outputDir`. `status/wait/get` on existing IDs remain unguarded/resumable.
+The adapter reserves an **uncertain** attempt durably before each paid POST, then records
+the returned ID as **accepted**. Identical request bodies or keys cannot be recreated.
+One unresolved job blocks all new generation: deliberately conservative concurrency of one,
+not an assumed requests-per-minute allowance. On 429, timeout, or lost response, pause new
+dispatch, inspect service status/backoff and reconcile; never automatically POST again.
+
+After inspecting actual service evidence, write a reconciliation JSON with `key`, `id`,
+`status` (`completed`, `failed`, `cancelled`, or `rejected` only when no job was accepted),
+`reviewedBy`, and written `notes` identifying that evidence. Run
+`reconcile /absolute/manifest.json request-key /absolute/reconciliation.json`.
+Only `rejected` omits `id`. Keys and request hashes remain in the ledger even after failure.
+Never invent a rejection to clear an uncertain job. Keep the same manifest path/output
+directory and `.film-preflight-state.json` through revisions; do not delete job history.
+A leftover `.film-preflight-state.json.lock` means inspect the interrupted writer first.
+
+**Coverage and limits:** a discipline/consistency guard, not a security boundary, remote
+agent identity attestation, authorization, or semantic review. It cannot discover absent
+remote tools; the worker must execute and the parent inspect. Direct Azure callers and
+separate renderers are not intercepted: run this preflight explicitly for their delegation
+and batch gates. Progress observations and reconciliation require truthful operator input.
+Use this worktree's canonical script directly for local activation; do not hand-edit
+installed wrappers or change global settings.
 
 ## The non-negotiable order of work
 
