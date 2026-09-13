@@ -164,7 +164,7 @@ Roberto promotes it.)* **(3) A DEMONSTRATED live exposure overrides the cap**, a
 "an attacker could…" is a risk, and a cap that yields to *might* is not a cap. Every PR states
 its own round count (`review-budget.sh line <card>`): a number that has to be written down makes
 the eighteenth round embarrassing to type, which prose never has.
-The loop is reliable without a daemon: durable file state and empirical checks carry it.
+Durable file state makes the loop recoverable, not self-starting: continuation needs an executor.
 
 **Goal tracking = [`kanban/`](kanban/) (durable, auditable, token-bounded, GATED — default).**
 Card-files in `todo/ doing/ done/`. Fast CLI: **`kb`** (`kb` view · `kb add "<title>" --repo <r> [dod] [acc]` ·
@@ -310,15 +310,35 @@ Canonical cross-tool contract — every agent that reads this file honors it.
   (`todo->doing` stays Roberto's, never auto-cross). Clear with **`kb resume --done`**.
 - **Always-on auto-save:** the `Stop` hook ([`hooks/auto-checkpoint.sh`](hooks/auto-checkpoint.sh))
   runs `kb pause --auto` every turn — refreshes mechanical state, **preserves the human
-  next-step note**; an unannounced crash loses at most the current turn.
+  next-step note**. Saves cannot wake an agent; a crash may skip the callback entirely.
+
+**Autonomous continuation contract:** never promise ongoing work from a checkpoint or a
+written "next step". Before yielding unfinished authorized work, observe an executor covering
+that goal: a running job with a supported completion wakeup, an active host schedule, or an
+actually invoked blocking stop callback. Record its ID/observation, host/runtime dependence,
+goal/acceptance and stop conditions in the existing [[auto-checkpoint]] capsule (`pending`,
+`evidence`, `constraints`); no second state store. Recheck after resume/cancellation. If none
+is observed, continue in the current turn or explicitly report **unfinished, no active
+continuation** with the precise manual resume step. Registration or markdown is not proof.
+Never infer shutdown, power-loss, credit or permission survival. Never create a second
+executor for work already owned by a live job/schedule; two no-progress observations stop/report.
 
 ## Don't stop while the authorized queue is full (default, no opt-in)
 
-**A turn cannot close while the repo's authorized queue still has open cards.**
+**Supported stop callbacks request another turn while the authorized queue has open cards.**
 [`hooks/goal-gate.sh`](hooks/goal-gate.sh) — the only hook here that BLOCKS (`exit 2`) — checks
-`kb queue --restanti` on every `Stop` and sends the agent back in with `kb next`. It is the
+`kb queue --restanti` on Claude `Stop` and Copilot CLI 1.0.84-1 `onAgentStop`, whose typed
+`{decision: "block", reason}` asks the live runtime to enqueue follow-up work. It is the
 mechanism the built-in `/goal` installs by hand for one session, except it is on by default and
 its condition is not a sentence but **the list Roberto already authorized on 2026-07-30**.
+Copilot idle does not run the queue check again once the stop callback is observed. Older
+hosts without that callback only warn; aborts, rejected tools and CLI exit are not covered.
+Standalone user pause commands (`stop`, `pause`, `pausa`, `fermati`, `metti in pausa`,
+`devo andare`, `vado`) suppress automatic continuation until the next root user prompt.
+This is a narrow command match, not interpretation of arbitrary prose; other requests
+to stop remain the agent's responsibility. Stop decisions are recorded in the extension log.
+The host also caps consecutive blocks. No final message is retracted. Goals absent from the
+authorized queue remain a discipline contract, not mechanically detected unfinished work.
 
 *Measured, not assumed (VirtualBPM, 31 Jul → 2 Aug): 46.5 h of session, **4.4 h of actual work**.
 Before each pause the agent had itself written what it would do next — "Non mi serve niente da te

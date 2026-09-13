@@ -1,6 +1,6 @@
 ---
 name: auto-checkpoint
-description: Portable "loop kit" — inject durable state, terminal-condition, auto-resume and auto-escalation into any session. Makes the loop reliable without a daemon.
+description: Durable checkpoints and bounded recovery across compaction/resume. Saves progress, not an executor or a scheduling guarantee.
 providers: [claude, copilot, codex]
 ---
 
@@ -11,6 +11,10 @@ and `handoff/resume.md` owns the recovery capsule. Existing job databases/cursor
 authoritative for their jobs; this skill does not create `state.db` or a scheduler.
 Outside this installation, use one local session/workspace checkpoint with the same
 fields. Never put confidential notes in a public working tree.
+Before promising autonomous continuation, follow AGENTS.md's autonomous continuation contract:
+record the observed executor ID and last observation in `pending`/`evidence`, its runtime
+dependence and stop conditions in `constraints`, and the authorized goal in `goal`/`acceptance`.
+No active executor means **unfinished, no active continuation**, not "I'll keep going".
 
 ## When to checkpoint
 
@@ -80,7 +84,10 @@ If any check is uncertain, retain the path with its reason and next check.
   mechanical save at 65% (rearmed below 50%), plus `session.compaction_start`. It never changes
   the host's compaction thresholds. On successful `session.compaction_complete`, the next
   prompt/tool receives one bounded `kb resume --context` result. Child events are ignored.
-  Idle/end saves remain. Event callbacks cannot hold up compaction or capture thoughts:
+  Idle/end saves remain. Separately, the adapter maps the existing queue gate to the typed
+  `onAgentStop` continuation return; only an observed invocation proves that surface is active.
+  It covers natural root stops, not shutdown/abort or arbitrary goals outside the queue.
+  Event callbacks cannot hold up compaction or capture thoughts:
   the saved capsule must already exist. Missing events on older hosts mean phase saves,
   not a fabricated automation guarantee.
 - **Other hosts:** use their declared tools only. Manual capsule recovery remains valid;

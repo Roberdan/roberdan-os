@@ -3,6 +3,20 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.48.0 — 2026-09-13
+
+### Added
+
+- Copilot puo' proseguire la coda gia' autorizzata nella stessa sessione aperta
+  attraverso `onAgentStop`, con i limiti esistenti su tentativi e mancato progresso.
+  La consegna del messaggio di ripresa e' stata osservata in differita, dopo la
+  conclusione del lavoro corrente: non garantisce una ripartenza immediata.
+- Comandi di pausa espliciti, isolamento degli eventi dei sotto-agenti e
+  registrazione delle decisioni nel log dell'estensione.
+- Guida aggiornata per attivazione, pausa e limiti: nessun avvio dopo chiusura
+  o riavvio, nessuna nuova autorizzazione, ripiego solo consultivo sui client
+  senza il callback nativo.
+
 ## 2.47.0 — 2026-09-13
 
 ### Added
