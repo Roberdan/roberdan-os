@@ -37,7 +37,7 @@ BOARD="$FED/kanban"
 # La copia del repo che fornisce gli script: kb.sh, thor-verify.sh e factory/lib.sh VERI.
 REPO="$TMP/repo"; mkdir -p "$REPO/kanban" "$REPO/factory"
 cp "$ROOT/kanban/"*.sh "$REPO/kanban/"
-cp "$ROOT/factory/lib.sh" "$REPO/factory/"
+cp "$ROOT/factory/lib.sh" "$ROOT/factory/engine.sh" "$REPO/factory/"
 
 # L'unico pezzo finto: un `claude` che scrive un verdetto leggibile e non costa niente. Cio' che
 # si prova e' l'INDIRIZZO su cui la card viene cercata, non il giudizio di merito.
@@ -82,7 +82,7 @@ fi
 # e si pretende che il cancello TORNI a non trovare la card. Se questo blocco resta verde, il
 # blocco 1 non stava provando niente: e' esattamente com'e' andata alla prima stesura.
 MUT="$TMP/mutato"; mkdir -p "$MUT/kanban" "$MUT/factory"
-cp "$REPO/kanban/"*.sh "$MUT/kanban/"; cp "$REPO/factory/lib.sh" "$MUT/factory/"
+cp "$REPO/kanban/"*.sh "$MUT/kanban/"; cp "$REPO/factory/lib.sh" "$REPO/factory/engine.sh" "$MUT/factory/"
 _mutate() { sed -e 's|tv="\$(RDA_KANBAN="\$KB" bash |tv="$(bash |' "$1" > "$1.new" && mv "$1.new" "$1"; }
 _mutate "$MUT/kanban/kb.sh"
 if grep -q 'RDA_KANBAN="\$KB" bash "\$ROOT/kanban/thor-verify.sh"' "$MUT/kanban/kb.sh"; then

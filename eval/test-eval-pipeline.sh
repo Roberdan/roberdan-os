@@ -90,10 +90,10 @@ EOF
 ok "wrote 3 task fixtures under $TASKS (2 core canon + 1 skill-type canon)"
 
 # ---------------------------------------------------------------------------
-section "stub claude: differentiated output per condition + content-based judge"
-# invoked as: claude -p "<prompt>" --dangerously-skip-permissions --add-dir <dir>
-# Role is decided by inspecting $2 (the prompt), same technique test-factory-kb.sh uses to
-# distinguish a thor-verify call from a normal task call.
+section "stub engine: differentiated output per condition + content-based judge"
+# invoked as: <engine> -p "<prompt>" <flags> --add-dir <dir>; default engine copilot since
+# 2026-09-13, so the stub carries BOTH names — otherwise the default path goes untested.
+# Role is decided by inspecting $2 (the prompt), as test-factory-kb.sh does for thor-verify.
 cat > "$BIN/claude" <<'STUBEOF'
 #!/usr/bin/env bash
 echo "invoked" >> "${EVAL_STUB_COUNTER:?}"
@@ -131,8 +131,8 @@ JSON
 esac
 exit 0
 STUBEOF
-chmod +x "$BIN/claude"
-ok "stub claude written to $BIN/claude"
+chmod +x "$BIN/claude"; cp "$BIN/claude" "$BIN/copilot"; chmod +x "$BIN/copilot"
+ok "stub engine written as $BIN/{claude,copilot} — default engine: copilot"
 
 COUNTER="$TMP/invocations.log"
 : > "$COUNTER"
@@ -158,7 +158,7 @@ else
 fi
 n1="$(wc -l < "$COUNTER" | tr -d ' ')"
 [ "$n1" -eq 6 ] && ok "claude invoked exactly 6 times on a fresh run" \
-  || err "expected 6 claude invocations, got $n1"
+  || err "expected 6 engine invocations, got $n1"
 
 section "differentiated stub content actually landed in the right files"
 if grep -q "FAKE-SHA" "$RESULTS/t1-evidence/b.md" && ! grep -q "FAKE-SHA" "$RESULTS/t1-evidence/a.md"; then
@@ -378,8 +378,8 @@ if grep -q '^ARGV: --fake-flag$' "$ALT_ARGV"; then
 else
   err "alt-agent argv did not match the expected '--fake-flag' only — got: $(cat "$ALT_ARGV" 2>/dev/null)"
 fi
-if grep -q -- '--dangerously-skip-permissions' "$ALT_ARGV" || grep -q -- '--add-dir' "$ALT_ARGV"; then
-  err "claude-specific flags (--dangerously-skip-permissions / --add-dir) leaked into the alt-agent invocation"
+if grep -q -- '--dangerously-skip-permissions' "$ALT_ARGV" || grep -q -- '--add-dir' "$ALT_ARGV" || grep -q -- '--allow-all-tools' "$ALT_ARGV"; then
+  err "engine-specific flags (--add-dir / --allow-all-tools / the retired --dangerously-skip-permissions) leaked into the alt-agent invocation"
 else
   ok "no claude-specific flags reached the alt-agent invocation"
 fi

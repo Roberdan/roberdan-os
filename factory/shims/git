@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# factory/shims/git — a `git` that REFUSES what AGENTS.md reserves to Roberto, for
+# UNATTENDED factory runs only. run.sh and verify_card() put this directory first on the
+# PATH of the claude subprocess; interactive sessions never see it.
+#
+# Why a shim and not another regex: hooks/factory-guard.sh reads the command as TEXT, so it
+# can only refuse spellings it recognises. @thor broke it three times in a row with new
+# spellings of the same command — `--am"end"`, `/usr/bin/git push`, `git${IFS}commit${IFS}
+# --amend`, `{git,commit,--amend}`. Every one of those is the shell rewriting the text before
+# anything runs. This shim reads "$@" AFTER the shell is done: expansion, quoting, braces and
+# word splitting have already happened, so all of those arrive here as the same argv. A new
+# spelling is not a new bypass.
+#
+# In scope, whatever produced it: the shell, a script written to a file and then run, a
+# python/node subprocess, a Makefile — anything that resolves `git` through PATH.
+# Out of scope, by construction: an absolute or relative path that skips PATH
+# (`/usr/bin/git push`, `./git push`) and a copy of the binary under another name. Those are
+# hooks/factory-guard.sh's half of the job — it matches path-qualified spellings as text.
+# Two partial layers, and they fail in opposite directions: neither alone is a sandbox.
+set -euo pipefail
+
+refuse() {
+  printf 'factory-shim: %s refused.\n' "$1" >&2
+  printf 'Unattended factory run: pushing, rewriting git history and forced deletion are gates reserved to Roberto.\n' >&2
+  printf 'Leave it as a proposal in your report instead.\n' >&2
+  exit 97
+}
+
+# Skip git's global options (-C <dir>, -c <k=v>, --git-dir=..., --exec-path...) to find the
+# subcommand, the same way git itself does. Options that take a separate argument consume it.
+args=("$@")
+sub=""
+i=0
+while [ "$i" -lt "${#args[@]}" ]; do
+  a="${args[$i]}"
+  case "$a" in
+    -C|-c|--git-dir|--work-tree|--namespace|--exec-path|--config-env) i=$((i + 2)); continue ;;
+    --) i=$((i + 1)); continue ;;
+    -*) i=$((i + 1)); continue ;;
+    *) sub="$a"; break ;;
+  esac
+done
+rest=()
+[ "$i" -lt "${#args[@]}" ] && rest=("${args[@]:$((i + 1))}")
+
+has() { local n="$1"; shift; for x in "$@"; do [ "$x" = "$n" ] && return 0; done; return 1; }
+starts() { local p="$1"; shift; for x in "$@"; do case "$x" in "$p"*) return 0 ;; esac; done; return 1; }
+
+# --no-verify skips the pre-commit gates (the privacy leak-checks included) wherever it appears.
+has --no-verify "${rest[@]:-}" && refuse "git --no-verify"
+
+case "$sub" in
+  push)                      refuse "git push" ;;
+  rebase|filter-branch|filter-repo|replace)
+                             refuse "git $sub (history rewrite)" ;;
+  commit)
+    # git accepts any unambiguous prefix of --amend: --am, --ame, --amen, --amend.
+    for x in ${rest[@]+"${rest[@]}"}; do
+      case "$x" in --am|--ame|--amen|--amend) refuse "git commit --amend" ;; esac
+    done
+    ;;
+  reset)
+    has --hard ${rest[@]+"${rest[@]}"} && refuse "git reset --hard"
+    has --keep ${rest[@]+"${rest[@]}"} && refuse "git reset --keep"
+    has --merge ${rest[@]+"${rest[@]}"} && refuse "git reset --merge"
+    ;;
+  clean)
+    for x in ${rest[@]+"${rest[@]}"}; do
+      case "$x" in
+        --force) refuse "git clean --force" ;;
+        --*) ;;
+        -*) case "${x#-}" in *f*) refuse "git clean -f" ;; esac ;;
+      esac
+    done
+    ;;
+  branch)
+    has -D ${rest[@]+"${rest[@]}"} && refuse "git branch -D (forced deletion)"
+    { has --delete ${rest[@]+"${rest[@]}"} && has --force ${rest[@]+"${rest[@]}"}; } && refuse "git branch --delete --force"
+    ;;
+  update-ref)
+    has -d ${rest[@]+"${rest[@]}"} && refuse "git update-ref -d (deleting a ref)"
+    has --stdin ${rest[@]+"${rest[@]}"} && refuse "git update-ref --stdin"
+    ;;
+  reflog)
+    case "${rest[0]:-}" in expire|delete) refuse "git reflog ${rest[0]}" ;; esac
+    ;;
+  stash)
+    case "${rest[0]:-}" in drop|clear) refuse "git stash ${rest[0]}" ;; esac
+    ;;
+  gc)
+    starts --prune ${rest[@]+"${rest[@]}"} && refuse "git gc --prune"
+    ;;
+  worktree)
+    # `worktree add|list|remove` is how kb start/finish work — allowed. `prune --expire`
+    # discards administrative data about other sessions' worktrees.
+    case "${rest[0]:-}" in prune) refuse "git worktree prune" ;; esac
+    ;;
+esac
+
+# Resolve the real git: first PATH entry holding an EXECUTABLE git that is not this shim.
+self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+real=""
+IFS=':' read -r -a path_entries <<<"${PATH:-}"
+for d in ${path_entries[@]+"${path_entries[@]}"}; do
+  [ -n "$d" ] || d="."
+  resolved="$(cd "$d" 2>/dev/null && pwd || echo "$d")"
+  [ "$resolved" = "$self_dir" ] && continue
+  [ -f "$d/git" ] && [ -x "$d/git" ] && { real="$d/git"; break; }
+done
+if [ -z "$real" ]; then
+  for p in /opt/homebrew/bin/git /usr/local/bin/git /usr/bin/git; do
+    [ -x "$p" ] && { real="$p"; break; }
+  done
+fi
+[ -n "$real" ] || { printf 'factory-shim: no real git found on PATH.\n' >&2; exit 127; }
+
+exec "$real" "$@"

@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# factory/shims/rm — see factory/shims/git for why this exists and what it does not cover.
+# Refuses RECURSIVE + FORCED deletion only. Plain `rm file`, `rm -f file` and `rm -r dir`
+# still work: a factory task has to be able to clean up after itself. This is the same rule
+# hooks/factory-guard.sh already applies as text; the shim makes it hold whatever spelling
+# produced it.
+set -euo pipefail
+
+recursive=0
+force=0
+end_of_opts=0
+for x in "$@"; do
+  if [ "$end_of_opts" -eq 0 ]; then
+    case "$x" in
+      --) end_of_opts=1; continue ;;
+      --recursive|-R) recursive=1; continue ;;
+      --force) force=1; continue ;;
+      --*) continue ;;
+      -*)
+        case "$x" in *[rR]*) recursive=1 ;; esac
+        case "$x" in *f*) force=1 ;; esac
+        continue
+        ;;
+    esac
+  fi
+done
+
+if [ "$recursive" -eq 1 ] && [ "$force" -eq 1 ]; then
+  printf 'factory-shim: rm -rf refused.\n' >&2
+  printf 'Unattended factory run: forced recursive deletion is a gate reserved to Roberto.\n' >&2
+  printf 'Delete explicitly, or leave it as a proposal in your report instead.\n' >&2
+  exit 97
+fi
+
+self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+real=""
+IFS=':' read -r -a path_entries <<<"${PATH:-}"
+for d in ${path_entries[@]+"${path_entries[@]}"}; do
+  [ -n "$d" ] || d="."
+  resolved="$(cd "$d" 2>/dev/null && pwd || echo "$d")"
+  [ "$resolved" = "$self_dir" ] && continue
+  [ -f "$d/rm" ] && [ -x "$d/rm" ] && { real="$d/rm"; break; }
+done
+[ -n "$real" ] || real=/bin/rm
+[ -x "$real" ] || { printf 'factory-shim: no real rm found.\n' >&2; exit 127; }
+
+exec "$real" "$@"

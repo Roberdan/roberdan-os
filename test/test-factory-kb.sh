@@ -9,10 +9,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
 FAIL=0
-section() { printf "\n=== %s ===\n" "$1"; }
-ok()      { printf "  ok: %s\n" "$1"; }
+section() { printf "\n=== %s ===\n" "$1"; }; ok() { printf "  ok: %s\n" "$1"; }
 err()     { printf "  FAIL: %s\n" "$1"; FAIL=1; }
-
+# motore copilot dal 2026-09-13: lo stub serve con ENTRAMBI i nomi, o si testa un ramo morto
+engine_stub() { chmod +x "$1/claude"; cp "$1/claude" "$1/copilot"; chmod +x "$1/copilot"; }
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -203,7 +203,7 @@ cat > "$FAC5/bin/claude" <<'EOF'
 env > "${CAPTURE_ENV:?}"
 exit 0
 EOF
-chmod +x "$FAC5/bin/claude"
+engine_stub "$FAC5/bin"
 printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe\n' "$TMP" > "$FAC5/queue/billing.md"
 CAPENV="$TMP/billing-env.txt"
 env -i PATH="$FAC5/bin:/usr/bin:/bin" HOME="$HOME" \
@@ -225,7 +225,7 @@ cat > "$FAC6/bin/claude" <<'EOF'
 printf '%s' "$2" > "${CAPTURE_PROMPT:?}"
 exit 0
 EOF
-chmod +x "$FAC6/bin/claude"
+engine_stub "$FAC6/bin"
 PRIMER_FILE="$TMP/fake-primer.md"
 echo "SENTINEL-PRIMER-MARKER-98214" > "$PRIMER_FILE"
 printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task body\n' "$TMP" > "$FAC6/queue/primer.md"
@@ -249,7 +249,7 @@ cat > "$FAC/bin/claude" <<'EOF'
 #!/usr/bin/env bash
 exit 5
 EOF
-chmod +x "$FAC/bin/claude"
+engine_stub "$FAC/bin"
 printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task\n' "$TMP" > "$FAC/queue/failer.md"
 
 # minimal, launchd-like PATH: no alias, no interactive shell config
@@ -278,7 +278,7 @@ cat > "$FAC2/bin/claude" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
-chmod +x "$FAC2/bin/claude"
+engine_stub "$FAC2/bin"
 printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task\n' "$TMP" > "$FAC2/queue/succeeder.md"
 env -i PATH="$FAC2/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FAC2" RDA_HANDOFF=/dev/null \
@@ -296,7 +296,7 @@ cat > "$FAC4/bin/claude" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
-chmod +x "$FAC4/bin/claude"
+engine_stub "$FAC4/bin"
 cat > "$KB4/doing/probe-sync.md" <<'EOF'
 ---
 title: probe sync card
@@ -337,7 +337,7 @@ case "$2" in
 esac
 exit 0
 EOF
-chmod +x "$FAC7/bin/claude"
+engine_stub "$FAC7/bin"
 cat > "$KB7/doing/verify-pass.md" <<'EOF'
 ---
 title: verify pass card
@@ -372,7 +372,7 @@ case "$2" in
 esac
 exit 0
 EOF
-chmod +x "$FAC8/bin/claude"
+engine_stub "$FAC8/bin"
 cat > "$KB8/doing/verify-fail.md" <<'EOF'
 ---
 title: verify fail card
@@ -412,7 +412,7 @@ case "$2" in
 esac
 exit 0
 EOF
-chmod +x "$FAC9/bin/claude"
+engine_stub "$FAC9/bin"
 printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task, no card\n' "$TMP" > "$FAC9/queue/nocard.md"
 env -i PATH="$FAC9/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FAC9" RDA_HANDOFF=/dev/null \
@@ -431,7 +431,7 @@ cat > "$FAC3/home/.local/bin/claude" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
-chmod +x "$FAC3/home/.local/bin/claude"
+engine_stub "$FAC3/home/.local/bin"
 printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task\n' "$TMP" > "$FAC3/queue/resolveme.md"
 # PATH deliberately excludes the .local/bin dir; only HOME is set, exercising the fallback lookup
 env -i PATH="/usr/bin:/bin" HOME="$FAC3/home" \
@@ -457,7 +457,7 @@ cat > "$FAC7/bin/claude" <<'EOF'
 pwd > "${CAPTURE_CWD:?}"
 exit 0
 EOF
-chmod +x "$FAC7/bin/claude"
+engine_stub "$FAC7/bin"
 printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe\n' "$FAC7/otherdir" > "$FAC7/queue/cwdcheck.md"
 CAPCWD="$TMP/observed-cwd.txt"
 # Launch run.sh from $TMP (NOT from $FAC7/otherdir) — the launch dir must NOT leak through.
@@ -485,16 +485,16 @@ cat > "$FACM1/bin/claude" <<'EOF'
 printf '%s\n' "$@" > "${CAPTURE_ARGV:?}"
 exit 0
 EOF
-chmod +x "$FACM1/bin/claude"
+engine_stub "$FACM1/bin"
 printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe task\n' "$TMP" > "$FACM1/queue/nomodel.md"
 CAPARGV1="$TMP/argv-default.txt"
 env -i PATH="$FACM1/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM1" RDA_HANDOFF=/dev/null CAPTURE_ARGV="$CAPARGV1" \
   bash factory/run.sh >/dev/null 2>&1
-if [ -f "$CAPARGV1" ] && grep -A1 -x -- '--model' "$CAPARGV1" | grep -qx 'sonnet' && grep -A1 -x -- '--permission-mode' "$CAPARGV1" | grep -qx 'auto' && grep -A1 -x -- '--permission-prompts' "$CAPARGV1" | grep -qx 'none' && grep -A1 -x -- '--settings' "$CAPARGV1" | grep -q 'hooks/factory-guard.sh' && ! grep -q -- '--dangerously-skip-permissions' "$CAPARGV1" factory/*.sh; then
+if [ -f "$CAPARGV1" ] && grep -A1 -x -- '--model' "$CAPARGV1" | grep -qx 'claude-sonnet-5' && grep -qx -- '--allow-all-tools' "$CAPARGV1" && grep -A1 -x -- '--deny-tool' "$CAPARGV1" | grep -qx 'shell(git push)' && ! grep -q -- '--dangerously-skip-permissions' "$CAPARGV1" factory/*.sh; then
   ok "task without model: gets --model sonnet, auto mode, --permission-prompts none (never skip-permissions)"
 else
-  err "task without model: did not get --model sonnet + --permission-mode auto + --permission-prompts none, or skip-permissions is back (argv: $(cat "$CAPARGV1" 2>/dev/null | tr '\n' ' '))"
+  err "task without model: did not get --model claude-sonnet-5 + --allow-all-tools + the deny list, or skip-permissions is back (argv: $(cat "$CAPARGV1" 2>/dev/null | tr '\n' ' '))"
 fi
 
 section "factory: model policy — model: opus in frontmatter passes --model opus"
@@ -504,16 +504,16 @@ cat > "$FACM2/bin/claude" <<'EOF'
 printf '%s\n' "$@" > "${CAPTURE_ARGV:?}"
 exit 0
 EOF
-chmod +x "$FACM2/bin/claude"
+engine_stub "$FACM2/bin"
 printf -- '---\ndir: %s\ntimeout: 30\nmodel: opus\n---\nprobe task\n' "$TMP" > "$FACM2/queue/opustask.md"
 CAPARGV2="$TMP/argv-opus.txt"
 env -i PATH="$FACM2/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM2" RDA_HANDOFF=/dev/null CAPTURE_ARGV="$CAPARGV2" \
   bash factory/run.sh >/dev/null 2>&1
-if [ -f "$CAPARGV2" ] && grep -A1 -x -- '--model' "$CAPARGV2" | grep -qx 'opus'; then
+if [ -f "$CAPARGV2" ] && grep -A1 -x -- '--model' "$CAPARGV2" | grep -qx 'claude-opus-5'; then
   ok "task with model: opus gets --model opus"
 else
-  err "task with model: opus did not get --model opus (argv: $(cat "$CAPARGV2" 2>/dev/null | tr '\n' ' '))"
+  err "task with model: opus did not get --model claude-opus-5 (argv: $(cat "$CAPARGV2" 2>/dev/null | tr '\n' ' '))"
 fi
 
 section "factory: model policy — disallowed model value is clamped to sonnet with a WARN"
@@ -523,16 +523,16 @@ cat > "$FACM3/bin/claude" <<'EOF'
 printf '%s\n' "$@" > "${CAPTURE_ARGV:?}"
 exit 0
 EOF
-chmod +x "$FACM3/bin/claude"
+engine_stub "$FACM3/bin"
 printf -- '---\ndir: %s\ntimeout: 30\nmodel: fable\n---\nprobe task\n' "$TMP" > "$FACM3/queue/fabletask.md"
 CAPARGV3="$TMP/argv-fable.txt"
 RUNLOG3="$TMP/run-fable.log"
 env -i PATH="$FACM3/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM3" RDA_HANDOFF=/dev/null CAPTURE_ARGV="$CAPARGV3" \
   bash factory/run.sh >/dev/null 2>"$RUNLOG3"
-if [ -f "$CAPARGV3" ] && grep -A1 -x -- '--model' "$CAPARGV3" | grep -qx 'sonnet' \
+if [ -f "$CAPARGV3" ] && grep -A1 -x -- '--model' "$CAPARGV3" | grep -qx 'claude-sonnet-5' \
   && grep -q "WARN model 'fable' not allowed (sonnet|opus only) — clamped to sonnet" "$RUNLOG3"; then
-  ok "model: fable is clamped to --model sonnet and logs an explicit WARN"
+  ok "model: fable is clamped to the mid-class model (claude-sonnet-5) and logs an explicit WARN"
 else
   err "model: fable was not clamped+warned correctly (argv: $(cat "$CAPARGV3" 2>/dev/null | tr '\n' ' '), run log: $(cat "$RUNLOG3" 2>/dev/null))"
 fi
@@ -549,7 +549,7 @@ case "$*" in
 esac
 exit 0
 EOF
-chmod +x "$FACM4/bin/claude"
+engine_stub "$FACM4/bin"
 cat > "$KBM4/doing/model-verify.md" <<'EOF'
 ---
 title: model verify card
@@ -567,10 +567,10 @@ CAPVERIFYARGV="$TMP/argv-verify.txt"
 env -i PATH="$FACM4/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM4" RDA_KANBAN="$KBM4" RDA_HANDOFF=/dev/null CAPTURE_VERIFY_ARGV="$CAPVERIFYARGV" \
   bash factory/run.sh >/dev/null 2>&1
-if [ -f "$CAPVERIFYARGV" ] && grep -A1 -x -- '--model' "$CAPVERIFYARGV" | grep -qx 'sonnet' && grep -A1 -x -- '--permission-mode' "$CAPVERIFYARGV" | grep -qx 'auto' && grep -A1 -x -- '--permission-prompts' "$CAPVERIFYARGV" | grep -qx 'none' && grep -A1 -x -- '--settings' "$CAPVERIFYARGV" | grep -q 'hooks/factory-guard.sh' && ! grep -q -- '--dangerously-skip-permissions' "$CAPVERIFYARGV" factory/*.sh; then
+if [ -f "$CAPVERIFYARGV" ] && grep -A1 -x -- '--model' "$CAPVERIFYARGV" | grep -qx 'claude-sonnet-5' && grep -qx -- '--allow-all-tools' "$CAPVERIFYARGV" && grep -A1 -x -- '--deny-tool' "$CAPVERIFYARGV" | grep -qx 'shell(git push)' && ! grep -q -- '--dangerously-skip-permissions' "$CAPVERIFYARGV" factory/*.sh; then
   ok "thor-verify pass always uses --model sonnet, even when the task itself used model: opus — in auto mode with --permission-prompts none"
 else
-  err "thor-verify pass did not use --model sonnet + --permission-mode auto + --permission-prompts none (argv: $(cat "$CAPVERIFYARGV" 2>/dev/null | tr '\n' ' '))"
+  err "thor-verify pass did not use --model claude-sonnet-5 + --allow-all-tools + the deny list (argv: $(cat "$CAPVERIFYARGV" 2>/dev/null | tr '\n' ' '))"
 fi
 
 # ---------------------------------------------------------------------------

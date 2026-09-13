@@ -99,21 +99,33 @@ expect allow 'ls .git && cat .gitignore'
 # time, so no text match can see it. Pinned as ALLOW so nobody mistakes this for coverage.
 expect allow 'GIT=git; $GIT push'
 
-echo "=== wiring: both factory launch paths load the guard ==="
-# shellcheck source=factory/lib.sh
+echo "=== wiring: the claude engine still loads the guard ==="
+# Behavioural, not a grep: launch_agent() is now the single launch site, so the assertion is
+# what it actually puts on the command line. A stub binary records its own argv.
+WTMP="$(mktemp -d)"; mkdir -p "$WTMP/bin" "$WTMP/dir"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$@" > "%s/argv"\n' "$WTMP" > "$WTMP/bin/claude"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$@" > "%s/argv"\n' "$WTMP" > "$WTMP/bin/copilot"
+chmod +x "$WTMP/bin/claude" "$WTMP/bin/copilot"
+launch_with() {
+  RDA_FACTORY_ENGINE="$1" PATH="$WTMP/bin:$PATH" bash -c '
+    source "$1/factory/lib.sh"; TIMEOUT_BIN=""
+    launch_agent "probe prompt" sonnet "$2" 30 "$2/log"' _ "$ROOT" "$WTMP/dir" >/dev/null 2>&1
+  cat "$WTMP/argv" 2>/dev/null
+}
+argv="$(launch_with claude)"
+printf '%s' "$argv" | grep -q -- '--permission-prompts' && printf '%s' "$argv" | grep -q -- "factory-guard.sh" \
+  && ok "claude engine: --permission-prompts none + --settings running $GUARD" \
+  || err "claude engine does not wire the guard (argv: $(printf '%s' "$argv" | tr '\n' ' '))"
 settings="$(bash -c 'source "$1/factory/lib.sh"; printf %s "$FACTORY_SETTINGS"' _ "$ROOT")"
 cmdline="$(printf '%s' "$settings" | jq -r '.hooks.PreToolUse[] | select(.matcher=="Bash") | .hooks[].command' 2>/dev/null)"
 [ "$cmdline" = "bash \"$GUARD\"" ] && ok "FACTORY_SETTINGS is valid JSON and runs $GUARD" \
   || err "FACTORY_SETTINGS does not wire the guard (got: $cmdline)"
-sites="$(grep -hc -- '-p "\$[a-z]*" --model [^ ]* --permission-mode auto --permission-prompts none --settings "\$FACTORY_SETTINGS"' "$ROOT"/factory/*.sh | paste -sd+ - | bc)"
-total="$(grep -hc -- '"\$CLAUDE" -p ' "$ROOT"/factory/*.sh | paste -sd+ - | bc)"
-[ "$total" -ge 4 ] && [ "$sites" = "$total" ] && ok "all $total claude -p launch sites pass --settings \"\$FACTORY_SETTINGS\"" \
-  || err "only $sites of $total claude -p launch sites load the guard"
+rm -rf "$WTMP"
 
 echo "=== fail closed: a missing guard stops the factory ==="
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/repo/factory" "$TMP/repo/hooks" "$TMP/fac/queue" "$TMP/bin"
-cp "$ROOT/factory/run.sh" "$ROOT/factory/lib.sh" "$TMP/repo/factory/"
+cp "$ROOT/factory/run.sh" "$ROOT/factory/lib.sh" "$ROOT/factory/engine.sh" "$TMP/repo/factory/"
 printf '#!/usr/bin/env bash\ntouch "%s/claude-ran"\n' "$TMP" > "$TMP/bin/claude"; chmod +x "$TMP/bin/claude"
 printf -- '---\ndir: %s\ntimeout: 30\n---\nprobe\n' "$TMP" > "$TMP/fac/queue/probe.md"
 env -i PATH="$TMP/bin:/usr/bin:/bin" HOME="$HOME" RDA_FACTORY="$TMP/fac" RDA_HANDOFF=/dev/null \

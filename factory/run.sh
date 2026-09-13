@@ -18,19 +18,26 @@ HANDOFF="${RDA_HANDOFF:-$HOME/GitHub/roberdan-os/handoff/latest.md}"
 KB="${RDA_KANBAN:-$HOME/GitHub/roberdan-os/kanban}"
 MAX_ATTEMPTS=2
 
-# BILLING SAFETY (verified w/ Claude Code docs): in `-p` headless mode, an
-# ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN is ALWAYS used → per-token API billing.
-# Unset both so auth falls through to the Max subscription OAuth (no API charges).
+# BILLING SAFETY. Two rules, and the second is Roberto's directive of 2026-09-13:
+#   1. in `-p` headless mode Claude Code ALWAYS bills per token when an ANTHROPIC_API_KEY or
+#      ANTHROPIC_AUTH_TOKEN is set → both are unset here so auth falls through to the
+#      subscription OAuth, for the rare run that opts back into the claude engine;
+#   2. unattended work must NEVER spend the Claude budget at all, so the default engine is
+#      GitHub Copilot CLI (RDA_FACTORY_ENGINE, see factory/lib.sh).
 unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN 2>/dev/null || true
 
-# locate the real claude binary (launchd has a minimal PATH; the interactive alias is unavailable)
-CLAUDE="$(command -v claude 2>/dev/null || true)"
-if [ -z "$CLAUDE" ] || [ ! -x "$CLAUDE" ]; then
-  for p in "$HOME/.local/bin/claude" /opt/homebrew/bin/claude "$HOME/.bun/bin/claude" /usr/local/bin/claude; do
-    [ -x "$p" ] && { CLAUDE="$p"; break; }
-  done
-fi
-[ -n "$CLAUDE" ] && [ -x "$CLAUDE" ] || { echo "[factory] FATAL: claude binary not found" >&2; exit 127; }
+# frontmatter(), field(), resolve_model(), engine_model(), launch_agent(), note_card(),
+# verify_card() and the Node 1 lock primitives are provided by factory/lib.sh — sourced here
+# and by dispatch-runner.sh (design §2d, @rex #3). BASH_SOURCE-relative so it resolves under
+# launchd's foreign cwd.
+# shellcheck source=factory/lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+# locate the engine binary (launchd has a minimal PATH; the interactive alias is unavailable)
+ENGINE_BIN="$(factory_engine_bin)" || { echo "[factory] FATAL: $FACTORY_ENGINE binary not found" >&2; exit 127; }
+# shellcheck disable=SC2034  # read by factory/lib.sh (factory_engine_bin) and by old callers
+CLAUDE="$ENGINE_BIN"          # historical name, still honoured as an override
+RDA_ENGINE_BIN="$ENGINE_BIN"; export RDA_ENGINE_BIN
 
 # `timeout` is GNU coreutils, not built into macOS /usr/bin — under launchd's minimal PATH
 # it is just as missing as `claude` was. Resolve it the same way, with a portable fallback.
@@ -46,15 +53,15 @@ if [ -z "$TIMEOUT_BIN" ] || [ ! -x "$TIMEOUT_BIN" ]; then
 fi
 
 # frontmatter(), field(), resolve_model(), note_card(), verify_card() and the Node 1
-# lock primitives are provided by factory/lib.sh — sourced here and by
-# dispatch-runner.sh (design §2d, @rex #3). BASH_SOURCE-relative so it resolves
-# under launchd's foreign cwd. $CLAUDE/$TIMEOUT_BIN/$KB are already set above; the
+# lock primitives are provided by factory/lib.sh — sourced above, before the binary
+# resolution that uses factory_engine_bin(). $CLAUDE/$TIMEOUT_BIN/$KB are set here; the
 # helpers late-bind them at call time regardless.
-# shellcheck source=factory/lib.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 # Fail closed: a hook command whose script is missing errors out, and a hook error does not
 # block the tool call — so without this check a moved guard would silently allow everything.
 [ -r "$FACTORY_GUARD" ] || { echo "[factory] FATAL: guard not found at $FACTORY_GUARD" >&2; exit 126; }
+# Same reasoning for the PATH shims: one layer missing is not a degraded run, it is an
+# unguarded one. Checked once here, before any task starts.
+factory_shims_ok || exit 126
 prompt_of() { awk 'BEGIN{f=0} /^---$/{f++; next} f>=2{print}' "$1"; }  # body after 2nd ---
 
 run_task() {
@@ -83,17 +90,11 @@ run_task() {
   # routine work is still approved, but what the classifier would ask about is DENIED instead of
   # allowed — a mechanical limit, where the old flag left only the AGENTS.md prose. A headless run
   # cannot answer a prompt, so "none" turns every would-be prompt into a refusal, never a hang.
-  local rc
-  if [ ! -d "$dir" ]; then
-    { echo "[factory] FATAL: dir '$dir' does not exist"; } >> "$log"
-    rc=2
-  elif [ -n "$TIMEOUT_BIN" ]; then
-    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$full" --model "$model" --permission-mode auto --permission-prompts none --settings "$FACTORY_SETTINGS" --add-dir "$dir" ) > "$log" 2>&1
-    rc=$?
-  else
-    ( cd "$dir" && "$CLAUDE" -p "$full" --model "$model" --permission-mode auto --permission-prompts none --settings "$FACTORY_SETTINGS" --add-dir "$dir" ) > "$log" 2>&1
-    rc=$?
-  fi
+  local rc=0
+  # `|| rc=$?` and not a bare call: under `set -e` a function that RETURNS non-zero in
+  # statement position kills the whole run. That is how a failing task stopped reaching
+  # failed/ the first time this was refactored — caught by test-factory-kb.sh.
+  launch_agent "$full" "$model" "$dir" "$tmo" "$log" || rc=$?
   set -e
   { echo; echo "=== factory: exit=$rc at $(date) ==="; } >> "$log"
 
