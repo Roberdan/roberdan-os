@@ -1743,6 +1743,8 @@ case "$cmd" in
   # temporanei, conversazioni fra agenti lasciate a meta', card aperte per progetto.
   # Referto di default; con --yes applica le pulizie proposte. Le card non si toccano mai.
   checkup) bash "$ROOT/kanban/checkup.sh" "$@" ;;
+  top) bash "$ROOT/kanban/top.sh" "$@" ;;
+  ask) bash "$ROOT/kanban/ask.sh" "$@" ;;
 
   *) usage ;;
 esac

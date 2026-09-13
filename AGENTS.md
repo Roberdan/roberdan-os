@@ -234,6 +234,17 @@ tool and this protocol are versioned.
   così vale anche per ciò che lascerà domani uno strumento che oggi non esiste. **A monte**,
   `autosweep` gira a ogni fine turno sul repo corrente: appena un ramo è integrato la sua copia
   sparisce da sola. Dettagli e limiti onesti: `kanban/README.md § kb checkup`.
+- **`kb top` — lo stato su uno schermo, non su richiesta.** Una finestrella stretta (~34 colonne)
+  che si ridisegna ogni 2s: card in corso e da quanto, agenti e sotto-agenti vivi con l'ultimo
+  comando che hanno lanciato davvero, ramo e cose non salvate, copie di lavoro, ultimi controlli,
+  e **i pezzi della richiesta di Roberto** spuntati o no (`kb ask set|add|doing|done`). Ristretta
+  al progetto in cui stai, sua scelta. Raccolta e disegno sono separati apposta: il ciclo di
+  disegno **non lancia mai un comando lento**, verificato sul codice e non a cronometro
+  (`test/test-kb-top.sh`). Dove non c'e' una misura stampa `-`; la spesa e' in unita' del motore
+  e non porta simbolo di valuta, perche' il cambio non lo conosce nessuno.
+  **Limite dichiarato:** l'elenco della richiesta lo scrive l'agente — e' una disciplina, non una
+  barriera; cio' che cambia e' che una dimenticanza diventa una riga mancante sotto gli occhi di
+  Roberto invece di un silenzio. Dettagli: `kanban/README.md § kb top`.
 - **Meta-card budget** (at most 1 active self-improvement card while an external-facing card waits
   in `todo/`) → `kanban/README.md § Meta-card budget`. Discipline norm, not a `kb.sh` gate.
 

@@ -171,6 +171,55 @@ sicurezza notturna e' `scheduling/com.roberdan.rda-worktrees.plist` (03:10, tutt
 Provato da `test/test-worktree-sweep.sh`, `test/test-junk-clean.sh`, `test/test-checkup.sh` —
 meta' delle asserzioni verifica che **rifiuti**, non che rimuova.
 
+## `kb top` — la finestrella che risponde da sola a "come va?"
+
+```
+kb top            # si ridisegna ogni 2s, `q` per uscire; largo ~34 colonne, sta di lato
+kb top --once     # una stampa sola (script, prove, incollare in un messaggio)
+```
+
+Nasce da una cosa detta il 2026-09-13: chiedere *"come va, cosa manca, quali copie di lavoro
+sono aperte"* e doverlo chiedere **ogni volta**. La risposta non era mai sbagliata, era sempre
+**su richiesta** — e una risposta su richiesta di stato non e' stato, e' un interrogatorio.
+Qui lo stato sta su uno schermo che si aggiorna da solo.
+
+Mostra, per il progetto in cui stai (**solo quello**, sua scelta: "solo quello in cui sto
+lavorando"): la card in lavorazione e da quanto · gli agenti e sotto-agenti vivi con **l'ultimo
+comando che hanno davvero lanciato**, il passo e se sono fermi · ramo, cose non salvate, copie
+di lavoro con quanto hanno dentro · gli ultimi controlli automatici · **i pezzi della tua
+richiesta** spuntati o no.
+
+**Due parti, per un motivo:** `snapshot.sh` raccoglie (git, card, agenti, controlli: secondi) e
+scrive un file; `top.sh` legge solo quel file e **non lancia mai un comando lento mentre
+disegna** — verificato sul codice in `test/test-kb-top.sh`, non a cronometro, perche' una prova
+a cronometro passa sulla macchina veloce e mente sull'altra. La raccolta si rinfresca in
+sottofondo quando la foto invecchia.
+
+### `kb ask` — i pezzi della richiesta, perche' non se ne perda uno
+
+```
+kb ask set "pezzo" "pezzo" ...   # inizio di una richiesta nuova: l'elenco
+kb ask add "pezzo"               # e' uscito fuori dopo
+kb ask doing 2 / kb ask done 2   # avanzamento
+kb ask list / kb ask clear
+```
+
+L'altra frase dello stesso giorno: *"mi manda ancora piu' in bestia quando gli agenti si
+scordano di fare pezzi di quello che gli ho chiesto"*. Una card copre un lavoro intero; una
+richiesta parlata ne contiene quattro o cinque, e i pezzi piccoli cadono perche' l'unico che li
+ricordava era l'agente. Qui l'elenco sta su un file e finisce nella finestrella: **lo vede lui**.
+
+**LIMITE DICHIARATO:** e' una disciplina, non una barriera. L'elenco lo scrive l'agente, quindi
+un agente che si scorda il pezzo si scorda anche di scriverlo. Quello che cambia e' che una
+dimenticanza diventa **una riga che manca sullo schermo di Roberto** invece di un silenzio.
+Renderlo obbligatorio e' un'altra decisione, sua. E la sezione non compare mai se nessuno ha
+scritto niente: un elenco inventato, proprio li', sarebbe il difetto peggiore di tutti
+(`test/test-kb-top.sh` lo verifica in entrambe le direzioni).
+
+**Dove non c'e' una misura si scrive `-`**, mai una stima plausibile — stessa regola del
+cruscotto. La spesa e' in **unita' del motore** e non porta simbolo di valuta: per un giorno
+faceva "$373833.34", che non era una cifra sbagliata ma una cifra **senza significato**.
+
 ## Cards that already exist — nothing breaks, and two things can be recovered
 Every field above is **optional**: a card written before any of this simply shows `-` where a
 measurement is missing, and both gates behave exactly as they did. Two things, though, are already
