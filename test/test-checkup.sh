@@ -58,4 +58,14 @@ grep -q '"kind":"closed"' "$RDA_BUS_HOME/demo/VIVA.jsonl" 2>/dev/null \
 [ -f "$R/kanban/doing/VIVA.md" ] && ok "nemmeno con --yes tocca una card" || fail "con --yes ha toccato una card"
 case "$out2" in *"le card sono decisioni tue"*) ok "dichiara che le card restano decisione di Roberto" ;; *) fail "non dichiara il limite sulle card" ;; esac
 
-if [ "$FAILS" -eq 0 ]; then echo "test-checkup: ✅ ALL GREEN"; else echo "test-checkup: ❌ $FAILS FAIL"; exit 1; fi
+# Quando fallisce, il referto che ha prodotto viene stampato: una suite che dice solo "rosso"
+# costa un giro di CI intero per scoprire cosa ha visto, e questa e' gia' andata rossa su Linux
+# mentre era verde sul Mac (stat BSD vs GNU).
+if [ "$FAILS" -eq 0 ]; then
+  echo "test-checkup: ✅ ALL GREEN"
+else
+  echo "--- referto prodotto dal checkup (per capire il rosso senza un altro giro) ---"
+  printf '%s\n' "$out"
+  echo "--- bash: $BASH_VERSION · date: $(date -v-1d +%Y 2>/dev/null || echo 'GNU') ---"
+  echo "test-checkup: ❌ $FAILS FAIL"; exit 1
+fi
