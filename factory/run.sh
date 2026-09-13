@@ -33,6 +33,17 @@ unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN 2>/dev/null || true
 # shellcheck source=factory/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+# Fail closed FIRST, before anything that can fail for a boring reason. A machine without the
+# engine installed (CI) must still answer "the guards are missing" with the guard exit code —
+# otherwise the only test that proves the factory refuses to run unguarded passes for the wrong
+# reason, or fails for one. Guard-before-binary is the order that keeps 126 meaning 126.
+# A hook command whose script is missing errors out, and a hook error does NOT block the tool
+# call — so without this check a moved guard would silently allow everything.
+[ -r "$FACTORY_GUARD" ] || { echo "[factory] FATAL: guard not found at $FACTORY_GUARD" >&2; exit 126; }
+# Same reasoning for the PATH shims: one layer missing is not a degraded run, it is an
+# unguarded one. Checked once here, before any task starts.
+factory_shims_ok || exit 126
+
 # locate the engine binary (launchd has a minimal PATH; the interactive alias is unavailable)
 ENGINE_BIN="$(factory_engine_bin)" || { echo "[factory] FATAL: $FACTORY_ENGINE binary not found" >&2; exit 127; }
 # shellcheck disable=SC2034  # read by factory/lib.sh (factory_engine_bin) and by old callers
@@ -56,12 +67,6 @@ fi
 # lock primitives are provided by factory/lib.sh — sourced above, before the binary
 # resolution that uses factory_engine_bin(). $CLAUDE/$TIMEOUT_BIN/$KB are set here; the
 # helpers late-bind them at call time regardless.
-# Fail closed: a hook command whose script is missing errors out, and a hook error does not
-# block the tool call — so without this check a moved guard would silently allow everything.
-[ -r "$FACTORY_GUARD" ] || { echo "[factory] FATAL: guard not found at $FACTORY_GUARD" >&2; exit 126; }
-# Same reasoning for the PATH shims: one layer missing is not a degraded run, it is an
-# unguarded one. Checked once here, before any task starts.
-factory_shims_ok || exit 126
 prompt_of() { awk 'BEGIN{f=0} /^---$/{f++; next} f>=2{print}' "$1"; }  # body after 2nd ---
 
 run_task() {
