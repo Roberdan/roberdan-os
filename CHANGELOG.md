@@ -3,6 +3,18 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.47.0 — 2026-09-13
+
+### Added
+
+- Optional `instagram-reel-preview` skill: local, video-based Reel covers and
+  Instagram-style post frames, with white outer spacing, readable headlines,
+  source protection and an explicit output language.
+- Approved Fightthestroke logo and `fightthestroke` publisher defaults, with
+  provenance and logo integrity checks; subjects remain distinct from the publisher.
+- Separate optional skill catalog and selective packaging/installation, excluded
+  from global synchronization. Includes renderer and installer regression tests.
+
 ## 2.46.1 — 2026-09-13
 
 ### Fixed

@@ -56,6 +56,10 @@ Prefer to explore first? Read [`AGENTS.md`](AGENTS.md) and run
 For the task CLI, optional Claude hooks, and other clients, see
 [additional setup](#additional-platform-setup) and the [operator guide](docs/USAGE.md).
 
+**Optional skills** live in a [separate catalog](skills/optional/README.md), outside the
+global installer. Run `python3 bin/optional-skills.py list` to discover them, including
+`instagram-reel-preview` for local Reel covers and Instagram-style post frames.
+
 ## What this actually is
 
 Concretely: **Markdown instructions, Bash/Python tooling, and a native Copilot extension.
