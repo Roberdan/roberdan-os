@@ -101,7 +101,7 @@ it advertises. Stated plainly so you can trust the rest.
   tools (`roberdanos_kanban/pause/resume/verify-done/doctor`). Its completion gate is **advisory**
   (Copilot can't block an already-produced final response — see limitations).
 - **factory** — bounded headless `claude -p` runs (timeout, model clamp, OAuth billing). Bounded,
-  **not OS-sandboxed** (auto mode with `--permission-prompts none`, scoped to one dir).
+  **not OS-sandboxed** (auto mode with `--permission-prompts none` plus the fixed deny list in `hooks/factory-guard.sh`, scoped to one dir).
 - **eval harness** — a real with/without-canon A/B + blind-judge pipeline. CI-gated. (See the
   caveat on its *results* below.)
 - **Self-improving meta-loop** (`learn/` → `ontology/`) — as of v2.10.0 it actually promotes:

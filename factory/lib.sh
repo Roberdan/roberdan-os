@@ -35,6 +35,15 @@ resolve_model() {
   esac
 }
 
+# --- deterministic guard for headless runs ------------------------------------
+# Auto mode's classifier decides case by case (same `git commit --amend`, denied 2 times and
+# allowed 5 on 2026-09-12). hooks/factory-guard.sh is the fixed list that always says no to
+# push, history rewrite and forced deletion; it is wired ONLY into factory runs, via --settings,
+# so interactive sessions are untouched. Resolved from this file, never from env: a variable
+# that could point elsewhere would be a switch to turn the guard off.
+FACTORY_GUARD="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/factory-guard.sh"
+FACTORY_SETTINGS="$(printf '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"bash \\"%s\\"","timeout":10}]}]}}' "$FACTORY_GUARD")"
+
 # --- card result annotation ---------------------------------------------------
 # If a task names its originating kanban card (`card: <id>` in frontmatter), append the
 # factory result to that card so kanban/doing/ and factory queue/->done/|failed/ don't
@@ -141,10 +150,10 @@ verifica non avvenuta e la card resta aperta."
   elif [ -n "$TIMEOUT_BIN" ]; then
     # Verify pass is QA, not authorship — always sonnet, never scaled to opus and never
     # influenced by RDA_FACTORY_MODEL/per-task model: (those govern the authoring pass only).
-    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$vprompt" --model sonnet --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$vlog" 2>&1
+    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$vprompt" --model sonnet --permission-mode auto --permission-prompts none --settings "$FACTORY_SETTINGS" --add-dir "$dir" ) > "$vlog" 2>&1
     vrc=$?
   else
-    ( cd "$dir" && "$CLAUDE" -p "$vprompt" --model sonnet --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$vlog" 2>&1
+    ( cd "$dir" && "$CLAUDE" -p "$vprompt" --model sonnet --permission-mode auto --permission-prompts none --settings "$FACTORY_SETTINGS" --add-dir "$dir" ) > "$vlog" 2>&1
     vrc=$?
   fi
   set -e

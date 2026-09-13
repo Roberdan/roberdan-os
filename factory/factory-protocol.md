@@ -117,9 +117,15 @@ hangs and never gets a blanket yes. **Which** commands get denied is the auto-mo
 judgment, not a fixed list: it weighs the task text and context, and it can change between releases.
 Measured 2026-09-12: `git commit --amend` on a throwaway local repo was denied in 2 runs (v2.1.269, similar
 prompts) and allowed in 5 (launchd and foreground, v2.1.269 and v2.1.270, one identical prompt). The only deterministic blocks are
-the hooks — `hooks/bash-guard.sh` refuses `git push --force` / `--no-verify` every time. Not a
-sandbox, and not a denylist: a task that *explicitly* asks for a risky action can still get it
-approved. Queue only tasks you would approve by hand.
+the hooks. So every factory run also loads **`hooks/factory-guard.sh`** through `--settings` (both
+the task run and the @thor verify run): a fixed list that denies, every time, `git push`, history
+rewrites (`commit --amend`, `rebase`, `reset --hard`, `filter-branch`, ref/reflog/stash deletion),
+`git clean -f`, `branch -D`, `--no-verify`, `rm -rf` in any flag order, `find -delete` and `gh`
+write actions (PR create/merge, releases, repo edits, `gh api` writes). It reads the raw command,
+quotes included, so `bash -c "git push"` is caught too. `factory/run.sh` refuses to start if the
+guard file is missing, because a hook whose script is gone errors out and lets the command through.
+Interactive sessions never load it. Still not a sandbox: a script written to a file and then run,
+or a python/node subprocess, bypasses any text match. Queue only tasks you would approve by hand.
 
 ## Guardrails (autonomous ≠ reckless)
 

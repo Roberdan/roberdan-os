@@ -491,7 +491,7 @@ CAPARGV1="$TMP/argv-default.txt"
 env -i PATH="$FACM1/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM1" RDA_HANDOFF=/dev/null CAPTURE_ARGV="$CAPARGV1" \
   bash factory/run.sh >/dev/null 2>&1
-if [ -f "$CAPARGV1" ] && grep -A1 -x -- '--model' "$CAPARGV1" | grep -qx 'sonnet' && grep -A1 -x -- '--permission-mode' "$CAPARGV1" | grep -qx 'auto' && grep -A1 -x -- '--permission-prompts' "$CAPARGV1" | grep -qx 'none' && ! grep -q -- '--dangerously-skip-permissions' "$CAPARGV1" factory/*.sh; then
+if [ -f "$CAPARGV1" ] && grep -A1 -x -- '--model' "$CAPARGV1" | grep -qx 'sonnet' && grep -A1 -x -- '--permission-mode' "$CAPARGV1" | grep -qx 'auto' && grep -A1 -x -- '--permission-prompts' "$CAPARGV1" | grep -qx 'none' && grep -A1 -x -- '--settings' "$CAPARGV1" | grep -q 'hooks/factory-guard.sh' && ! grep -q -- '--dangerously-skip-permissions' "$CAPARGV1" factory/*.sh; then
   ok "task without model: gets --model sonnet, auto mode, --permission-prompts none (never skip-permissions)"
 else
   err "task without model: did not get --model sonnet + --permission-mode auto + --permission-prompts none, or skip-permissions is back (argv: $(cat "$CAPARGV1" 2>/dev/null | tr '\n' ' '))"
@@ -567,7 +567,7 @@ CAPVERIFYARGV="$TMP/argv-verify.txt"
 env -i PATH="$FACM4/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM4" RDA_KANBAN="$KBM4" RDA_HANDOFF=/dev/null CAPTURE_VERIFY_ARGV="$CAPVERIFYARGV" \
   bash factory/run.sh >/dev/null 2>&1
-if [ -f "$CAPVERIFYARGV" ] && grep -A1 -x -- '--model' "$CAPVERIFYARGV" | grep -qx 'sonnet' && grep -A1 -x -- '--permission-mode' "$CAPVERIFYARGV" | grep -qx 'auto' && grep -A1 -x -- '--permission-prompts' "$CAPVERIFYARGV" | grep -qx 'none' && ! grep -q -- '--dangerously-skip-permissions' "$CAPVERIFYARGV" factory/*.sh; then
+if [ -f "$CAPVERIFYARGV" ] && grep -A1 -x -- '--model' "$CAPVERIFYARGV" | grep -qx 'sonnet' && grep -A1 -x -- '--permission-mode' "$CAPVERIFYARGV" | grep -qx 'auto' && grep -A1 -x -- '--permission-prompts' "$CAPVERIFYARGV" | grep -qx 'none' && grep -A1 -x -- '--settings' "$CAPVERIFYARGV" | grep -q 'hooks/factory-guard.sh' && ! grep -q -- '--dangerously-skip-permissions' "$CAPVERIFYARGV" factory/*.sh; then
   ok "thor-verify pass always uses --model sonnet, even when the task itself used model: opus — in auto mode with --permission-prompts none"
 else
   err "thor-verify pass did not use --model sonnet + --permission-mode auto + --permission-prompts none (argv: $(cat "$CAPVERIFYARGV" 2>/dev/null | tr '\n' ' '))"

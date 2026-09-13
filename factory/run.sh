@@ -52,6 +52,9 @@ fi
 # helpers late-bind them at call time regardless.
 # shellcheck source=factory/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# Fail closed: a hook command whose script is missing errors out, and a hook error does not
+# block the tool call — so without this check a moved guard would silently allow everything.
+[ -r "$FACTORY_GUARD" ] || { echo "[factory] FATAL: guard not found at $FACTORY_GUARD" >&2; exit 126; }
 prompt_of() { awk 'BEGIN{f=0} /^---$/{f++; next} f>=2{print}' "$1"; }  # body after 2nd ---
 
 run_task() {
@@ -85,10 +88,10 @@ run_task() {
     { echo "[factory] FATAL: dir '$dir' does not exist"; } >> "$log"
     rc=2
   elif [ -n "$TIMEOUT_BIN" ]; then
-    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$full" --model "$model" --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$log" 2>&1
+    ( cd "$dir" && "$TIMEOUT_BIN" "$tmo" "$CLAUDE" -p "$full" --model "$model" --permission-mode auto --permission-prompts none --settings "$FACTORY_SETTINGS" --add-dir "$dir" ) > "$log" 2>&1
     rc=$?
   else
-    ( cd "$dir" && "$CLAUDE" -p "$full" --model "$model" --permission-mode auto --permission-prompts none --add-dir "$dir" ) > "$log" 2>&1
+    ( cd "$dir" && "$CLAUDE" -p "$full" --model "$model" --permission-mode auto --permission-prompts none --settings "$FACTORY_SETTINGS" --add-dir "$dir" ) > "$log" 2>&1
     rc=$?
   fi
   set -e
