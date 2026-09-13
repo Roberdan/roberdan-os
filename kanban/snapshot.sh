@@ -151,8 +151,17 @@ fi
 if [ -f "$REPO_PATH/bus/bus.sh" ]; then
   # `bus count` non stampa niente quando non c'e' niente: un campo vuoto qui diventerebbe "-",
   # cioe' "non lo so", che e' una cosa diversa da "zero". Silenzio con esito buono = zero.
-  _b="$(bash "$REPO_PATH/bus/bus.sh" count --repo "$REPO" 2>/dev/null | tr -dc '0-9')"
-  p bus "${_b:-0}"
+  if _b="$(bash "$REPO_PATH/bus/bus.sh" count --repo "$REPO")" && \
+     _b="$(printf '%s\n' "$_b" | awk -F'\t' '
+       NF == 0 {next}
+       NF != 3 || $3 !~ /^[0-9]+$/ {bad=1; next}
+       {total += $3}
+       END {if (bad) exit 1; print total+0}')"; then
+    p bus "$_b"
+  else
+    echo "snapshot: bus count failed or returned an invalid format" >&2
+    p bus "-"
+  fi
 else
   p bus "-"
 fi

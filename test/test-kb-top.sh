@@ -47,6 +47,22 @@ v() { awk -F'\t' -v k="$1" '$1==k{print $2; exit}' "$SNAP"; }
 [ "$(v branch)" = "card/x" ] && ok "il ramo e' quello della copia in cui stai" || fail "ramo: $(v branch)"
 
 echo "== il disegno non paga mai un comando lento =="
+mkdir -p "$REPO/bus"
+cat > "$REPO/bus/bus.sh" <<'SH'
+printf '260913-150759\tarchitect\t3\n260913-150759\tqa-gate\t3\n260913-150759\tsecurity\t3\n260913-150759\tsol-gate\t3\n'
+SH
+(cd "$WT" && RDA_KANBAN="$REPO/kanban" bash "$ROOT/kanban/snapshot.sh" "$SNAP" >/dev/null 2>&1)
+[ "$(v bus)" = "12" ] && ok "somma 12 consegne non lette, senza includere i numeri delle card" \
+  || fail "conteggio bus corrotto: $(v bus)"
+printf 'exit 0\n' > "$REPO/bus/bus.sh"
+(cd "$WT" && RDA_KANBAN="$REPO/kanban" bash "$ROOT/kanban/snapshot.sh" "$SNAP" >/dev/null 2>&1)
+[ "$(v bus)" = "0" ] && ok "bus vuoto con successo significa zero" || fail "bus vuoto: $(v bus)"
+printf 'printf "invalid output\\n"\n' > "$REPO/bus/bus.sh"
+(cd "$WT" && RDA_KANBAN="$REPO/kanban" bash "$ROOT/kanban/snapshot.sh" "$SNAP" >/dev/null 2>&1)
+[ "$(v bus)" = "-" ] && ok "formato bus inatteso non inventa zero" || fail "formato bus inatteso: $(v bus)"
+printf 'exit 1\n' > "$REPO/bus/bus.sh"
+(cd "$WT" && RDA_KANBAN="$REPO/kanban" bash "$ROOT/kanban/snapshot.sh" "$SNAP" >/dev/null 2>&1)
+[ "$(v bus)" = "-" ] && ok "bus fallito resta sconosciuto, non zero" || fail "bus fallito: $(v bus)"
 # Sul codice, non a cronometro. `git rev-parse` una volta sola all'avvio e' ammesso: serve a
 # sapere di quale progetto e' la fotografia, costa millisecondi e non e' nel ciclo.
 ciclo="$(sed -n '/^while :; do/,/^done/p' "$ROOT/kanban/top.sh")"
@@ -87,7 +103,10 @@ for l in sys.stdin:
     l=l.rstrip(chr(10))
     if len(l)>24: print("   >>", len(l), repr(l))'; fi
 grep -q 'tput cols' "$ROOT/kanban/top.sh" && ok "la larghezza la chiede al terminale, non e' un numero fisso" || fail "la larghezza e' ancora fissa"
-grep -q "trap 'term_size' WINCH" "$ROOT/kanban/top.sh" && ok "e la ri-legge quando ridimensioni il riquadro" || fail "non si accorge del ridimensionamento"
+# Il trap non misura piu' il terminale direttamente (farlo dentro un segnale che interrompe
+# una `read -t` mandava in stallo la lettura su Linux, vedi commento in top.sh): si limita
+# a segnare che e' arrivato un ridimensionamento, e il ciclo principale lo applica.
+grep -q "trap 'RESIZED=1' WINCH" "$ROOT/kanban/top.sh" && ok "e la ri-legge quando ridimensioni il riquadro" || fail "non si accorge del ridimensionamento"
 
 echo "== il ridisegno sta fermo: niente sfarfallio, niente scorrimento =="
 # Pulire tutto lo schermo a ogni giro fa sfarfallare, e un disegno alto una riga piu' del
@@ -136,6 +155,7 @@ else
   ok "non stampa mai un prezzo che nessuno sa convertire"
 fi
 
+python3 "$ROOT/test/test-kb-top-pty.py" || fail "terminale interattivo: resize, ridisegno, uscita"
 echo ""
 if [ "$FAILS" -eq 0 ]; then echo "test-kb-top: ✅ ALL GREEN"; else
   echo "--- disegno prodotto (per capire il rosso senza un altro giro) ---"; printf '%s\n' "$d2"

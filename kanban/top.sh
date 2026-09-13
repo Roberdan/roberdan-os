@@ -25,16 +25,41 @@ RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 # La misura del riquadro, ri-letta a ogni ridimensionamento (segnale WINCH). Fuori da un
 # terminale (prove, script) non c'e' niente da misurare: 34 colonne, il valore storico.
 W=34; H=40
+# Se fd 0 e' un terminale si decide UNA SOLA VOLTA qui, prima di entrare nel ciclo: chiesto
+# di nuovo dentro un trap WINCH mentre il ciclo e' fermo su `read -t`, lo stesso controllo
+# (`[ -t 0 ]`, e persino `stty size` sul descrittore 0) puo' rispondere onestamente "non e'
+# un terminale" anche quando lo e' davvero — misurato, stesso processo, stesso terminale,
+# esito diverso a seconda del momento in cui arriva il segnale. La domanda "e' interattivo?"
+# non cambia mai durante la vita dello script: chiesta una volta sola, fuori da quella
+# finestra instabile, la risposta e' quella giusta per tutta la sessione.
+IS_TTY=0; [ -t 0 ] && IS_TTY=1
 term_size() {
-  local c r
-  c="$(tput cols 2>/dev/null || echo 0)"; r="$(tput lines 2>/dev/null || echo 0)"
+  local c r out
+  if [ "$IS_TTY" = 1 ]; then
+    # macOS tput perde la misura con stdout catturato e stderr rediretto; `/dev/tty` e' il
+    # terminale di controllo del processo, stabile anche quando il ciclo principale la
+    # richiede di nuovo dopo un ridimensionamento.
+    out="$(stty size </dev/tty 2>/dev/null)"
+    if [ -n "$out" ]; then read -r r c <<<"$out"; else c=0; r=0; fi
+  else
+    c="$(tput cols 2>/dev/null || echo 0)"; r="$(tput lines 2>/dev/null || echo 0)"
+  fi
   [ "${c:-0}" -gt 0 ] 2>/dev/null || c=35
   [ "${r:-0}" -gt 0 ] 2>/dev/null || r=41
   W="${RDA_TOP_WIDTH:-$((c-1))}"; [ "$W" -lt 20 ] && W=20
   H="${RDA_TOP_HEIGHT:-$r}"
 }
 term_size
-trap 'term_size' WINCH
+# Il trap NON misura nulla: su Linux, aprire il terminale (`stty size </dev/tty`) proprio
+# mentre interrompe una `read -t` bloccata sullo stesso descrittore — dentro un ciclo che
+# ha appena letto da un heredoc — manda in stallo per sempre quella `read`, misurato con un
+# caso minimo isolato (stesso script, stesso segnale, la sola differenza e' il tocco al
+# terminale dentro il trap). Il trap si limita a segnare "e' arrivato un ridimensionamento";
+# la misura vera la richiede il ciclo principale, fuori da quella finestra instabile — al
+# massimo attesa fino al prossimo giro (la `read -t` interrotta dal segnale comunque ritorna
+# subito, quindi in pratica e' immediata).
+RESIZED=0
+trap 'RESIZED=1' WINCH
 EVERY="${RDA_TOP_REFRESH:-15}"     # ogni quanti secondi si rinfresca la fotografia
 ONCE=0; [ -t 1 ] || ONCE=1
 case "${1:-}" in --once) ONCE=1 ;; esac
@@ -62,7 +87,7 @@ hdr()  { local l="$1" r="${2:-}"; printf "${B}%s${R}${D}%*s${R}\n" "$l" $((W-${#
 # Due modi di accorciare, perche' sono due cose diverse.
 # `fit` e' per le stringhe che una macchina ha prodotto (un comando, un percorso): mandarle a
 # capo non le rende piu' leggibili, quindi si tagliano e si dice che sono tagliate con "…".
-fit() { local t="$1" m=$((W-4)); [ "$m" -lt 8 ] && m=8
+fit() { local t="$1" m="${2:-$((W-4))}"; [ "$m" -lt 8 ] && m=8
         if [ "${#t}" -le "$m" ]; then printf '%s' "$t"; else printf '%s…' "${t:0:$((m-1))}"; fi; }
 # `wrap` e' per le frasi scritte da una persona: si va a capo SULLE PAROLE. Tagliare una parola
 # a meta' — "salva archivio card sul repo p" — non e' una riga corta, e' una riga sbagliata, ed
@@ -124,7 +149,7 @@ draw() {
   else
     printf "${B}${C}%s${R}\n" "$(fit "$REPO")"; printf "  ${D}%s${R}\n" "$(fit "$branch")"
   fi
-  [ "$here" != "$REPO" ] && printf "  ${D}sei in: %s${R}\n" "$(fit "$here")"
+  [ "$here" != "$REPO" ] && printf "  ${D}sei in: %s${R}\n" "$(fit "$here" "$((W-10))")"
   line
 
   # --- LAVORO ---------------------------------------------------------------------------
@@ -212,7 +237,7 @@ draw() {
     line
   fi
 
-  printf "${D}"; wrap "  " "$(v bus) messaggi fra agenti"
+  printf "${D}"; wrap "  " "$(v bus) letture in attesa fra agenti"
   wrap "  " "$(v richieste_oggi) richieste oggi · $(v unita_oggi) unita"; printf "${R}"
   if [ "$age" -gt $((EVERY*4)) ]; then
     printf "${Y}"; wrap "  " "foto di $(dur "$age") fa"; printf "${R}"
@@ -233,6 +258,7 @@ printf '\033[?25l\033[2J'
 # (\033[K), e alla fine si pulisce quel che resta sotto (\033[J). E non si scrive mai
 # sull'ultima riga del riquadro: e' scrivere li' che fa scorrere un terminale.
 while :; do
+  [ "$RESIZED" = 1 ] && { RESIZED=0; term_size; }
   refresh_if_stale
   out="$(draw)"
   printf '\033[H'
