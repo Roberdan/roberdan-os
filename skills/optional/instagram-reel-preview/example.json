@@ -1,0 +1,15 @@
+{
+  "style": "reel-cover",
+  "video": "/path/to/source.mp4",
+  "timestamp": 12.5,
+  "title_lines": ["A SMALL CHANGE.", "WHAT HAPPENS NEXT?"],
+  "subtitle": "Replace with a detail supported by the transcript.",
+  "display_name": "Supplied display name",
+  "locale": "en",
+  "cta": "WATCH THE VIDEO",
+  "reels_label": "REELS",
+  "font": "/path/to/headline-font.ttf",
+  "sans_font": "/path/to/body-font.ttf",
+  "output_dir": "/path/to/user/output",
+  "output_name": "preview-example.jpg"
+}

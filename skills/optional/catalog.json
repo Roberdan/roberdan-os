@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "skills": {
+    "instagram-reel-preview": {
+      "description": "Local Reel covers and Instagram-inspired post framing; no uploads.",
+      "files": [
+        "SKILL.md",
+        "render.py",
+        "graphics.py",
+        "storage.py",
+        "requirements.txt",
+        "example.json"
+      ]
+    }
+  }
+}
