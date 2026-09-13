@@ -64,6 +64,42 @@ case "$d" in *AGENTI*) ok "mostra gli agenti" ;; *) fail "manca la sezione degli
 case "$d" in *GIT*) ok "mostra lo stato di git" ;; *) fail "manca lo stato di git" ;; esac
 case "$d" in *"una card viva"*) ok "scrive il titolo della card, non il suo codice" ;; *) fail "non scrive il titolo della card" ;; esac
 
+echo "== l'impaginazione sta dentro il riquadro e non spezza le parole =="
+# Il primo difetto visto a occhio: larghezza fissa a 34 dentro un riquadro piu' largo, con le
+# parole tagliate a meta' ("...sul repo p") e meta' schermo vuoto. Qui si misura in CARATTERI,
+# non in byte: un accento o un pallino occupano piu' byte di quanto occupino di schermo, e una
+# prova che conta i byte griderebbe al rosso su un disegno perfetto.
+printf 'aperto|una richiesta scritta per bene con parole lunghe da mandare a capo\n' > "$RDA_HOME/ask-demo.txt"
+(cd "$WT" && RDA_KANBAN="$REPO/kanban" bash "$ROOT/kanban/snapshot.sh" "$SNAP" >/dev/null 2>&1)
+d40="$(cd "$WT" && RDA_TOP_SNAP="$SNAP" RDA_TOP_WIDTH=40 timeout 20 bash "$ROOT/kanban/top.sh" --once 2>&1)"
+# `awk` qui conta BYTE, e un trattino lungo o un pallino ne occupano tre: misurerebbe 120 su
+# una riga larga 40 e griderebbe al rosso su un disegno perfetto. I caratteri li conta python3.
+maxlen() { python3 -c 'import sys;print(max((len(l.rstrip(chr(10))) for l in sys.stdin),default=0))'; }
+lunga="$(printf '%s\n' "$d40" | maxlen)"; [ "$lunga" -le 40 ] && lunga=""
+[ -z "$lunga" ] && ok "nessuna riga esce dal riquadro a 40 colonne" || fail "una riga e' lunga $lunga caratteri su 40"
+case "$d40" in *"parole lunghe da mandare a"*) ok "la frase lunga va a capo sulle parole, non tagliata a meta'" ;;
+  *) fail "la frase lunga non e' andata a capo" ;; esac
+d24="$(cd "$WT" && RDA_TOP_SNAP="$SNAP" RDA_TOP_WIDTH=24 timeout 20 bash "$ROOT/kanban/top.sh" --once 2>&1)"
+l24="$(printf '%s\n' "$d24" | maxlen)"; [ "$l24" -le 24 ] && l24=""
+if [ -z "$l24" ]; then ok "e nemmeno a 24 colonne, che e' il caso stretto vero"
+else fail "a 24 colonne una riga e' lunga $l24"; printf '%s\n' "$d24" | python3 -c 'import sys
+for l in sys.stdin:
+    l=l.rstrip(chr(10))
+    if len(l)>24: print("   >>", len(l), repr(l))'; fi
+grep -q 'tput cols' "$ROOT/kanban/top.sh" && ok "la larghezza la chiede al terminale, non e' un numero fisso" || fail "la larghezza e' ancora fissa"
+grep -q "trap 'term_size' WINCH" "$ROOT/kanban/top.sh" && ok "e la ri-legge quando ridimensioni il riquadro" || fail "non si accorge del ridimensionamento"
+
+echo "== il ridisegno sta fermo: niente sfarfallio, niente scorrimento =="
+# Pulire tutto lo schermo a ogni giro fa sfarfallare, e un disegno alto una riga piu' del
+# riquadro lo fa SCORRERE: e' quello che si vedeva. Si riscrive sul posto cancellando la coda
+# di ogni riga, e non si scrive mai sull'ultima riga — scrivere li' e' cio' che fa scorrere.
+case "$ciclo" in *'[2J'*) fail "il ciclo pulisce tutto lo schermo a ogni giro (sfarfallio)" ;;
+  *) ok "il ciclo non pulisce tutto lo schermo a ogni giro" ;; esac
+case "$ciclo" in *'[K'*) ok "riscrive sul posto cancellando solo la coda di ogni riga" ;;
+  *) fail "non cancella la coda delle righe: restano pezzi del disegno vecchio" ;; esac
+case "$ciclo" in *'-ge "$H"'*) ok "non scrive mai sull'ultima riga del riquadro" ;;
+  *) fail "puo' scrivere sull'ultima riga, e allora il terminale scorre" ;; esac
+
 echo "== senza elenco della richiesta, la sezione NON esiste =="
 # Un elenco inventato qui sarebbe il peggiore dei difetti: e' il posto dove Roberto va a
 # vedere se un pezzo e' stato dimenticato. Vuoto vuol dire vuoto.
