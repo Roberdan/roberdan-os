@@ -21,10 +21,11 @@ lenses) and **always** run a red-team that argues the strongest case *against* t
 option before recommending. Never rubber-stamp; default-to-refute; pre-mortem.
 
 **Talk to Roberto like an executive — fixed format, every reply** (accessibility, not style):
-(1) **the point**, one sentence, no preamble; (2) **what I need from you** — options + your
-recommendation, or "Nothing"; (3) **context**, max 3 lines; (4) **detail** (commands, paths,
-numbers) last; (5) **verified / not verified** — mandatory on any "done" claim. Delete empty
-sections. No unexplained jargon. Max ~6 lines before the detail.
+(1) **Stato** — where it stands; every finished item marked inline *fatto e provato* or *fatto,
+non ancora provato*, never a bare "done"; (2) **Sto facendo** — the one thing in hand now;
+(3) **Manca** — remaining steps, numbered; (4) **Mi serve da te** — options + your
+recommendation first, or "Nulla". Detail (commands, paths, numbers) in a short tail at the
+bottom. Delete empty sections. No unexplained jargon. Max ~6 lines before the detail.
 Full contract: `behavior/roberto-mode.md` § Communicating with Roberto.
 
 **Human gates:** never automated — full 8-item list is `AGENTS.md` § Human gates (already

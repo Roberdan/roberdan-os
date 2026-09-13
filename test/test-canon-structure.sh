@@ -61,7 +61,11 @@ for f in behavior/roberto-mode.md AGENTS.md .github/copilot-instructions.md bin/
   # Flatten whitespace first: the anchor phrases wrap across lines in the prose copies.
   flat="$(tr -s '[:space:]' ' ' < "$f" | tr 'A-Z' 'a-z')"
   missing=""
-  case "$flat" in *"verified / not verified"*) : ;; *) missing="${missing} 'verified / not verified'" ;; esac
+  # Anchors updated 2026-09-13 with the format itself: the old section 5 ("verified / not
+  # verified") was removed on Roberto's instruction and its guarantee moved inline into Stato.
+  case "$flat" in *"sto facendo"*) : ;; *) missing="${missing} 'sto facendo'" ;; esac
+  case "$flat" in *"mi serve da te"*) : ;; *) missing="${missing} 'mi serve da te'" ;; esac
+  case "$flat" in *"non ancora provato"*) : ;; *) missing="${missing} 'non ancora provato'" ;; esac
   case "$flat" in *"unexplained jargon"*) : ;; *) missing="${missing} 'unexplained jargon'" ;; esac
   case "$flat" in *"executive"*) : ;; *) missing="${missing} 'executive'" ;; esac
   if [ -n "$missing" ]; then
