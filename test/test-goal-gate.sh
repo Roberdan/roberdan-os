@@ -44,7 +44,12 @@ CARD
 _coda() { { echo "# CODA"; echo "# scattata"; for i in "$@"; do echo "$i"; done; } > "$KB/.coda-repo.md"; }
 
 # Lancia l'hook come lo lancerebbe Claude Code: JSON su stdin, dentro il repo.
-run() { (cd "$REPO" && printf '{"session_id":"%s","hook_event_name":"Stop"}' "${SID:-s1}" \
+# RDA_KANBAN/RDA_KANBAN_REGISTRY vanno azzerati esplicitamente: una sessione reale (agente o
+# umano) puo' averli gia' esportati per puntare alla board vera di roberdan-os, e senza questo
+# il repo di test qui sotto erediterebbe quella board invece della propria — falso rosso o falso
+# verde a seconda di cosa contiene la board vera al momento, non del codice sotto test.
+run() { (cd "$REPO" && export RDA_KANBAN="$KB" RDA_KANBAN_REGISTRY="$TMP/registry" \
+         && printf '{"session_id":"%s","hook_event_name":"Stop"}' "${SID:-s1}" \
          | bash "$HOOK" 2>"$TMP/err"); }
 
 printf '\n=== (a) blocca quando resta lavoro autorizzato ===\n'
@@ -131,7 +136,8 @@ created: 2026-08-02
 ---
 CARD
 }
-run2() { (cd "$REPO2" && printf '{"session_id":"%s","hook_event_name":"Stop"}' "${SID:-s1}" \
+run2() { (cd "$REPO2" && export RDA_KANBAN="$KB2" RDA_KANBAN_REGISTRY="$TMP/registry2" \
+          && printf '{"session_id":"%s","hook_event_name":"Stop"}' "${SID:-s1}" \
           | bash "$HOOK" 2>"$TMP/err2"); }
 
 rm -f "$KB"/todo/*.md; _card A1; _coda A1                 # repo A: una card, e non si muove
