@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
+# rdos-factory-shim (marker on line 2: other wrappers skip this file when resolving the real binary)
 # factory/shims/gh — see factory/shims/git for why this exists and what it does not cover.
 # rdos-gh-wrapper: this file searches PATH for the real gh; bin/gh-shim.sh skips it by this marker.
 # Refuses the GitHub write actions AGENTS.md reserves to Roberto: publishing (PRs, releases),
 # repository administration and any authenticated write through `gh api`.
 # Reads: `gh pr view`, `gh run list`, `gh api` GETs — a factory task must be able to look.
 set -euo pipefail
+# Any copy of these shims is skipped when resolving the real binary, and
+# RDA_SHIM_HOPS turns a wrapper loop into a loud error instead of a process that never ends
+# (2026-09-14: two copies of the git/gh shims exec'd each other for hours inside @thor runs).
+RDA_SHIM_HOPS=$(( ${RDA_SHIM_HOPS:-0} + 1 )); export RDA_SHIM_HOPS
+if [ "$RDA_SHIM_HOPS" -gt 20 ]; then
+  printf 'factory-shim: loop between command wrappers (%s hops) — check PATH: %s\n' "$RDA_SHIM_HOPS" "${PATH:-}" >&2
+  exit 125
+fi
 
 refuse() {
   printf 'factory-shim: %s refused.\n' "$1" >&2
@@ -65,6 +74,7 @@ for d in ${path_entries[@]+"${path_entries[@]}"}; do
   [ -n "$d" ] || d="."
   resolved="$(cd "$d" 2>/dev/null && pwd || echo "$d")"
   [ "$resolved" = "$self_dir" ] && continue
+  head -8 "$d/gh" 2>/dev/null | grep -q 'rdos-factory-shim' && continue   # another copy of a shim
   [ -f "$d/gh" ] && [ -x "$d/gh" ] && { real="$d/gh"; break; }
 done
 if [ -z "$real" ]; then

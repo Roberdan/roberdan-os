@@ -7,6 +7,11 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 
 ### Fixed
 
+- Nessun comando della fabbrica o di @thor puo' piu' girare all'infinito: gli shim `git`/`gh`/`rm`
+  saltano ogni copia di shim nel PATH (due copie si rilanciavano per ore) e dopo 20 salti escono
+  con un errore visibile.
+- @thor non rifa' piu' la suite gia' verde: `thor-verify.sh` controlla la CI del commit e, se e'
+  verde, lo dice a @thor e `test/validate.sh` dentro la verifica non riparte.
 - `gh` non si appende piu' nelle esecuzioni senza persona (fabbrica, @thor): `factory/shims/gh` e
   `bin/gh-shim.sh` si trovavano a vicenda nel PATH e si rilanciavano per sempre. Era la causa
   delle verifiche @thor che non riuscivano a leggere la CI e andavano in timeout.

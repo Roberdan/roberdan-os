@@ -18,6 +18,13 @@
 # its own result and prints exactly the line it printed before. The report a
 # human reads is unchanged and still deterministic; only the waiting is gone.
 # A suite that needs its output (not just its exit code) reads _suite_out.
+# Dentro @thor, con la CI gia' verde sullo stesso commit, la suite non riparte: 15 minuti per
+# ridire cio' che GitHub ha gia' detto (2026-09-14, due verifiche, una in timeout).
+if [ "${RDA_IN_THOR_VERIFY:-0}" = "1" ] && [ -n "${RDA_THOR_CI_GREEN:-}" ] \
+   && [ "$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" = "$RDA_THOR_CI_GREEN" ]; then
+  echo "validate: CI GitHub gia' verde su $RDA_THOR_CI_GREEN — dentro @thor non si rilancia, usa quella prova."
+  exit 0
+fi
 _PARDIR="$(mktemp -d "${TMPDIR:-/tmp}/rda-validate.XXXXXX")"
 trap 'rm -rf "$_PARDIR"' EXIT INT TERM
 

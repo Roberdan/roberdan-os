@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
+# rdos-factory-shim (marker on line 2: other wrappers skip this file when resolving the real binary)
 # factory/shims/rm — see factory/shims/git for why this exists and what it does not cover.
 # Refuses RECURSIVE + FORCED deletion only. Plain `rm file`, `rm -f file` and `rm -r dir`
 # still work: a factory task has to be able to clean up after itself. This is the same rule
 # hooks/factory-guard.sh already applies as text; the shim makes it hold whatever spelling
 # produced it.
 set -euo pipefail
+# Any copy of these shims is skipped when resolving the real binary, and
+# RDA_SHIM_HOPS turns a wrapper loop into a loud error instead of a process that never ends
+# (2026-09-14: two copies of the git/gh shims exec'd each other for hours inside @thor runs).
+RDA_SHIM_HOPS=$(( ${RDA_SHIM_HOPS:-0} + 1 )); export RDA_SHIM_HOPS
+if [ "$RDA_SHIM_HOPS" -gt 20 ]; then
+  printf 'factory-shim: loop between command wrappers (%s hops) — check PATH: %s\n' "$RDA_SHIM_HOPS" "${PATH:-}" >&2
+  exit 125
+fi
 
 recursive=0
 force=0
@@ -39,6 +48,7 @@ for d in ${path_entries[@]+"${path_entries[@]}"}; do
   [ -n "$d" ] || d="."
   resolved="$(cd "$d" 2>/dev/null && pwd || echo "$d")"
   [ "$resolved" = "$self_dir" ] && continue
+  head -8 "$d/rm" 2>/dev/null | grep -q 'rdos-factory-shim' && continue   # another copy of a shim
   [ -f "$d/rm" ] && [ -x "$d/rm" ] && { real="$d/rm"; break; }
 done
 [ -n "$real" ] || real=/bin/rm

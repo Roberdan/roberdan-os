@@ -133,6 +133,18 @@ fi
 # 2026-07-31 una verifica uscita in timeout (exit=124) e' arrivata a chi chiudeva come "@thor ha
 # verificato e dice NO". E' la stessa sostituzione che il resto di questo file rifiuta, solo
 # nell'altro verso: li' uno SKIP non deve diventare un PASS, qui non deve diventare un FAIL.
+# LA CI GIA' VERDE E' LA PROVA DEI TEST (2026-09-14). Due verifiche di @thor hanno rifatto per 15
+# minuti l'intera suite gia' verde su GitHub, e una e' finita in timeout. Il sistema controlla la
+# CI del commit una volta, qui; se e' verde lo dice a @thor e test/validate.sh non riparte.
+if [ -n "$dir" ] && [ -z "${RDA_THOR_CI_GREEN:-}" ]; then
+  _tv_sha="$(git -C "$dir" rev-parse HEAD 2>/dev/null || true)"
+  _tv_to="$(command -v gtimeout 2>/dev/null || command -v timeout 2>/dev/null || true)"
+  if [ -n "$_tv_sha" ] && command -v gh >/dev/null 2>&1; then
+    _tv_ci="$(cd "$dir" && ${_tv_to:+$_tv_to 30} gh run list --commit "$_tv_sha" --json status,conclusion \
+      -q 'if length>0 and all(.[]; .status=="completed" and .conclusion=="success") then "green" else "" end' 2>/dev/null || true)"
+    [ "$_tv_ci" = green ] && export RDA_THOR_CI_GREEN="$_tv_sha"
+  fi
+fi
 out="$(verify_card "$card" "$dir" "$tmo" "$vlog")"
 case "$out" in
   # "non e eseguibile ora" = credito finito, token scaduto, quota esaurita: il processo e' uscito

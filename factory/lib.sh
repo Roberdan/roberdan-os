@@ -145,6 +145,10 @@ NON RIFARE CIO' CHE E' GIA' PROVATO. Se la CI su GitHub del commit e' verde (gh 
 NON RINVIARE. Non aspettare job in background: il turno e la verifica finiscono insieme, e
 l ultima riga che scrivi e il verdetto."
 
+  [ -n "${RDA_THOR_CI_GREEN:-}" ] && vprompt="$vprompt
+
+CI GIA' VERDE: il sistema ha controllato che la CI GitHub sul commit $RDA_THOR_CI_GREEN e' completata
+con successo. E' la prova dei test: NON lanciare test/validate.sh (si rifiuta), cita la CI."
   # Verify pass is QA, not authorship — always the mid-class model, never scaled to opus and
   # never influenced by RDA_FACTORY_MODEL/per-task `model:` (those govern authorship only).
   # `|| vrc=$?` for the same `set -e` reason documented in run.sh.
