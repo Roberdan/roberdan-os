@@ -16,6 +16,12 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   fa piu' mollare l'agente dopo due turni. Il messaggio dice di aspettare la CI dentro il
   turno invece di chiuderlo.
 
+### Changed
+
+- Tetto di ripartenze automatiche per sessione portato da 12 a 40 (`RDA_GOAL_GATE_MAX`),
+  decisione di Roberto: 12 turni non coprono una notte. Vale per Claude Code e Copilot CLI
+  (che applica anche un suo tetto nativo sui blocchi consecutivi).
+
 ## 2.48.0 — 2026-09-13
 
 ### Added

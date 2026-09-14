@@ -357,7 +357,7 @@ looked at the board — the one place the work is written.*
 the queue not shrinking **and** no new commit or file change in the checkout or card worktrees
 (a human gate, something wedged, or waiting outside the turn — `kb block` it and say why; a long
 card that keeps changing files is progress, not a stall — revised 2026-09-14) ·
-`RDA_GOAL_GATE_MAX` restarts spent (default 12) · no authorized queue at all — Roberto's
+`RDA_GOAL_GATE_MAX` restarts spent (default 40, Roberto 2026-09-14; was 12; Copilot CLI also applies its own native cap on consecutive stop blocks) · no authorized queue at all — Roberto's
 `todo→doing` gate still holds · `RDA_NO_GOAL_GATE=1` or `~/.roberdan-os/goal-gate.off`.
 
 **Half of [`test/test-goal-gate.sh`](test/test-goal-gate.sh) asserts that it LETS GO**: a gate

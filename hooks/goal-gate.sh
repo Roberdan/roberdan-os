@@ -88,7 +88,7 @@ impronta="$(
   } | cksum 2>/dev/null | tr -cd '0-9'
 )"
 
-MAX_BLOCCHI="${RDA_GOAL_GATE_MAX:-12}"
+MAX_BLOCCHI="${RDA_GOAL_GATE_MAX:-40}"  # 12 fino al 2026-09-14: una notte finiva dopo 12 turni (decisione di Roberto)
 MAX_FERMI="${RDA_GOAL_GATE_STALL:-2}"
 
 # --- FRENO 1: nessun progresso. Il freno che conta davvero. ----------------------------------
