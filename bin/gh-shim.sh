@@ -23,6 +23,9 @@
 # INVARIATO. Uno shim su un comando che Roberto usa cento volte al giorno non puo' permettersi di
 # essere l'anello che si rompe: al massimo non aiuta, mai impedisce.
 set -u
+# Un ciclo fra wrapper diventa un errore visibile, non un processo che non finisce mai.
+RDA_SHIM_HOPS=$(( ${RDA_SHIM_HOPS:-0} + 1 )); export RDA_SHIM_HOPS
+[ "$RDA_SHIM_HOPS" -gt 20 ] && { echo "gh-shim: ciclo fra wrapper di gh ($RDA_SHIM_HOPS salti), controlla il PATH" >&2; exit 125; }
 
 # --- il gh VERO: il primo nel PATH che non sia questo file (mai ricorsione) ------------------
 _self="$0"
@@ -40,7 +43,7 @@ for _p in $PATH; do
   # salta gli altri wrapper che cercano a loro volta il gh nel PATH (factory/shims/gh): senza,
   # i due si rilanciano a vicenda con exec per sempre, stesso processo e nessun errore.
   # 2026-09-14: chiamate `gh` di @thor e della fabbrica appese da ore, verifiche in timeout.
-  head -5 "$_c" 2>/dev/null | grep -q 'rdos-gh-wrapper' && continue
+  head -8 "$_c" 2>/dev/null | grep -qE 'rdos-gh-wrapper|rdos-factory-shim' && continue
   [ -L "$_c" ] && [ "$(cd "$(dirname "$_c")" && cd "$(dirname "$(readlink "$_c")")" 2>/dev/null && pwd -P)/$(basename "$(readlink "$_c")")" = "$_self_real" ] && continue
   REAL="$_c"; break
 done

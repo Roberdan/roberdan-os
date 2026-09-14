@@ -187,7 +187,20 @@ tr '\n' ' ' < "$rotmp/argv" | grep -qE -- '--deny-tool write|--disallowedTools E
 out="$(RDA_TEST_SCRIVE=1 tv)"
 case "$out" in SKIP*modificato*) ok "agente che modifica un file e dice PASS -> SKIP, verdetto scartato" ;;
   *) err "@thor ha modificato la cartella e il suo verdetto e' passato lo stesso: '$out'" ;; esac
+# CI gia' verde: il sistema la controlla una volta e @thor non rifa' la suite (2026-09-14).
+printf '#!/usr/bin/env bash\necho green\n' > "$rotmp/bin/gh"; chmod +x "$rotmp/bin/gh"
+printf '#!/usr/bin/env bash\nprintf "%%s" "${RDA_THOR_CI_GREEN:-}" > "%s/ci"\nprintf "%%s\\n" "$@" > "%s/argv"\necho "VERDICT: PASS — ci"\n' "$rotmp" "$rotmp" > "$rotmp/bin/agente"
+out="$(PATH="$rotmp/bin:$PATH" tv)"
+[ "$(cat "$rotmp/ci" 2>/dev/null)" = "$(git -C "$rotmp/repo" rev-parse HEAD)" ] && grep -q "CI GIA' VERDE" "$rotmp/argv" \
+  && ok "CI verde sul commit -> @thor riceve lo sha e l'ordine di non rifare la suite" \
+  || err "la CI verde non arriva a @thor: rifara' la suite intera ($(cat "$rotmp/ci" 2>/dev/null))"
 rm -rf "$rotmp"
+# Si sourcea il motore del gate, non si lancia la suite: lanciarla per provare che non parte
+# appenderebbe proprio questo test se la guardia mancasse (successo scrivendolo, 2026-09-14).
+o="$(cd "$ROOT" && ROOT="$ROOT" RDA_IN_THOR_VERIFY=1 RDA_THOR_CI_GREEN="$(git -C "$ROOT" rev-parse HEAD)" \
+     bash -c '. "$ROOT/test/lib-suites.sh"; echo NON-FERMATO' 2>&1)"
+case "$o" in *"dentro @thor non si rilancia"*) ok "validate.sh dentro @thor con CI verde sullo stesso commit non riparte" ;;
+  *) err "validate.sh riparte dentro @thor nonostante la CI verde: '$o'" ;; esac
 
 printf '\n=== i due fallimenti si dicono DIVERSI (era lo stesso messaggio per tutti e due) ===\n'
 grep -q "SENZA scrivere un verdetto" "$LIB" \

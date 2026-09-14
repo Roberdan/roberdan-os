@@ -165,6 +165,26 @@ for b in git gh rm; do
     || err "factory/shims/$b is not executable — the shim would be skipped silently"
 done
 
+echo "=== two copies of the shims on PATH never exec each other (2026-09-14) ==="
+# The real case: @thor's PATH had the main checkout's shims, a test in a card worktree put its own
+# copy in front — git/gh exec'd each other for hours, same PID, no output.
+_to="$(command -v gtimeout 2>/dev/null || command -v timeout 2>/dev/null || true)"
+COPY="$TMP/shimcopy/factory/shims"; mkdir -p "$COPY"; cp "$SHIMS"/git "$SHIMS"/gh "$SHIMS"/rm "$COPY/"; chmod +x "$COPY"/*
+if [ -z "$_to" ]; then
+  echo "  skip: no timeout binary, a loop could not be bounded here"
+else
+  for b in git rm; do
+    arg="--version"; [ "$b" = rm ] && arg="-f $TMP/none"
+    ( cd "$REPO" && PATH="$SHIMS:$COPY:$PATH" "$_to" 10 bash -c "$b $arg" ) >/dev/null 2>&1; rc=$?
+    [ "$rc" -eq 0 ] && ok "$b through two shim copies resolves the real binary (no loop)" \
+      || err "$b through two shim copies did not finish (rc=$rc) — the wrappers exec each other"
+  done
+fi
+o="$(cd "$REPO" && RDA_SHIM_HOPS=20 PATH="$SHIMS:$PATH" bash -c 'git --version' 2>&1)"; rc=$?
+[ "$rc" -eq 125 ] && printf '%s' "$o" | grep -q 'loop between command wrappers' \
+  && ok "a wrapper loop ends with a loud error (exit 125), never a process that hangs" \
+  || err "the hop guard does not stop a loop (rc=$rc)"
+
 echo "=== fail closed: a missing shim stops the factory ==="
 FAKE="$TMP/fake"; mkdir -p "$FAKE/repo/factory/shims" "$FAKE/repo/hooks" "$FAKE/fac/queue" "$FAKE/bin"
 cp "$ROOT/factory/run.sh" "$ROOT/factory/lib.sh" "$ROOT/factory/engine.sh" "$FAKE/repo/factory/"

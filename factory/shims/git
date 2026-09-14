@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# rdos-factory-shim (marker on line 2: other wrappers skip this file when resolving the real binary)
 # factory/shims/git — a `git` that REFUSES what AGENTS.md reserves to Roberto, for
 # UNATTENDED factory runs only. run.sh and verify_card() put this directory first on the
 # PATH of the claude subprocess; interactive sessions never see it.
@@ -18,6 +19,14 @@
 # hooks/factory-guard.sh's half of the job — it matches path-qualified spellings as text.
 # Two partial layers, and they fail in opposite directions: neither alone is a sandbox.
 set -euo pipefail
+# Any copy of these shims is skipped when resolving the real binary, and
+# RDA_SHIM_HOPS turns a wrapper loop into a loud error instead of a process that never ends
+# (2026-09-14: two copies of the git/gh shims exec'd each other for hours inside @thor runs).
+RDA_SHIM_HOPS=$(( ${RDA_SHIM_HOPS:-0} + 1 )); export RDA_SHIM_HOPS
+if [ "$RDA_SHIM_HOPS" -gt 20 ]; then
+  printf 'factory-shim: loop between command wrappers (%s hops) — check PATH: %s\n' "$RDA_SHIM_HOPS" "${PATH:-}" >&2
+  exit 125
+fi
 
 refuse() {
   printf 'factory-shim: %s refused.\n' "$1" >&2
@@ -105,6 +114,7 @@ for d in ${path_entries[@]+"${path_entries[@]}"}; do
   [ -n "$d" ] || d="."
   resolved="$(cd "$d" 2>/dev/null && pwd || echo "$d")"
   [ "$resolved" = "$self_dir" ] && continue
+  head -8 "$d/git" 2>/dev/null | grep -q 'rdos-factory-shim' && continue   # another copy of a shim
   [ -f "$d/git" ] && [ -x "$d/git" ] && { real="$d/git"; break; }
 done
 if [ -z "$real" ]; then
