@@ -65,11 +65,30 @@ mkdir -p "$STATE_DIR" 2>/dev/null || exit_pass
 # card), e condividerebbero i contatori se la chiave fosse il nome.
 scope="$(printf '%s' "$repo_root" | cksum 2>/dev/null | tr -cd '0-9')"
 sf="$STATE_DIR/$(printf '%s' "$session" | tr -cd 'A-Za-z0-9._-').${scope:-norepo}"
-blocchi=0; prec=-1; fermi=0
-[ -f "$sf" ] && read -r blocchi prec fermi < "$sf" 2>/dev/null
-case "$blocchi$prec$fermi" in *[!0-9-]*|'') blocchi=0; prec=-1; fermi=0 ;; esac
+blocchi=0; prec=-1; fermi=0; impronta_prec=""
+[ -f "$sf" ] && read -r blocchi prec fermi impronta_prec < "$sf" 2>/dev/null
+case "$blocchi$prec$fermi" in *[!0-9-]*|'') blocchi=0; prec=-1; fermi=0; impronta_prec="" ;; esac
 
-MAX_BLOCCHI="${RDA_GOAL_GATE_MAX:-12}"
+# IMPRONTA DEL LAVORO (2026-09-14). Prima il progresso era SOLO "la coda si e' accorciata": una
+# card che richiede piu' di due turni — quasi tutte — faceva scattare il FRENO 1 a meta' lavoro,
+# e la notte finiva dopo la prima card lunga. Ora conta anche il lavoro visibile su disco: un
+# commit in qualunque copia del repo, o una modifica nel checkout o nelle copie delle card.
+# Resta fermo solo chi, fra due fermate, non ha cambiato niente: aspettare la CI o rileggere lo
+# stesso muro. Il tetto (FRENO 2) resta il limite di spesa per chi cambia file senza avanzare.
+impronta="$(
+  {
+    git -C "$repo_root" worktree list --porcelain 2>/dev/null | grep '^HEAD '
+    { printf '%s\n' "$repo_root"
+      git -C "$repo_root" worktree list --porcelain 2>/dev/null \
+        | awk '/^worktree /{p=substr($0,10)} /^branch refs\/heads\/card\//{print p}' | head -20
+    } | while read -r wt; do
+      git -C "$wt" status --porcelain 2>/dev/null
+      git -C "$wt" diff HEAD 2>/dev/null
+    done
+  } | cksum 2>/dev/null | tr -cd '0-9'
+)"
+
+MAX_BLOCCHI="${RDA_GOAL_GATE_MAX:-40}"  # 12 fino al 2026-09-14: una notte finiva dopo 12 turni (decisione di Roberto)
 MAX_FERMI="${RDA_GOAL_GATE_STALL:-2}"
 
 # --- FRENO 1: nessun progresso. Il freno che conta davvero. ----------------------------------
@@ -77,15 +96,15 @@ MAX_FERMI="${RDA_GOAL_GATE_STALL:-2}"
 # una decisione di Roberto (gate umano), o e' incastrato. In tutti e due i casi continuare a
 # rimandarlo dentro non produce lavoro, produce giri. E' la regola di loop-protocol: due
 # passaggi consecutivi senza progresso -> fermati e di' cosa e' incastrato.
-if [ "$prec" -ge 0 ] && [ "$restanti" -ge "$prec" ]; then
+if [ "$prec" -ge 0 ] && [ "$restanti" -ge "$prec" ] && [ "$impronta" = "$impronta_prec" ]; then
   fermi=$((fermi+1))
 else
   fermi=0
 fi
 
 if [ "$fermi" -ge "$MAX_FERMI" ]; then
-  printf '%s %s %s\n' "$blocchi" "$restanti" "0" > "$sf" 2>/dev/null
-  echo "⚠️  GOAL-GATE: mi fermo. $restanti card ancora aperte ma la coda non si accorcia da $fermi giri — o aspettano una tua decisione, o qualcosa e' incastrato. \`kb queue\` per vedere quali." >&2
+  printf '%s %s %s %s\n' "$blocchi" "$restanti" "0" "$impronta" > "$sf" 2>/dev/null
+  echo "⚠️  GOAL-GATE: mi fermo. $restanti card ancora aperte ma la coda non si accorcia da $fermi giri e nessun file e' cambiato — o aspettano una tua decisione, o qualcosa e' incastrato. \`kb queue\` per vedere quali." >&2
   exit_pass
 fi
 
@@ -96,7 +115,7 @@ if [ "$blocchi" -ge "$MAX_BLOCCHI" ]; then
 fi
 
 blocchi=$((blocchi+1))
-printf '%s %s %s\n' "$blocchi" "$restanti" "$fermi" > "$sf" 2>/dev/null
+printf '%s %s %s %s\n' "$blocchi" "$restanti" "$fermi" "$impronta" > "$sf" 2>/dev/null
 
 # exit 2 = il turno NON si chiude, e questo testo torna all'agente come istruzione.
 cat >&2 <<EOF
@@ -112,6 +131,9 @@ Non chiedergli il permesso: la coda E' il permesso, dato il 2026-07-30. Continua
 Fermati da solo, senza aspettare questo hook, solo per: uno degli 8 gate umani di AGENTS.md
 (spesa reale, pubblicazione esterna, decisione strategica, merge che tocca release/sicurezza),
 oppure una card che non puo' avanzare — in quel caso scrivi PERCHE' sulla card con \`kb block\`,
-cosi' il giro dopo la coda non si accorcia e questo cancello ti lascia uscire.
+cosi' quella card esce dal conto e questo cancello non ti ci rimanda.
+
+Se stai aspettando qualcosa di esterno (CI, una revisione), non chiudere il turno per aspettare:
+aspettalo dentro il turno (\`gh run watch\`, \`gh pr checks --watch\`) oppure passa alla card dopo.
 EOF
 exit 2

@@ -175,14 +175,20 @@ tool and this protocol are versioned.
 - **Every card carries a `repo:` (which repo/scope it's about — a `~/GitHub` dir-name, or
   `personal` for non-code work), a Definition of Done (`dod:`) + Acceptance criteria
   (`acceptance:`)** — a card can't start without all three filled. See `kanban/README.md`.
-- **Gate `todo → doing`: the LIST, not the card** (Roberto's decision, 2026-07-30). At session
-  start the hook photographs every `todo` card of the repo you are in (`kb queue`); an agent
-  walks that list to the end with `kb next`, **without asking**, and stops when it is done.
-  His words: *"completa tutte le card che ci sono quando comincia una sessione e poi fermati,
-  così io vedo solo se hai aggiunto altro."*
-  - **The one property that makes this a MOVED gate and not a REMOVED one:** a card created
-    **after** the snapshot is not in the list and does not start. So what an agent adds while
-    working stays for Roberto — asserted in `test/test-kb-queue.sh`, in both directions.
+- **Gate `todo → doing`: the LIST, not the card** (Roberto's decision, 2026-07-30). At the start
+  of every **new** session — Claude and Copilot alike — the hook photographs every non-blocked
+  `todo` card of the repo you are in (`kb queue --sessione <id>`); an agent walks that list to
+  the end with `kb next`, **without asking**, and stops when it is done. Compaction, resume and
+  fork keep the session's photo. His words: *"completa tutte le card che ci sono quando comincia
+  una sessione e poi fermati, così io vedo solo se hai aggiunto altro."*
+  - **The one property that makes this a MOVED gate and not a REMOVED one:** inside a session, a
+    card created **after** the snapshot is not in the list and does not start. At the next
+    session it enters, and the snapshot marks it `ENTRATA ORA` so Roberto reads what was added
+    (revised 2026-09-14, his "sistema": until then the photo was taken once and never renewed —
+    roberdan-os still held the 2026-07-30 one, all closed, so goal-gate never held anyone).
+    Asserted in `test/test-kb-queue.sh` and `test/test-context-inject-staleness.sh`.
+  - Blocked cards stay out of the photo and `kb next` skips them: re-listing them every session
+    only restarts the agent against the same wall.
   - `kb next` prints the cards born after the snapshot when the list runs out. If that report
     ever goes silent, the gate is gone: it is the only thing Roberto asked to see.
   - Revoke with `kb queue --stop` → back to per-card approval. Rule "one card in progress per
@@ -347,9 +353,11 @@ te" (14 h 36). Every pause ended because Roberto typed "vai". Nothing was blocke
 when the agent WRITES, and the other two `Stop` hooks both declare they never block. Neither ever
 looked at the board — the one place the work is written.*
 
-**Terminal conditions** (it lets go, and says which one fired): queue finished · queue not
-shrinking for 2 rounds (a human gate, or something wedged — `kb block` it and say why) ·
-`RDA_GOAL_GATE_MAX` restarts spent (default 12) · no authorized queue at all — Roberto's
+**Terminal conditions** (it lets go, and says which one fired): queue finished · 2 rounds with
+the queue not shrinking **and** no new commit or file change in the checkout or card worktrees
+(a human gate, something wedged, or waiting outside the turn — `kb block` it and say why; a long
+card that keeps changing files is progress, not a stall — revised 2026-09-14) ·
+`RDA_GOAL_GATE_MAX` restarts spent (default 40, Roberto 2026-09-14; was 12; Copilot CLI also applies its own native cap on consecutive stop blocks) · no authorized queue at all — Roberto's
 `todo→doing` gate still holds · `RDA_NO_GOAL_GATE=1` or `~/.roberdan-os/goal-gate.off`.
 
 **Half of [`test/test-goal-gate.sh`](test/test-goal-gate.sh) asserts that it LETS GO**: a gate

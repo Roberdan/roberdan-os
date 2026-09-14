@@ -172,6 +172,28 @@ RDA_GOAL_GATE_MAX=1 run2; t3=$?
   && ok "il tetto consumato in un repo non chiude la coda dell'altro" \
   || err "il tetto e' stato consumato in comune fra due repo (t3=$t3)"
 
+printf '\n=== una card lunga NON e'"'"' uno stallo: conta il lavoro su disco, non solo la coda ===\n'
+# IL DIFETTO (2026-09-14). Il progresso era solo "la coda si accorcia": una card che dura piu' di
+# due turni faceva mollare il cancello a meta' lavoro, e la notte finiva alla prima card lunga.
+git -C "$REPO" config user.email t@t; git -C "$REPO" config user.name t
+printf 'kanban/\n' > "$REPO/.gitignore"; git -C "$REPO" add .gitignore; git -C "$REPO" commit -qm base
+SID=sLUNGA
+rm -f "$KB"/todo/*.md "$KB"/done/*.md; _card L1; _coda L1
+run >/dev/null; l1=$?
+echo "passo 1" > "$REPO/lavoro.txt"                 # modifica non ancora salvata
+run >/dev/null; l2=$?
+git -C "$REPO" add lavoro.txt; git -C "$REPO" commit -qm passo1   # un commit
+run >/dev/null; l3=$?
+echo "passo 2" >> "$REPO/lavoro.txt"
+run >/dev/null; l4=$?
+[ "$l1" -eq 2 ] && [ "$l2" -eq 2 ] && [ "$l3" -eq 2 ] && [ "$l4" -eq 2 ] \
+  && ok "coda ferma ma file e commit che cambiano a ogni giro -> continua a bloccare (4 giri)" \
+  || err "una card lunga fa mollare il cancello a meta' lavoro (giri: $l1 $l2 $l3 $l4)"
+run >/dev/null; l5=$?
+run; l6=$?
+[ "$l6" -eq 0 ] && grep -q "non si accorcia da" "$TMP/err" \
+  && ok "poi niente cambia per due giri -> molla, e dice perche'" \
+  || err "senza cambiamenti il cancello non molla (giri: $l5 $l6)"
 
 out="$(cd "$TMP" && printf '{"session_id":"sH"}' | bash "$HOOK" 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] && [ -z "$out" ] && ok "fuori da un repo -> exit 0 e silenzio" \

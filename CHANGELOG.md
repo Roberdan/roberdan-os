@@ -3,6 +3,25 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.49.0 — 2026-09-14
+
+### Fixed
+
+- La coda autorizzata si rifotografa a ogni sessione nuova, su Claude e su Copilot
+  (`kb queue --sessione <id>`); compattazione e ripresa tengono la foto. Prima restava
+  quella del primo scatto per sempre (roberdan-os: 30 luglio, tutta chiusa) e il cancello
+  che trattiene l'agente non scattava mai. Lo scatto segna le card `ENTRATA ORA`.
+- Le card bloccate non rientrano nella foto e `kb next` le salta.
+- `goal-gate.sh` conta come progresso anche commit e modifiche ai file: una card lunga non
+  fa piu' mollare l'agente dopo due turni. Il messaggio dice di aspettare la CI dentro il
+  turno invece di chiuderlo.
+
+### Changed
+
+- Tetto di ripartenze automatiche per sessione portato da 12 a 40 (`RDA_GOAL_GATE_MAX`),
+  decisione di Roberto: 12 turni non coprono una notte. Vale per Claude Code e Copilot CLI
+  (che applica anche un suo tetto nativo sui blocchi consecutivi).
+
 ## 2.48.0 — 2026-09-13
 
 ### Added

@@ -119,7 +119,12 @@
 # (verde/rosso), la stessa forma di ogni altra suite qui sopra. Lo split di validate.sh resta
 # la strada giusta e resta rimandato: e' un refactor del gate condiviso, fuori dallo scope di
 # questa card, ed e' annotato in docs/findings.md perche' non si perda.
-1753 kanban/kb.sh
+# 2026-09-14, diciassettesima: +24 kb.sh (1753 -> 1777) per `kb queue --sessione <id>`. La coda
+# autorizzata si fotografava una volta sola: roberdan-os teneva quella del 30 luglio, tutta
+# chiusa, e goal-gate.sh non tratteneva mai nessuno — agenti fermi dopo la prima card mentre
+# Roberto dormiva. Righe: lettura dell'id, rinnovo per sessione nuova, card bloccate fuori e
+# saltate, segno ENTRATA ORA. Quattro mutazioni provate rosse in test-kb-queue.sh.
+1777 kanban/kb.sh
 1390 test/test-bus.sh
 1133 test/test-bus-mutants.sh
 774 bus/bus.sh
