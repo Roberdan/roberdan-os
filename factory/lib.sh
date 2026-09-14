@@ -78,13 +78,15 @@ thor_read_verdict() {
   local vlog="$1" v ev
   [ -f "$vlog" ] || return 0
   v="$(sed -E 's/\*+//g' "$vlog" 2>/dev/null \
-       | grep -oE 'VERDICT:[[:space:]]*(PASS|FAIL)([[:space:]]*[—-][[:space:]]*.*)?' \
+       | grep -oE 'VERDICT:[[:space:]]*(PASS|FAIL|SKIP)([[:space:]]*[—-][[:space:]]*.*)?' \
        | tail -1 || true)"
   [ -n "$v" ] || return 0
-  ev="$(printf '%s' "$v" | sed -E 's/^VERDICT:[[:space:]]*(PASS|FAIL)[[:space:]]*[—-]?[[:space:]]*//')"
+  ev="$(printf '%s' "$v" | sed -E 's/^VERDICT:[[:space:]]*(PASS|FAIL|SKIP)[[:space:]]*[—-]?[[:space:]]*//')"
+  # SKIP = "non ho potuto controllare": terza risposta, mai un NO e mai un SI' (agents/thor.md).
   case "$v" in
-    VERDICT:*PASS*) printf 'PASS\t%s' "$ev" ;;
-    VERDICT:*FAIL*) printf 'FAIL\t%s' "$ev" ;;
+    VERDICT:[[:space:]]*PASS*) printf 'PASS\t%s' "$ev" ;;
+    VERDICT:[[:space:]]*FAIL*) printf 'FAIL\t%s' "$ev" ;;
+    VERDICT:[[:space:]]*SKIP*) printf 'SKIP\t%s' "$ev" ;;
   esac
 }
 
@@ -111,6 +113,12 @@ thor_unavailable_reason() {
     "$vlog" 2>/dev/null | tail -1 || true
 }
 
+# Impronta di una cartella git: commit + file cambiati + contenuto delle modifiche.
+_verify_fingerprint() {
+  { git -C "$1" rev-parse HEAD 2>/dev/null; git -C "$1" status --porcelain 2>/dev/null
+    git -C "$1" diff HEAD 2>/dev/null; } | cksum 2>/dev/null | tr -cd '0-9' || true   # set -e/pipefail callers
+}
+
 verify_card() {
   local cid="$1" dir="$2" tmo="$3" vlog="$4" cf="" dod="" acc="" vprompt="" vrc=0 verdict="" _tv_unavail=""
   for c in todo doing "done"; do [ -e "$KB/$c/$cid.md" ] && cf="$KB/$c/$cid.md"; done
@@ -124,21 +132,37 @@ verify_card() {
 quality validator, zero tolerance for incomplete work, fresh context, evidence-only — no
 rubber-stamping. Given these acceptance criteria — Definition of Done: \"$dod\" / Acceptance:
 \"$acc\" — and this repo state, verify with concrete evidence (files, commits, test output)
-whether they are met. Output exactly \`VERDICT: PASS — <evidence>\` or \`VERDICT: FAIL —
-<reason>\` as the last line.
+whether they are met. The last line is exactly one of: \`VERDICT: PASS — <evidence>\`,
+\`VERDICT: FAIL — <criterion you SAW not met>\`, \`VERDICT: SKIP — <check you could not run, and why>\`.
 
-NON RINVIARE. Non aspettare job in background, notifiche o esiti che arriveranno dopo: il tuo
-turno e la tua verifica finiscono insieme. Se un controllo non lo puoi completare adesso, quello
-e un FAIL con scritto perche, non un motivo per non dare il verdetto. Qualunque cosa succeda,
-l ultima riga che scrivi e il verdetto: un turno che finisce senza verdetto viene letto come
-verifica non avvenuta e la card resta aperta."
+TRE RISPOSTE, NON DUE. FAIL solo se hai visto un criterio NON rispettato. Se un controllo non
+lo puoi eseguire (strumento assente, rete, credenziali, ambiente della macchina) e' SKIP con
+scritto cosa e perche: la card resta aperta senza un NO che nessuno ha pronunciato.
+SOLO LETTURA. Non modificare nessun file: un difetto lo descrivi nel verdetto, non lo ripari.
+Se la cartella cambia durante la verifica, il verdetto viene scartato.
+NON RIFARE CIO' CHE E' GIA' PROVATO. Se la CI su GitHub del commit e' verde (gh run list
+--commit <sha>), usala come prova; rilancia solo i test legati alla card.
+NON RINVIARE. Non aspettare job in background: il turno e la verifica finiscono insieme, e
+l ultima riga che scrivi e il verdetto."
 
   # Verify pass is QA, not authorship — always the mid-class model, never scaled to opus and
   # never influenced by RDA_FACTORY_MODEL/per-task `model:` (those govern authorship only).
   # `|| vrc=$?` for the same `set -e` reason documented in run.sh.
   vrc=0
+  # Solo lettura, in due strati: gli strumenti di scrittura negati al lancio (lo stesso
+  # launch_agent, con la lista estesa solo qui) e l'impronta della cartella prima/dopo, perche'
+  # la shell puo' scrivere lo stesso. 2026-09-14 un @thor ha riscritto un test della card.
+  local -a FACTORY_DENY_TOOLS=("${FACTORY_DENY_TOOLS[@]}" 'write')
+  local -a FACTORY_CLAUDE_DISALLOWED=(Edit Write NotebookEdit)
+  local impronta_prima impronta_dopo
+  impronta_prima="$(_verify_fingerprint "$dir")"
   launch_agent "$vprompt" "sonnet" "$dir" "$tmo" "$vlog" || vrc=$?
   { echo; echo "=== factory: thor-verify exit=$vrc at $(date) ==="; } >> "$vlog"
+  impronta_dopo="$(_verify_fingerprint "$dir")"
+  if [ "$impronta_prima" != "$impronta_dopo" ]; then
+    printf 'SKIP\t@thor ha modificato la cartella verificata (%s): verdetto scartato, controlla git status — see %s\n' "$dir" "$vlog"
+    return 0
+  fi
 
   verdict="$(thor_read_verdict "$vlog")"
   if [ "$vrc" -ne 0 ] || [ -z "$verdict" ]; then

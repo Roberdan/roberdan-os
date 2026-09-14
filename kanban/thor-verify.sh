@@ -40,7 +40,7 @@ card="${1:?id card richiesto}"
 # L'ordine e': la cartella che chi chiama ha dichiarato, se esiste davvero; altrimenti il
 # checkout del repo che LA CARD nomina; altrimenti si rifiuta. Mai $ROOT per deduzione.
 dir="${2:-}"
-tmo="${3:-1200}"   # 600s non bastava su una card grossa: misurato il 2026-07-31
+tmo="${3:-2400}"   # 600s non bastava (2026-07-31), 1200s nemmeno: 2026-09-14 exit=124 a 20 min, PASS a 29
 vlog="${4:-${TMPDIR:-/tmp}/thor-verify-$card-$$.log}"
 
 # Il boccone amaro: thor gira come un processo separato, sul motore della fabbrica. Se quel

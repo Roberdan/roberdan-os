@@ -3,6 +3,19 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.50.0 — 2026-09-14
+
+### Changed
+
+- @thor ha tre risposte: PASS, FAIL (criterio visto non rispettato) e SKIP (controllo che non si
+  puo' eseguire). Prima il prompt chiedeva un FAIL anche per un problema della macchina.
+- @thor e' solo lettura davvero: strumenti di scrittura negati al lancio e verdetto scartato se la
+  cartella verificata cambia. Usa la CI verde del commit invece di rilanciare tutta la suite.
+- Tempo massimo della verifica @thor da 20 a 40 minuti (misurato: timeout a 20, PASS a 29).
+- Canone, roberto-mode e skill twin: un gate umano ferma la card, non la sessione. Senza nessuno
+  a rispondere la domanda va sulla card (`kb block`) e si passa alla successiva. Gate 7 definito
+  sugli invarianti (sicurezza, rilascio, dati, gate), non sul numero di file.
+
 ## 2.49.0 — 2026-09-14
 
 ### Fixed

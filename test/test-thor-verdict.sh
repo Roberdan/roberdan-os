@@ -154,6 +154,41 @@ case "$tvout" in
 esac
 rm -rf "$tvtmp"
 
+printf '\n=== SKIP: "non ho potuto controllare" come terza risposta (2026-09-14) ===\n'
+# Il prompt diceva "un controllo che non puoi completare e' un FAIL", agents/thor.md il contrario.
+# Risultato misurato: un NO pronunciato per un problema della macchina, non del codice.
+r="$(leggi 'VERDICT: SKIP — gh non raggiungibile, CI non consultabile')"
+[ "$(esito "$r")" = SKIP ] && ok "SKIP letto come SKIP" || err "SKIP non letto: '$r'"
+r="$(leggi '**VERDICT: SKIP** — rete giu')"
+[ "$(esito "$r")" = SKIP ] && ok "SKIP in grassetto" || err "SKIP in grassetto: '$r'"
+r="$(leggi 'Avrei detto VERDICT: PASS ma non ho potuto eseguire i test.
+VERDICT: SKIP — i test non partono su questa macchina')"
+[ "$(esito "$r")" = SKIP ] && ok "un PASS citato nel ragionamento non vince su un SKIP finale" \
+                           || err "SKIP finale scavalcato: '$r'"
+grep -q "TRE RISPOSTE" "$LIB" && ! grep -q "quello e un FAIL con scritto perche" "$LIB" \
+  && ok "il prompt di @thor permette SKIP e non chiede piu' un FAIL per cio' che non si puo' controllare" \
+  || err "il prompt chiede ancora un FAIL quando un controllo non si puo' eseguire"
+
+printf '\n=== @thor solo lettura: se cambia la cartella il verdetto non vale ===\n'
+rotmp="$(mktemp -d)"
+mkdir -p "$rotmp/kb/doing" "$rotmp/bin"
+git -C "$rotmp" init -q repo && git -C "$rotmp/repo" config user.email t@t && git -C "$rotmp/repo" config user.name t
+echo x > "$rotmp/repo/f.txt"; git -C "$rotmp/repo" add f.txt; git -C "$rotmp/repo" commit -qm base
+printf -- '---\ntitle: prova\nrepo: nonesiste\ndod: "d"\nacceptance: "a"\n---\n' > "$rotmp/kb/doing/990101-000001.md"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$@" > "%s/argv"\n[ "${RDA_TEST_SCRIVE:-0}" = 1 ] && echo cambiato >> f.txt\necho "VERDICT: PASS — tutto bene"\n' "$rotmp" > "$rotmp/bin/agente"
+chmod +x "$rotmp/bin/agente"
+tv() { CLAUDE="$rotmp/bin/agente" RDA_ENGINE_BIN="$rotmp/bin/agente" RDA_KANBAN="$rotmp/kb" RDA_IN_THOR_VERIFY=0 \
+  bash "$ROOT/kanban/thor-verify.sh" 990101-000001 "$rotmp/repo" 60 "$rotmp/v.log" 2>/dev/null || true; }
+out="$(tv)"
+case "$out" in PASS*) ok "agente che non tocca niente e dice PASS -> PASS" ;; *) err "PASS pulito non arriva: '$out'" ;; esac
+tr '\n' ' ' < "$rotmp/argv" | grep -qE -- '--deny-tool write|--disallowedTools Edit Write' \
+  && ok "gli strumenti di scrittura sono negati al lancio di @thor" \
+  || err "@thor parte con gli strumenti di scrittura: $(tr '\n' ' ' < "$rotmp/argv")"
+out="$(RDA_TEST_SCRIVE=1 tv)"
+case "$out" in SKIP*modificato*) ok "agente che modifica un file e dice PASS -> SKIP, verdetto scartato" ;;
+  *) err "@thor ha modificato la cartella e il suo verdetto e' passato lo stesso: '$out'" ;; esac
+rm -rf "$rotmp"
+
 printf '\n=== i due fallimenti si dicono DIVERSI (era lo stesso messaggio per tutti e due) ===\n'
 grep -q "SENZA scrivere un verdetto" "$LIB" \
   && ok "turno finito senza verdetto: messaggio suo" \
