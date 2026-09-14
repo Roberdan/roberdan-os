@@ -3,6 +3,16 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.50.1 — 2026-09-14
+
+### Added
+
+- film-director: `scripts/preflight.mjs`, precontrollo prima di delegare o di una nuova generazione
+  a pagamento (manifesto con percorsi assoluti e hash, prova eseguita dal worker vero, prototipo
+  di 10-15 s prima della produzione, registro dei job con un solo job incerto alla volta).
+  `sora-azure.sh` richiede `FILM_MANIFEST` e `FILM_REQUEST_KEY` per create/shot/remix e non
+  ripete mai da solo una POST dopo un 429 o una risposta persa. Test: `test/test-film-preflight.mjs`.
+
 ## 2.50.0 — 2026-09-14
 
 ### Fixed

@@ -12,6 +12,19 @@
 # Optional: SORA_DEPLOYMENT (default sora-2).
 set -euo pipefail
 
+PREFLIGHT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/preflight.mjs"
+case "${1:-}" in
+  create|shot|remix)
+    [[ -n "${FILM_MANIFEST:-}" && -n "${FILM_REQUEST_KEY:-}" ]] ||
+      { echo "new generation requires FILM_MANIFEST and unique FILM_REQUEST_KEY; no request sent" >&2; exit 1; }
+    if [[ "$1" == shot ]]; then
+      node "$PREFLIGHT" check "$FILM_MANIFEST" "${3:?shot requires absolute output path}" >&2
+    else
+      node "$PREFLIGHT" check "$FILM_MANIFEST" >&2
+    fi
+    ;;
+esac
+
 ENDPOINT="${AZURE_OPENAI_ENDPOINT:?set AZURE_OPENAI_ENDPOINT, e.g. https://<res>.openai.azure.com/}"
 ENDPOINT="${ENDPOINT%/}/"
 MODEL="${SORA_DEPLOYMENT:-sora-2}"
@@ -33,9 +46,14 @@ cmd_create() {
   local body
   body=$(jq -nc --arg m "$MODEL" --arg p "$prompt" --arg s "$size" --arg d "$secs" \
     '{model:$m, prompt:$p, size:$s, seconds:$d}')
-  local resp; resp=$(api POST videos "$body")
+  node "$PREFLIGHT" reserve "$FILM_MANIFEST" "$FILM_REQUEST_KEY" "$body" || return 1
+  local resp; resp=$(api POST videos "$body") || {
+    echo "dispatch uncertain; reconcile $FILM_REQUEST_KEY before any new generation" >&2; return 1;
+  }
   local id; id=$(echo "$resp" | jq -r '.id // empty')
-  [[ -n "$id" ]] || { echo "create failed: $resp" >&2; return 1; }
+  [[ -n "$id" ]] || { echo "create unresolved (including 429); reconcile $FILM_REQUEST_KEY: $resp" >&2; return 1; }
+  echo "accepted job $id; recording $FILM_REQUEST_KEY" >&2
+  node "$PREFLIGHT" accept "$FILM_MANIFEST" "$FILM_REQUEST_KEY" "$id" || return 1
   echo "$id"
 }
 
@@ -77,7 +95,15 @@ cmd_remix() {
   local id="$1" instruction="$2"
   local body; body=$(jq -nc --arg m "$MODEL" --arg p "$instruction" --arg r "$id" \
     '{model:$m, prompt:$p, remix_video_id:$r}')
-  api POST videos "$body" | jq -r '.id // .'
+  node "$PREFLIGHT" reserve "$FILM_MANIFEST" "$FILM_REQUEST_KEY" "$body" || return 1
+  local resp; resp=$(api POST videos "$body") || {
+    echo "dispatch uncertain; reconcile $FILM_REQUEST_KEY before any new generation" >&2; return 1;
+  }
+  local new_id; new_id=$(echo "$resp" | jq -r '.id // empty')
+  [[ -n "$new_id" ]] || { echo "remix unresolved; reconcile $FILM_REQUEST_KEY: $resp" >&2; return 1; }
+  echo "accepted job $new_id; recording $FILM_REQUEST_KEY" >&2
+  node "$PREFLIGHT" accept "$FILM_MANIFEST" "$FILM_REQUEST_KEY" "$new_id" || return 1
+  echo "$new_id"
 }
 
 case "${1:-}" in
