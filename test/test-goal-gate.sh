@@ -48,7 +48,7 @@ _coda() { { echo "# CODA"; echo "# scattata"; for i in "$@"; do echo "$i"; done;
 # umano) puo' averli gia' esportati per puntare alla board vera di roberdan-os, e senza questo
 # il repo di test qui sotto erediterebbe quella board invece della propria — falso rosso o falso
 # verde a seconda di cosa contiene la board vera al momento, non del codice sotto test.
-run() { (cd "$REPO" && export RDA_KANBAN="$KB" RDA_KANBAN_REGISTRY="$TMP/registry" \
+run() { (cd "$REPO" && unset RDA_HEADLESS RDA_IN_THOR_VERIFY && export RDA_KANBAN="$KB" RDA_KANBAN_REGISTRY="$TMP/registry" \
          && printf '{"session_id":"%s","hook_event_name":"Stop"}' "${SID:-s1}" \
          | bash "$HOOK" 2>"$TMP/err"); }
 
@@ -83,6 +83,17 @@ SID=sE; run; rc=$?
 [ "$rc" -eq 0 ] && ok "interruttore su file goal-gate.off -> exit 0" \
                 || err "il file interruttore non spegne il cancello (exit $rc)"
 rm -f "$RDA_HOME/goal-gate.off"
+
+# Headless (factory, @thor): un compito solo. 2026-09-14 un @thor spinto nella coda ha bloccato
+# una card vera per poter uscire.
+hl() { (cd "$REPO" && export RDA_KANBAN="$KB" RDA_KANBAN_REGISTRY="$TMP/registry" "$1=1" \
+        && printf '{"session_id":"sHL","hook_event_name":"Stop"}' | bash "$HOOK" 2>/dev/null); }
+hl RDA_HEADLESS; rc=$?
+[ "$rc" -eq 0 ] && ok "esecuzione headless (RDA_HEADLESS=1) -> exit 0, mai spinta nella coda" \
+                || err "una esecuzione headless viene spinta nella coda (exit $rc)"
+hl RDA_IN_THOR_VERIFY; rc=$?
+[ "$rc" -eq 0 ] && ok "verifica @thor (RDA_IN_THOR_VERIFY=1) -> exit 0" \
+                || err "la verifica @thor viene spinta nella coda (exit $rc)"
 
 printf '\n=== (b) LASCIA PASSARE: i freni contro il loop infinito ===\n'
 # FRENO nessun-progresso: la coda non si accorcia -> al secondo giro deve mollare.
@@ -136,7 +147,7 @@ created: 2026-08-02
 ---
 CARD
 }
-run2() { (cd "$REPO2" && export RDA_KANBAN="$KB2" RDA_KANBAN_REGISTRY="$TMP/registry2" \
+run2() { (cd "$REPO2" && unset RDA_HEADLESS RDA_IN_THOR_VERIFY && export RDA_KANBAN="$KB2" RDA_KANBAN_REGISTRY="$TMP/registry2" \
           && printf '{"session_id":"%s","hook_event_name":"Stop"}' "${SID:-s1}" \
           | bash "$HOOK" 2>"$TMP/err2"); }
 

@@ -15,6 +15,11 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 - `goal-gate.sh` conta come progresso anche commit e modifiche ai file: una card lunga non
   fa piu' mollare l'agente dopo due turni. Il messaggio dice di aspettare la CI dentro il
   turno invece di chiuderlo.
+- Le esecuzioni senza persona (fabbrica notturna, verifica @thor) girano con `RDA_HEADLESS=1`:
+  non rifanno la foto della coda e non vengono spinte a lavorarla. Trovato dal vivo: una
+  verifica @thor su Copilot CLI e' stata spinta nella coda e ha bloccato una card vera per uscire.
+- `test-goal-gate` e il test di avvio sessione non ereditano piu' board e variabili della
+  sessione che li lancia (falsi rossi durante la verifica @thor).
 
 ### Changed
 

@@ -97,6 +97,8 @@ fi
 if [ -x "$HOME/.local/bin/kb" ]; then
   _qarg=""
   case "$_src" in resume|compact|fork) : ;; *) [ -n "$_sid" ] && _qarg="--sessione $_sid" ;; esac
+  # headless (factory, @thor): un compito solo — la foto della coda non si tocca
+  { [ "${RDA_HEADLESS:-0}" = "1" ] || [ "${RDA_IN_THOR_VERIFY:-0}" = "1" ]; } && _qarg=""
   # shellcheck disable=SC2086  # _qarg è vuoto o due parole già ripulite
   _coda="$("$HOME/.local/bin/kb" queue $_qarg 2>/dev/null)"
   if [ -n "$_coda" ]; then
