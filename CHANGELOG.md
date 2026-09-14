@@ -5,6 +5,12 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 
 ## 2.50.0 — 2026-09-14
 
+### Fixed
+
+- `gh` non si appende piu' nelle esecuzioni senza persona (fabbrica, @thor): `factory/shims/gh` e
+  `bin/gh-shim.sh` si trovavano a vicenda nel PATH e si rilanciavano per sempre. Era la causa
+  delle verifiche @thor che non riuscivano a leggere la CI e andavano in timeout.
+
 ### Changed
 
 - @thor ha tre risposte: PASS, FAIL (criterio visto non rispettato) e SKIP (controllo che non si

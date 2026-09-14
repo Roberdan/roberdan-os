@@ -168,5 +168,21 @@ else
                   || err "PATH senza gh -> uscito $rc: $(printf '%s' "$o" | head -1)"
 fi
 
+echo "=== con gli shim della fabbrica davanti nel PATH non si rilanciano a vicenda (2026-09-14) ==="
+# Il caso vero: PATH = factory/shims : ~/.local/bin (gh -> questo shim) : gh vero. I due wrapper si
+# trovavano a vicenda e si rilanciavano con exec per sempre: `gh` di @thor e della fabbrica
+# appesi per ore, stesso processo, nessun errore.
+_to="$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || true)"
+mkdir -p "$TMP/localbin"; ln -s "$SHIM" "$TMP/localbin/gh"
+if [ -z "$_to" ]; then
+  echo "  skip: nessun timeout disponibile, il ciclo non e' verificabile senza rischiare di appendersi"
+else
+  o="$(cd "$NOREPO" && PATH="$ROOT/factory/shims:$TMP/localbin:$TMP/fakebin:/usr/bin:/bin" RDA_GH_MAP="$TMP/map.conf" \
+       "$_to" 10 gh pr list 2>&1)"; rc=$?
+  [ "$rc" -eq 0 ] && printf '%s' "$o" | grep -q '^ARGS=pr list$' \
+    && ok "factory/shims/gh -> gh-shim -> gh vero, senza ciclo (argomenti intatti)" \
+    || err "i due wrapper di gh si rilanciano a vicenda (exit $rc): $(printf '%s' "$o" | head -1)"
+fi
+
 [ "$FAIL" -eq 0 ] && { echo "test-gh-shim: PASS"; exit 0; }
 echo "test-gh-shim: FAIL"; exit 1

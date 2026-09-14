@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # factory/shims/gh — see factory/shims/git for why this exists and what it does not cover.
+# rdos-gh-wrapper: this file searches PATH for the real gh; bin/gh-shim.sh skips it by this marker.
 # Refuses the GitHub write actions AGENTS.md reserves to Roberto: publishing (PRs, releases),
 # repository administration and any authenticated write through `gh api`.
 # Reads: `gh pr view`, `gh run list`, `gh api` GETs — a factory task must be able to look.

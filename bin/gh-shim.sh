@@ -37,6 +37,10 @@ for _p in $PATH; do
   _cr="$(cd "$(dirname "$_c")" 2>/dev/null && pwd -P)/gh"
   # salta sia questo file sia il symlink che lo punta
   [ "$_cr" = "$_self_real" ] && continue
+  # salta gli altri wrapper che cercano a loro volta il gh nel PATH (factory/shims/gh): senza,
+  # i due si rilanciano a vicenda con exec per sempre, stesso processo e nessun errore.
+  # 2026-09-14: chiamate `gh` di @thor e della fabbrica appese da ore, verifiche in timeout.
+  head -5 "$_c" 2>/dev/null | grep -q 'rdos-gh-wrapper' && continue
   [ -L "$_c" ] && [ "$(cd "$(dirname "$_c")" && cd "$(dirname "$(readlink "$_c")")" 2>/dev/null && pwd -P)/$(basename "$(readlink "$_c")")" = "$_self_real" ] && continue
   REAL="$_c"; break
 done
