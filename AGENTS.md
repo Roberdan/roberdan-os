@@ -375,12 +375,19 @@ Autonomy ≠ black box. These **always** go through Roberto (direct message):
 4. Deletion of non-regenerable data (vault notes, gbrain sources, repo history)
 5. Strategic/product decisions with non-obvious tradeoffs (agent proposes with evidence, Roberto decides)
 6. Material published in Roberto's / Fight the Stroke's name
-7. Architectural changes >4 files with cross-cutting invariants
+7. Architectural changes to cross-cutting invariants — security, release, data integrity, or the
+   gates themselves. The number of files touched is not the trigger (revised 2026-09-14,
+   Roberto's "sì": an ordinary fix touching 14 files is not an architectural change)
 8. **Another review round once the declared budget is spent, or a third round on one class**
    (`loop/review-budget.sh` exits 3) — continuing is a spend decision, and the agent is the
    worst-placed party to make it: every round that finds something true feels like justification
    for the next one. Overriding the cap needs a **demonstrated** exposure, on the record
 
+**A human gate stops the card, not the session** (2026-09-14). When nobody is there to answer — a
+restart by goal-gate, a night run, the factory — never end the turn to wait for Roberto: write the
+question on the card with your recommendation first (`kb block <id> "<question · recommended option>"`)
+and take the next card. The same applies to intake questions and to a problem that failed twice:
+the question goes on the card, the work goes on. Roberto answers on the board in the morning.
 ---
 
 ## Privacy

@@ -122,6 +122,8 @@ launch_agent() {
     # classifier would ask about is DENIED instead of allowed, and a headless run that cannot
     # answer a prompt refuses instead of hanging.
     cmd=( "$bin" -p "$prompt" --model "$model" --permission-mode auto --permission-prompts none --settings "$FACTORY_SETTINGS" --add-dir "$dir" )
+    # set only by verify_card (@thor is read-only); `+x` keeps `set -u` callers safe when unset
+    [ -n "${FACTORY_CLAUDE_DISALLOWED+x}" ] && cmd+=( --disallowedTools "${FACTORY_CLAUDE_DISALLOWED[@]}" )
   fi
   set +e
   if [ -n "${TIMEOUT_BIN:-}" ]; then

@@ -85,11 +85,16 @@ Autonomy is not a black box. Stop and ask Roberto before:
 4. Deleting non-regenerable data (repo history, vault notes, source data)
 5. Strategic/product decisions with non-obvious trade-offs — propose with evidence, **he decides**
 6. Material published in his name or Fight the Stroke's
-7. Architectural changes across >4 files with cross-cutting invariants
+7. Architectural changes to cross-cutting invariants (security, release, data, the gates
+   themselves) — not a file count
 8. One more review round after the declared budget is spent (see `ENGINEERING.md § review budget`)
 
 And the universal one: **no irreversible action without explicit confirmation**, even under
 "full autonomy".
+
+**A gate stops the task, not the session.** When nobody is there to answer (an unattended or
+night run), don't end the turn waiting: write the question where he will read it — the task
+tracker, the PR — with your recommendation first, and move on to the next piece of work.
 
 ## How to talk to him (non-negotiable)
 
@@ -112,7 +117,8 @@ And the universal one: **no irreversible action without explicit confirmation**,
 - Leave a plan that quietly evaporates with nothing shipped.
 
 If you got it wrong: acknowledge plainly, fix it, don't justify. Escalate after 2 failed
-attempts on the same approach — change strategy or ask, never a third identical try.
+attempts on the same approach — change strategy, or write the question down and move on to
+other work if nobody is there to answer; never a third identical try.
 
 ## Read on demand (progressive disclosure)
 

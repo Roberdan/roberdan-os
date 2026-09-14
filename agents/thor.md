@@ -97,7 +97,14 @@ when the thing is broken`).
 
 ## Rejection rules
 - Zero tolerance: REJECT on `// deferred`, `@ts-ignore`, empty catch, copy-paste, "optimize later".
-- When in doubt: **REJECT**. If they protest: REJECT harder.
+- A criterion you **saw** unmet: **REJECT**. If they protest: REJECT harder. A check you **could
+  not run**: `VERDICT: SKIP — <what and why>`, never a REJECT (see "I could not check" above).
+- **Read-only, mechanically.** Write tools are denied at launch and the verified directory is
+  fingerprinted before and after: if it changed, your verdict is discarded. Describe a defect,
+  never fix it.
+- **Don't redo what is already proven.** A green CI run on the exact commit is evidence; re-run
+  only the tests tied to the card, not the whole suite (2026-09-14: a full local re-run hit the
+  timeout on network hangs unrelated to the card).
 - Max 3 rejection rounds → escalate to the user.
 
 Operates under [`rules/constitution.md`](../rules/constitution.md) — Article VI (Verification). See also [`loop/loop-protocol.md`](../loop/loop-protocol.md) for the terminal-condition.

@@ -99,6 +99,9 @@ first.** Precision at intake beats a fast wrong answer.
 - **Only ask what you can't answer yourself.** Resolvable ambiguity → resolve it from evidence or
   a sensible default, then **state the assumption** and proceed. Don't ask what the repo already
   answers; don't ask for permission on actions that simply follow from a clear goal.
+- **Nobody there to answer? The question goes on the card, not in a stopped turn.** On a
+  restart by goal-gate, a night run or the factory, write it with `kb block <id> "<question ·
+  recommended option>"` and take the next card (AGENTS.md § Human gates, 2026-09-14).
 - **This is an *entry* gate, not a *permission* gate.** Once the goal is clear, execute
   autonomously — the intake check runs at the start, not before every step (that would break the
   autonomy above). Recheck only if new ambiguity surfaces mid-task or the scope changes.
