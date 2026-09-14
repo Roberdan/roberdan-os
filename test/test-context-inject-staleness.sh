@@ -41,5 +41,35 @@ check_full '{"source":"resume","prompt_cache_likely_expired":true}' "resume + ex
 check_full '{"source":"resume"}' "resume, field absent -> full block (safe fallback)"
 check_full 'not json at all' "unparseable stdin -> full block (fail-safe)"
 
+echo "=== the authorized queue is re-photographed for a NEW session only (2026-09-14) ==="
+# The defect: the first photo lived forever (roberdan-os: 2026-07-30, all closed), so goal-gate
+# never held anyone. Runs the real hook against a throwaway HOME + board, never the real one.
+T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+mkdir -p "$T/home/.local/bin" "$T/board/todo" "$T/board/doing" "$T/board/done"
+ln -s "$ROOT/kanban/kb.sh" "$T/home/.local/bin/kb"
+git -C "$T" init -q ciq 2>/dev/null
+card() { printf -- '---\ntitle: card %s\nrepo: ciq\ndod: "d"\nacceptance: "a"\nstatus: todo\ncreated: 2026-09-14\n---\n' "$1" > "$T/board/todo/$1.md"; }
+inject() { (cd "$T/ciq" && printf '%s' "$1" | HOME="$T/home" RDA_KANBAN="$T/board" RDA_KANBAN_REGISTRY="$T/reg" bash "$HOOK" >/dev/null 2>&1); }
+inq() { grep -qx "$1" "$T/board/.coda-ciq.md" 2>/dev/null; }
+card Q1
+inject '{"session_id":"s1","source":"startup"}'
+inq Q1 && ok "Claude startup with a session id -> photo taken" || err "Claude startup took no photo"
+card Q2
+inject '{"session_id":"s1","source":"compact"}'
+inq Q2 && err "compact re-photographed: a card born mid-session would start" || ok "compact keeps the session's photo"
+inject '{"session_id":"s2","source":"resume"}'
+inq Q2 && err "resume re-photographed" || ok "resume keeps the photo"
+inject ''
+inq Q2 && err "empty stdin (no session id) re-photographed" || ok "empty stdin keeps the photo (no id, no renewal)"
+inject '{"session_id":"s3","source":"startup"}'
+inq Q2 && ok "a NEW Claude session re-photographs: the card born before it enters" || err "new Claude session kept the stale photo (the 2026-07-30 defect)"
+card Q3
+inject '{"session_id":"cp-9","source":"new"}'
+inq Q3 && ok "Copilot-shaped start (sessionId + source new) re-photographs too" || err "Copilot new session kept the stale photo"
+card Q4
+inject '{"session_id":"cp-9","source":"resume"}'
+inq Q4 && err "Copilot resume re-photographed" || ok "Copilot resume keeps the photo"
+# (that the real Copilot extension SENDS this shape is asserted in test-copilot-adapter.sh § G2)
+
 if [ "$fails" -eq 0 ]; then printf '\ntest-context-inject-staleness: ✅ ALL GREEN\n'; else printf '\ntest-context-inject-staleness: ❌ FAIL (see above)\n'; fi
 exit "$fails"

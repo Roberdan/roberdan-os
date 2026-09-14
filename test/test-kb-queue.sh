@@ -9,6 +9,10 @@
 # quella che questo file esiste per proteggere: **una card creata dopo lo scatto non parte**.
 # Se quella proprietà cade, un agente può crearsi il lavoro da solo e autorizzarselo — cioè
 # esattamente ciò che il gate impediva. Ogni asserzione qui è nei due sensi.
+#
+# REVISIONE 2026-09-14: "quando comincia una sessione" ora vale davvero per OGNI sessione nuova
+# (`kb queue --sessione <id>`, chiamato da hooks/context-inject.sh). La proprietà sopra resta
+# dentro la sessione; alla sessione dopo le card nate prima entrano, e lo scatto le segnala.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KBSH="$ROOT/kanban/kb.sh"
@@ -129,6 +133,63 @@ if [ "$(_rest)" = "0" ]; then
 else
   err "con tutte le card bloccate restanti non e' 0: $(_rest)"
 fi
+
+printf '\n=== una sessione NUOVA rifa la foto, la STESSA no (revisione 2026-09-14) ===\n'
+# IL DIFETTO. La foto si scattava una volta sola e restava per sempre: roberdan-os aveva quella
+# del 30 luglio, tutta chiusa, e goal-gate non tratteneva mai nessuno. Nei due sensi: una
+# sessione nuova deve prendere le card di adesso; la stessa sessione (compattazione, ripresa)
+# deve tenere la sua foto, altrimenti cio' che l'agente crea mentre lavora parte subito.
+SQ="$TMP/sq"; mkdir -p "$SQ/todo" "$SQ/doing" "$SQ/done"
+kbs() { RDA_KANBAN="$SQ" RDA_KANBAN_REGISTRY="$TMP/registry-sq" bash "$KBSH" "$@" 2>/dev/null; }
+_cards() { cat > "$SQ/todo/$1.md" <<CARD
+---
+title: card $1
+repo: sq
+dod: "una dod"
+acceptance: "il comando stampa il risultato"
+status: todo
+created: 2026-09-14
+---
+CARD
+}
+_cards S1
+kbs queue sq --sessione sessA >/dev/null
+_cards S2                                          # nata DURANTE la sessione A
+out="$(kbs queue sq --sessione sessA)"
+grep -qx S2 "$SQ/.coda-sq.md" \
+  && err "la stessa sessione ha rifatto la foto: una card nata durante il lavoro e' entrata subito" \
+  || ok "stessa sessione -> stessa foto: la card nata durante il lavoro resta fuori"
+out="$(kbs queue sq --sessione sessB)"
+grep -qx S2 "$SQ/.coda-sq.md" \
+  && ok "sessione nuova -> foto nuova: entra la card nata nella sessione prima" \
+  || err "sessione nuova ma foto vecchia: e' il difetto del 30 luglio. Output: $out"
+case "$out" in
+  *S2*"ENTRATA ORA"*) ok "lo scatto dice quali card sono entrate rispetto alla foto prima" ;;
+  *) err "lo scatto non segnala le card entrate: Roberto non vede cosa e' stato aggiunto. Output: $out" ;;
+esac
+case "$out" in
+  *S1*"ENTRATA ORA"*S2*) err "segna come entrata anche una card che c'era gia'" ;;
+  *) ok "una card gia' in lista non viene segnata come entrata" ;;
+esac
+
+printf '\n=== le card bloccate non rientrano a ogni sessione ===\n'
+kbs block S1 "aspetta Roberto" >/dev/null
+kbs queue sq --sessione sessC >/dev/null
+grep -qx S1 "$SQ/.coda-sq.md" \
+  && err "una card bloccata e' rientrata nella foto: ogni sessione riparte contro lo stesso muro" \
+  || ok "una card bloccata resta fuori dalla foto nuova"
+{ echo "# CODA AUTORIZZATA — sq"; echo "# scattata il prova"; echo "# x"; echo "# sessione: sessC"; echo S1; echo S2; } > "$SQ/.coda-sq.md"
+out="$(kbs next sq)"
+case "$out" in
+  *"salto S1"*"prendo S2"*) ok "kb next salta la card bloccata e prende la successiva" ;;
+  *) err "kb next riparte una card bloccata o si ferma li'. Output: $out" ;;
+esac
+mv "$SQ/doing/S2.md" "$SQ/done/" 2>/dev/null
+rm -f "$SQ"/todo/*.md
+kbs queue sq --sessione sessD >/dev/null
+grep -q '^# sessione: sessD' "$SQ/.coda-sq.md" && ! grep -qx S2 "$SQ/.coda-sq.md" \
+  && ok "sessione nuova senza card: la foto vecchia viene sostituita, non lasciata in vita" \
+  || err "senza card la foto di un'altra sessione resta valida"
 
 printf '\n=== revoca ===\n'
 

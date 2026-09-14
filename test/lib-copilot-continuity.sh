@@ -112,3 +112,20 @@ fi
 for marker in 'unfinished, no active' 'Registration or markdown is not proof.' 'two no-progress'; do
   grep -qF "$marker" "$ROOT/AGENTS.md" || err "missing canonical continuation contract: $marker"
 done
+
+# G2) onSessionStart must hand context-inject the session id AND the source, or the authorized
+# queue is never re-photographed on Copilot (2026-09-14: the photo froze at 2026-07-30).
+printf '#!/usr/bin/env bash\nprintf "%%s|%%s\\n" "context-inject.sh" "$(cat)" >> "%s"\nexit 0\n' "$SID_OUT" > "$SID_OS/hooks/context-inject.sh"
+chmod +x "$SID_OS/hooks/context-inject.sh"
+cat > "$STAGE/driver-start.mjs" <<JS
+import "./extension.mjs";
+const cfg = globalThis.__RDA_CFG;
+await cfg.hooks.onSessionStart({ sessionId: "cp-start-1", source: "new", workingDirectory: process.cwd() });
+await cfg.hooks.onSessionStart({ sessionId: "cp-start-1", source: "resume", workingDirectory: process.cwd() });
+console.log("DONE");
+JS
+( cd "$STAGE" && RDA_OS="$SID_OS" node driver-start.mjs >/dev/null 2>&1 )
+grep -q '^context-inject.sh|.*"session_id":"cp-start-1".*"source":"new"' "$SID_OUT" \
+  && grep -q '^context-inject.sh|.*"session_id":"cp-start-1".*"source":"resume"' "$SID_OUT" \
+  && ok "onSessionStart passes session_id + source to context-inject (queue renews on a new Copilot session only)" \
+  || err "onSessionStart does not pass session_id/source: Copilot never renews the authorized queue"

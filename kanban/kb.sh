@@ -1137,13 +1137,19 @@ _repo_view() {
 # IL RISCHIO, DICHIARATO: se la lista contiene una card che non voleva, parte lo stesso. Si
 # revoca cancellando la fotografia (`kb queue --stop`), e `kb queue` la stampa per intero prima
 # di scattarla, così è leggibile in dieci secondi.
+# REVISIONE 2026-09-14: la foto restava per sempre (roberdan-os: 30 luglio, tutta chiusa). Ora
+# `--sessione <id>` la rifà per ogni sessione NUOVA (Claude e Copilot, da context-inject.sh), la
+# tiene per la stessa; lo scatto segna le card ENTRATE ORA; le `blocked` restano fuori.
 _queue_file() { printf '%s/.coda-%s.md' "$KB" "$1"; }
 
 _queue_repo() { _repo_qui; }  # stessa risoluzione di `kb pending`
 
 _queue() {
-  local repo="" arg
-  for arg in "$@"; do case "$arg" in --*) ;; *) repo="$arg" ;; esac; done
+  local repo="" arg sessione="" prendi=0
+  for arg in "$@"; do
+    if [ "$prendi" -eq 1 ]; then sessione="$(printf '%s' "$arg" | tr -cd 'A-Za-z0-9._-')"; prendi=0; continue; fi
+    case "$arg" in --sessione|--session) prendi=1 ;; --*) ;; *) repo="$arg" ;; esac
+  done
   [ -n "$repo" ] || repo="$(_queue_repo)"
   local qf; qf="$(_queue_file "$repo")"
 
@@ -1178,37 +1184,56 @@ _queue() {
 
   local rinnova=0
   case " $* " in *" --nuova "*|*" --new "*) rinnova=1 ;; esac
+  if [ -n "$sessione" ] && ! { [ -f "$qf" ] && grep -qxF "# sessione: $sessione" "$qf"; }; then
+    rinnova=1
+  fi
 
   if [ -f "$qf" ] && [ "$rinnova" -eq 0 ]; then
-    local fatte=0 restanti=0 id
+    local fatte=0 restanti=0 bloccate=0 id
     while read -r id; do
       case "$id" in ''|\#*) continue ;; esac
-      if [ -e "$KB/todo/$id.md" ] || [ -e "$KB/doing/$id.md" ]; then restanti=$((restanti+1)); else fatte=$((fatte+1)); fi
+      if [ -e "$KB/todo/$id.md" ] || [ -e "$KB/doing/$id.md" ]; then
+        if [ "$(_field "$KB/todo/$id.md" status)" = blocked ]; then bloccate=$((bloccate+1)); else restanti=$((restanti+1)); fi
+      else fatte=$((fatte+1)); fi
     done < "$qf"
-    echo "coda '$repo': $fatte chiuse, $restanti da fare  ($(sed -n '2p' "$qf"))"
+    echo "coda '$repo': $fatte chiuse, $restanti da fare, $bloccate bloccate  ($(sed -n '2p' "$qf"))"
     [ "$restanti" -gt 0 ] && echo "  prossima: \`kb next\`" || echo "  LISTA FINITA — vedi \`kb queue --aggiunte\` per cosa e' nato dopo."
     return 0
   fi
 
   # Lo scatto. Solo le card del repo chiesto: una board puo' tenerne di piu' d'uno, e una coda
   # che mescolasse i repo farebbe partire lavoro su un progetto che non e' quello dove sei.
-  local ids="" n=0 f
+  local ids="" n=0 f prima=""
+  [ -f "$qf" ] && prima="$(grep -v '^#' "$qf")"
   for f in "$KB/todo"/*.md; do
     [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue ;; esac
     [ "$(_field "$f" repo)" = "$repo" ] || continue
+    [ "$(_field "$f" status)" = blocked ] && continue
     ids="$ids$(basename "$f" .md)
 "; n=$((n+1))
   done
-  if [ "$n" -eq 0 ]; then echo "nessuna card in attesa per '$repo': niente da fotografare."; return 0; fi
+  if [ "$n" -eq 0 ]; then
+    # sessione nuova senza card: la foto vecchia non deve restare valida
+    if [ -n "$sessione" ]; then
+      { echo "# CODA AUTORIZZATA — $repo"
+        echo "# scattata il $(date '+%Y-%m-%d %H:%M:%S %Z') · autorizzazione permanente di Roberto del 2026-07-30"
+        echo "# Le card qui sotto partono senza chiedere. Quelle nate DOPO questo scatto no."
+        echo "# sessione: $sessione"; } > "$qf"
+    fi
+    echo "nessuna card in attesa per '$repo': niente da fotografare."; return 0
+  fi
   { echo "# CODA AUTORIZZATA — $repo"
     echo "# scattata il $(date '+%Y-%m-%d %H:%M:%S %Z') · autorizzazione permanente di Roberto del 2026-07-30"
     echo "# Le card qui sotto partono senza chiedere. Quelle nate DOPO questo scatto no."
+    [ -n "$sessione" ] && echo "# sessione: $sessione"
     printf '%s' "$ids"; } > "$qf"
   echo "coda '$repo' fotografata: $n card, in quest'ordine."
-  local id
+  local id nuova
   while read -r id; do
     case "$id" in ''|\#*) continue ;; esac
-    printf '  • %s — %s\n' "$id" "$(_field "$KB/todo/$id.md" title)"
+    nuova=""
+    [ -n "$prima" ] && ! printf '%s\n' "$prima" | grep -qxF "$id" && nuova="  (ENTRATA ORA: non era nella foto prima)"
+    printf '  • %s — %s%s\n' "$id" "$(_field "$KB/todo/$id.md" title)" "$nuova"
   done < "$qf"
   echo "  parti con \`kb next\` · revoca con \`kb queue --stop\`"
 }
@@ -1235,6 +1260,7 @@ _next() {
   while read -r id; do
     case "$id" in ''|\#*) continue ;; esac
     [ -e "$KB/todo/$id.md" ] || continue
+    [ "$(_field "$KB/todo/$id.md" status)" = blocked ] && { echo "kb next: salto $id — bloccata: $(_field "$KB/todo/$id.md" blocked_reason | cut -c1-120)"; continue; }
     echo "kb next: prendo $id — $(_field "$KB/todo/$id.md" title)"
     # Si richiama lo STESSO script invece di duplicare il corpo di `start`: quel corpo scrive
     # la riga di audit, controlla dod/acceptance/repo, applica la regola 1 e crea il worktree.
@@ -1254,6 +1280,7 @@ _next() {
     [ -e "$f" ] || continue; case "$(basename "$f")" in _*) continue ;; esac
     [ "$(_field "$f" repo)" = "$repo" ] || continue
     grep -qx "$(basename "$f" .md)" "$qf" && continue
+    [ "$(_field "$f" status)" = blocked ] && continue   # esclusa dallo scatto, non nata dopo
     [ "$nate" -eq 0 ] && echo "" && echo "NATE DOPO lo scatto del $scatto — queste aspettano TE:"
     nate=$((nate+1))
     printf '  • %s — %s\n' "$(basename "$f" .md)" "$(_field "$f" title)"

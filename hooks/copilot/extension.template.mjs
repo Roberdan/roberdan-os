@@ -539,7 +539,10 @@ const hooks = {
         contextRecovery.rememberDirectory(input);
         const ci = join(HOOKS, "context-inject.sh");
         if (!existsSync(ci)) return undefined;
-        const { stdout } = await runScript(ci, "", input && input.workingDirectory);
+        // session_id + source (CLI 1.0.84-5 SessionStartHookInput) renew the queue on a NEW session only.
+        const sid = String((input && input.sessionId) || sessionId() || "");
+        const stdin = sid ? JSON.stringify({ session_id: sid, source: String((input && input.source) || "") }) : "";
+        const { stdout } = await runScript(ci, stdin, input && input.workingDirectory);
         const ctx = (stdout || "").trim();
         return ctx ? { additionalContext: ctx } : undefined;
     },

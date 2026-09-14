@@ -17,8 +17,10 @@ ROOT="$HOME/GitHub/roberdan-os"
 # Claude Code, and Copilot's emulated chain, which calls this hook with empty stdin (see
 # hooks/copilot/extension.template.mjs onSessionStart: runScript(ci, "", ...)).
 _stdin="$(cat 2>/dev/null || true)"
+_src=""; _sid=""
 if command -v jq >/dev/null 2>&1 && [ -n "$_stdin" ]; then
   _src="$(printf '%s' "$_stdin" | jq -r '.source // ""' 2>/dev/null || echo "")"
+  _sid="$(printf '%s' "$_stdin" | jq -r '.session_id // ""' 2>/dev/null | tr -cd 'A-Za-z0-9._-' || echo "")"
   _fresh="$(printf '%s' "$_stdin" | jq -r 'if .prompt_cache_likely_expired == false then "1" else "" end' 2>/dev/null || echo "")"
   if { [ "$_src" = "resume" ] || [ "$_src" = "fork" ]; } && [ -n "$_fresh" ]; then
     echo "## roberdan-os — resumed, cache still warm (context unchanged since last turn)"
@@ -86,8 +88,17 @@ fi
 # NOTA sul board: qui NON si forza RDA_KANBAN come fa il blocco sopra. Quel blocco mostra sempre
 # roberdan-os di proposito (è il board di casa); la coda invece deve essere quella del repo in cui
 # la sessione è aperta, altrimenti fotograferebbe il lavoro di un altro progetto.
+#
+# REVISIONE 2026-09-14: la foto si rifà a ogni sessione NUOVA (`--sessione <id>`). Senza, la prima
+# foto restava per sempre — roberdan-os aveva quella del 30 luglio, tutta chiusa, e l'agente non
+# veniva mai trattenuto. Compattazione, ripresa e fork tengono la foto che c'è: dentro una
+# sessione ciò che nasce dopo non parte. Copilot passa session_id e source (startup|resume|new)
+# da hooks/copilot/extension.template.mjs onSessionStart; stdin vuoto = nessun id = foto intatta.
 if [ -x "$HOME/.local/bin/kb" ]; then
-  _coda="$("$HOME/.local/bin/kb" queue 2>/dev/null)"
+  _qarg=""
+  case "$_src" in resume|compact|fork) : ;; *) [ -n "$_sid" ] && _qarg="--sessione $_sid" ;; esac
+  # shellcheck disable=SC2086  # _qarg è vuoto o due parole già ripulite
+  _coda="$("$HOME/.local/bin/kb" queue $_qarg 2>/dev/null)"
   if [ -n "$_coda" ]; then
     echo
     echo "### 🎫 Coda autorizzata di questa sessione (Roberto ha già detto sì a queste):"

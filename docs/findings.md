@@ -21,11 +21,15 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 
 ---
 
-## Aperti — 1 su 10
+## Aperti — 5 su 10
 
 | # | Cosa | Prova |
 |---|---|---|
 | 26 | `test/validate.sh` non e' ermetico rispetto all'ambiente ereditato: se gira dentro una sessione @thor annidata, `RDA_IN_THOR_VERIFY` (recursion-guard) e `RDA_KANBAN` (registro reale al posto della fixture) lo fanno fallire su codice sano | Il 3 agosto il gate interno di `kb finish` ha dato `test-goal-gate` rosso su `main`, dove lo stesso test e' verde da solo e la suite completa e' ALL GREEN in due run indipendenti. `env -u RDA_IN_THOR_VERIFY -u RDA_KANBAN bash test/validate.sh` -> ALL GREEN. **Un falso rosso e' peggio di nessun test: erode la fiducia in tutti i gate.** `validate.sh` dovrebbe ripulire da se' le variabili che governano il suo stesso comportamento |
+| 28 | **La fabbrica notturna gira a vuoto** (2026-09-14). launchd `rda-factory` parte all'01:00, ma niente la alimenta: `factory/enqueue.sh` è citato solo in documentazione | `/tmp/rda-factory.log`: `queue empty — processed 0 task(s)` il 2026-09-14 01:00. `~/.roberdan-os/factory/done/`: 2 lavori reali in totale (test 2026-07-02, prova launchd 2026-09-12). **Condizione per la card:** Roberto decide quali card possono andare di notte senza di lui |
+| 29 | **`handoff/latest.md` è del 2026-08-19 (VirtualBPM, PR #108) e viene indicato a ogni sessione come "filo corrente"** da `context-inject.sh` | Header del file; il checkpoint `kb resume` dello stesso giorno dice altro (roberdan-os, PR #74/#75). Due fonti di "dove eravamo" in disaccordo, una vecchia di 26 giorni. **Condizione per la card:** si decide se l'handoff si aggiorna a ogni pausa o si toglie dall'iniezione |
+| 30 | **Peso del canone oltre i suoi stessi tetti** | `rules/best-practices.md` 236 righe (tetto dichiarato 200, sempre caricato); lettura prescritta per lavoro non banale ≈135 KB (AGENTS.md 38 KB, roberto-mode 17 KB, kanban/README 27 KB, loop-protocol 12 KB, best-practices 16 KB). 60% delle card chiuse (112/188) riguarda il sistema stesso. **Non misurato:** quanto questo rallenti davvero un agente. **Condizione per la card:** una sessione A/B con/senza lettura completa |
+| 31 | **Il precheck di `kb start` segnala "FORSE GIA' FATTA" su 2 parole in comune** e scrive `kb_start_audit` sulla stessa riga dell'ultimo avviso | Card `260913-213559`: 7 avvisi falsi positivi ("film-director" vs "Instagram Reel"), e la riga `...marcatorekb_start_audit: "at=..."`. **Condizione per la card:** un secondo caso di campo letto male per quella riga incollata |
 
 Il 2 agosto 2026 la lista e' passata da 19 rilievi aperti a zero: 13 chiusi da una
 decisione, 6 riparati con la loro card e la loro prova di mutazione. Il 26 e' nato dopo.
@@ -41,6 +45,10 @@ Una seconda imprecisione della stessa verifica, "tre suite fanno grep sulla fras
 qui e basta.
 
 Il posto e' vuoto e va tenuto vuoto: il tetto e' 10, e chi scrive l'undicesimo ne cancella uno.
+
+**Pagato il 14 settembre, non rinviato:** il #27 (la coda autorizzata fotografata una volta sola, il
+30 luglio, e mai più) è riparato dalla card `260914-114300` su richiesta di Roberto: foto nuova a
+ogni sessione nuova, Claude e Copilot, card bloccate fuori, stallo misurato anche su commit e file.
 
 ## Rinviati con motivo scritto — non contano nel tetto
 
