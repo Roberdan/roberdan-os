@@ -49,7 +49,7 @@ mkdir -p "$T/home/.local/bin" "$T/board/todo" "$T/board/doing" "$T/board/done"
 ln -s "$ROOT/kanban/kb.sh" "$T/home/.local/bin/kb"
 git -C "$T" init -q ciq 2>/dev/null
 card() { printf -- '---\ntitle: card %s\nrepo: ciq\ndod: "d"\nacceptance: "a"\nstatus: todo\ncreated: 2026-09-14\n---\n' "$1" > "$T/board/todo/$1.md"; }
-inject() { (cd "$T/ciq" && printf '%s' "$1" | HOME="$T/home" RDA_KANBAN="$T/board" RDA_KANBAN_REGISTRY="$T/reg" bash "$HOOK" >/dev/null 2>&1); }
+inject() { (cd "$T/ciq" && unset RDA_HEADLESS RDA_IN_THOR_VERIFY && printf '%s' "$1" | HOME="$T/home" RDA_KANBAN="$T/board" RDA_KANBAN_REGISTRY="$T/reg" bash "$HOOK" >/dev/null 2>&1); }
 inq() { grep -qx "$1" "$T/board/.coda-ciq.md" 2>/dev/null; }
 card Q1
 inject '{"session_id":"s1","source":"startup"}'
@@ -69,6 +69,9 @@ inq Q3 && ok "Copilot-shaped start (sessionId + source new) re-photographs too" 
 card Q4
 inject '{"session_id":"cp-9","source":"resume"}'
 inq Q4 && err "Copilot resume re-photographed" || ok "Copilot resume keeps the photo"
+card Q5
+(cd "$T/ciq" && printf '%s' '{"session_id":"hl-1","source":"startup"}' | HOME="$T/home" RDA_KANBAN="$T/board" RDA_KANBAN_REGISTRY="$T/reg" RDA_HEADLESS=1 bash "$HOOK" >/dev/null 2>&1)
+inq Q5 && err "a headless run (factory/@thor) re-photographed the queue" || ok "a headless run (RDA_HEADLESS=1) never touches the queue photo"
 # (that the real Copilot extension SENDS this shape is asserted in test-copilot-adapter.sh § G2)
 
 if [ "$fails" -eq 0 ]; then printf '\ntest-context-inject-staleness: ✅ ALL GREEN\n'; else printf '\ntest-context-inject-staleness: ❌ FAIL (see above)\n'; fi

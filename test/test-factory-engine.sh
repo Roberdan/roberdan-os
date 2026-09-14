@@ -17,7 +17,7 @@ mkdir -p "$TMP/bin" "$TMP/dir"
 # Stubs that record WHICH binary ran and with what argv. A run that touches the claude stub
 # leaves a file behind — that file existing is the whole failure mode this test exists for.
 for b in claude copilot; do
-  printf '#!/usr/bin/env bash\ntouch "%s/ran-%s"\nprintf "%%s\\n" "$@" > "%s/argv-%s"\n' "$TMP" "$b" "$TMP" "$b" > "$TMP/bin/$b"
+  printf '#!/usr/bin/env bash\ntouch "%s/ran-%s"\nprintf "%%s\\n" "$@" > "%s/argv-%s"\nprintf "%%s" "${RDA_HEADLESS:-}" > "%s/headless-%s"\n' "$TMP" "$b" "$TMP" "$b" "$TMP" "$b" > "$TMP/bin/$b"
   chmod +x "$TMP/bin/$b"
 done
 
@@ -55,6 +55,9 @@ case "$a" in *"--add-dir $TMP/dir"*) ok "the task dir is passed with --add-dir" 
 launch "" opus
 case "$(argv_of copilot)" in *"--model claude-opus-5"*) ok "alias opus -> claude-opus-5" ;;
   *) err "opus did not resolve to a Copilot frontier id" ;; esac
+
+[ "$(cat "$TMP/headless-copilot" 2>/dev/null)" = "1" ] && ok "the headless agent runs with RDA_HEADLESS=1 (never re-photographs or chases the queue)" \
+  || err "RDA_HEADLESS=1 not passed: a factory/@thor run gets pushed into the authorized queue"
 
 echo "=== claude only on an explicit opt-in ==="
 launch claude sonnet

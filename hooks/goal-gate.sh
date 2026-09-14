@@ -28,6 +28,9 @@ GATE_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 # --- FRENO 0: interruttore. Deve esistere e deve essere ovvio. -------------------------------
 [ "${RDA_NO_GOAL_GATE:-0}" = "1" ] && exit_pass
 [ -e "$GATE_HOME/goal-gate.off" ] && exit_pass
+# Esecuzioni headless (factory, verifica @thor): un compito solo, mai la coda.
+[ "${RDA_HEADLESS:-0}" = "1" ] && exit_pass
+[ "${RDA_IN_THOR_VERIFY:-0}" = "1" ] && exit_pass
 
 payload="$(cat 2>/dev/null || true)"
 session="$(printf '%s' "$payload" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"

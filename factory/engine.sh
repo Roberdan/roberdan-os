@@ -100,6 +100,9 @@ engine_model() {
 # cwd. Without the cd, "current directory" in a prompt silently resolved to wherever run.sh
 # was launched from — found live, a probe task wrote its file into this repo instead of its
 # workdir. Subshell, so neither the cd nor the PATH leaks into the rest of the run.
+# RDA_HEADLESS=1: a headless run (factory task, @thor verification) owns ONE task. It must not
+# re-photograph the authorized queue nor be pushed into it by goal-gate (2026-09-14: a @thor run
+# did both, then blocked a real card on the board to escape).
 launch_agent() {
   local prompt="$1" alias="$2" dir="$3" tmo="$4" log="$5" rc=0 bin model
   if [ ! -d "$dir" ]; then
@@ -122,10 +125,10 @@ launch_agent() {
   fi
   set +e
   if [ -n "${TIMEOUT_BIN:-}" ]; then
-    ( cd "$dir" && PATH="$FACTORY_SHIMS:$PATH" "$TIMEOUT_BIN" "$tmo" "${cmd[@]}" ) > "$log" 2>&1
+    ( cd "$dir" && RDA_HEADLESS=1 PATH="$FACTORY_SHIMS:$PATH" "$TIMEOUT_BIN" "$tmo" "${cmd[@]}" ) > "$log" 2>&1
     rc=$?
   else
-    ( cd "$dir" && PATH="$FACTORY_SHIMS:$PATH" "${cmd[@]}" ) > "$log" 2>&1
+    ( cd "$dir" && RDA_HEADLESS=1 PATH="$FACTORY_SHIMS:$PATH" "${cmd[@]}" ) > "$log" 2>&1
     rc=$?
   fi
   set -e
