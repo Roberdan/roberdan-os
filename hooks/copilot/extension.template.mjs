@@ -686,13 +686,8 @@ try {
         return runStopChain(contextRecovery.directory).catch((e) => diag("session.idle:runStopChain", e));
     });
     contextRecovery.register(session);
-    try {
-        await session.log("roberdan-os extension loaded (agents, guards, kanban tools, always-on checkpoint).", {
-            ephemeral: true,
-        });
-    } catch (e) {
-        diag("join:session.log(loaded)", e);
-    }
+    // Host plugin reconciliation can restart us repeatedly; readiness belongs in the extension log.
+    diag("lifecycle", "extension ready (tools, guards, checkpoint).");
 } catch (e) {
     // stdout is reserved for JSON-RPC; diagnostics go to stderr and never crash the CLI.
     process.stderr.write(`roberdan-os extension failed to join session: ${e && e.stack ? e.stack : e}\n`);

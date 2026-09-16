@@ -372,6 +372,6 @@ done
 . "$ROOT/test/lib-copilot-context.sh"
 # shellcheck source=test/lib-copilot-continuity.sh
 . "$ROOT/test/lib-copilot-continuity.sh"
-# --- Result --------------------------------------------------------------
+bash "$ROOT/test/test-copilot-startup.sh" || err "startup diagnostics regression"
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "test-copilot-adapter: PASS"; exit 0; else echo "test-copilot-adapter: FAIL"; exit 1; fi

@@ -15,6 +15,9 @@ bash bin/sync.sh --install
 Copilot must have been started at least once so its configuration directory exists. Installation
 adds generated agents, skills, and the extension without replacing foreign same-named files.
 Restart Copilot to load the generated extension, or ask the running CLI to reload extensions.
+Readiness is recorded in the extension's diagnostic log, not as a conversation banner.
+Inspect `roberdan-os` with `extensions_manage` to see its status and log. Copilot may restart
+extensions during plugin reconciliation; this adapter does not prevent those host reloads.
 Claude Code and Codex compatibility remains;
 Copilot-first does not mean those clients understand Copilot-specific model IDs or settings.
 
