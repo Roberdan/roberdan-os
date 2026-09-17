@@ -13,6 +13,8 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 - Osservatori nativi per Copilot e Claude, con rilevazione esplicita dei buchi di copertura,
   degli esiti sconosciuti e delle esecuzioni annullate; l'audit non concede permessi e non
   autentica il consenso umano.
+- L'ingresso pubblico della skill twin è ora `roberdan-twin` (prima `roberto-twin`); le
+  installazioni esistenti vengono migrate senza sovrascrivere copie locali o collisioni.
 
 ## 2.50.1 — 2026-09-14
 
