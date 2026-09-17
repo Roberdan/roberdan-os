@@ -191,10 +191,12 @@ export function createAuditObserver({ root, sessionId, runScript = ingest, repor
     async function flush() {
         pump();
         if (!running) return !gap;
+        const pending = queue.length + Number(Boolean(active));
+        const budget = Math.max(AUDIT_LIMITS.flushMs, pending * AUDIT_LIMITS.writeMs);
         let timer;
         const drained = await Promise.race([
             running.then(() => true),
-            new Promise((resolve) => { timer = setTimeout(() => resolve(false), AUDIT_LIMITS.flushMs); }),
+            new Promise((resolve) => { timer = setTimeout(() => resolve(false), budget); }),
         ]);
         clearTimeout(timer);
         if (!drained) { lost("flush_timeout"); active?.abort(); }

@@ -160,10 +160,12 @@ test("ingest rejection is sanitized and the next successful write is a coverage 
 
 test("shutdown is bounded even if an injected writer ignores cancellation", async () => {
     let calls = 0;
-    const { observer, warnings } = fixture(async () => {
+    const { observer, warnings } = fixture(async (path, input) => {
+        if (JSON.parse(input).type.startsWith("observer.")) return { code: 0 };
         calls++;
         await new Promise(() => {});
     });
+    await observer.flush();
     observer.observe(start("waiting"));
     const before = Date.now();
     assert.equal(await observer.stop(), false);
