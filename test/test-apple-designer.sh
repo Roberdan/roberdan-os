@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 
-for file in AGENTS.md .github/skills/roberto-twin/ENGINEERING.md; do
+for file in AGENTS.md .github/skills/roberdan-twin/ENGINEERING.md; do
   grep -Fq 'Apple application UI: mandatory skill' "$file" ||
     fail "mandatory Apple UI route missing from $file"
   grep -Fq 'apple-designer' "$file" || fail "Apple Designer not named in $file"
@@ -14,7 +14,7 @@ route_body() {
   awk '/^## Apple application UI: mandatory skill$/{active=1;next}
        active && /^## /{exit} active && NF{print}' "$1"
 }
-[ "$(route_body AGENTS.md)" = "$(route_body .github/skills/roberto-twin/ENGINEERING.md)" ] ||
+[ "$(route_body AGENTS.md)" = "$(route_body .github/skills/roberdan-twin/ENGINEERING.md)" ] ||
   fail "portable and canonical mandatory routing drifted"
 
 skill=skills/apple-designer/skill.md

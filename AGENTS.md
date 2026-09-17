@@ -33,6 +33,16 @@ answer for lack of context is *your* failure to explain. Revised 2026-09-13 on h
 the old "verified / not verified" block is gone, its guarantee moved inside the Stato lines.
 Full contract in [`behavior/roberto-mode.md § Communicating`](behavior/roberto-mode.md).
 
+**Decision before handoff (Roberto approved, 2026-09-17):** when the next step depends on
+Roberto's priorities, consult the **`twin` agent** before returning alternatives or analysis
+without an operational recommendation. The public entry point is the `roberdan-twin` skill;
+the `twin` agent is its internal adviser. A skill load is not that consultation.
+Bring one recommended next step, grounded in his explicit preferences, with uncertainty and
+the strongest counterargument. Execute if already authorized; human gates remain unchanged.
+Skip routine implementation and already-decided choices; reuse relevant advice, never recurse.
+If unavailable, disclose it and reason from available evidence, never invent Roberto's consent.
+Full contract: [`behavior/roberto-mode.md § Writing rules`](behavior/roberto-mode.md#writing-rules).
+
 The two complementary hemispheres of the behavioral canon:
 
 - **Engineering / operating** → [`behavior/roberto-mode.md`](behavior/roberto-mode.md)

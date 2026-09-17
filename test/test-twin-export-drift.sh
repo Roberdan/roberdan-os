@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test-twin-export-drift.sh — la skill twin esportata non resta indietro rispetto al canone.
 #
-# Perche' esiste: `.github/skills/roberto-twin/` e' derivata A MANO dal canone, non generata.
+# Perche' esiste: `.github/skills/roberdan-twin/` e' derivata A MANO dal canone, non generata.
 # Il 2026-09-13 si e' scoperto che era ferma al 21 agosto: il formato di risposta era cambiato
 # in AGENTS.md e la skill — quella che viaggia in OGNI repo e in ogni chat — insegnava ancora
 # il formato vecchio. Una copia a mano non ha nessun meccanismo che la tenga allineata: questo
@@ -16,8 +16,15 @@ fail=0
 t() { if [ "$2" = "ok" ]; then echo "  ok: $1"; else echo "  FAIL: $1"; fail=1; fi; }
 has() { grep -q -- "$2" "$1" 2>/dev/null && echo ok || echo no; }
 
-SK=".github/skills/roberto-twin/SKILL.md"
-TH=".github/skills/roberto-twin/THINKING.md"
+SK=".github/skills/roberdan-twin/SKILL.md"
+TH=".github/skills/roberdan-twin/THINKING.md"
+
+echo "== un solo ingresso pubblico con il nome approvato =="
+t "la skill dichiara roberdan-twin" "$(has "$SK" '^name: roberdan-twin$')"
+t "il vecchio ingresso non resta caricabile" "$([ ! -e .github/skills/roberto-twin/SKILL.md ] && echo ok || echo no)"
+for sidecar in ENGINEERING VOICE THINKING CONSTITUTION; do
+  t "il file $sidecar accompagna la skill" "$([ -s ".github/skills/roberdan-twin/$sidecar.md" ] && echo ok || echo no)"
+done
 
 echo "== il formato di risposta corrente e' nella skill che viaggia ovunque =="
 for part in "Stato" "Sto facendo" "Manca" "Mi serve da te"; do
