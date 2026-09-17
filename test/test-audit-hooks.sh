@@ -134,5 +134,8 @@ class ClaudeAuditHooks(unittest.TestCase):
         self.assertLess(time.monotonic() - before, 2)
 
 
-unittest.main(verbosity=2)
+result = unittest.main(verbosity=2, exit=False)
+raise SystemExit(0 if result.result.wasSuccessful() and subprocess.call(
+    ["node", "--test", str(HOOK.parents[1] / "test" / "test-copilot-audit.mjs")]) == 0 and subprocess.call(
+    ["bash", str(HOOK.parents[1] / "test" / "test-audit-chain.sh")]) == 0 else 1)
 PY

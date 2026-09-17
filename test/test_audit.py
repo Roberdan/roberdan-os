@@ -284,6 +284,53 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(coverage["declarations"][0]["provenance"], "agent_declared")
         self.assertFalse(coverage["permission_authority"])
 
+    def test_observer_self_reports_are_coverage_not_unsupported(self):
+        start = self.ingest("observer.start", {"error": {"code": "live_events_only"}}, source="o1")
+        limit = self.ingest("observer.unsupported",
+                            {"error": {"code": "permission_consent_not_observed"}}, source="o2")
+        gap = self.ingest("observer.gap", {"error": {"code": "events_lost"}}, source="o3")
+        end = self.ingest("observer.end", source="o4")
+        self.assertEqual([start["kind"], limit["kind"], gap["kind"], end["kind"]],
+                         ["observer_started", "observer_limitation", "observer_gap", "observer_ended"])
+        coverage = self.run_cli("coverage", "--json")
+        self.assertEqual(coverage["unsupported_events"], [])
+        self.assertEqual(coverage["observer_gaps"], [gap["id"]])
+        self.assertEqual([row["code"] for row in coverage["observer_limitations"]],
+                         ["permission_consent_not_observed"])
+
+    def test_claude_native_names_pair_without_inventing_a_subagent_outcome(self):
+        self.assertEqual(self.ingest("SessionStart", {"model": "claude"}, host="claude")["kind"],
+                         "session_started")
+        started = self.ingest("PreToolUse", {"toolCallId": "t1", "toolName": "Skill",
+                                             "arguments": {"skill": "roberdan-twin"}}, host="claude")
+        done = self.ingest("PostToolUse", {"toolCallId": "t1", "success": True}, host="claude")
+        self.assertEqual([started["kind"], done["kind"]],
+                         ["skill_invocation_started", "skill_invocation_succeeded"])
+        self.ingest("PreToolUse", {"toolCallId": "t2", "toolName": "Agent",
+                                   "arguments": {"agent_type": "twin"}}, host="claude")
+        failed = self.ingest("PostToolUseFailure", {"toolCallId": "t2", "success": False}, host="claude")
+        self.assertEqual(failed["kind"], "consultation_failed")
+        self.ingest("SubagentStart", {"agentId": "a1", "agentName": "twin"}, host="claude")
+        stopped = self.ingest("SubagentStop", {"agentId": "a1"}, host="claude")
+        self.assertEqual(stopped["kind"], "subagent_stopped")
+        self.assertEqual(self.ingest("SessionEnd", host="claude")["kind"], "session_ended")
+        stats = self.run_cli("stats", "--json")
+        self.assertEqual({item["agent_id"]: item["status"] for item in stats["attempts"]
+                          if item["agent_id"]}, {"a1": "terminal_status_unknown"})
+        self.assertEqual(stats["coverage"]["unsupported_events"], [])
+
+    def test_only_twin_selectors_count_as_skill_invocation(self):
+        other = self.ingest("tool.execution_start", {"toolCallId": "c1", "toolName": "skill",
+                                                     "arguments": {"skill": "pdf"}})
+        twin = self.ingest("tool.execution_start", {"toolCallId": "c2", "toolName": "skill",
+                                                    "arguments": {"skill": "roberdan-twin"}})
+        self.assertEqual([other["kind"], twin["kind"]],
+                         ["execution_started", "skill_invocation_started"])
+        self.assertEqual(self.ingest("subagent.configured", {"agentId": "a2", "agentName": "twin"})["kind"],
+                         "subagent_configured")
+        self.assertEqual(self.ingest("session.shutdown")["kind"], "session_ended")
+        self.assertEqual(self.run_cli("coverage", "--json")["unsupported_events"], [])
+
     def test_native_validation_and_unlinked_subagent(self):
         self.run_cli("ingest", "--host", "copilot", "--json", '{"type":"session.start"}', ok=False)
         self.ingest("tool.execution_complete", {"success": "true"}, ok=False)
