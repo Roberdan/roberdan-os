@@ -5,13 +5,8 @@
 set -euo pipefail
 
 RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
-# repo ROOT (independent of $KB, which under tests points at a temp fixture
-# dir) — needed so `kb plans`/`kb plan`/`kb sched` resolve docs/ and
-# proposals/ from the real repo no matter what directory `kb` is invoked from.
-#
-# Resolve the symlink chain FIRST. `kb` is installed as ~/.local/bin/kb -> this
-# file, and bash does not resolve symlinks for BASH_SOURCE: it reports the link
-# path. So the naive `dirname "${BASH_SOURCE[0]}"/..` computed ~/.local on every
+# Resolve ROOT independently of the board before dispatching commands such as audit.
+# BASH_SOURCE can name ~/.local/bin/kb; using its parent computed ~/.local on every
 # PATH invocation — i.e. essentially always. Nothing crashed, because every
 # consumer of $ROOT either fails soft or writes a directory into existence,
 # which is why it survived from install until 2026-07-29:
@@ -32,6 +27,11 @@ while [ -L "$_kb_src" ]; do
 done
 ROOT="$(cd -P "$(dirname "$_kb_src")/.." && pwd)"
 unset _kb_src _kb_dir
+
+if [ "${1:-}" = "audit" ]; then
+  shift
+  exec python3 "$ROOT/kanban/audit.py" "$@"
+fi
 
 # --- Federation read-path (design §2a/§2b) ---------------------------------
 # The registry (~/.roberdan-os/kanban-registry, local-only, one repo path per

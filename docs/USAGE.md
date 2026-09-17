@@ -363,9 +363,11 @@ bash bin/check-embedder.sh     # gbrain bge-m3 patch durability
 ```
 
 Hooks on a new machine: merge the generated `platforms/claude/settings-hooks.json` into
-`~/.claude/settings.json` (all five events — SessionStart context-inject, PreToolUse guards,
-PostToolUse autofmt, PreCompact + Stop auto-checkpoint). `bin/sync.sh --emit-only` regenerates
-it; bootstrap's "Manual steps" point at it.
+`~/.claude/settings.json` (context injection, guards, autofmt, checkpoints, and the read-only
+audit observer on Claude lifecycle/tool/subagent events). The observer records only sanitized
+metadata in `~/.roberdan-os/private/audit/events.sqlite3`; it never grants permission and
+unknown or missing events remain unknown. `bin/sync.sh --emit-only` regenerates it; bootstrap's
+"Manual steps" point at it.
 
 **Prompt cache TTL, and why the two values differ.** The same generated file carries
 `promptCacheTtl: "1h"` and `subagentPromptCacheTtl: "5m"` (claude-code ≥ 2.1.243). A card is one

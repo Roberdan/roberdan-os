@@ -104,6 +104,16 @@ compaction when available, not `/clear` or `/new`; do not cancel healthy jobs or
 downgrade the model/effort to make space. Only delegate when independent work benefits
 from a fresh context, with the required model profile and a concise evidence-based return.
 
+## Decision audit is evidence, not permission
+
+When the host provides a native lifecycle observer, record only the sanitized metadata needed
+to reconstruct usage, consultation attempts, execution and coverage. Keep prompts, commands,
+results, secrets and private reasoning out of the record. A discovery event is not a skill
+invocation; a consultation is not a recommendation; a recommendation is not Roberto's consent.
+Missing or unsupported events stay explicitly unknown, and the local audit never authorizes an
+action. Use explicit semantic records for decisions and human responses, then link them to
+typed evidence such as a commit, test or artifact.
+
 After compaction, recover the capsule and recheck its claims against the current revision,
 task, approvals and live job state before effects. Preserve review budgets and rejected
 approaches. Cancellation does not prove rollback: reconcile before retrying. Missing

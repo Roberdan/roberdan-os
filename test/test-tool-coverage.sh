@@ -38,6 +38,7 @@ CANON_SKILLS="$(cd "$ROOT/skills" 2>/dev/null && for d in */; do [ -f "$d/skill.
 # Se la derivazione si rompe l'elenco resta vuoto e il gate passerebbe senza asserire NIENTE —
 # esattamente il difetto che questo file esiste per impedire. Quindi vuoto = FAIL, non skip.
 [ -n "${CANON_SKILLS// /}" ] || err "nessuna skill trovata in $ROOT/skills/ — la derivazione dell'elenco e' rotta e il gate non starebbe verificando nulla"
+CANON_SKILLS="$CANON_SKILLS $(sed -n 's/^name: //p' "$ROOT/.github/skills/roberdan-twin/SKILL.md")"
 
 # Un solo controllo per tutti i tool: stessa forma di cablaggio (symlink dentro platforms/),
 # stesso elenco derivato, cosi' claude e copilot non possono divergere in silenzio.
@@ -54,6 +55,10 @@ check_skills_wired() { # <label> <skills-dir>
     _ns="$dir/rdos-$s/SKILL.md"
     if [ -e "$_lnk" ] && readlink "$_lnk" 2>/dev/null | grep -q "roberdan-os/platforms/"; then
       ok "$label skill '$s' wired (symlink resolves into roberdan-os platforms/)"
+    elif [ "$s" = "roberdan-twin" ] && [ -L "$dir/$s" ] \
+      && readlink "$dir/$s" | grep -qE '/\.github/skills/roberdan-twin$' \
+      && grep -q '^name: roberdan-twin$' "$_lnk"; then
+      ok "$label skill '$s' wired directly to its portable canonical directory"
     elif [ -f "$_ns" ] && grep -q "roberdan-os: namespaced install" "$_ns" 2>/dev/null; then
       ok "$label skill '$s' wired as 'rdos-$s' (nome '$s' occupato da un altro sistema)"
     elif [ -e "$_lnk" ]; then
@@ -62,6 +67,7 @@ check_skills_wired() { # <label> <skills-dir>
       err "$label skill '$s' missing at $_lnk (ne' come rdos-$s) — $REMEDIATE"
     fi
   done
+  [ ! -e "$dir/roberto-twin/SKILL.md" ] || err "$label still discovers the retired roberto-twin entry — migrate it without discarding local edits"
 }
 
 if [ -d "$HOME/.claude" ]; then

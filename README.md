@@ -62,6 +62,20 @@ global installer. Run `python3 bin/optional-skills.py list` to discover them, in
 
 ## What this actually is
 
+### One twin, one public entry point
+
+[`roberdan-twin`](.github/skills/roberdan-twin/SKILL.md) is the public skill for the operating
+method, voice and decision workflow. Its internal `twin` agent is a dedicated adviser, not
+another personality or a second skill the operator must choose. The former `roberto-twin`
+name has been retired; see the [installation and migration instructions](.github/skills/README.md).
+
+When a next step depends on the operator's priorities, the assistant consults that adviser
+with the actual choice, current constraints and relevant explicit preferences, then brings
+one actionable recommendation with uncertainty and a counterargument. Routine implementation
+and already-decided choices do not need another consultation. Advice is never human consent.
+Loading the skill proves that instructions were loaded, not that a consultation occurred or
+that the recommendation matches what the operator would decide.
+
 Concretely: **Markdown instructions, Bash/Python tooling, and a native Copilot extension.
 No hosted service or separate roberdan-os account.** The
 Markdown is a *behavioral canon* — the shared operating instructions — that any
@@ -101,9 +115,12 @@ it advertises. Stated plainly so you can trust the rest.
   and collision-safe, **Copilot custom agents** (`~/.copilot/agents/`) and a **user-scoped extension**
   (`~/.copilot/extensions/roberdan-os/`) that binds the provider-neutral `hooks/` to Copilot's
   lifecycle: context-injection on session start, the `main`/`bash` guards on pre-tool-use (real
-  deny/ask, fail-safe on error), autofmt, and an always-on pause/resume checkpoint — plus namespaced
-  tools (`roberdanos_kanban/pause/resume/verify-done/doctor`). Its completion gate is **advisory**
-  (Copilot can't block an already-produced final response — see limitations).
+  deny/ask, fail-safe on error), autofmt, an always-on pause/resume checkpoint, and a sanitized
+  lifecycle audit observer — plus namespaced tools (`roberdanos_kanban/pause/resume/verify-done/doctor`).
+  The observer records usage and coverage metadata locally, never permission or prompt contents;
+  its limits are explicit: discovery is not invocation, missing events remain unknown, and audit
+  records do not grant consent. Its completion gate is **advisory** (Copilot can't block an
+  already-produced final response — see limitations).
 - **factory** — bounded headless `claude -p` runs (timeout, model clamp, OAuth billing). Bounded,
   **not OS-sandboxed** (auto mode with `--permission-prompts none` plus the fixed deny list in `hooks/factory-guard.sh`, scoped to one dir).
 - **eval harness** — a real with/without-canon A/B + blind-judge pipeline. CI-gated. (See the

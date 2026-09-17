@@ -20,6 +20,7 @@ the canon changes meaningfully, re-derive it rather than assuming it's still in 
 | **Copilot Cowork / Copilot coding agent** | Already live for this repo (skills load from `.github/skills/`). For another repo: copy the `roberdan-twin/` folder into that repo's `.github/skills/`. |
 | **Copilot CLI / VS Code, personal scope** | `ln -s "$PWD/.github/skills/roberdan-twin" ~/.copilot/skills/` — available in every project, and it follows the repo. |
 | **Claude Code** | `ln -s "$PWD/.github/skills/roberdan-twin" ~/.claude/skills/` |
+| **Clients discovering `~/.agents/skills/`** | `ln -s "$PWD/.github/skills/roberdan-twin" ~/.agents/skills/` |
 | **claude.ai (upload)** | use `claude-ai-skill/` instead — that export is tuned for a sandbox with no repo. |
 
 **Link, don't copy — this is a scar, not a preference.** Both personal installs were plain
@@ -30,7 +31,8 @@ A copy has nothing that keeps it current; a symlink cannot drift. `test/test-twi
 guards the other half (the export itself falling behind `AGENTS.md`).
 
 Renamed from `roberto-twin` on 2026-09-17 at Roberto's request. For an existing install, inspect
-the old path first: migrate a symlink to the new name and target; preserve any real directory
+the old path in every discovery location, including `~/.agents/skills/`: migrate a symlink to
+the new name and target; preserve any real directory
 outside the host's skill-discovery directory before installing the link above. Never discard
 local edits. Do not leave the old skill alongside the new one: this is a rename, not an alias
 or a second entry point. Restart an existing session if its skill list is cached.
