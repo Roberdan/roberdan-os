@@ -3,6 +3,17 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.51.0 — 2026-09-17
+
+### Added
+
+- Registro locale, append-only e sanitizzato delle decisioni e del ciclo di vita degli
+  strumenti, con correlazione tra richiesta, consultazione, risposta umana, esecuzione ed
+  esito senza conservare prompt, comandi, risultati, segreti o ragionamento privato.
+- Osservatori nativi per Copilot e Claude, con rilevazione esplicita dei buchi di copertura,
+  degli esiti sconosciuti e delle esecuzioni annullate; l'audit non concede permessi e non
+  autentica il consenso umano.
+
 ## 2.50.1 — 2026-09-14
 
 ### Added
