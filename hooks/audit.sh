@@ -86,7 +86,7 @@ def send(envelope):
         result = subprocess.run(
             ["python3", str(root / "kanban" / "audit.py"), "ingest", "--host", "claude"],
             input=json.dumps(envelope).encode(), stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, timeout=0.75, check=False)
+            stderr=subprocess.DEVNULL, timeout=1.5, check=False)
     except subprocess.TimeoutExpired:
         diagnostic("ingest_timeout")
         return False
