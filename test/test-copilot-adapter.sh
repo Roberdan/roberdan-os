@@ -145,12 +145,12 @@ pout2="$(RDA_CLAUDE_SKILLS_DIR="$TMP/cl-pres" RDA_COPILOT_SKILLS_DIR="$CO/skills
     RDA_POINTER_HOME="$TMP/ptr-pres" RDA_FORCE_CODEX=0 RDA_FORCE_OPENCODE=0 bash bin/sync.sh --install 2>&1)"
 [ "$(printf '%s\n' "$pout2" | grep -c '^INSTALL agent ')" -eq 0 ] && ok "second run installs 0 new agents (idempotent)" || err "second run re-installed agents"
 printf '%s\n' "$pout2" | grep -q "^SKIP copilot extension: .* già presente" && ok "second run skips the existing extension (never overwrite)" || err "second run did not skip existing extension"
-
 # --- C/D/E) load shape + guard mapping via a stubbed SDK -----------------------
 section "extension load — registers namespaced tools + hooks; guard mapping deny/ask/allow/fail-safe"
 STAGE="$TMP/stage"; mkdir -p "$STAGE/node_modules/@github/copilot-sdk"
 cp "$EXT" "$STAGE/extension.mjs"
 cp "$(dirname "$EXT")/context-recovery.mjs" "$STAGE/context-recovery.mjs"
+cp "$(dirname "$EXT")/audit.mjs" "$STAGE/audit.mjs"
 cat > "$STAGE/node_modules/@github/copilot-sdk/package.json" <<'JSON'
 { "name": "@github/copilot-sdk", "version": "0.0.0-stub", "exports": { "./extension": "./extension.mjs" } }
 JSON

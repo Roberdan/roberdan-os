@@ -1,9 +1,10 @@
 # .github/skills — agent skills exported from the canon
 
-## `roberto-twin`
+## `roberdan-twin`
 
 Roberto's digital twin, packaged as a portable [Agent Skill](https://docs.github.com/en/copilot/how-tos/customize-copilot/add-agent-skills):
-one `SKILL.md` + three on-demand files. It carries the **judgment layer** of roberdan-os —
+one `SKILL.md` + four on-demand files. This is the single public entry point; the `twin` agent
+is its internal decision adviser, not a second skill to choose. It carries the **judgment layer** of roberdan-os —
 operating loop, evidence-first verification, human gates, voice, reasoning method — and
 explicitly *not* the local infrastructure (`kb`, `gbrain`, launchd, `private/`).
 
@@ -16,9 +17,10 @@ the canon changes meaningfully, re-derive it rather than assuming it's still in 
 
 | Surface | How to install |
 |---|---|
-| **Copilot Cowork / Copilot coding agent** | Already live for this repo (skills load from `.github/skills/`). For another repo: copy the `roberto-twin/` folder into that repo's `.github/skills/`. |
-| **Copilot CLI / VS Code, personal scope** | `ln -s "$PWD/.github/skills/roberto-twin" ~/.copilot/skills/` — available in every project, and it follows the repo. |
-| **Claude Code** | `ln -s "$PWD/.github/skills/roberto-twin" ~/.claude/skills/` |
+| **Copilot Cowork / Copilot coding agent** | Already live for this repo (skills load from `.github/skills/`). For another repo: copy the `roberdan-twin/` folder into that repo's `.github/skills/`. |
+| **Copilot CLI / VS Code, personal scope** | `ln -s "$PWD/.github/skills/roberdan-twin" ~/.copilot/skills/` — available in every project, and it follows the repo. |
+| **Claude Code** | `ln -s "$PWD/.github/skills/roberdan-twin" ~/.claude/skills/` |
+| **Clients discovering `~/.agents/skills/`** | `ln -s "$PWD/.github/skills/roberdan-twin" ~/.agents/skills/` |
 | **claude.ai (upload)** | use `claude-ai-skill/` instead — that export is tuned for a sandbox with no repo. |
 
 **Link, don't copy — this is a scar, not a preference.** Both personal installs were plain
@@ -28,9 +30,12 @@ rest of the day — in *every* project, which is exactly the surface this skill 
 A copy has nothing that keeps it current; a symlink cannot drift. `test/test-twin-export-drift.sh`
 guards the other half (the export itself falling behind `AGENTS.md`).
 
-If you made copies before this note, replace them: `rm -rf ~/.claude/skills/roberto-twin` then
-the `ln -s` above. Leaving a stale copy *next to* the link is worse than either — two
-directories declaring `name: roberto-twin` is a name collision, and the host silently keeps one.
+Renamed from `roberto-twin` on 2026-09-17 at Roberto's request. For an existing install, inspect
+the old path in every discovery location, including `~/.agents/skills/`: migrate a symlink to
+the new name and target; preserve any real directory
+outside the host's skill-discovery directory before installing the link above. Never discard
+local edits. Do not leave the old skill alongside the new one: this is a rename, not an alias
+or a second entry point. Restart an existing session if its skill list is cached.
 
 ### How it activates
 

@@ -29,6 +29,27 @@
 NS_PREFIX="rdos-"
 NS_MARKER="<!-- roberdan-os: namespaced install (skill-name collision) -->"
 
+emit_portable_twin() {
+  local d="$1" s="$ROOT/.github/skills/roberdan-twin/SKILL.md" name desc
+  name="$(fm "$s" name)"; desc="$(fm "$s" description)"
+  mkdir -p "$d/skills/$name"
+  cat > "$d/skills/$name/SKILL.md" <<EOF
+---
+name: $name
+description: $(yaml_dq "$desc")
+---
+
+# $name (single public entry)
+
+Read \`$s\` for the full instructions. Its internal \`twin\` agent is a decision
+adviser, not a second public entry. Companion instructions, read when relevant:
+- \`$ROOT/.github/skills/roberdan-twin/ENGINEERING.md\`
+- \`$ROOT/.github/skills/roberdan-twin/VOICE.md\`
+- \`$ROOT/.github/skills/roberdan-twin/THINKING.md\`
+- \`$ROOT/.github/skills/roberdan-twin/CONSTITUTION.md\`
+EOF
+}
+
 # Directory of any FOREIGN skill under $1 declaring name $2, ignoring the two dirs
 # that are legitimately ours ($3 plain, $4 namespaced). Empty + rc 1 when none.
 #
@@ -44,6 +65,8 @@ foreign_owner_of_name() {
     owner="$(dirname "$f")"
     [ "$owner" = "$mine_plain" ] && continue
     [ "$owner" = "$mine_ns" ] && continue
+    if [ "$want" = "roberdan-twin" ] && [ "$(basename "$owner")" = "roberto-twin" ] \
+      && legacy_twin_link "$owner" >/dev/null; then continue; fi
     if [ "$(fm "$f" name)" = "$want" ]; then echo "$owner"; return 0; fi
   done
   return 1
@@ -93,6 +116,56 @@ write_ns_wrapper() {
   fi
 }
 
+legacy_twin_link() {
+  local old="$1" link resolved
+  if [ -L "$old" ]; then link="$old"
+  elif [ -L "$old/SKILL.md" ]; then link="$old/SKILL.md"
+  else return 1; fi
+  resolved="$(python3 - "$link" <<'PY'
+import os
+import sys
+link = os.path.abspath(sys.argv[1])
+target = os.readlink(link)
+print(os.path.normpath(os.path.join(os.path.dirname(link), target)))
+PY
+)" || { echo "SKIP legacy twin: cannot inspect $link" >&2; return 1; }
+  case "$resolved" in
+    "$ROOT/.github/skills/roberto-twin"|"$ROOT/.github/skills/roberto-twin/SKILL.md"|\
+    "$ROOT/.github/skills/roberdan-twin"|"$ROOT/.github/skills/roberdan-twin/SKILL.md"|\
+    "$P/claude/skills/roberto-twin"|"$P/claude/skills/roberto-twin/SKILL.md")
+      printf '%s\n' "$link"; return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+retire_legacy_twin_link() {
+  local target_dir="$1" old="$1/roberto-twin" replacement="$1/roberdan-twin"
+  local link
+  if [ ! -e "$old" ] && [ ! -L "$old" ]; then return 0; fi
+  if [ ! -f "$replacement/SKILL.md" ] || [ "$(fm "$replacement/SKILL.md" name)" != "roberdan-twin" ]; then
+    echo "SKIP legacy twin: no verified roberdan-twin replacement in $target_dir"
+    return 0
+  fi
+  if ! python3 - "$replacement/SKILL.md" "$ROOT/.github/skills/roberdan-twin/SKILL.md" \
+    "$P/claude/skills/roberdan-twin/SKILL.md" <<'PY'
+import os
+import sys
+actual, *expected = map(os.path.realpath, sys.argv[1:])
+sys.exit(0 if actual in expected else 1)
+PY
+  then
+    echo "SKIP legacy twin: replacement in $target_dir is not managed by this installation"
+    return 0
+  fi
+  if ! link="$(legacy_twin_link "$old")"; then
+    echo "SKIP legacy twin: preserve real copy or unrelated link $old; inspect it before migration"
+    return 0
+  fi
+  unlink "$link"
+  if [ "$link" != "$old" ]; then rmdir "$old" 2>/dev/null || true; fi
+  echo "MIGRATE twin: retired verified legacy link $link; roberdan-twin is the public entry"
+}
+
 install_skills_set() {
   local label="$1" target_dir="$2"
   echo ""
@@ -140,5 +213,5 @@ install_skills_set() {
     ln -s "$w" "$plain/SKILL.md"
     echo "INSTALL $sname: symlink $plain/SKILL.md -> $w"
   done
+  retire_legacy_twin_link "$target_dir"
 }
-

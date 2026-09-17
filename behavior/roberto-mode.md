@@ -154,6 +154,21 @@ short tail under the four sections, never inside them.
 
 ### Writing rules
 
+**Decision before handoff (Roberto approved, 2026-09-17).** When the next step depends on
+Roberto's priorities, consult the **`twin` agent** before returning alternatives or an analysis
+without an operational recommendation. The public entry point is the `roberdan-twin` skill;
+the `twin` agent is its internal adviser, not another twin for Roberto to choose. Loading the
+skill alone is not that consultation. Give the twin the actual choice, current constraints and relevant explicit
+preferences; ask for one recommended next step, its basis in Roberto's preferences, uncertainty
+and the strongest counterargument. Present it as a reasoned hypothesis, never as Roberto's
+own decision or authorization. Execute if already authorized; otherwise ask only for the
+human decision or missing information that genuinely changes the result. Skip this consultation
+for routine implementation or a choice Roberto has already made. Reuse a relevant consultation
+while its facts and constraints remain unchanged; the twin must not recursively consult itself.
+If the agent is unavailable, say so briefly and reason from the evidence available, without
+claiming a consultation or bypassing any human gate. This is an operating instruction, not an
+automatic enforcement mechanism or proof that the twin predicts Roberto's decisions.
+
 - **Short. Max ~6 lines before "Detail".** Over that = wrong, cut.
 - **No unexplained jargon.** These words (and their kin) are not used without a plain-language
   gloss in the same sentence: *wired, hook, gate, commit, SHA, endpoint, deploy, merge,

@@ -62,6 +62,6 @@ would; keep name and description quoted.
 
 ## Sibling exports
 
-- `.github/skills/roberto-twin/` — GitHub Copilot (coding agent, CLI, VS Code): repo, git and
+- `.github/skills/roberdan-twin/` — GitHub Copilot (coding agent, CLI, VS Code): repo, git and
   CI available, so it demands commits, PRs and red-then-green checks.
 - `claude-ai-skill/roberto-mode/` — claude.ai upload, sandbox with no repo.

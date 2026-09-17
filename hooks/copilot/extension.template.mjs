@@ -1,6 +1,6 @@
 // roberdan-os — native GitHub Copilot CLI extension (TEMPLATE).
 //
-// Canonical source: sync.sh emits extension.mjs plus context-recovery.mjs, baking ROOT.
+// Canonical source: sync.sh emits extension.mjs, context-recovery.mjs and audit.mjs, baking ROOT.
 // --install symlinks the emitted extension into ~/.copilot/extensions/roberdan-os/.
 //
 // Shell hooks own context, tool guards, checkpoints and kanban gates; tools never bypass them.
@@ -17,6 +17,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createContextRecovery } from "./context-recovery.mjs";
+import { createAuditObserver } from "./audit.mjs";
 
 // Repo root: a runtime RDA_OS env wins (portable across forks / relocations); otherwise the
 // path baked at emit time. Never throws if it's wrong — every hook degrades to a no-op.
@@ -92,6 +93,7 @@ let chainRunning = false;
 let lastChainRun = 0;
 
 let session;
+let auditObserver;
 let agentStopObserved = false;
 let userPauseRequested = false;
 const contextRecovery = createContextRecovery({ hooksDirectory: HOOKS, runScript, runKb, hookPayload, diag });
@@ -632,6 +634,7 @@ const hooks = {
 
     onSessionEnd: async (input) => {
         // Best effort on graceful exit; crashes may never deliver this callback.
+        if (auditObserver) await auditObserver.stop();
         const p = join(HOOKS, "auto-checkpoint.sh");
         if (existsSync(p)) await runScript(p, hookPayload(input && input.workingDirectory), input && input.workingDirectory);
         return undefined;
@@ -680,6 +683,8 @@ try {
     const systemMessage = execFormatSystemMessage();
     session = await joinSession(systemMessage ? { tools, hooks, systemMessage } : { tools, hooks });
     execFormatInSystemMessage = Boolean(systemMessage); // after join: a throw leaves the long form
+    auditObserver = createAuditObserver({ root: RDA_OS, sessionId: sessionId() });
+    auditObserver.register(session);
     // Idle remains advisory. Only the typed onAgentStop return asks the runtime to continue.
     session.on("session.idle", (event) => {
         if (event && event.agentId) return;
