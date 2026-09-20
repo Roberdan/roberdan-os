@@ -66,6 +66,22 @@ class RecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "outside the active folder"):
                 self.runner.command(["git", "status"])
 
+    def test_active_discovery_includes_new_and_linked_roots_without_old_manifest(self):
+        root = self.root / "GitHub"
+        (root / "new/.git").mkdir(parents=True)
+        (root / "linked").mkdir()
+        (root / "linked/.git").write_text("gitdir: /fixture")
+        (root / "WareHouse/old/.git").mkdir(parents=True)
+        seen = []
+        def inspect(path):
+            seen.append(path)
+            return {"path": str(path), "github": "owner/" + path.name}
+        manifest = recovery.active_manifest(root, inspect)
+        self.assertEqual(seen, [root / "linked", root / "new"])
+        self.assertEqual(manifest["remote"], [])
+        with self.assertRaisesRegex(RuntimeError, "unavailable"):
+            recovery.active_manifest(root / "missing", inspect)
+
     def test_denied_pin_is_blocked_before_checkout_even_if_registered_path_changed(self):
         self.runner.manifest = {"remote": [], "local": [
             {"path": "/repo", "github": "owner/repo", "pin": "denied"}]}
@@ -156,6 +172,29 @@ class RecoveryTests(unittest.TestCase):
             self.assertEqual(self.runner.head(path), first)
             self.assertNotEqual(git("-C", original, "rev-parse", "HEAD"), first)
             self.assertEqual((path / "readme.md").read_text(), "one")
+            self.runner.checkout({"key": "owner/repo", "github": "owner/repo",
+                                  "local_path": str(original), "bare": False})
+            self.assertEqual(self.runner.head(path), git("-C", original, "rev-parse", "HEAD"))
+            self.assertEqual((path / "readme.md").read_text(), "two")
+            (path / ".git/info/exclude").write_text("personal.txt\n")
+            (path / "personal.txt").write_text("preserve")
+            with self.assertRaisesRegex(RuntimeError, "refusing to overwrite"):
+                self.runner.checkout({"key": "owner/repo", "github": "owner/repo",
+                                      "local_path": str(original), "bare": False})
+            self.assertEqual((path / "personal.txt").read_text(), "preserve")
+
+    def test_previously_verified_record_is_rechecked(self):
+        self.runner.manifest = {"remote": [], "local": [{"path": "/repo", "github": "owner/repo"}]}
+        self.runner.state["repos"]["owner/repo"] = {"status": "verified", "snapshot": "old"}
+        with patch.object(self.runner, "validate_backup"), \
+             patch.object(self.runner, "checkout", return_value=Path("/snapshot")) as checkout, \
+             patch.object(self.runner, "source_for", return_value=("source", False)), \
+             patch.object(self.runner, "refresh", return_value={"snapshot": "abc"}), \
+             patch.object(self.runner, "local_vectors") as vectors:
+            self.assertEqual(self.runner.run(), 0)
+            checkout.assert_called_once()
+            vectors.assert_called_once_with("source")
+        self.assertEqual(self.runner.state["repos"]["owner/repo"]["snapshot"], "abc")
 
     def test_incremental_refresh_checks_retained_page_identity(self):
         with patch.object(recovery, "active_pages", side_effect=[{1, 2}, {2, 3}]), \

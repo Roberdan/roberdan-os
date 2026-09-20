@@ -14,6 +14,13 @@ worktree containers, symlinks, removed repositories and remote-only entries are
 excluded even when an old manifest lists them. Scope is rechecked before each
 command; moving a repository out of the active folder blocks further processing.
 Excluded historical records are retained, not deleted or counted as current work.
+Current local Git metadata is discovered afresh, including top-level linked
+worktrees: a saved manifest is never used to resurrect removed projects or omit
+new active ones. The legacy `--manifest` argument remains for command compatibility.
+Every resumed pass rechecks previously verified projects against current local HEAD.
+Owned clean snapshots advance only by fast-forward from the active local repository;
+divergence, ignored/untracked files or a moving local HEAD block verification rather
+than resetting a branch or reporting an old snapshot as current.
 
 ```sh
 python3 bin/gbrain-recover-repos.py \

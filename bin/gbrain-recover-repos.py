@@ -71,6 +71,15 @@ def eligible(record, root):
             and (path / ".git").exists())
 
 
+def active_manifest(root, inspect_repo):
+    root = Path(root)
+    if not root.is_dir():
+        raise RuntimeError("Active repository folder is unavailable.")
+    local = [inspect_repo(path) for path in sorted(root.iterdir())
+             if eligible({"local_path": str(path)}, root)]
+    return {"local": [item for item in local if item], "remote": []}
+
+
 class Recovery:
     def __init__(self, manifest, root, backup, blocked_sources=(), active_root=None):
         self.manifest = manifest
@@ -151,8 +160,21 @@ class Recovery:
         if path.exists():
             if not marker.exists() or json.loads(marker.read_text()).get("key") != record["key"]:
                 raise RuntimeError(f"Existing checkout is not owned by this recovery: {path}")
-            if self.command(["git", "-C", path, "status", "--porcelain"]):
+            if self.command(["git", "-C", path, "status", "--porcelain", "--untracked-files=all", "--ignored"]):
                 raise RuntimeError(f"Managed snapshot was modified; refusing to overwrite: {path}")
+            if local:
+                revision = self.head(Path(local))
+                if self.head(path) != revision:
+                    git_dir = self.command(["git", "-C", local, "rev-parse", "--absolute-git-dir"])
+                    self.command(["git", "-c", "core.hooksPath=/dev/null", "-C", path, "fetch",
+                                  "--no-tags", "--no-recurse-submodules", git_dir, revision])
+                    if self.head(Path(local)) != revision:
+                        raise RuntimeError("Local HEAD changed while refreshing the managed snapshot.")
+                    self.command(["git", "-c", "core.hooksPath=/dev/null", "-C", path,
+                                  "merge", "--ff-only", "--no-edit", revision])
+                    if self.head(path) != revision:
+                        raise RuntimeError("Managed snapshot does not match current local HEAD.")
+                    marker.write_text(json.dumps({"key": record["key"], "snapshot": revision}) + "\n")
             return path
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         if local:
@@ -261,9 +283,6 @@ class Recovery:
             self.state["active_root"] = str(self.active_root) if self.active_root else None
             for index, record in enumerate(records, 1):
                 key = record["key"]
-                previous = self.state["repos"].get(key, {})
-                if previous.get("status") == "verified":
-                    continue
                 row = {**record, "status": "running", "started": time.time()}
                 self.current_record = record
                 self.state["repos"][key] = row
@@ -284,6 +303,8 @@ class Recovery:
                     row["index_status"] = "verified"
                     self.save()
                     self.local_vectors(source)
+                    if record.get("local_path") and self.head(Path(record["local_path"])) != row["snapshot"]:
+                        raise RuntimeError("Local HEAD changed during recovery; a fresh pass is required.")
                     row["status"] = "verified"
                 except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
                     row["status"] = "blocked"
@@ -312,7 +333,12 @@ def main():
                         help="Do not access or modify an explicitly ungranted source.")
     args = parser.parse_args()
     os.umask(0o077)
-    manifest = json.loads(args.manifest.read_text())
+    # The saved manifest is evidence, not authority to resurrect moved/deleted projects.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("repo_audit", Path(__file__).with_name("gbrain-repo-audit.py"))
+    audit = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(audit)
+    manifest = active_manifest(args.active_root, audit.inspect)
     if not args.apply:
         print(json.dumps([r for r in plan(manifest) if eligible(r, args.active_root)], indent=2))
         return 0
