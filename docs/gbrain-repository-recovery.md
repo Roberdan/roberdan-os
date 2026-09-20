@@ -28,6 +28,29 @@ indexed revision reached, production metadata unchanged. The evidence cannot
 authorize deletions, reconciliation or a different rename batch. Live retention
 and revision checks still run after the operation.
 
+## Recurring active-only maintenance
+
+`bin/gbrain-refresh-active.py` reuses the conservative recovery implementation
+and the installed private `~/.claude/scripts/buongiorno*` logging/Ollama helpers.
+Install it alongside `gbrain-recover-repos.py` and `gbrain-repo-audit.py` in a
+stable private directory; never point a scheduled job at a disposable worktree.
+`--plan` only discovers current direct-child projects. Normal refresh requires
+`--backup <verified-state.json>`; repeat `--blocked-source` for access exclusions.
+`--require-ac` preserves the existing battery safeguard without changing schedules.
+
+`--embed-source <id>` performs only explicitly scoped embeddings. It measures
+gbrain's actual stale count, including changed hashes/signatures, not just NULL
+vectors; malformed results, command failures, two no-progress passes and the
+iteration ceiling fail visibly. There is no global embedding fallback, SQL
+interpolation of source IDs, secret-file loading, remote model fallback or model
+download. An existing Ollama process stays running; an owned temporary service
+is held for the whole operation and stopped afterwards. Logs are retained under
+`~/Library/Logs/gbrain-refresh`, without truncation or changes to the 05:30 check.
+
+The currently validated upstream revision is pinned in the runner. A different
+or dirty gbrain installation stops it rather than assuming migration compatibility.
+This is not an automatic gbrain upgrader; that remains separate unfinished work.
+
 ```sh
 python3 bin/gbrain-recover-repos.py \
   --manifest /private/path/repo-coverage.json \

@@ -305,6 +305,8 @@ class Recovery:
     def run(self):
         with (self.root / "run.lock").open("w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if self.path.exists():
+                self.state = json.loads(self.path.read_text())
             self.validate_backup()
             all_records = plan(self.manifest)
             records = [r for r in all_records if eligible(r, self.active_root)]
