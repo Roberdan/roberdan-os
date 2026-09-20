@@ -7,7 +7,7 @@ import re
 
 MODEL = "jev-1.13.0"
 ENDPOINT = "https://api.typesafe.ai/v1/systemone"
-POLICY_VERSION = "jev-policy-1"
+POLICY_VERSION = "jev-policy-2"
 MAX_INPUT_BYTES = 48000
 MAX_REQUEST_BYTES = 12000
 MAX_RESPONSE_BYTES = 262144

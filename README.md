@@ -80,7 +80,9 @@ Instruction-based routing is not a guarantee that a host agent invokes the tool.
 **Live mode stays off after installation:** use the skill's activation instructions only after
 approving a budget and reviewing the exact public/synthetic payload. A saved key is not consent.
 Credentials and runtime state stay outside Git under `~/.roberdan-os/private/`.
-Since **2.52.1**, explicit provider credit refusals carry a clear operator alert, separate
+Version **2.52.1** corrects typed provider-response handling and preserves confidence as a
+separate signal rather than equating it with the selected Choice probability.
+Explicit provider credit refusals carry a clear operator alert, separate
 from local allowance limits. An HTTP 402 without credit evidence reports a payment issue,
 not a verified zero balance; errors never trigger automatic retries or account recharges.
 No account is needed for the core system; live Jev use needs a separate TypeSafe API account.

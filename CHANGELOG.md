@@ -7,6 +7,9 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 
 ### Fixed
 
+- Correct the real provider response contract: require each answer's `type`, validate it
+  against its question, and treat Choice confidence separately from the selected probability.
+  The first authorized live activation exposed a fixture-only compatibility blind spot.
 - Explicit TypeSafe credit-exhaustion responses now return a clear operator-facing message,
   distinct from local spending/request limits and an otherwise unexplained HTTP 402.
 - Error-body inspection is bounded and never echoes provider text, account details or keys.
