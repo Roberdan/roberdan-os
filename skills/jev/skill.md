@@ -71,7 +71,12 @@ use the original workflow rather than treating a truncated result as a full comp
 
 Run `evaluate PROFILE --input FILE` without `--live`. Inspect the complete outbound payload.
 The request hash binds that payload/model/rubric to review. Do not fabricate approval.
-Live use needs BOTH an operator-approved private configuration and the approved payload hash:
+Live use needs BOTH an operator-approved private configuration and the approved payload hash.
+Disclosure approval may name one payload **or an explicit public/synthetic class within the
+authorized task/provider**. Under that standing authorization, the orchestrator reviews the
+actual bytes and records their hash without asking Roberto again for every routine request.
+Never infer disclosure rights from the budget alone, a demo label, a clean secret scan,
+a memory note or a model judgment. Private context remains excluded.
 
 ```bash
 python3 bin/jev.py evaluate twin --input /absolute/path/to/reviewed-input.json \
@@ -80,7 +85,11 @@ python3 bin/jev.py evaluate twin --input /absolute/path/to/reviewed-input.json \
 
 Never infer spend approval from a saved API key, from installation or from this example.
 Do not set a budget or enable a profile on the user's behalf without their authorization.
-An approved exact payload can be reused within its allowance; changed bytes need new review.
+An approved exact payload can be reused within its allowance; changed bytes need new review,
+not necessarily a new human approval if they remain inside the explicit authorized class.
+Retries after a diagnosed local defect consume the same allowance; no automatic transport
+retry, reset or transfer of unused budget to an unrelated purpose. Keep the approval's stated
+scope/lifetime rather than inventing a fresh allowance at each session.
 This deliberately does not enable unreviewed every-turn network calls.
 
 Credentials: `TYPESAFE_API_KEY`, or the owner-only file

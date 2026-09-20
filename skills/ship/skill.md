@@ -21,13 +21,19 @@ If a step fails: fix and **re-run all** checks. Never push with known failures.
 ## Sequence
 1. Dedicated branch (never work directly on `main`).
 2. Commit **per phase**, conventional + evidence-first messages (SHA/PR/CI).
-3. `git push` the branch.
+3. Before public push/tag/release, verify scope-matching publication approval and content
+   provenance, then run `bash "$RDA_ROOT/bin/publication-check.sh" <reviewed-base>` from the
+   target repo (`RDA_ROOT` is the canonical roberdan-os checkout). Missing/failed Gitleaks
+   blocks publication, not local work. Its clean result is not confidentiality or permission
+   proof; retain the repository's existing privacy checks. Then `git push` the branch.
 4. Open PR: **Summary + Test plan** (5-section template if the repo uses one).
 5. Watch CI: `gh pr checks <n>` — all SUCCESS before proceeding.
 6. Merge: **merge-commit only** (never squash, never rebase — preserves history for parallel agents).
 7. Post-merge: delete the branch, fast-forward local `main`, report the merge commit SHA.
 
 ## Human gates (STOP — ask first)
+Do not ask again if the operator already authorized this artifact, destination and consequence.
+Local edits/commits, tests and implementation choices are not publication.
 - Merge to `main` impacting branch-protection / security / license / release-infra (#1)
 - Force-push to `main` (#2) — **always forbidden without explicit confirmation**
 - CI not fully green → don't merge anything pending/failing

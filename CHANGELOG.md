@@ -3,7 +3,25 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
-## 2.52.1 — 2026-09-20
+## 2.53.0 — 2026-09-20
+
+### Added
+
+- Risk-scoped standing authorization: routine in-scope work proceeds without repeated
+  confirmation; genuine authority gaps remain human decisions and do not stall unrelated
+  authorized work. Canonical, global and portable Twin instructions stay aligned.
+- Memory-informed Twin decisions use explicit preferences, applicable precedents and observed
+  outcomes, retaining provenance and uncertainty. Old memories never create permissions;
+  private context stays out of Jev and failed recall does not freeze routine work.
+- Fail-closed Gitleaks publication check over the outgoing Git history, routed through the
+  universal entry point and shipping skill. A clean secret scan is not confidentiality proof
+  or publication authorization. ADR-0004 records the boundaries and acceptance matrix.
+
+### Changed
+
+- Explicit disclosure approval can cover a public/synthetic input class; the orchestrator
+  still reviews/hash-binds every payload within the existing provider/purpose/allowance.
+  Controlled replays consume the same cap; no auto-reset, top-up or unlimited retry is added.
 
 ### Fixed
 

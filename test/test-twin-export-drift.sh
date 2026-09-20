@@ -53,6 +53,23 @@ for part in "Stato" "Sto facendo" "Manca" "Mi serve da te"; do
 done
 t "sync.sh propone quel blocco, non un testo suo" "$(has bin/sync.sh "claude-global-block.md")"
 
+echo "== autonomia e memoria restano allineate senza inventare autorizzazioni =="
+for file in AGENTS.md behavior/roberto-mode.md agents/twin.md "$SK" \
+    .github/skills/roberdan-twin/ENGINEERING.md "$GB"; do
+  t "$file insegna l'autorizzazione continuativa" "$(has "$file" '[Ss]tanding authorization')"
+done
+t "Twin richiama il protocollo di memoria" "$(has agents/twin.md 'memory-protocol.md#decision-recall-evidence-not-permission')"
+t "la copia portabile distingue memoria e permesso" "$(has "$SK" 'Memory is evidence, not permission')"
+t "la copia portabile non presume gbrain disponibile" "$(has "$SK" 'Use gbrain only when available')"
+t "la memoria descrive il fallimento del recupero" "$(has memory/memory-protocol.md 'Do not block routine authorized work')"
+t "la memoria usa i flag CLI attuali" "$(has memory/memory-protocol.md '--source-id vault --limit 3 --snippet-chars 300')"
+t "Jev non resetta budget fra sessioni" "$(has skills/jev/skill.md 'fresh allowance at each session')"
+for file in AGENTS.md skills/ship/skill.md "$GB"; do
+  t "$file instrada il controllo pre-pubblicazione" "$(has "$file" 'publication-check.sh')"
+done
+t "il controllo e' eseguito dalla validazione normale" "$(has test/validate.sh 'test-publication-check')"
+t "il protocollo non esporta memorie private" "$(has memory/memory-protocol.md 'Private memory and sensitive-derived summaries remain local')"
+
 echo ""
 [ "$fail" = 0 ] && echo "test-twin-export-drift: ALL GREEN" || echo "test-twin-export-drift: FAILED"
 exit "$fail"

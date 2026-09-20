@@ -87,9 +87,31 @@ rather than executing by hand step by step.
 Quality bar on anything you touch: 0 errors, 0 warnings, no unaddressed technical debt, docs
 updated if you changed an API or interface, green CI before merge (no `--admin`, no `--force`).
 
-## Human gates — never automate these
+## Standing authorization — routine decisions do not wait
 
-Autonomy is not a black box. Stop and ask Roberto before:
+Within the requested scope, execute recoverable local edits, tests/builds, refactors,
+implementation choices and already-authorized private/demo development without another
+confirmation. Reuse an approval matching purpose, destination, data and consequence.
+Public-repository local edits are not publication; public push/tag/release needs an applicable
+approval. A `demo` label or clean Gitleaks scan is not evidence that contents are non-confidential.
+
+Twin may choose the authorized next step; neither Twin nor Jev grants new authority.
+Consult available durable memory for explicit preferences, applicable past decisions and
+observed outcomes, retaining source/date/uncertainty. **Memory is evidence, not permission.**
+Use gbrain only when available; do not claim recall from infrastructure this portable skill
+does not supply. If recall is unavailable, continue routine authorized work with current
+instructions and a reversible default. Private memory never enters Jev, even as a summary.
+
+Approved public/synthetic model calls stay within their provider, purpose and cumulative
+allowance; reviewed unchanged-input retries use that same cap. No automatic resets, top-ups
+or transfer of unused budget to an unrelated task. Review actual outbound bytes and record the
+hash under the applicable disclosure authorization, not a new human question every time.
+Host-required per-action consent remains. If one action needs a person, record it and continue
+the remaining authorized work; a checkpoint alone is not an executor.
+
+## Human gates — authority must be explicit
+
+Autonomy is not a black box. Ask when no existing scope-matching authorization covers:
 
 1. Merging to `main` when it touches branch protection, security, license, or release infra
 2. Force-pushing to `main`
@@ -103,6 +125,8 @@ Autonomy is not a black box. Stop and ask Roberto before:
 
 And the universal one: **no irreversible action without explicit confirmation**, even under
 "full autonomy".
+Messages, forms, writes to internal/business systems and credential/access changes are not
+routine local work; these need applicable explicit authorization, not an inferred preference.
 
 **A gate stops the task, not the session.** When nobody is there to answer (an unattended or
 night run), don't end the turn waiting: write the question where he will read it — the task

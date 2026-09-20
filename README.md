@@ -80,7 +80,7 @@ Instruction-based routing is not a guarantee that a host agent invokes the tool.
 **Live mode stays off after installation:** use the skill's activation instructions only after
 approving a budget and reviewing the exact public/synthetic payload. A saved key is not consent.
 Credentials and runtime state stay outside Git under `~/.roberdan-os/private/`.
-Version **2.52.1** corrects typed provider-response handling and preserves confidence as a
+Version **2.53.0** corrects typed provider-response handling and preserves confidence as a
 separate signal rather than equating it with the selected Choice probability.
 Explicit provider credit refusals carry a clear operator alert, separate
 from local allowance limits. An HTTP 402 without credit evidence reports a payment issue,
@@ -88,6 +88,29 @@ not a verified zero balance; errors never trigger automatic retries or account r
 No account is needed for the core system; live Jev use needs a separate TypeSafe API account.
 Model quality, Italian accuracy, preference agreement and end-to-end savings are not yet
 established by the offline tests. Twin observations remain separate from its recommendation.
+
+### Routine autonomy, informed by memory
+
+Version **2.53.0** makes the boundary explicit: routine recoverable work inside the requested
+scope proceeds without repeated permission questions. Twin can choose an already-authorized
+next step using relevant gbrain memories: explicit preferences, comparable decisions and
+observed outcomes, with provenance and uncertainty. Memory is evidence, never consent;
+private notes and sensitive-derived summaries stay out of Jev. Unavailable recall does not
+freeze routine authorized work.
+
+An existing approval is reused only when purpose, destination, data and consequence match.
+New spending, unapproved publication, confidential disclosure, external messages/business
+system writes and irreversible actions still need applicable authority. If one action is
+blocked, the rest of the authorized work continues. Budgets remain cumulative; installation
+does not enable paid calls and a new session never resets an allowance.
+
+Before public push/tag/release, the universal instructions and shipping workflow require
+`bash bin/publication-check.sh <reviewed-base>` (invoke its canonical path when inside another
+repository). It requires Gitleaks on PATH, scans outgoing history with redacted diagnostics and
+refuses missing/failed scans. A clean scan is not confidentiality proof or permission.
+[ADR-0004](docs/adr/0004-bounded-autonomy.md) records the examples and acceptance criteria.
+These are operating instructions plus a real scanner, not a new host permission system or an
+always-running executor; memory infrastructure remains optional.
 
 ## What this actually is
 
