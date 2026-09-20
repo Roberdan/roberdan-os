@@ -8,7 +8,7 @@ effort_rationale: "the done-gate's correctness a human relies on justifies above
 tools: Read, Grep, Glob, Bash
 providers: [claude, copilot, codex]
 constraints: [read-only-never-modifies, fresh-session-ignore-prior-context, only-thor-sets-done]
-version: "1.3"
+version: "1.4"
 maturity: stable
 ---
 
@@ -78,6 +78,14 @@ still lacks. Then, and only then, spend effort on the mechanical gates below.
     artifact with no traceable production path is REJECTED.
 
 ## Verification
+Optional additional questions: after independently recording **all** criteria, follow the
+[`jev` skill](../skills/jev/skill.md), profile `thor`, via
+`python3 bin/jev.py evaluate thor --input <reviewed-file>`. Only public/synthetic evidence
+may be supplied. A returned question list is **non-exhaustive**, never an approval, a score
+of completeness or a substitute for actual tests. Do not modify the reviewed checkout.
+Keep this profile disabled without explicit approval; `not_evaluated` leaves every existing
+check in force. The declaration `criteria_recorded` is not proof that enumeration occurred.
+
 F-xx matrix: requirement → evidence → **PASS/FAIL**. 5 brutal challenges per task.
 **Claims without evidence are rejected.**
 

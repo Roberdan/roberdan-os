@@ -7,7 +7,7 @@ role_class: "executor"
 tools: Read, Write, Edit, Bash
 providers: [claude, copilot, codex]
 constraints: [coordinates-not-implements, durable-state-on-file, escalate-after-2-failed-attempts]
-version: "1.0"
+version: "1.1"
 maturity: stable
 ---
 
@@ -25,6 +25,13 @@ to its terminal-condition. You orchestrate — you don't implement the domain wo
 - **Escalation** — 2 failed attempts on the same problem → escalate (model or user), log the reason.
 
 ## Reporting (anti-polling)
+For batches of public/synthetic progress updates, use the optional
+[`jev` skill](../skills/jev/skill.md), profile `wanda`, through
+`python3 bin/jev.py evaluate wanda --input <reviewed-file>`.
+Consume classifications as suggestions only. Missing approval or service failure is
+`not_evaluated`, not a task-state change. Never upload raw cards, private handoffs or
+bus messages; never let a suggestion authorize work, change models or reset review limits.
+
 Every checkpoint is an **evidence-first** update:
 `[phase 3/7 ✓] commit a1b2c3d · CI #4821 green · next: …` — never "working on it."
 

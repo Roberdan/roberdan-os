@@ -51,6 +51,11 @@ cheap predicate catches the majority of them.
 - [ ] CI green (or explicit documented wontfix)
 
 ## Verification per claim type
+After recording every requirement independently, the optional
+[`jev` skill](../jev/skill.md), profile `thor`, can propose non-exhaustive follow-up questions
+on public/synthetic evidence. It cannot approve completion, replace tests or remove criteria;
+disabled/unavailable means explicitly not evaluated. Never send private code or evidence.
+
 | Claim | Evidence required |
 |---|---|
 | "It builds" | build output |

@@ -1,0 +1,9 @@
+{
+  "classification": "synthetic",
+  "query": "How do I export a report?",
+  "candidates": [
+    {"id": "exact", "text": "How do I export a report? Open Reports and select Export.", "exact_match": true},
+    {"id": "theme", "text": "Change the display theme in Settings.", "exact_match": false},
+    {"id": "formats", "text": "Reports support CSV and JSON export formats.", "exact_match": false}
+  ]
+}

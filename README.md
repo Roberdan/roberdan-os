@@ -60,6 +60,30 @@ For the task CLI, optional Claude hooks, and other clients, see
 global installer. Run `python3 bin/optional-skills.py list` to discover them, including
 `instagram-reel-preview` for local Reel covers and Instagram-style post frames.
 
+### Optional Jev judgments
+
+Version **2.52.0** adds a shared [Jev integration](skills/jev/skill.md) for four bounded uses:
+Twin preference observations, public search-result ordering, Wanda progress suggestions and
+Thor evidence-gap questions. It complements agent reasoning; it never authorizes an action
+or declares work complete. [ADR-0003](docs/adr/0003-jev-shared-judgment.md) records the decision.
+
+```bash
+python3 bin/jev.py status
+python3 bin/jev.py profiles
+python3 bin/jev.py evaluate twin --input skills/jev/examples/twin.json
+bash test/test-jev.sh
+```
+
+The example is an offline preview, not an inference. `bin/sync.sh --install` makes the `jev`
+skill and agent instructions available through the existing platform integrations.
+Instruction-based routing is not a guarantee that a host agent invokes the tool.
+**Live mode stays off after installation:** use the skill's activation instructions only after
+approving a budget and reviewing the exact public/synthetic payload. A saved key is not consent.
+Credentials and runtime state stay outside Git under `~/.roberdan-os/private/`.
+No account is needed for the core system; live Jev use needs a separate TypeSafe API account.
+Model quality, Italian accuracy, preference agreement and end-to-end savings are not yet
+established by the offline tests. Twin observations remain separate from its recommendation.
+
 ## What this actually is
 
 ### One twin, one public entry point

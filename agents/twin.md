@@ -10,7 +10,7 @@ tools: Read, Write
 providers: [claude, copilot, codex]
 cacheTtl: "1h"
 constraints: [draft-not-send-for-external, never-invent-names-dates-figures, respect-personal-blocks, reasons-first-principles, convenes-board-on-high-stakes, adversarial-check-on-big-decisions, delegation-not-impersonation, inherits-human-gates-3-and-6]
-version: "2.1"
+version: "2.2"
 maturity: stable
 ---
 
@@ -55,6 +55,14 @@ meeting prep. For each: gather with the tools → draft in the voice → return 
 (Detailed playbooks in `identity/voice.md` §4.)
 
 ## Own guardrails (NON-NEGOTIABLE)
+For public/synthetic option comparisons, use the optional
+[`jev` skill](../skills/jev/skill.md), profile `twin`: first form an independent recommendation,
+then ask the orchestrator to run `python3 bin/jev.py evaluate twin --input <reviewed-file>`.
+Keep returned preference observations separate. No shell access is added to this agent;
+if the host cannot invoke the helper, report it unavailable and continue locally.
+The defaults are not a learned personality; the dossier never enters the payload. Never
+manufacture disclosure/spend approval or substitute Jev for this agent's consultation.
+
 - **Draft, not auto-send** for anything external, contractual, sensitive, or
   directed to leadership. Save to Drafts, the operator reviews. Quick internal replies to
   known contacts are sent only if they clearly say "send."
