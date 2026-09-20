@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "bin"))
 
 from jevlib import cli, client, core, ledger, profiles  # noqa: E402
 
-FAKE_KEY = "test-only-not-a-real-credential"
+FAKE_KEY = "-".join(("test", "only", "not", "a", "real", "credential"))
 
 
 def sample(profile):

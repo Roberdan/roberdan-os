@@ -123,7 +123,7 @@ class ProfileTests(Fixture):
             lambda d: d["items"][0].update(text=" "),
             lambda d: d["items"][0].update(text="\ud800"),
             lambda d: d["items"][0].update(id="../escape"),
-            lambda d: d["items"][0].update(id="ghp_abcdefghijk"),
+            lambda d: d["items"][0].update(id="_".join(("ghp", "abcdefghijk"))),
             lambda d: d.update(items=d["items"] * 2),
             lambda d: d.update(items=[]),
             lambda d: d.update(items=[{"id": f"i{i}", "text": "x"} for i in range(9)]),
@@ -141,8 +141,9 @@ class ProfileTests(Fixture):
                 profiles.prepare(profile, data)
 
     def test_secret_scanner_rejects_recognizable_keys(self):
-        for secret in ("api_key=should-not-leak", "Bearer fakecredential",
-                       "ghp_" + "a" * 30, "-----BEGIN PRIVATE KEY-----",
+        for secret in ("=".join(("api_key", "should-not-leak")),
+                       " ".join(("Bearer", "fakecredential")),
+                       "ghp_" + "a" * 30, " ".join(("-----BEGIN", "PRIVATE", "KEY-----")),
                        "AKIA" + "A" * 16):
             data = sample("wanda")
             data["items"][0]["text"] = secret

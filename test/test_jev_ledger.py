@@ -114,17 +114,21 @@ class LedgerTests(Fixture):
             changed = sample("wanda")
             changed["items"][0]["text"] += " Changed."
             self.assertFalse(self.live(data=changed)["from_cache"])
+            self.live()
             with mock.patch.object(core, "POLICY_VERSION", "test-policy"):
                 self.assertFalse(self.live()["from_cache"])
+            self.live()
             with mock.patch.object(profiles, "RUBRIC_VERSION", "test-rubric"):
                 self.assertFalse(self.live()["from_cache"])
+            self.live()
             with mock.patch.object(core, "MODEL", "test-model"):
                 self.assertFalse(self.live()["from_cache"])
+            self.live()
             self.configure(approval="a different explicit approval")
             self.assertFalse(self.live()["from_cache"])
-            self.assertEqual(network.call_count, 6)
-            self.assertEqual(self.state()["requests"], 6)
-        self.assertEqual(self.state()["input_tokens"], 600)
+            self.assertEqual(network.call_count, 10)
+            self.assertEqual(self.state()["requests"], 10)
+        self.assertEqual(self.state()["input_tokens"], 1000)
 
     def test_config_changes_never_reset_request_or_spending_totals(self):
         self.configure(max_requests=1)
