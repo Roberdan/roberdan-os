@@ -9,6 +9,21 @@ from jevlib.private import credential
 
 
 class SecurityTests(Fixture):
+    def test_dry_run_never_opens_private_area_with_or_without_key(self):
+        path = self.input_file("wanda")
+        with mock.patch.object(client, "Area", side_effect=OSError("must stay unopened")) as area:
+            with mock.patch.object(client, "credential") as secret:
+                with mock.patch.object(client, "transport") as network:
+                    for present in (True, False):
+                        if not present:
+                            self.env.pop("TYPESAFE_API_KEY")
+                        code, result = self.invoke(["evaluate", "wanda", "--input", str(path)])
+                        self.assertEqual((code, result["status"]), (0, "dry_run"))
+                    area.assert_not_called()
+                    secret.assert_not_called()
+                    network.assert_not_called()
+        self.assertFalse((self.home / ".roberdan-os").exists())
+
     def test_missing_and_disabled_config_make_zero_calls(self):
         with mock.patch.object(client, "transport") as network:
             with mock.patch.object(client, "credential", side_effect=AssertionError("read")):
@@ -63,8 +78,10 @@ class SecurityTests(Fixture):
                                      (self.area, 0o755, 0o700),
                                      (self.area.parent, 0o755, 0o700)):
             path.chmod(unsafe)
-            with self.assertRaisesRegex(core.JevError, "unsafe_private_permissions"):
-                self.live()
+            with mock.patch.object(client, "transport", side_effect=reply) as network:
+                with self.assertRaisesRegex(core.JevError, "unsafe_private_permissions"):
+                    self.live()
+                network.assert_not_called()
             path.chmod(secure)
 
     def test_symlink_and_hardlink_rejected(self):
