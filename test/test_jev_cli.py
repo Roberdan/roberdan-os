@@ -36,3 +36,14 @@ class EntrypointTests(Fixture):
         result = self.run_cli("evaluate", "twin", "--input", str(self.home / "absent.json"))
         self.assertEqual(result.returncode, 2)
         self.assertEqual(json.loads(result.stdout)["reason"], "local_io_error")
+
+    def test_help_exposes_explicit_local_recovery(self):
+        result = self.run_cli("--help")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("acknowledge-overrun", result.stdout)
+        result = self.run_cli("acknowledge-overrun", "--help")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("--approval REFERENCE", result.stdout)
+        self.assertIn("No credentials or network", " ".join(result.stdout.split()))
+        self.assertIn("1000", result.stdout)
+        self.assertFalse(self.area.exists())

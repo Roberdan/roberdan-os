@@ -26,9 +26,14 @@ NOTICE = ("Classification is a declaration, not a privacy proof. Key scanning is
           "defense in depth only. Review this exact payload before approving its hash.")
 
 
+def bounded_collection(value, allow_empty=False):
+    core.require(type(value) is list, "invalid_input")
+    core.require(len(value) <= core.MAX_ITEMS, "too_many_items")
+    core.require(len(value) >= int(not allow_empty), "invalid_input")
+
+
 def entries(value, fields, allow_empty=False):
-    core.require(type(value) is list and int(not allow_empty) <= len(value) <= core.MAX_ITEMS,
-                 "invalid_input")
+    bounded_collection(value, allow_empty)
     result, seen = [], set()
     for item in value:
         core.exact(item, fields)
@@ -53,7 +58,7 @@ def normalize(profile, data):
     if profile in ("twin", "retrieval"):
         context, collection = fields
         flag = "eligible" if profile == "twin" else "exact_match"
-        out[context] = core.text(data[context], 2400)
+        out[context] = core.text(data[context], core.MAX_CONTEXT_CHARS)
         out[collection] = entries(data[collection], ("id", "text", flag))
         for original, item in zip(data[collection], out[collection]):
             core.require(type(original[flag]) is bool, "invalid_input")
@@ -68,8 +73,7 @@ def normalize(profile, data):
         known = {item["id"] for item in out["requirements"]}
         for original, item in zip(data["evidence"], out["evidence"]):
             refs = original["requirement_ids"]
-            core.require(type(refs) is list and 1 <= len(refs) <= core.MAX_ITEMS,
-                         "invalid_input")
+            bounded_collection(refs)
             core.require(all(type(ref) is str and ref in known for ref in refs),
                          "unknown_requirement")
             core.require(len(set(refs)) == len(refs), "duplicate_id")

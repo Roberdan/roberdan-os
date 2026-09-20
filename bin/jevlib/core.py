@@ -12,10 +12,14 @@ MAX_INPUT_BYTES = 48000
 MAX_REQUEST_BYTES = 12000
 MAX_RESPONSE_BYTES = 262144
 MAX_ITEMS = 8
+MAX_TEXT_CHARS = 1200
+MAX_CONTEXT_CHARS = 2400
+MAX_ID_CHARS = 24
+MAX_APPROVAL_CHARS = 1000
 MAX_USAGE = 1000000
 PRICE_NANO_PER_INPUT_TOKEN = 42  # $0.042/M; output free, documented 2026-09-20.
 PROFILES = ("twin", "retrieval", "wanda", "thor")
-ID = re.compile(r"[a-z][a-z0-9_-]{0,23}\Z", re.ASCII)
+ID = re.compile(rf"[a-z][a-z0-9_-]{{0,{MAX_ID_CHARS - 1}}}\Z", re.ASCII)
 HASH = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 SECRET = re.compile(
     r"(?i)(?:\b(?:sk|ghp|github_pat|xox[baprs])[-_][a-z0-9_-]{8,}"
@@ -50,7 +54,7 @@ def number(value, minimum=0, maximum=1, reason="malformed_response"):
     return value
 
 
-def text(value, limit=1200):
+def text(value, limit=MAX_TEXT_CHARS):
     require(type(value) is str and 0 < len(value) <= limit, "invalid_input")
     require(bool(value.strip()) and not SECRET.search(value), "unsafe_input")
     require(not any(ord(c) < 32 and c not in "\n\t" for c in value), "unsafe_input")

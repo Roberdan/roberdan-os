@@ -1,4 +1,4 @@
-"""Public JSON CLI. Disabled and all errors exit 2; dry-run/evaluated exit 0."""
+"""Public JSON CLI. Refusals/errors exit 2; successful local/live commands exit 0."""
 
 import argparse
 import json
@@ -17,6 +17,12 @@ def main(argv=None):
     commands = parser.add_subparsers(dest="command", required=True, parser_class=Parser)
     commands.add_parser("profiles")
     commands.add_parser("status")
+    acknowledge = commands.add_parser(
+        "acknowledge-overrun", help="Locally clear an overrun stop without resetting usage or limits.",
+        description="Explicit local recovery: retain counters, cache and budgets. No credentials or network.")
+    acknowledge.add_argument(
+        "--approval", required=True, metavar="REFERENCE",
+        help=f"Nonblank operator reference, at most {core.MAX_APPROVAL_CHARS} characters; stored only as a hash.")
     evaluate = commands.add_parser("evaluate")
     evaluate.add_argument("profile", choices=core.PROFILES)
     evaluate.add_argument("--input", type=Path, required=True)
@@ -28,9 +34,13 @@ def main(argv=None):
             result = {"profiles": list(core.PROFILES), "model": core.MODEL,
                       "rubric_version": profiles.RUBRIC_VERSION, "default": "disabled",
                       "max_payload_utf8_bytes": core.MAX_REQUEST_BYTES,
+                      "max_items": core.MAX_ITEMS, "max_text_chars": core.MAX_TEXT_CHARS,
+                      "max_context_chars": core.MAX_CONTEXT_CHARS, "max_id_chars": core.MAX_ID_CHARS,
                       "notice": profiles.NOTICE}
         elif args.command == "status":
             result = client.status()
+        elif args.command == "acknowledge-overrun":
+            result = client.acknowledge_overrun(args.approval)
         else:
             with args.input.open("rb") as stream:
                 raw = stream.read(core.MAX_INPUT_BYTES + 1)

@@ -43,6 +43,11 @@ class MutationTests(unittest.TestCase):
              "test_jev_ledger.LedgerTests.test_input_policy_rubric_model_and_config_invalidate_cache"),
             ("client.py", '"config": settings', '"config": {}',
              "test_jev_ledger.LedgerTests.test_input_policy_rubric_model_and_config_invalidate_cache"),
+            ("profiles.py", 'len(value) <= core.MAX_ITEMS', 'True',
+             "test_jev_limits.LimitTests.test_all_collection_overflows_return_distinct_reason_without_calls"),
+            ("ledger.py", 'state["reservation_exceeded"] = False',
+             'state["reservation_exceeded"] = True',
+             "test_jev_recovery.RecoveryTests.test_acknowledgement_preserves_usage_uncertainty_cache_and_config"),
         ]
         for filename, original, replacement, target in cases:
             with self.subTest(target=target), tempfile.TemporaryDirectory(prefix="jev-mutant-") as temp:

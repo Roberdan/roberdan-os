@@ -69,13 +69,13 @@ def evaluate(profile, data, *, live=False, approved_sha256=None, home=None, envi
                 core.require(profile in settings["enabled_profiles"], "profile_disabled")
                 key = cache_key(prepared, settings)
                 state = ledger.read(area, lock)
-                core.require(not state["reservation_exceeded"], "reservation_exceeded")
                 hit = state["cache"] is not None and state["cache"]["key"] == key
                 if hit:
                     answers = responses.answers(state["cache"]["answers"],
                                                 prepared["payload"]["questions"], cached=True)
                     usage = responses.usage(state["cache"]["usage"])
                 else:
+                    core.require(not state["reservation_exceeded"], "reservation_exceeded")
                     questions = prepared["payload"]["questions"]
                     core.require(bool(questions), "no_eligible_questions")
                     secret = credential(home, environ)
@@ -102,8 +102,30 @@ def evaluate(profile, data, *, live=False, approved_sha256=None, home=None, envi
                           "consumption": ledger.metadata(state, settings),
                           "result": profiles.consume(prepared, answers)}
                 if state["reservation_exceeded"]:
-                    result["warning"] = "reservation_exceeded_next_call_blocked"
+                    result["warning"] = "reservation_exceeded_next_network_call_blocked"
                 return result
+    except FileNotFoundError:
+        raise core.JevError("missing_config") from None
+
+
+def acknowledge_overrun(approval, home=None):
+    core.require(type(approval) is str and 0 < len(approval) <= core.MAX_APPROVAL_CHARS
+                 and bool(approval.strip()), "invalid_approval_reference")
+    try:
+        approval_hash = core.digest(approval.strip())
+    except UnicodeError:
+        raise core.JevError("invalid_approval_reference") from None
+    try:
+        with Area(Path.home() if home is None else home, "jev") as area:
+            settings = ledger.config(area)
+            state = ledger.read(area)
+            core.require(state["reservation_exceeded"], "no_overrun_to_acknowledge")
+            with area.locked():
+                settings = ledger.config(area)
+                state = ledger.read(area)
+                ledger.acknowledge_overrun(area, state, approval_hash)
+                return {"status": "overrun_acknowledged",
+                        "consumption": ledger.metadata(state, settings)}
     except FileNotFoundError:
         raise core.JevError("missing_config") from None
 

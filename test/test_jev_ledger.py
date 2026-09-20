@@ -63,7 +63,7 @@ class LedgerTests(Fixture):
         self.configure()
         with mock.patch.object(client, "transport", side_effect=lambda p, k: reply(p, k, 200000)) as net:
             output = self.live()
-            self.assertEqual(output["warning"], "reservation_exceeded_next_call_blocked")
+            self.assertEqual(output["warning"], "reservation_exceeded_next_network_call_blocked")
             self.assertEqual(self.state()["charged_nano_usd"], 200000 * 42)
             self.configure(budget_usd=10, max_requests=100)
             with self.assertRaisesRegex(core.JevError, "reservation_exceeded"):
