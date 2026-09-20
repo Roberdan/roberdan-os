@@ -45,6 +45,35 @@ class RecoveryTests(unittest.TestCase):
         self.assertNotEqual(recovery.make_id("owner/repo"), recovery.make_id("other/repo"))
         self.assertEqual(recovery.make_id("Owner/Repo"), recovery.make_id("owner/repo"))
 
+    def test_active_scope_excludes_archives_remote_deleted_and_symlinks(self):
+        root = self.root / "GitHub"
+        for name in ("active", "WareHouse/old", "ParkingLot/parked", "worktrees/copy"):
+            (root / name / ".git").mkdir(parents=True)
+        (root / "alias").symlink_to(root / "WareHouse/old", target_is_directory=True)
+        self.assertTrue(recovery.eligible({"local_path": str(root / "active")}, root))
+        for name in ("WareHouse/old", "ParkingLot/parked", "worktrees/copy", "alias", "deleted"):
+            self.assertFalse(recovery.eligible({"local_path": str(root / name)}, root))
+        self.assertFalse(recovery.eligible({"local_path": None}, root))
+
+    def test_moved_repository_stops_before_next_command(self):
+        active = self.root / "GitHub/active"
+        (active / ".git").mkdir(parents=True)
+        self.runner.active_root = active.parent
+        self.runner.current_record = {"local_path": str(active)}
+        self.runner.check_scope()
+        active.rename(active.parent / "removed")
+        with patch.object(recovery.subprocess, "Popen", side_effect=AssertionError("must not run")):
+            with self.assertRaisesRegex(RuntimeError, "outside the active folder"):
+                self.runner.command(["git", "status"])
+
+    def test_denied_pin_is_blocked_before_checkout_even_if_registered_path_changed(self):
+        self.runner.manifest = {"remote": [], "local": [
+            {"path": "/repo", "github": "owner/repo", "pin": "denied"}]}
+        self.runner.blocked_sources = {"denied"}
+        with patch.object(self.runner, "validate_backup"), \
+             patch.object(self.runner, "checkout", side_effect=AssertionError("must not read content")):
+            self.assertEqual(self.runner.run(), 1)
+
     def test_no_repair_before_verified_backup(self):
         (self.root / "backup.json").write_text('{"status":"running"}')
         with self.assertRaisesRegex(RuntimeError, "restore-tested"):

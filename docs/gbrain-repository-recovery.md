@@ -8,6 +8,13 @@ The recovery command defaults to a plan. `--apply` requires a restore-tested
 backup state plus matching archive checksums, and local `ollama:bge-m3` embeddings
 at 1024 dimensions. It does not upgrade gbrain or invoke paid synthesis.
 
+The CLI now processes only existing direct-child repositories of `~/GitHub`
+(`--active-root` can name a different explicit root). `WareHouse`, `ParkingLot`,
+worktree containers, symlinks, removed repositories and remote-only entries are
+excluded even when an old manifest lists them. Scope is rechecked before each
+command; moving a repository out of the active folder blocks further processing.
+Excluded historical records are retained, not deleted or counted as current work.
+
 ```sh
 python3 bin/gbrain-recover-repos.py \
   --manifest /private/path/repo-coverage.json \

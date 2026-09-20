@@ -59,8 +59,20 @@ def plan(manifest):
     return sorted(records.values(), key=lambda row: (not bool(row.get("local_path")), row["key"]))
 
 
+def eligible(record, root):
+    if root is None:
+        return True
+    if not record.get("local_path"):
+        return False
+    path = Path(record["local_path"])
+    return (path.name.casefold() not in {"warehouse", "parkinglot", "worktrees"}
+            and not path.is_symlink() and path.is_dir()
+            and path.resolve().parent == Path(root).resolve()
+            and (path / ".git").exists())
+
+
 class Recovery:
-    def __init__(self, manifest, root, backup, blocked_sources=()):
+    def __init__(self, manifest, root, backup, blocked_sources=(), active_root=None):
         self.manifest = manifest
         self.root = root
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -68,6 +80,8 @@ class Recovery:
         self.state = json.loads(self.path.read_text()) if self.path.exists() else {"repos": {}, "commands": []}
         self.backup = backup
         self.blocked_sources = set(blocked_sources)
+        self.active_root = active_root
+        self.current_record = None
         self.env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GH_PROMPT_DISABLED="1",
                         COPILOT_AUTO_UPDATE="false")
         for key in ("DATABASE_URL", "GBRAIN_DATABASE_URL", "GBRAIN_SOURCE"):
@@ -78,7 +92,12 @@ class Recovery:
         temp.write_text(json.dumps(self.state, indent=2) + "\n")
         temp.replace(self.path)
 
+    def check_scope(self):
+        if self.current_record is not None and not eligible(self.current_record, self.active_root):
+            raise RuntimeError("BLOCKED: repository was removed, archived or moved outside the active folder.")
+
     def command(self, argv, timeout=600):
+        self.check_scope()
         argv = list(map(str, argv))
         index = len(self.state["commands"]) + 1
         log = self.root / f"command-{index:05d}.log"
@@ -234,23 +253,28 @@ class Recovery:
         with (self.root / "run.lock").open("w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self.validate_backup()
-            records = plan(self.manifest)
+            all_records = plan(self.manifest)
+            records = [r for r in all_records if eligible(r, self.active_root)]
             registered = sources()
             self.state["total"] = len(records)
+            self.state["excluded_from_scope"] = len(all_records) - len(records)
+            self.state["active_root"] = str(self.active_root) if self.active_root else None
             for index, record in enumerate(records, 1):
                 key = record["key"]
                 previous = self.state["repos"].get(key, {})
                 if previous.get("status") == "verified":
                     continue
                 row = {**record, "status": "running", "started": time.time()}
+                self.current_record = record
                 self.state["repos"][key] = row
                 self.state["current"] = key
                 self.save()
                 print(f"[{index}/{len(records)}] {key}", flush=True)
                 try:
+                    self.check_scope()
                     matches = [s["id"] for s in registered if s["local_path"] == record.get("local_path")
                                and s["local_path"]]
-                    if self.blocked_sources.intersection(matches):
+                    if record.get("pin") in self.blocked_sources or self.blocked_sources.intersection(matches):
                         raise RuntimeError("BLOCKED: source access not granted; no content read.")
                     path = self.checkout(record)
                     row["checkout"] = str(path)
@@ -273,7 +297,7 @@ class Recovery:
             self.state["current"] = None
             self.state["finished"] = time.time()
             self.save()
-            return int(any(r["status"] != "verified" for r in self.state["repos"].values()))
+            return int(any(self.state["repos"][r["key"]]["status"] != "verified" for r in records))
 
 
 def main():
@@ -282,15 +306,17 @@ def main():
     parser.add_argument("--backup", type=Path, required=True)
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--active-root", type=Path, default=Path.home() / "GitHub",
+                        help="Only existing direct-child repositories here; no archived or remote-only collections.")
     parser.add_argument("--blocked-source", action="append", default=[],
                         help="Do not access or modify an explicitly ungranted source.")
     args = parser.parse_args()
     os.umask(0o077)
     manifest = json.loads(args.manifest.read_text())
     if not args.apply:
-        print(json.dumps(plan(manifest), indent=2))
+        print(json.dumps([r for r in plan(manifest) if eligible(r, args.active_root)], indent=2))
         return 0
-    return Recovery(manifest, args.state_dir, args.backup, args.blocked_source).run()
+    return Recovery(manifest, args.state_dir, args.backup, args.blocked_source, args.active_root).run()
 
 
 if __name__ == "__main__":
