@@ -70,6 +70,7 @@ def main(argv=None):
     parser.add_argument("--plan", action="store_true")
     parser.add_argument("--require-ac", action="store_true")
     parser.add_argument("--result-file", type=Path)
+    parser.add_argument("--full-sync-proofs", type=Path)
     args = parser.parse_args(argv)
     if not args.plan and not args.embed_source and args.backup is None:
         parser.error("Il recupero richiede --backup con una copia gia ripristinata e verificata.")
@@ -134,7 +135,9 @@ def main(argv=None):
                                 ["git", "-C", Path.home() / "gbrain", "rev-parse", "HEAD"])
         dirty = job.command("Modifiche codice gbrain",
                             ["git", "-C", Path.home() / "gbrain", "status", "--porcelain"])
-        if installed is None or installed.strip() != "a6be012a3bcfac42e279630aedec5cda4a450e29" or dirty != "":
+        reviewed = {"a6be012a3bcfac42e279630aedec5cda4a450e29",
+                    "668b9bac302705f3bca0ae4792a49fab0a79a74e"}
+        if installed is None or installed.strip() not in reviewed or dirty != "":
             raise RuntimeError("Versione gbrain non ancora validata per questa manutenzione; nessuna modifica.")
         config = dependencies.configuration(job)
         with dependencies.ollama_for_operation(job, config, needed=True) as env:
@@ -157,7 +160,8 @@ def main(argv=None):
                         embed_until_done(job, source, self.env, recovery.GB)
 
                 runner = ManagedRecovery(manifest, args.state_dir, args.backup,
-                                         args.blocked_source, args.active_root)
+                                         args.blocked_source, args.active_root,
+                                         full_sync_proofs=args.full_sync_proofs)
                 runner.env.update(env)
                 for key in ("DATABASE_URL", "GBRAIN_DATABASE_URL", "GBRAIN_SOURCE"):
                     runner.env.pop(key, None)

@@ -149,6 +149,31 @@ class RecoveryTests(unittest.TestCase):
                 self.runner.refresh("source", Path("/repo"), False)
             self.assertEqual(cmd.call_count, 1)
 
+    def test_chunker_full_sync_requires_exact_source_retention_proof(self):
+        metadata = {"last_commit": "abc", "pages": [{"id": 1}]}
+        line = "Full-sync dry run (strategy=auto): 1 file(s) would be imported from /repo @ abc."
+        preview = "[sync] chunker_version gate: stored=6, current=7.\n" + line
+        proof = {"status": "verified", "source": "source", "production_unchanged": True,
+                 "lost_page_ids": [], "full_sync_lines": [line],
+                 "metadata_sha256": hashlib.sha256(json.dumps(metadata, sort_keys=True).encode()).hexdigest(),
+                 "snapshot": "abc", "indexed_revision": "abc", "gbrain_revision": "installed"}
+        with patch.object(recovery, "active_pages", return_value={1}), \
+             patch.object(self.runner, "command", return_value=preview):
+            with self.assertRaisesRegex(RuntimeError, "reconciliation"):
+                self.runner.refresh("source", Path("/repo"), False)
+        self.runner.full_sync_proofs = self.root / "proofs.json"
+        self.runner.full_sync_proofs.write_text(json.dumps({"source": proof}))
+        with patch.object(recovery, "active_pages", return_value={1}), \
+             patch.object(recovery, "page_metadata", return_value=metadata), \
+             patch.object(self.runner, "command", side_effect=[preview, "installed", "", "ok"]):
+            self.assertEqual(self.runner.refresh("source", Path("/repo"), False)["pages_after"], 1)
+        self.runner.full_sync_proofs.write_text(json.dumps({"source": {**proof, "lost_page_ids": [1]}}))
+        with patch.object(recovery, "page_metadata", return_value=metadata):
+            with self.assertRaisesRegex(RuntimeError, "does not match"):
+                self.runner.validate_full_sync("source", Path("/repo"), preview)
+        with self.assertRaisesRegex(RuntimeError, "reconciliation"):
+            self.runner.validate_full_sync("source", Path("/repo"), line)
+
     def test_head_change_prevents_actual_sync(self):
         self.head_mock.side_effect = ["abc", "def"]
         with patch.object(recovery, "active_pages", return_value={1}), \

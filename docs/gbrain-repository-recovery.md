@@ -27,6 +27,12 @@ rename batch and clean installed gbrain revision, all active page IDs retained,
 indexed revision reached, production metadata unchanged. The evidence cannot
 authorize deletions, reconciliation or a different rename batch. Live retention
 and revision checks still run after the operation.
+The 0.50.5.0 chunker transition can also request a full re-chunk with unchanged
+Git HEAD. It is not bypassed by stamping a new version: `--full-sync-proofs`
+requires an actual isolated sync preserving every active page ID, keyed to the
+exact source, metadata fingerprint, snapshot, preview and installed revision.
+Other reconciliations and deletions remain blocked. A new run clears old finish
+markers before doing work, so an interruption cannot look like a completed run.
 
 ## Recurring active-only maintenance
 
@@ -51,7 +57,7 @@ writes a fresh structured receipt for the parent maintenance command; an existin
 file is refused. SIGTERM unwinds owned processes and the Ollama context before
 the process exits; parent callers must allow its cleanup grace period.
 
-The currently validated upstream revision is pinned in the runner. A different
+The reviewed 0.50.0.0 and 0.50.5.0 upstream revisions are pinned in the runner. A different
 or dirty gbrain installation stops it rather than assuming migration compatibility.
 This is not an automatic gbrain upgrader; that remains separate unfinished work.
 
