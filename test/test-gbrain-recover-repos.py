@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import importlib.util
+import hashlib
+import json
 from pathlib import Path
 import tempfile
 import subprocess
@@ -109,6 +111,35 @@ class RecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "reconciliation"):
                 self.runner.refresh("source", Path("/repo"), False)
             self.assertEqual(cmd.call_count, 1)
+
+    def test_renames_require_exact_isolated_evidence(self):
+        metadata = {"last_commit": "old", "pages": [{"id": 1}]}
+        proof = {"status": "verified", "source": "source", "production_unchanged": True,
+                 "lost_page_ids": [], "rename_lines": ["Renamed: old.md -> new.md"],
+                 "metadata_sha256": hashlib.sha256(json.dumps(metadata, sort_keys=True).encode()).hexdigest(),
+                 "snapshot": "abc", "indexed_revision": "abc", "gbrain_revision": "installed"}
+        preview = "Sync dry run: old..abc\n  Renamed: old.md -> new.md"
+        with self.assertRaisesRegex(RuntimeError, "deletions/renames"):
+            self.runner.validate_renames("source", Path("/repo"), preview)
+        self.runner.rename_proof = self.root / "proof.json"
+        self.runner.rename_proof.write_text(json.dumps(proof))
+        with patch.object(recovery, "page_metadata", return_value=metadata), \
+             patch.object(self.runner, "command", side_effect=["installed", ""]):
+            self.runner.validate_renames("source", Path("/repo"), preview)
+        for field, value in (("source", "other"), ("lost_page_ids", [1]),
+                             ("metadata_sha256", "stale"), ("snapshot", "old"),
+                             ("rename_lines", ["Renamed: other.md -> new.md"]),
+                             ("production_unchanged", False), ("indexed_revision", "old")):
+            self.runner.rename_proof.write_text(json.dumps({**proof, field: value}))
+            with patch.object(recovery, "page_metadata", return_value=metadata), \
+                 patch.object(self.runner, "command", side_effect=AssertionError("must not run")):
+                with self.assertRaisesRegex(RuntimeError, "does not match"):
+                    self.runner.validate_renames("source", Path("/repo"), preview)
+        self.runner.rename_proof.write_text(json.dumps(proof))
+        with patch.object(recovery, "page_metadata", return_value=metadata), \
+             patch.object(self.runner, "command", side_effect=["changed", ""]):
+            with self.assertRaisesRegex(RuntimeError, "gbrain changed"):
+                self.runner.validate_renames("source", Path("/repo"), preview)
 
     def test_unsyncable_hard_delete_preview_is_blocked(self):
         with patch.object(recovery, "active_pages", return_value={1}), \

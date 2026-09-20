@@ -40,6 +40,14 @@ def active_pages(source):
                    quote(source) + " AND deleted_at IS NULL"))
 
 
+def page_metadata(source):
+    return sql("SELECT json_build_object('last_commit',"
+               "(SELECT last_commit FROM sources WHERE id=" + quote(source) + "),"
+               "'pages',(SELECT coalesce(json_agg(p),'[]') FROM "
+               "(SELECT id,slug,source_path,updated_at,deleted_at FROM pages "
+               "WHERE source_id=" + quote(source) + " ORDER BY id) p))")
+
+
 def make_id(identity):
     stem = re.sub("[^a-z0-9-]", "-", identity.split("/")[-1].lower()).strip("-")[:19]
     return "repo-" + stem + "-" + hashlib.sha256(identity.lower().encode()).hexdigest()[:6]
@@ -81,7 +89,7 @@ def active_manifest(root, inspect_repo):
 
 
 class Recovery:
-    def __init__(self, manifest, root, backup, blocked_sources=(), active_root=None):
+    def __init__(self, manifest, root, backup, blocked_sources=(), active_root=None, rename_proof=None):
         self.manifest = manifest
         self.root = root
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -91,6 +99,7 @@ class Recovery:
         self.blocked_sources = set(blocked_sources)
         self.active_root = active_root
         self.current_record = None
+        self.rename_proof = rename_proof
         self.env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GH_PROMPT_DISABLED="1",
                         COPILOT_AUTO_UPDATE="false")
         for key in ("DATABASE_URL", "GBRAIN_DATABASE_URL", "GBRAIN_SOURCE"):
@@ -221,14 +230,36 @@ class Recovery:
         self.command([GB, "sources", "add", source_id, "--path", path, "--no-federated"])
         return source_id, True
 
+    def validate_renames(self, source, path, preview):
+        if self.rename_proof is None:
+            raise RuntimeError("BLOCKED: preview contains deletions/renames; originals preserved.")
+        proof = json.loads(Path(self.rename_proof).read_text())
+        metadata = page_metadata(source)
+        digest = hashlib.sha256(json.dumps(metadata, sort_keys=True).encode()).hexdigest()
+        lines = [line.strip() for line in preview.splitlines() if line.strip().startswith("Renamed:")]
+        if (proof.get("status") != "verified" or proof.get("source") != source
+                or proof.get("production_unchanged") is not True
+                or proof.get("lost_page_ids") != []
+                or not lines or proof.get("rename_lines") != lines
+                or proof.get("metadata_sha256") != digest
+                or proof.get("snapshot") != self.head(path)
+                or proof.get("indexed_revision") != proof.get("snapshot")):
+            raise RuntimeError("BLOCKED: isolated rename proof does not match the current source and changes.")
+        installed = self.command(["git", "-C", HOME / "gbrain", "rev-parse", "HEAD"])
+        dirty = self.command(["git", "-C", HOME / "gbrain", "status", "--porcelain"])
+        if dirty or installed != proof.get("gbrain_revision"):
+            raise RuntimeError("BLOCKED: gbrain changed since the isolated rename validation.")
+
     def refresh(self, source, path, new):
         before = active_pages(source)
         revision = self.head(path)
         base = [GB, "sync", "--source", source, "--repo", path, "--no-pull",
                 "--strategy", "auto", "--no-embed", "--no-auto-embed"]
         preview = self.command([*base, "--dry-run"], timeout=300)
-        if re.search(r"^\s*(Deleted|Removed|Renamed):|would delete", preview, re.MULTILINE | re.IGNORECASE):
+        if re.search(r"^\s*(Deleted|Removed):|would delete", preview, re.MULTILINE | re.IGNORECASE):
             raise RuntimeError("BLOCKED: preview contains deletions/renames; originals preserved.")
+        if re.search(r"^\s*Renamed:", preview, re.MULTILINE | re.IGNORECASE):
+            self.validate_renames(source, path, preview)
         if before and re.search(r"full (sync|import)|reconcil", preview, re.IGNORECASE):
             raise RuntimeError("BLOCKED: existing source requires reconciliation; original pages preserved.")
         if before and not (re.search(r"Sync dry run: [0-9a-f]+\.\.[0-9a-f]+", preview)
@@ -329,6 +360,8 @@ def main():
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--active-root", type=Path, default=Path.home() / "GitHub",
                         help="Only existing direct-child repositories here; no archived or remote-only collections.")
+    parser.add_argument("--rename-proof", type=Path,
+                        help="Exact isolated-sync evidence; never permits deletions or other rename batches.")
     parser.add_argument("--blocked-source", action="append", default=[],
                         help="Do not access or modify an explicitly ungranted source.")
     args = parser.parse_args()
@@ -342,7 +375,8 @@ def main():
     if not args.apply:
         print(json.dumps([r for r in plan(manifest) if eligible(r, args.active_root)], indent=2))
         return 0
-    return Recovery(manifest, args.state_dir, args.backup, args.blocked_source, args.active_root).run()
+    return Recovery(manifest, args.state_dir, args.backup, args.blocked_source,
+                    args.active_root, args.rename_proof).run()
 
 
 if __name__ == "__main__":

@@ -21,6 +21,12 @@ Every resumed pass rechecks previously verified projects against current local H
 Owned clean snapshots advance only by fast-forward from the active local repository;
 divergence, ignored/untracked files or a moving local HEAD block verification rather
 than resetting a branch or reporting an old snapshot as current.
+Renames remain blocked unless `--rename-proof` supplies evidence from the exact
+sync performed on an isolated restored database: same source metadata, snapshot,
+rename batch and clean installed gbrain revision, all active page IDs retained,
+indexed revision reached, production metadata unchanged. The evidence cannot
+authorize deletions, reconciliation or a different rename batch. Live retention
+and revision checks still run after the operation.
 
 ```sh
 python3 bin/gbrain-recover-repos.py \
