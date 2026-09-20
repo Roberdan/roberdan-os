@@ -30,6 +30,24 @@ Copilot-first does not mean those clients understand Copilot-specific model IDs 
 | `/usage` | Inspect actual usage, rather than estimated prices |
 | `/limits` | Set an optional spending limit; a model call may overshoot the remaining limit |
 
+### Installed files are not a loaded session
+
+`roberdanos_doctor` checks installation files, MCP configuration presence and execution of
+the context script. It does **not** query the host's live agent/skill registry or establish
+MCP connectivity. A positive disk check cannot prove that `rex`, a skill or gbrain is usable.
+
+If a running session rejects an installed custom agent or reports no loadable skills:
+
+1. Inspect the extension status with `extensions_manage`, then reload extensions.
+2. Actually invoke a harmless custom-agent probe and load an installed skill. Those calls,
+   not file counts, establish recovery for those specific tools.
+3. If discovery still fails, save a pause checkpoint and restart Copilot. Reinstall only
+   if the installation check identifies missing files; do not rewrite healthy symlinks.
+
+A reload restored discovery in the observed session, but this is a recovery procedure,
+not a proven fix for the host's underlying registry failure. Diagnose a failing MCP server
+separately; reloading an extension is not evidence that its servers connected.
+
 ### Three independent model choices
 
 The **model** chooses the engine; **effort** sets how deeply it reasons; **context** chooses

@@ -31,6 +31,9 @@ console.log(JSON.stringify({
     timeline: globalThis.timeline,
     tools: globalThis.config.tools.map((tool) => tool.name),
     hooks: Object.keys(globalThis.config.hooks),
+    doctor: process.env.PROBE_DOCTOR === "1"
+        ? await globalThis.config.tools.find((tool) => tool.name === "roberdanos_doctor").handler()
+        : null,
 }));
 JS
 
@@ -38,10 +41,11 @@ RDA_OS="$ROOT" STAGE="$STAGE" node --input-type=module <<'JS'
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
 
-function launch(fail = false) {
+function launch(fail = false, env = {}) {
     const result = spawnSync(process.execPath, [join(process.env.STAGE, "driver.mjs")], {
-        env: { ...process.env, FAIL_JOIN: fail ? "1" : "0" },
+        env: { ...process.env, FAIL_JOIN: fail ? "1" : "0", ...env },
         encoding: "utf8",
         timeout: 10000,
     });
@@ -64,5 +68,33 @@ const failed = launch(true);
 assert.deepEqual(failed.output.timeline, []);
 assert.match(failed.stderr, /extension failed to join session: Error: startup-test rejected join/);
 assert.doesNotMatch(failed.stderr, /extension ready/);
-console.log("test-copilot-startup: PASS (3 fresh processes, failed join, hooks/tools retained)");
+
+const home = join(process.env.STAGE, "doctor-home");
+const root = join(process.env.STAGE, "doctor-root");
+mkdirSync(home);
+mkdirSync(root);
+const doctorEnv = { HOME: home, RDA_OS: root, PROBE_DOCTOR: "1" };
+const missing = launch(false, doctorEnv).output.doctor;
+assert.match(missing, /MISS/);
+assert.match(missing, /Remediation:/);
+for (const directory of [".copilot/agents", ".copilot/skills/test",
+                         ".copilot/extensions/roberdan-os"]) {
+    mkdirSync(join(home, directory), { recursive: true });
+}
+writeFileSync(join(home, ".copilot/agents/test.md"), "# fixture");
+writeFileSync(join(home, ".copilot/extensions/roberdan-os/extension.mjs"), "// fixture");
+writeFileSync(join(home, ".copilot/mcp-config.json"),
+              '{"gbrain": {"secret": "doctor-must-not-print-this"}}');
+writeFileSync(join(root, "AGENTS.md"), "# fixture");
+mkdirSync(join(root, "hooks"));
+writeFileSync(join(root, "hooks/context-inject.sh"), "#!/bin/sh\nexit 0\n");
+const present = launch(false, doctorEnv).output.doctor;
+assert.doesNotMatch(present, /MISS|All roberdan-os.*wiring present/);
+assert.match(present, /Installation files present/);
+for (const result of [missing, present]) {
+    assert.match(result, /Runtime agent\/skill discovery and MCP connectivity are NOT verified/);
+    assert.match(result, /reload extensions/);
+    assert.doesNotMatch(result, /doctor-must-not-print-this/);
+}
+console.log("test-copilot-startup: PASS (reloads, failed join, hooks/tools, doctor scope)");
 JS

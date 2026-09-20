@@ -24,6 +24,12 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 - Runtime coverage is not a benchmark of Jev accuracy, Italian performance, savings or
   agreement with the operator's preferences; those remain to be measured before reliance.
 
+### Fixed
+
+- Copilot doctor distinguishes installation checks from unverified live agent/skill discovery
+  and MCP connectivity; the operator guide documents reload, real probes and restart recovery.
+- Frontmatter test headings no longer execute the literal `description:` as a shell command.
+
 ## 2.51.0 — 2026-09-17
 
 ### Added
