@@ -61,6 +61,15 @@ class RefreshTests(unittest.TestCase):
         self.assertEqual(selected, {"remote": [], "local": [{"path": "/root/three"}]})
         self.assertEqual(excluded, ["/root/one", "/root/two"])
 
+    def test_policy_refusal_does_not_hide_integrity_failure(self):
+        self.assertEqual(refresh.recovery_outcome(
+            "BLOCKED: existing source requires reconciliation; original pages preserved."), "RINVIATO")
+        self.assertEqual(refresh.recovery_outcome(
+            "BLOCKED: isolated import proof does not match"), "RINVIATO")
+        self.assertEqual(refresh.recovery_outcome(
+            "BLOCKED: stored index revision does not match the managed checkout."), "ERRORE")
+        self.assertEqual(refresh.recovery_outcome("RETENTION FAILURE: missing prior pages"), "ERRORE")
+
 
 if __name__ == "__main__":
     unittest.main()

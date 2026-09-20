@@ -31,6 +31,17 @@ def scoped_manifest(manifest, registered, denied):
     return {"local": local, "remote": []}, excluded
 
 
+def recovery_outcome(error):
+    policy_refusals = (
+        "BLOCKED: source access not granted",
+        "BLOCKED: existing source requires reconciliation",
+        "BLOCKED: existing source needs a full/reconcile sync",
+        "BLOCKED: preview contains deletions/renames",
+        "BLOCKED: isolated",
+    )
+    return "RINVIATO" if error.startswith(policy_refusals) else "ERRORE"
+
+
 def embed_until_done(job, source, env, binary, *, passes=12):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", source):
         raise RuntimeError("Serve un identificatore di fonte esplicito e valido.")
@@ -172,9 +183,9 @@ def main(argv=None):
                         job.row("ESEGUITO", Path(record["local_path"]).name,
                                 "Memoria allineata alla versione Git attuale; zero parti da indicizzare.")
                     else:
-                        job.row("ERRORE", Path(record["local_path"]).name,
-                                row.get("error", "Recupero non completato."))
-                if result and not any(row["state"] == "ERRORE" for row in job.rows):
+                        error = row.get("error", "Recupero non completato.")
+                        job.row(recovery_outcome(error), Path(record["local_path"]).name, error)
+                if result and not any(row["state"] in ("ERRORE", "RINVIATO") for row in job.rows):
                     raise RuntimeError("Il recupero non ha confermato il completamento.")
     except BlockingIOError:
         job.row("RINVIATO", "Memorie", "Un altro recupero detiene il blocco; nessun lavoro duplicato.")

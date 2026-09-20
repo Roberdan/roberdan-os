@@ -258,6 +258,36 @@ class RecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "RETENTION FAILURE"):
                 self.runner.refresh("source", Path("/repo"), False)
 
+    def test_only_database_matching_canonical_notes_are_preserved(self):
+        path = self.root / "snapshot"
+        note = path / "notes/memory.md"
+        note.parent.mkdir(parents=True)
+        note.write_text("# Stored memory\n")
+        page = {"source_id": "source", "slug": "notes/memory", "content": "# Stored memory\n"}
+        with patch.object(recovery, "sources", return_value=[{"id": "source", "local_path": str(path)}]), \
+             patch.object(self.runner, "command", return_value=json.dumps(page)) as command:
+            notes = self.runner.canonical_notes(path, "?? notes/memory.md\0")
+            self.assertTrue(command.call_args.kwargs["sensitive"])
+            self.runner.preserve_notes(notes)
+            note.write_text("# New user edit\n")
+            with self.assertRaisesRegex(RuntimeError, "changed during"):
+                self.runner.preserve_notes(notes)
+            with self.assertRaisesRegex(RuntimeError, "not the current canonical"):
+                self.runner.canonical_notes(path, "?? notes/memory.md\0")
+        self.assertEqual(note.read_text(), "# New user edit\n")
+        for status in (" M tracked.md\0", "!! ignored.md\0"):
+            with self.assertRaisesRegex(RuntimeError, "refusing to overwrite"):
+                self.runner.canonical_notes(path, status)
+
+    def test_sensitive_command_keeps_content_out_of_persistent_logs(self):
+        import sys
+        with patch.object(recovery, "HOME", self.root):
+            (self.root / ".gbrain").mkdir()
+            text = self.runner.command([sys.executable, "-c", "print('private-note-fixture')"], sensitive=True)
+        self.assertEqual(text, "private-note-fixture")
+        log = Path(self.runner.state["commands"][-1]["log"])
+        self.assertNotIn("private-note-fixture", log.read_text())
+
     def test_incremental_refresh_never_pulls_or_embeds(self):
         with patch.object(recovery, "active_pages", side_effect=[{1}, {1, 2}]), \
              patch.object(self.runner, "command", side_effect=["Sync dry run: abc..def\nAdded: one.md", "ok"]) as cmd:

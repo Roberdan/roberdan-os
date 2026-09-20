@@ -10,6 +10,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 
@@ -116,15 +117,18 @@ class Recovery:
         if self.current_record is not None and not eligible(self.current_record, self.active_root):
             raise RuntimeError("BLOCKED: repository was removed, archived or moved outside the active folder.")
 
-    def command(self, argv, timeout=600):
+    def command(self, argv, timeout=600, *, sensitive=False):
         self.check_scope()
         argv = list(map(str, argv))
         index = len(self.state["commands"]) + 1
         log = self.root / f"command-{index:05d}.log"
         entry = {"argv": argv, "log": str(log), "started": time.time(), "exit": None}
+        if sensitive:
+            entry["sensitive_output"] = True
+            log.write_text("Contenuto privato confrontato localmente; output non conservato.\n")
         self.state["commands"].append(entry)
         self.save()
-        with log.open("wb") as output:
+        with (tempfile.TemporaryFile() if sensitive else log.open("w+b")) as output:
             with subprocess.Popen(argv, cwd=HOME / ".gbrain", env=self.env,
                                   stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT,
                                   start_new_session=True) as proc:
@@ -140,12 +144,52 @@ class Recovery:
                     entry["exit"] = 124
                     self.save()
                     raise
+            output.flush()
+            output.seek(0)
+            text = output.read().decode(errors="replace")
         entry["exit"] = code
         self.save()
-        text = log.read_text(errors="replace")
         if code:
-            raise RuntimeError(f"Command exit {code}: {log}\n" + "\n".join(text.splitlines()[-8:]))
+            raise RuntimeError(f"Command exit {code}: {log}\n" +
+                               ("Output privato non riportato." if sensitive else "\n".join(text.splitlines()[-8:])))
         return text.strip()
+
+    def canonical_notes(self, path, status):
+        entries = [item for item in status.split("\0") if item]
+        if any(not item.startswith("?? ") for item in entries):
+            raise RuntimeError(f"Managed snapshot was modified; refusing to overwrite: {path}")
+        matches = [source for source in sources() if source.get("local_path") == str(path)]
+        if len(matches) != 1 or matches[0]["id"] in self.blocked_sources:
+            raise RuntimeError(f"Managed snapshot was modified; refusing to overwrite: {path}")
+        source = matches[0]["id"]
+        notes = {}
+        for entry in entries:
+            relative = Path(entry[3:])
+            note = path / relative
+            if (relative.is_absolute() or ".." in relative.parts or note.is_symlink()
+                    or note.suffix != ".md" or not note.is_file()
+                    or not note.resolve().is_relative_to(path.resolve())):
+                raise RuntimeError(f"Managed snapshot was modified; refusing to overwrite: {path}")
+            slug = relative.as_posix()[:-3]
+            output = self.command([GB, "get", slug, "--source", source, "--include-content", "--json"],
+                                  timeout=60, sensitive=True)
+            data = json.loads(output[output.index("{"):])
+            content = data.get("content") if isinstance(data, dict) else None
+            if (not isinstance(content, str) or data.get("slug") != slug or data.get("source_id") != source
+                    or content.replace("\r\n", "\n").rstrip("\n") != note.read_text().replace("\r\n", "\n").rstrip("\n")):
+                raise RuntimeError("Managed snapshot contains an untracked file that is not the current canonical memory.")
+            with note.open("rb") as stream:
+                notes[note] = hashlib.file_digest(stream, "sha256").hexdigest()
+        return notes
+
+    @staticmethod
+    def preserve_notes(notes):
+        for note, expected in notes.items():
+            if not note.is_file() or note.is_symlink():
+                raise RuntimeError("Canonical memory file changed during snapshot update.")
+            with note.open("rb") as stream:
+                if hashlib.file_digest(stream, "sha256").hexdigest() != expected:
+                    raise RuntimeError("Canonical memory file changed during snapshot update.")
 
     def validate_backup(self):
         data = json.loads(self.backup.read_text())
@@ -171,8 +215,8 @@ class Recovery:
         if path.exists():
             if not marker.exists() or json.loads(marker.read_text()).get("key") != record["key"]:
                 raise RuntimeError(f"Existing checkout is not owned by this recovery: {path}")
-            if self.command(["git", "-C", path, "status", "--porcelain", "--untracked-files=all", "--ignored"]):
-                raise RuntimeError(f"Managed snapshot was modified; refusing to overwrite: {path}")
+            status = self.command(["git", "-C", path, "status", "--porcelain", "--untracked-files=all", "--ignored", "-z"])
+            notes = self.canonical_notes(path, status) if status else {}
             if local:
                 revision = self.head(Path(local))
                 if self.head(path) != revision:
@@ -181,8 +225,10 @@ class Recovery:
                                   "--no-tags", "--no-recurse-submodules", git_dir, revision])
                     if self.head(Path(local)) != revision:
                         raise RuntimeError("Local HEAD changed while refreshing the managed snapshot.")
+                    self.preserve_notes(notes)
                     self.command(["git", "-c", "core.hooksPath=/dev/null", "-C", path,
-                                  "merge", "--ff-only", "--no-edit", revision])
+                                  "merge", "--ff-only", "--no-edit", "--no-overwrite-ignore", revision])
+                    self.preserve_notes(notes)
                     if self.head(path) != revision:
                         raise RuntimeError("Managed snapshot does not match current local HEAD.")
                     marker.write_text(json.dumps({"key": record["key"], "snapshot": revision}) + "\n")

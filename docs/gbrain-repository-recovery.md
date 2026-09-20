@@ -33,6 +33,15 @@ requires an actual isolated sync preserving every active page ID, keyed to the
 exact source, metadata fingerprint, snapshot, preview and installed revision.
 Other reconciliations and deletions remain blocked. A new run clears old finish
 markers before doing work, so an interruption cannot look like a completed run.
+An untracked Markdown file is preserved as a canonical memory only when the
+registered source is unambiguous and permitted and its source/slug/full content
+match the stored page. Content is compared through private temporary output,
+never persisted in command logs. Other untracked, ignored or tracked changes
+still block. Fast-forward uses Git's no-overwrite-ignore protection and verifies
+the note's byte hash before and after; notes are never committed, removed or
+overwritten by recovery.
+Known missing-authorization/evidence refusals are explicit deferrals, not failed
+updates. Actual retention and stored-index-revision failures remain errors.
 
 ## Recurring active-only maintenance
 
