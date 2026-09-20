@@ -85,6 +85,11 @@ Agents must not manufacture approval, enable profiles themselves, or treat a key
 - Serialize budget reservations before sending. Failed/uncertain calls retain a reservation.
   Request and estimated-spend limits are application controls, not a provider billing guarantee;
   provider usage and billing remain authoritative.
+- Reported usage above the reservation blocks further network calls, not valid cache reads.
+  Resumption requires explicit local operator acknowledgement; it never resets cumulative
+  consumption or expands an allowance. Changing configuration alone cannot clear the stop.
+- Expose collection/text limits in `profiles`. Oversized reviews retain the complete matrix
+  locally and use explicitly scoped batches, never silent truncation or automatic paid fan-out.
 
 ## Delivery and activation
 

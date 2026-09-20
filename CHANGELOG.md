@@ -26,6 +26,10 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 
 ### Fixed
 
+- Usage overruns have an explicit local acknowledgement path that preserves consumption and
+  limits; valid approved cache hits remain available while further network calls are blocked.
+- Profile metadata exposes collection/text limits; oversized lists return `too_many_items`,
+  and Thor documents scoped batches while preserving the complete local acceptance matrix.
 - Copilot doctor distinguishes installation checks from unverified live agent/skill discovery
   and MCP connectivity; the operator guide documents reload, real probes and restart recovery.
 - Frontmatter test headings no longer execute the literal `description:` as a shell command.

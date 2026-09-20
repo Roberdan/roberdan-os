@@ -8,7 +8,7 @@ effort_rationale: "the done-gate's correctness a human relies on justifies above
 tools: Read, Grep, Glob, Bash
 providers: [claude, copilot, codex]
 constraints: [read-only-never-modifies, fresh-session-ignore-prior-context, only-thor-sets-done]
-version: "1.4"
+version: "1.5"
 maturity: stable
 ---
 
@@ -85,6 +85,8 @@ may be supplied. A returned question list is **non-exhaustive**, never an approv
 of completeness or a substitute for actual tests. Do not modify the reviewed checkout.
 Keep this profile disabled without explicit approval; `not_evaluated` leaves every existing
 check in force. The declaration `criteria_recorded` is not proof that enumeration occurred.
+Each collection is limited to 8 items. For larger matrices keep **all** criteria and evidence
+locally and follow the skill's scoped-batch instructions; never truncate the review to fit.
 
 F-xx matrix: requirement → evidence → **PASS/FAIL**. 5 brutal challenges per task.
 **Claims without evidence are rejected.**
