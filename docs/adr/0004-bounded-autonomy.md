@@ -87,4 +87,4 @@ quality, preference prediction, Italian accuracy or savings.
 | A09 | Documentation/version explain installation versus live activation and limitations honestly | README, changelog, ADRs, VERSION, links/frontmatter checks |
 | A10 | Release is integrated, published, installed and reachable, with green checks on the actual release revision | PR, merge/tag/release identity, installed skill/runtime probe and CI |
 | A11 | Existing private allowance/state is preserved and installed approved cache reuse causes no new network charge | Safe status and cached approved fixture probe; never reset the ledger |
-| A12 | Independent completion review and task-owned cleanup are durable | Thor criterion-by-criterion verdict and closed card/worktree evidence |
+| A12 | Independent review precedes closure; task-owned work is clean/integrated and ready for automatic cleanup | Thor verifies pre-closure readiness; after `kb finish`, the orchestrator verifies the closed card and actual worktree/branch removal before reporting completion |
