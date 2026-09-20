@@ -12,6 +12,38 @@ from jevlib import responses
 
 
 class ResponseTests(Fixture):
+    def test_documented_typed_answers_and_distinct_choice_confidence_are_accepted(self):
+        for profile in ("twin", "retrieval", "wanda", "thor"):
+            payload = profiles.prepare(profile, sample(profile))["payload"]
+            response = reply(payload)
+            for ident, answer in response["answers"].items():
+                answer["type"] = payload["questions"][ident]["type"]
+                if answer["type"] == "choice":
+                    answer.update(confidence=0.6, probabilities={
+                        "progress": 0.1, "blocked": 0.1, "decision_needed": 0.7, "unknown": 0.1})
+            with self.subTest(profile=profile):
+                try:
+                    clean, _ = responses.validate(response, payload["questions"])
+                except core.JevError as error:
+                    self.fail(f"Documented {profile} response rejected: {error}")
+                self.assertTrue(clean)
+                for answer in clean.values():
+                    self.assertNotIn("type", answer)
+                self.assertEqual(responses.answers(clean, payload["questions"], cached=True), clean)
+
+    def test_missing_wrong_or_nonstring_answer_type_is_rejected(self):
+        for profile in ("twin", "wanda", "thor"):
+            payload = profiles.prepare(profile, sample(profile))["payload"]
+            for kind in (None, "unexpected", ["score"]):
+                response = reply(payload)
+                response["answers"]["q0"]["type"] = kind
+                with self.subTest(profile=profile, kind=kind), self.assertRaises(core.JevError):
+                    responses.validate(response, payload["questions"])
+            response = reply(payload)
+            response["answers"]["q0"].pop("type", None)
+            with self.assertRaises(core.JevError):
+                responses.validate(response, payload["questions"])
+
     def test_malformed_answer_shapes_and_numbers(self):
         payload = profiles.prepare("retrieval", sample("retrieval"))["payload"]
         valid = reply(payload)
@@ -48,7 +80,7 @@ class ResponseTests(Fixture):
 
     def test_choice_values_distribution_and_confidence(self):
         payload = profiles.prepare("wanda", sample("wanda"))["payload"]
-        for change in ({"choice": "delete"}, {"choice": []}, {"confidence": 0.5},
+        for change in ({"choice": "delete"}, {"choice": []}, {"confidence": 1.5},
                        {"probabilities": {"decision_needed": 1}},
                        {"probabilities": {"progress": 0.8, "blocked": 0,
                                           "decision_needed": 0.2, "unknown": 0},
@@ -63,7 +95,7 @@ class ResponseTests(Fixture):
         for answer in ({"noul": -1}, {"noul": 1.1}, {"noul": True}, {"noul": float("nan")},
                        {"noul": 1, "explanation": "invented"}, {"noul": "yes"}):
             value = reply(payload)
-            value["answers"]["q0"] = answer
+            value["answers"]["q0"] = {"type": "noul", **answer}
             with self.assertRaises(core.JevError):
                 responses.validate(value, payload["questions"])
 

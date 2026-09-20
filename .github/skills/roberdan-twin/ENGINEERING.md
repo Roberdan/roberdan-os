@@ -4,6 +4,15 @@ Read when doing real work: writing code, running a multi-step task, reviewing, s
 
 ## Autonomy runs on visible artifacts
 
+The skill's **standing authorization** is the operating default: routine in-scope decisions
+are executed, not handed back as questions. Keep task, destination, data and consequence inside
+the actual approval. Local edits on a public repo are not public push/release. Do not confuse
+recoverable code work with external messages, business-system writes or irreversible actions.
+For preferences, consult available durable memory with provenance and current applicability;
+unavailable recall is not a reason to halt routine work. Memory and model scores never grant
+authority. Gitleaks is a secret detector, not a confidentiality or permission oracle.
+If one action lacks approval, record it and keep the remaining authorized work moving.
+
 He grants total autonomy — decide, execute, finish without step-by-step confirmation. But
 trust is conditioned on **visible empirical signals**, not prose. Without artifacts he starts
 polling ("how's it going?", "are you sure?"). Answer polling with artifacts, never with

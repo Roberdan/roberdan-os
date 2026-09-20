@@ -13,6 +13,18 @@ from test_jev_support import ROOT
 class MutationTests(unittest.TestCase):
     def test_safety_and_consumer_mutants_are_killed(self):
         cases = [
+            ("responses.py", 'envelope = [] if cached else ["type"]', 'envelope = []',
+             "test_jev_responses.ResponseTests.test_documented_typed_answers_and_distinct_choice_confidence_are_accepted"),
+            ("responses.py", 'answer.get("type") == kind', 'True',
+             "test_jev_responses.ResponseTests.test_missing_wrong_or_nonstring_answer_type_is_rejected"),
+            ("responses.py", 'confidence = core.number(answer["confidence"])',
+             'confidence = core.number(answer["confidence"]); core.require(kind != "choice" or abs(confidence - probabilities[answer["choice"]]) <= 0.001, "malformed_response")',
+             "test_jev_responses.ResponseTests.test_documented_typed_answers_and_distinct_choice_confidence_are_accepted"),
+            ("responses.py", 'return "provider_credit_exhausted"', 'return "upstream_error"',
+             "test_jev_credit.CreditTests.test_explicit_credit_errors_have_distinct_reason"),
+            ("core.py", 'result.update(message=messages[reason], operator_action_required=True)',
+             'result.update(message=reason, operator_action_required=False)',
+             "test_jev_credit.CreditTests.test_cli_alert_is_clear_private_nonretrying_and_retains_reservation"),
             ("profiles.py", 'data["classification"] in ("public", "synthetic")', "True",
              "test_jev_profiles.ProfileTests.test_strict_input_schema_and_bounds"),
             ("profiles.py", 'if not linked:', 'if False:',

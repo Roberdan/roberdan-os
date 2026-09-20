@@ -26,6 +26,44 @@ Use this skill when:
 
 Roberto grants total autonomy. It's not rhetoric: he wants you to decide, execute, and finish **without asking for confirmation** at every step.
 
+### Standing authorization: decide inside the boundary (2026-09-20)
+
+Roberto explicitly authorizes routine decisions, not repeated permission questions. Within the
+requested task and approved project, proceed on these classes: recoverable local project edits,
+tests/builds, in-scope refactors, implementation/tool choices, and already-authorized private/demo
+development. Local edits or commits in a public repository are not publication; pushing,
+tagging, releasing or exposing a deployment is a separate consequence.
+
+**Reuse matching authorization.** Check the action's purpose, destination, affected data and
+consequence against the actual operator instruction. If they match, execute and record the
+result, rather than asking again. A new session does not revoke an unexpired grant or renew
+its budget. A grant cannot be transferred to another service, purpose or project by analogy.
+For an approved provider and public/synthetic data class, review the exact outbound bytes and
+bind their hash locally; a fresh human confirmation for each harmless payload is not required.
+Repeat attempts after a diagnosed local bug consume the same cumulative allowance and request
+cap. No automatic transport retries, cap resets, top-ups or endless repair loops.
+
+**Escalate an authority gap, not an implementation detail.** The eight
+[human gates](../AGENTS.md#human-gates) remain: new/excess spending; publication not already
+approved for that artifact and destination; messages, forms or writes to internal/business
+systems; confidential-data egress; non-regenerable destruction; credentials/access changes;
+legal/strategic commitments or cross-cutting invariants outside the approved task.
+Host-required per-action consent still applies. Never bypass a security warning.
+
+**Twin chooses an authorized next step; it does not grant new authority.** Consult it when
+preferences or a meaningful trade-off matter, not for every test or file edit. Ground its
+reasoning in [decision recall](../memory/memory-protocol.md#decision-recall-evidence-not-permission):
+explicit preferences, applicable precedents and observed outcomes. Jev supplies separate
+optional judgments on public/synthetic input; neither model scores nor old memories are consent.
+Gitleaks detects some secrets, not all confidential content. A `demo` label proves neither
+data provenance nor reversibility. Review contents before disclosure.
+
+**Block the action, not all work.** Record the unresolved decision and a recommended option
+on the card; continue other authorized steps/cards. Batch outstanding decisions at handoff,
+respecting a request for final-only updates. Do not manufacture unrelated work to look busy.
+Keep a real executor and precise checkpoint while work runs; a saved note cannot wake it.
+These are operating instructions, not a new host permission system.
+
 **However:** his trust is conditioned on **visible empirical signals**. Not text — artifacts:
 - Git commit with a readable message
 - Open, linkable PR

@@ -3,6 +3,38 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.53.0 — 2026-09-20
+
+### Added
+
+- Risk-scoped standing authorization: routine in-scope work proceeds without repeated
+  confirmation; genuine authority gaps remain human decisions and do not stall unrelated
+  authorized work. Canonical, global and portable Twin instructions stay aligned.
+- Memory-informed Twin decisions use explicit preferences, applicable precedents and observed
+  outcomes, retaining provenance and uncertainty. Old memories never create permissions;
+  private context stays out of Jev and failed recall does not freeze routine work.
+- Fail-closed Gitleaks publication check over the outgoing Git history, routed through the
+  universal entry point and shipping skill. A clean secret scan is not confidentiality proof
+  or publication authorization. ADR-0004 records the boundaries and acceptance matrix.
+
+### Changed
+
+- Explicit disclosure approval can cover a public/synthetic input class; the orchestrator
+  still reviews/hash-binds every payload within the existing provider/purpose/allowance.
+  Controlled replays consume the same cap; no auto-reset, top-up or unlimited retry is added.
+
+### Fixed
+
+- Correct the real provider response contract: require each answer's `type`, validate it
+  against its question, and treat Choice confidence separately from the selected probability.
+  The first authorized live activation exposed a fixture-only compatibility blind spot.
+- Explicit TypeSafe credit-exhaustion responses now return a clear operator-facing message,
+  distinct from local spending/request limits and an otherwise unexplained HTTP 402.
+- Error-body inspection is bounded and never echoes provider text, account details or keys.
+  Failed calls retain their local reservation; no automatic retry or recharge is introduced.
+- Offline regressions and mutation checks cover credit alerts, ambiguous billing responses,
+  unrelated authentication/rate-limit failures and safe accounting.
+
 ## 2.52.0 — 2026-09-20
 
 ### Added

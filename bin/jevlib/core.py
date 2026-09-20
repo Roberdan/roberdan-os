@@ -7,10 +7,11 @@ import re
 
 MODEL = "jev-1.13.0"
 ENDPOINT = "https://api.typesafe.ai/v1/systemone"
-POLICY_VERSION = "jev-policy-1"
+POLICY_VERSION = "jev-policy-2"
 MAX_INPUT_BYTES = 48000
 MAX_REQUEST_BYTES = 12000
 MAX_RESPONSE_BYTES = 262144
+MAX_ERROR_BYTES = 4096
 MAX_ITEMS = 8
 MAX_TEXT_CHARS = 1200
 MAX_CONTEXT_CHARS = 2400
@@ -92,5 +93,22 @@ def loads(raw, reason="invalid_json"):
 
 
 def not_evaluated(reason):
-    return {"status": "not_evaluated", "reason": reason,
-            "preserve_original_behavior": True}
+    result = {"status": "not_evaluated", "reason": reason,
+              "preserve_original_behavior": True}
+    messages = {
+        "provider_credit_exhausted": (
+            "Credito TypeSafe esaurito o insufficiente. Valutazione non disponibile: "
+            "verifica il saldo o ricarica l'account. Nessun nuovo tentativo automatico."),
+        "provider_payment_required": (
+            "TypeSafe richiede un pagamento (HTTP 402). Verifica credito e fatturazione: "
+            "la risposta non conferma che il saldo sia esaurito."),
+        "budget_limit": (
+            "Raggiunto il limite di spesa locale autorizzato per Jev. "
+            "Questo non indica che il credito TypeSafe sia esaurito."),
+        "request_limit": (
+            "Raggiunto il limite locale di chiamate autorizzate per Jev. "
+            "Questo non indica che il credito TypeSafe sia esaurito."),
+    }
+    if reason in messages:
+        result.update(message=messages[reason], operator_action_required=True)
+    return result

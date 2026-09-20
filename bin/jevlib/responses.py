@@ -1,6 +1,42 @@
 """Validate typed answers before any consumer or persistent cache sees them."""
 
+import re
+
 from . import core
+
+
+def http_error_reason(status, raw):
+    """Recognize explicit credit refusals, never echo or infer an account balance."""
+    fallback = "provider_payment_required" if status == 402 else "upstream_error"
+    if status not in (400, 402, 403, 429) or len(raw) > core.MAX_ERROR_BYTES:
+        return fallback
+    try:
+        body = core.loads(raw)
+    except core.JevError:
+        try:
+            body = raw.decode("utf-8")
+        except UnicodeError:
+            return fallback
+    nodes = [body]
+    if type(body) is dict:
+        nodes.extend(body.get(key) for key in ("error", "detail"))
+    codes = {"insufficient_credit", "insufficient_credits", "credit_exhausted",
+             "credits_exhausted", "credit_balance_exhausted", "insufficient_balance"}
+    for node in nodes:
+        if type(node) is dict:
+            for field in ("code", "type"):
+                code = node.get(field)
+                if type(code) is str and code.strip().lower() in codes:
+                    return "provider_credit_exhausted"
+            node = node.get("message")
+        if type(node) is str and re.match(
+            r"(?:insufficient (?:credits?|credit balance|balance)\b"
+            r"|(?:your )?(?:credit balance|credits?)(?: is| are)? (?:exhausted|depleted)\b"
+            r"|you (?:have )?run out of credits?\b)",
+            node.strip(), flags=re.IGNORECASE | re.ASCII,
+        ):
+            return "provider_credit_exhausted"
+    return fallback
 
 
 def usage(value):
@@ -15,11 +51,15 @@ def answers(value, questions, cached=False):
     for ident, question in questions.items():
         answer = value[ident]
         kind = question["type"]
+        if not cached:
+            core.require(type(answer) is dict and answer.get("type") == kind,
+                         "malformed_response")
+        envelope = [] if cached else ["type"]
         if kind == "noul":
-            core.exact(answer, ("noul",), "malformed_response")
+            core.exact(answer, ["noul", *envelope], "malformed_response")
             clean[ident] = {"noul": core.number(answer["noul"])}
             continue
-        fields = [kind, "confidence", "probabilities"]
+        fields = [kind, "confidence", "probabilities", *envelope]
         if kind == "score" and not cached:
             fields.append("legend")
         core.exact(answer, fields, "malformed_response")
@@ -33,8 +73,6 @@ def answers(value, questions, cached=False):
         if kind == "choice":
             selected = answer["choice"]
             core.require(type(selected) is str and selected in allowed, "malformed_response")
-            core.require(abs(confidence - probabilities[selected]) <= 0.001,
-                         "malformed_response")
             core.require(probabilities[selected] + 0.001 >= max(probabilities.values()),
                          "malformed_response")
         else:

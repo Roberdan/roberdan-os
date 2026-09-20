@@ -15,6 +15,20 @@ by `roberto-mode`. `AGENTS.md` is the universal standard; `CLAUDE.md` and
 
 ## Behavior
 
+**Standing authorization (Roberto, 2026-09-20):** execute routine, recoverable work inside the
+requested scope without repeated questions; reuse an approval matching purpose, destination,
+data and consequence. Twin may choose authorized actions, not expand authority. Use gbrain
+memories as evidence, never consent; private memory never goes to Jev. Escalate only a real
+authority gap and continue the rest. Full boundaries:
+[`behavior/roberto-mode.md § Standing authorization`](behavior/roberto-mode.md#standing-authorization-decide-inside-the-boundary-2026-09-20)
+and [ADR-0004](docs/adr/0004-bounded-autonomy.md).
+
+**Before public publication (including workflows supplied by another skill):** verify the
+artifact/destination approval and review confidentiality, then run
+`bash ~/GitHub/roberdan-os/bin/publication-check.sh <reviewed-base>` in the target repo.
+Missing or failed Gitleaks blocks publication, not local work. A clean scan detects no
+recognized secrets; it is not permission or proof that business/personal content is public.
+
 **Intake gate (default, every tool):** when a goal/prompt/command is ambiguous or under-specified
 in a way that would change the result, **ask targeted clarifying questions before executing** —
 resolve what evidence or an obvious default can answer, ask the rest, batched. This is an *entry*
@@ -384,7 +398,9 @@ that can no longer open is worse than one that never closes.
 
 ## Human gates
 
-Autonomy ≠ black box. These **always** go through Roberto (direct message):
+Autonomy ≠ black box. These require Roberto's explicit authorization. Reuse an existing
+scope-matching approval; ask only when purpose, destination, data, limits or consequence
+are not covered. The standing authorization above does not create permission for these:
 
 1. Merge to `main` impacting branch-protection / security / license / release-infra
 2. Force-push to `main`

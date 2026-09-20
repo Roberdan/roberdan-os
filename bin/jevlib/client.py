@@ -33,8 +33,13 @@ def transport(payload, key):
             core.require(response.status == 200, "upstream_error")
             raw = response.read(core.MAX_RESPONSE_BYTES + 1)
     except urllib.error.HTTPError as error:
-        error.close()
-        raise core.JevError("upstream_error") from None
+        try:
+            raw = error.read(core.MAX_ERROR_BYTES + 1)
+        except (OSError, http.client.HTTPException):
+            raise core.JevError("upstream_error_body_unreadable") from None
+        finally:
+            error.close()
+        raise core.JevError(responses.http_error_reason(error.code, raw)) from None
     except (urllib.error.URLError, OSError, http.client.HTTPException):
         raise core.JevError("transport_error") from None
     core.require(len(raw) <= core.MAX_RESPONSE_BYTES, "response_too_large")

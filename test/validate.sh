@@ -25,12 +25,12 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-model-economy \
           test-model-registry test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
-          test-drift test-links test-privacy test-plan-coverage test-optional-skills test-jev test-jev-routing; do
+          test-drift test-links test-privacy test-plan-coverage test-optional-skills test-jev test-jev-routing test-publication-check; do
   _spawn "$_s"
 done
 unset _s
 _spawn_serial_group test-sync-install test-copilot-adapter test-skill-name-collision test-apple-designer test-twin-install
-for _j in test-optional-skills test-jev test-jev-routing; do if _suite "$_j"; then ok "$_j"; else _suite_out "$_j"; err "$_j failed"; fi; done; unset _j
+for _j in test-optional-skills test-jev test-jev-routing test-publication-check; do if _suite "$_j"; then ok "$_j"; else _suite_out "$_j"; err "$_j failed"; fi; done; unset _j
 # --- 1) Frontmatter lint (agenti, skill, card, schema federato) ---------------
 # Le quattro famiglie vivono in test/test-frontmatter.sh: il frontmatter e' il contratto fra un
 # file e chi lo carica, e un contratto rotto non fallisce rumorosamente — viene caricato lo

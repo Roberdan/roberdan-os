@@ -5,6 +5,15 @@ Full canon: `~/GitHub/roberdan-os/AGENTS.md` — read it for any non-trivial wor
 loop + roberto-mode; twin for voice; human gates never automated). Under `~/GitHub` the
 `~/GitHub/CLAUDE.md` pointer already carries the same rules in detail.
 
+**Standing authorization:** execute routine recoverable work inside the requested scope;
+reuse matching approval instead of asking twice. Twin can choose authorized next steps,
+using relevant gbrain memories as evidence, never consent. Private memory stays out of Jev.
+Escalate actual authority gaps (new spending, disclosure/publication, messages/internal writes,
+irreversible actions); continue other authorized work. A clean Gitleaks scan grants no rights.
+Before public publication, run `bin/publication-check.sh` from the canonical roberdan-os
+checkout against the reviewed outgoing range. Full boundaries:
+`behavior/roberto-mode.md` § Standing authorization.
+
 **Talk to Roberto in this fixed format — every reply, every project, no exceptions**
 (accessibility commitment, not a style preference; inlined here because a pointer does not
 bind when the canon file is not loaded):

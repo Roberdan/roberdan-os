@@ -55,6 +55,7 @@ def reply(payload, key=FAKE_KEY, input_tokens=100):
                                                 for k in question["criteria"]}}
         else:
             answers[ident] = {"noul": 1.0}
+        answers[ident]["type"] = kind
     return {"model": payload["model"], "answers": answers,
             "usage": {"input_tokens": input_tokens, "output_tokens": 20}}
 

@@ -52,8 +52,38 @@ longer the source-of-truth.
 
 1. **`gbrain search` keyword FIRST** (reliable). Semantic `query` drops sparse topics —
    see [[reference-gbrain-semantic-recall-gap]].
-2. Scope to the right source (`vault` for memory), `--detail low`, small limit.
+2. Scope to one source (`vault` for memory), with a small limit and bounded snippets.
+   Current CLI: `gbrain search "<terms>" --source-id vault --limit 3 --snippet-chars 300`.
+   Check installed help before using version-specific flags; `--detail` is not supported by
+   gbrain 0.50's search command. Missing MCP tools do not imply the CLI is unavailable.
 3. Greppable markdown as fallback until semantic recall is fixed.
+
+## Decision recall: evidence, not permission
+
+Before a preference-dependent decision, Twin retrieves a few relevant explicit preferences,
+comparable past decisions and their **observed outcomes**, not a dump of the vault. Start with
+known names/terms; read the actual source note when a snippet is insufficient. A retrieval
+score is relevance, not truth or proof that the search was complete.
+
+For each fact used, retain its note identifier, date if known, provenance, scope and applicability.
+Distinguish operator-confirmed statements from model hypotheses or unconfirmed summaries.
+Current explicit instructions and applicable approvals outrank stale or conflicting recollections;
+an old decision for one project does not authorize an action on another. Unknown dates,
+contradictory notes and missing outcomes remain explicit uncertainty, never invented facts.
+
+Memory informs **how** to choose within authority; it cannot grant spend, disclosure, sending,
+publication or access rights. Do not store Jev scores or Twin guesses as Roberto's preferences,
+and never learn an authorization from a model-generated outcome.
+
+If gbrain is unavailable, try the known local source note when accessible. Otherwise disclose
+that recall was unavailable and use current instructions plus a reversible in-scope default.
+Do not block routine authorized work solely because recall failed; hold only decisions that
+genuinely need missing critical facts or authority. Continue other authorized work.
+
+Private memory and sensitive-derived summaries remain local and outside Git. Never pass them
+to Jev or treat a clean Gitleaks scan as declassification. Capture durable corrections/decisions
+through the existing taxonomy and privacy rules below, keeping observed outcomes separate from
+recommendations; do not create another per-agent memory store.
 
 ## Privacy (hard gate, like code)
 
