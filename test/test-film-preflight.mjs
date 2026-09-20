@@ -6,6 +6,7 @@ import {
   realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -13,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 const root = realpathSync(join(dirname(fileURLToPath(import.meta.url)), '..'));
 const cli = join(root, 'skills/film-director/scripts/preflight.mjs');
 const adapter = join(root, 'skills/film-director/scripts/sora-azure.sh');
-const tmp = mkdtempSync(join(root, '.film-preflight-test-'));
+const tmp = realpathSync(mkdtempSync(join(tmpdir(), 'rda-film-preflight-test-')));
 after(() => rmSync(tmp, { recursive: true }));
 const sha = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
 const ref = (path) => ({ path, sha256: sha(path) });

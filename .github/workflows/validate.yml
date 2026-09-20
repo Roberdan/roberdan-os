@@ -9,8 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck jq
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install -y shellcheck jq ffmpeg
       - name: Run validate.sh
         run: bash test/validate.sh
         # NB: leak-check has 3 tiers (see test/leak-check.sh, AGENTS.md § Privacy):

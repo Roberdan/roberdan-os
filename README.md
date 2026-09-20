@@ -112,6 +112,24 @@ refuses missing/failed scans. A clean scan is not confidentiality proof or permi
 These are operating instructions plus a real scanner, not a new host permission system or an
 always-running executor; memory infrastructure remains optional.
 
+### Integrated workflow utilities
+
+Version **2.54.0** consolidates the remaining Film Director, memory-recovery and original
+Copilot-continuation branches without reverting the newer pause and session-isolation fixes.
+
+- **[Film Director](skills/film-director/skill.md):** verify actual worker execution and
+  a reviewed short prototype before full production. New Azure generation requires the
+  explicit manifest/request key; uncertain or duplicate dispatches block new generation.
+  Existing status/wait/download operations remain available. Installation generates no video.
+- **[Repository memory recovery](docs/gbrain-repository-recovery.md):**
+  [`gbrain-repo-audit.py`](bin/gbrain-repo-audit.py) inventories repository coverage;
+  [`gbrain-recover-repos.py`](bin/gbrain-recover-repos.py) defaults to a plan and requires
+  a restore-tested backup before applying recovery. Original checkouts and denied sources
+  remain protected. This is an explicit recovery utility, not automatic live indexing.
+
+Both suites run in normal validation; the film tests use FFmpeg/ffprobe and synthetic media,
+not paid generation. The existing Jev allowance and private runtime state are unchanged.
+
 ## What this actually is
 
 ### One twin, one public entry point

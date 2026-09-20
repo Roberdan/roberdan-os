@@ -1,0 +1,48 @@
+# Conservative repository recovery
+
+`bin/gbrain-repo-audit.py` records local and GitHub coverage in a private JSON
+manifest. `bin/gbrain-recover-repos.py` consumes that manifest. Both tools keep
+operational inventories, checkout paths and command output outside this repository.
+
+The recovery command defaults to a plan. `--apply` requires a restore-tested
+backup state plus matching archive checksums, and local `ollama:bge-m3` embeddings
+at 1024 dimensions. It does not upgrade gbrain or invoke paid synthesis.
+
+```sh
+python3 bin/gbrain-recover-repos.py \
+  --manifest /private/path/repo-coverage.json \
+  --backup /private/path/backup/state.json \
+  --state-dir /private/path/recovery \
+  --blocked-source source-without-access
+```
+
+Add `--apply` only after reviewing the plan and confirming its authorization.
+Use repeated `--blocked-source` arguments for sources this execution must not
+access. A denied existing source is recorded as blocked rather than accessed
+through another transport.
+
+## Guarantees and boundaries
+
+- Original checkouts, intentional bare containers and linked worktrees are not
+  edited. Git content is copied into managed checkouts with hooks disabled.
+- Every managed checkout has an ownership marker. Unknown existing directories
+  and modified snapshots are not overwritten.
+- Existing indexes requiring full reconciliation, deletion, rename or
+  un-syncable-page deletion are blocked before actual synchronization.
+- Synchronization uses the automatic code/document strategy without pull or
+  automatic embedding. Retained page identities and the stored index revision
+  must match the validated snapshot.
+- Vector catch-up uses `embed --stale --source`, not `dream --phase embed`.
+  In gbrain 0.50 the latter is global even when a source argument is supplied.
+  The final dry-run must report zero eligible stale chunks, including stale
+  content/signatures rather than only missing vectors.
+- Missing anchors, inaccessible remotes, empty repositories, changed local
+  heads and stalled embeddings remain explicit blocked records. No successful
+  exit is returned while a recorded repository is blocked.
+- Resume uses the same state directory. Verified entries belong to this
+  one-time recovery snapshot, not an assertion that future commits are indexed.
+  This runner does not replace a scheduled incremental refresh service.
+
+Full command evidence and per-repository state are written atomically under the
+private state directory. The backup is retained. A reviewer PASS validates the
+implementation, not live coverage or the task's final completion gate.
