@@ -1,6 +1,42 @@
 """Validate typed answers before any consumer or persistent cache sees them."""
 
+import re
+
 from . import core
+
+
+def http_error_reason(status, raw):
+    """Recognize explicit credit refusals, never echo or infer an account balance."""
+    fallback = "provider_payment_required" if status == 402 else "upstream_error"
+    if status not in (400, 402, 403, 429) or len(raw) > core.MAX_ERROR_BYTES:
+        return fallback
+    try:
+        body = core.loads(raw)
+    except core.JevError:
+        try:
+            body = raw.decode("utf-8")
+        except UnicodeError:
+            return fallback
+    nodes = [body]
+    if type(body) is dict:
+        nodes.extend(body.get(key) for key in ("error", "detail"))
+    codes = {"insufficient_credit", "insufficient_credits", "credit_exhausted",
+             "credits_exhausted", "credit_balance_exhausted", "insufficient_balance"}
+    for node in nodes:
+        if type(node) is dict:
+            for field in ("code", "type"):
+                code = node.get(field)
+                if type(code) is str and code.strip().lower() in codes:
+                    return "provider_credit_exhausted"
+            node = node.get("message")
+        if type(node) is str and re.match(
+            r"(?:insufficient (?:credits?|credit balance|balance)\b"
+            r"|(?:your )?(?:credit balance|credits?)(?: is| are)? (?:exhausted|depleted)\b"
+            r"|you (?:have )?run out of credits?\b)",
+            node.strip(), flags=re.IGNORECASE | re.ASCII,
+        ):
+            return "provider_credit_exhausted"
+    return fallback
 
 
 def usage(value):
