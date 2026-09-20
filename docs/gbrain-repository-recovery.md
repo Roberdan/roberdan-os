@@ -46,6 +46,10 @@ interpolation of source IDs, secret-file loading, remote model fallback or model
 download. An existing Ollama process stays running; an owned temporary service
 is held for the whole operation and stopped afterwards. Logs are retained under
 `~/Library/Logs/gbrain-refresh`, without truncation or changes to the 05:30 check.
+One runner lock covers refresh and explicit embedding requests. `--result-file`
+writes a fresh structured receipt for the parent maintenance command; an existing
+file is refused. SIGTERM unwinds owned processes and the Ollama context before
+the process exits; parent callers must allow its cleanup grace period.
 
 The currently validated upstream revision is pinned in the runner. A different
 or dirty gbrain installation stops it rather than assuming migration compatibility.

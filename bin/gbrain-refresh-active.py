@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Local-only active-repository refresh, or explicitly source-scoped embeddings."""
 import argparse
+import fcntl
 import importlib.util
 import json
 import os
 from pathlib import Path
 import re
+import signal
 import sys
+import time
 from types import SimpleNamespace
 
 
@@ -66,11 +69,14 @@ def main(argv=None):
     parser.add_argument("--embed-source")
     parser.add_argument("--plan", action="store_true")
     parser.add_argument("--require-ac", action="store_true")
+    parser.add_argument("--result-file", type=Path)
     args = parser.parse_args(argv)
     if not args.plan and not args.embed_source and args.backup is None:
         parser.error("Il recupero richiede --backup con una copia gia ripristinata e verificata.")
     if args.embed_source in args.blocked_source:
         parser.error("La fonte richiesta e esclusa dai permessi concessi.")
+    if args.result_file and (args.result_file.exists() or not args.result_file.parent.is_dir()):
+        parser.error("--result-file richiede un file nuovo in una cartella esistente.")
     os.umask(0o077)
     directory = Path(__file__).resolve().parent
     recovery = load("active_recovery", directory / "gbrain-recover-repos.py")
@@ -87,6 +93,32 @@ def main(argv=None):
     job = buongiorno.Maintenance(
         SimpleNamespace(check=False, plain=True, nightly=False, only=["memory"]),
         root=Path.home() / "Library/Logs/gbrain-refresh")
+    lock = (job.root / "run.lock").open("a")
+
+    def save_result():
+        if args.result_file:
+            with args.result_file.open("x") as output:
+                json.dump(job.data(), output, indent=2)
+
+    def finish():
+        try:
+            code = job.finish()
+            save_result()
+            return code
+        finally:
+            lock.close()
+
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        job.row("RINVIATO", "Memorie", "Un'altra manutenzione delle memorie e gia in corso.")
+        job.exit_code = 0
+        job.finished = time.time()
+        job.save()
+        save_result()
+        lock.close()
+        print("RINVIATO: un'altra manutenzione delle memorie e gia in corso.", flush=True)
+        return 0
     try:
         if args.require_ac:
             power = job.command("Alimentazione", ["/usr/bin/pmset", "-g", "ps"], timeout=10)
@@ -94,7 +126,7 @@ def main(argv=None):
                 raise RuntimeError("Non riesco a verificare l'alimentazione.")
             if "AC Power" not in power:
                 job.row("RINVIATO", "Memorie", "Computer a batteria: nessuna elaborazione avviata.")
-                return job.finish()
+                return finish()
         for key in ("DATABASE_URL", "GBRAIN_DATABASE_URL", "GBRAIN_SOURCE"):
             job.env.pop(key, None)
         # This runner's sync guarantees were exercised against this exact upstream revision.
@@ -117,7 +149,8 @@ def main(argv=None):
             else:
                 manifest, excluded = scoped_manifest(manifest, recovery.sources(), set(args.blocked_source))
                 for path in excluded:
-                    job.row("RINVIATO", Path(path).name, "Escluso dai permessi concessi; nessun contenuto letto.")
+                    job.row("INVARIATO", "Fonti escluse",
+                            Path(path).name + ": escluso dai permessi concessi; nessun contenuto letto.")
 
                 class ManagedRecovery(recovery.Recovery):
                     def local_vectors(self, source):
@@ -145,8 +178,11 @@ def main(argv=None):
         job.row("ERRORE", "Memorie", str(exc))
     except KeyboardInterrupt:
         job.row("ERRORE", "Memorie", "Interrotto; stato parziale e registri conservati.")
-    return job.finish()
+    return finish()
 
 
 if __name__ == "__main__":
+    def terminate(_signum, _frame):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, terminate)
     sys.exit(main())
