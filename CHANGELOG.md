@@ -3,6 +3,29 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.54.0 — 2026-09-20
+
+### Added
+
+- Film Director preflight checks require actual worker execution, fixed narration/timing
+  and a reviewed short prototype before full production. New Azure generation records
+  uncertain attempts before dispatch and refuses duplicate or unresolved jobs; status,
+  waiting and downloading existing jobs remain available.
+- Conservative repository-memory inventory and recovery tools, with a plan-only default,
+  restore-tested backup prerequisites, managed snapshots, scoped local embeddings and
+  explicit stops for denied sources, destructive reconciliation or missing evidence.
+  Installation does not run recovery or establish that live repositories are fully indexed.
+- Both imported regression suites now run in standard validation. Video fixtures use
+  temporary directories outside the checkout; CI installs FFmpeg for real synthetic media.
+
+### Changed
+
+- Integrate all three retained source branches into one release. The older Copilot
+  continuation branch contributes its history without replacing the already-shipped newer
+  implementation: explicit pause, root-session isolation, audit and startup fixes remain.
+- Preserve the Jev, memory-informed autonomy and publication controls from 2.53.0.
+  No provider allowance, permission boundary or active recovery state is changed.
+
 ## 2.53.0 — 2026-09-20
 
 ### Added
