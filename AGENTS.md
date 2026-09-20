@@ -287,6 +287,13 @@ Scheduling = **launchd** (fires even with Claude closed). Never auto-commit on `
 
 ## Skills
 
+**Optional typed judgments:** [`jev`](skills/jev/skill.md) connects public/synthetic Twin
+option comparisons, retrieval reranking, Wanda updates and Thor follow-up questions to one
+client. At those decision points, consult the skill; never send raw context automatically.
+For public search candidates use `python3 bin/jev.py evaluate retrieval --input <reviewed-file>`.
+Live calls default off and require approved disclosure plus budget. Jev never replaces
+human gates, private reasoning or actual verification. See [ADR-0003](docs/adr/0003-jev-shared-judgment.md).
+
 Logic in plain markdown, tool-agnostic (wrappers are generated):
 [`verify-done`](skills/verify-done/skill.md) · [`ship`](skills/ship/skill.md) ·
 [`review`](skills/review/skill.md) · [`sync`](skills/sync/skill.md) ·

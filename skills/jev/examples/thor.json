@@ -1,0 +1,11 @@
+{
+  "classification": "synthetic",
+  "criteria_recorded": true,
+  "requirements": [
+    {"id": "csv", "text": "Export creates a CSV file with the required header."},
+    {"id": "auth", "text": "Unauthenticated export requests are rejected."}
+  ],
+  "evidence": [
+    {"id": "csv_test", "text": "A synthetic test checked the exported header.", "requirement_ids": ["csv"]}
+  ]
+}

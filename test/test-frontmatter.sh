@@ -41,7 +41,7 @@ for s in $(find skills -maxdepth 2 -name 'skill.md' | LC_ALL=C sort); do
   [ -n "$miss" ] && err "$s missing:$miss" || ok "$s"
 done
 
-section "frontmatter — exported SKILL.md must PARSE, not merely contain the word (grep saw `description:`, the loader saw nothing)"
+section 'frontmatter — exported SKILL.md must PARSE, not merely contain the word (grep saw `description:`, the loader saw nothing)'
 # Scar 2026-08-21: cowork-skill/roberdan-os/SKILL.md had a description containing ": ",
 # which is not a valid YAML plain scalar. M365 Cowork refused the upload with "manca la
 # descrizione" while `grep -qE '^description:'` above was perfectly happy. Presence is not

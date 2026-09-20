@@ -3,6 +3,37 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.52.0 — 2026-09-20
+
+### Added
+
+- Shared optional Jev runtime with four consumers: separate Twin preference observations,
+  lossless public-result reranking, Wanda update suggestions and non-exhaustive Thor
+  evidence-gap questions. ADR-0003 records the approved design and acceptance matrix.
+- Canonical `jev` skill, synthetic examples and agent/portable-Twin routing through the
+  existing cross-platform generator; no edits to the upstream TypeSafe skill.
+- Offline runtime and integration coverage for typed answers, opt-in disclosure, private
+  credentials/state, bounded consumption, cache identity and explicit failure results.
+
+### Safety and limits
+
+- Live inference is disabled by default and requires a separately approved budget,
+  enabled profile and exact payload hash. Installation does not authorize spend.
+- No dossier or confidential material is sent. Jev cannot approve work, change human
+  gates, start tasks, override model assignments or replace the Twin's reasoning.
+- Runtime coverage is not a benchmark of Jev accuracy, Italian performance, savings or
+  agreement with the operator's preferences; those remain to be measured before reliance.
+
+### Fixed
+
+- Usage overruns have an explicit local acknowledgement path that preserves consumption and
+  limits; valid approved cache hits remain available while further network calls are blocked.
+- Profile metadata exposes collection/text limits; oversized lists return `too_many_items`,
+  and Thor documents scoped batches while preserving the complete local acceptance matrix.
+- Copilot doctor distinguishes installation checks from unverified live agent/skill discovery
+  and MCP connectivity; the operator guide documents reload, real probes and restart recovery.
+- Frontmatter test headings no longer execute the literal `description:` as a shell command.
+
 ## 2.51.0 — 2026-09-17
 
 ### Added

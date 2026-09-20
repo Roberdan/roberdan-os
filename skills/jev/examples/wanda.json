@@ -1,0 +1,8 @@
+{
+  "classification": "synthetic",
+  "items": [
+    {"id": "progress", "text": "The synthetic export test now passes."},
+    {"id": "blocked", "text": "The test cannot run because the fixture is missing."},
+    {"id": "decision", "text": "An operator decision is needed on the public output format."}
+  ]
+}

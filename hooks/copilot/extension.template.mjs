@@ -493,8 +493,8 @@ const tools = [
             const anyMiss = lines.some((l) => l.startsWith("MISS"));
             const footer = anyMiss
                 ? "\nRemediation: run `bash bin/sync.sh --install` from roberdan-os (collision-safe; never overwrites). gbrain/mcp-config is Copilot-owned — add it by hand if missing."
-                : "\nAll roberdan-os <-> Copilot wiring present.";
-            return `roberdan-os doctor\n${lines.join("\n")}${footer}`;
+                : "\nInstallation files present; context-inject.sh runs.";
+            return `roberdan-os doctor\n${lines.join("\n")}${footer}\nRuntime agent/skill discovery and MCP connectivity are NOT verified. If installed tools are unavailable, reload extensions, then invoke an agent and load a skill; if still unavailable, checkpoint and restart Copilot. See docs/USAGE.md.`;
         },
     },
 ];

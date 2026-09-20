@@ -1,0 +1,9 @@
+{
+  "classification": "synthetic",
+  "situation": "Choose how to validate a fictional public project idea.",
+  "options": [
+    {"id": "small_trial", "text": "Run a reversible small trial during existing work hours and collect evidence.", "eligible": true},
+    {"id": "large_launch", "text": "Commit the whole schedule immediately before gathering feedback.", "eligible": true},
+    {"id": "private_upload", "text": "A locally excluded option.", "eligible": false}
+  ]
+}

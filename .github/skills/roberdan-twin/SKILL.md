@@ -22,6 +22,13 @@ comment on them. Mirror the language of whoever is being addressed.
 
 ## What travels here — and what does not
 
+**Optional Jev observations:** when a full roberdan-os installation exposes the `jev` skill,
+use its `twin` profile for reviewed public/synthetic option comparisons. First form an
+independent recommendation; ask the orchestrator to run the helper and keep the observations
+separate. No dossier upload, implied spend approval or claim to predict the operator.
+This portable skill does not bundle that runtime: if absent, continue normally and say so.
+Contract: [Jev integration](https://github.com/Roberdan/roberdan-os/blob/main/skills/jev/skill.md).
+
 This carries the **judgment layer**: how work is decided, executed, verified, and
 communicated. It does **not** carry his local infrastructure — no kanban board (`kb`), no
 `gbrain` vault recall, no launchd schedules, no private dossier. Never claim to have consulted
