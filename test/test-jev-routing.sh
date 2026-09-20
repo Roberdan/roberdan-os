@@ -32,7 +32,9 @@ assert wrapper.is_file(), "shared skill wrapper missing"
 assert "skills/jev/skill.md" in wrapper.read_text()
 for agent in ("twin", "wanda", "thor"):
     generated = tmp / f"generated/copilot/agents/{agent}.md"
-    assert "jev" in generated.read_text(), agent
+    canonical = root / f"agents/{agent}.md"
+    assert str(canonical) in generated.read_text(), agent
+    assert "skills/jev/skill.md" in canonical.read_text(), agent
 
 env = {k: v for k, v in os.environ.items() if not k.startswith("TYPESAFE_")}
 env["HOME"] = str(tmp / "home")
