@@ -38,6 +38,7 @@ def recovery_outcome(error):
         "BLOCKED: existing source needs a full/reconcile sync",
         "BLOCKED: preview contains deletions/renames",
         "BLOCKED: isolated",
+        "BLOCKED: claimed source root",
     )
     return "RINVIATO" if error.startswith(policy_refusals) else "ERRORE"
 
@@ -147,7 +148,8 @@ def main(argv=None):
         dirty = job.command("Modifiche codice gbrain",
                             ["git", "-C", Path.home() / "gbrain", "status", "--porcelain"])
         reviewed = {"a6be012a3bcfac42e279630aedec5cda4a450e29",
-                    "668b9bac302705f3bca0ae4792a49fab0a79a74e"}
+                    "668b9bac302705f3bca0ae4792a49fab0a79a74e",
+                    "d13aa742fd68b71bfd6c98be3dda5813791f1d6c"}
         if installed is None or installed.strip() not in reviewed or dirty != "":
             raise RuntimeError("Versione gbrain non ancora validata per questa manutenzione; nessuna modifica.")
         config = dependencies.configuration(job)

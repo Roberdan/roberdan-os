@@ -213,6 +213,9 @@ class Recovery:
         path = HOME / ".gbrain/checkouts" / (identity or "local/" + make_id(record["key"]))
         marker = path / ".git/roberdan-recovery.json"
         if path.exists():
+            if (path / ".gbrain-owner.json").exists():
+                raise RuntimeError("BLOCKED: claimed source root; gbrain refuses periodic sync here. "
+                                   "Keep this ownership protection; do not remove its marker.")
             if not marker.exists() or json.loads(marker.read_text()).get("key") != record["key"]:
                 raise RuntimeError(f"Existing checkout is not owned by this recovery: {path}")
             status = self.command(["git", "-C", path, "status", "--porcelain", "--untracked-files=all", "--ignored", "-z"])

@@ -67,6 +67,8 @@ class RefreshTests(unittest.TestCase):
         self.assertEqual(refresh.recovery_outcome(
             "BLOCKED: isolated import proof does not match"), "RINVIATO")
         self.assertEqual(refresh.recovery_outcome(
+            "BLOCKED: claimed source root; do not remove its marker"), "RINVIATO")
+        self.assertEqual(refresh.recovery_outcome(
             "BLOCKED: stored index revision does not match the managed checkout."), "ERRORE")
         self.assertEqual(refresh.recovery_outcome("RETENTION FAILURE: missing prior pages"), "ERRORE")
 

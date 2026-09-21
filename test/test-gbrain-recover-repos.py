@@ -97,6 +97,17 @@ class RecoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "restore-tested"):
             self.runner.validate_backup()
 
+    def test_claimed_root_stops_before_git_or_sync_and_keeps_marker(self):
+        path = self.root / ".gbrain/checkouts/owner/repo"
+        path.mkdir(parents=True)
+        marker = path / ".gbrain-owner.json"
+        marker.write_text('{"fixture":"ownership"}')
+        with patch.object(recovery, "HOME", self.root), \
+             patch.object(self.runner, "command", side_effect=AssertionError("must not run")):
+            with self.assertRaisesRegex(RuntimeError, "BLOCKED: claimed source root"):
+                self.runner.checkout({"github": "owner/repo", "local_path": "/repo", "key": "owner/repo"})
+        self.assertEqual(marker.read_text(), '{"fixture":"ownership"}')
+
     def test_deletions_are_preview_only(self):
         with patch.object(recovery, "active_pages", return_value={1, 2}), \
              patch.object(self.runner, "command", return_value="Sync dry run: abc..def\n  Deleted: file.md") as cmd:
