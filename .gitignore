@@ -91,3 +91,8 @@ handoff/resume.md
 # non nel negozio del bus, dove sarebbe il registro che test 12 rifiuta.
 .bus-role
 .bus-session
+
+# Cache di Python: generata da qualunque modulo importato qui dentro, mai versionata.
+# Restava come cartella non tracciata e faceva rumore in git status a ogni sessione.
+__pycache__/
+*.pyc
