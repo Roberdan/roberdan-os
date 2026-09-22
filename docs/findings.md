@@ -340,3 +340,37 @@ sono righe con la condizione che le renderebbe tali, e solo Roberto le promuove.
   `test-bus-mutants.sh` deriva i propri controlli da test-bus.sh: lo split cambia
   la superficie tracciata e vuole quella batteria in mano. Diventa una card quando
   qualcuno tocca bus.sh per un motivo di prodotto.
+
+### 2026-09-22 — dalla revisione avversariale su GPT-6 Astra (@baccio) e da @rex
+
+Quelli corretti subito stanno nei commit. Questi no, e la condizione che li
+renderebbe card e' scritta accanto.
+
+- **Le tre "cause" del monologo sono ipotesi, non misure.** 13 thread con un solo
+  mittente puo' voler dire monologo, ma anche risultato depositato o risposta
+  tornata per il canale dell'host; "14 senza cursore" non e' "nessuno li ha
+  aperti" (`peek` non avanza il cursore, `log` non ne scrive uno). Manca il
+  denominatore che conta: **quante volte due lavori avevano davvero bisogno l'uno
+  dell'altro.** Diventa una card se si vuole sapere se il bus serve: si misurano
+  le DIPENDENZE (quale informazione aveva A che serviva a B, quando B poteva
+  leggerla, cosa e' stato rifatto senza), non il traffico.
+- **`owed` misura citazioni mancanti, non impegni aperti.** "Me ne occupo dopo"
+  con `--re` estingue il debito; una richiesta a `all` risulta dovuta anche da chi
+  non ha mai toccato la card; chiudere il thread cancella tutto senza guardare gli
+  impegni. La correzione vera distingue *ricevuta*, *presa in carico*, *risposta*,
+  *rifiuto*, *ritiro* — eventi nello stesso registro, nessun secondo archivio.
+  Diventa una card quando qualcuno viene davvero morso da una promessa persa.
+- **Cursore e autore non distinguono le istanze.** Due sessioni dello stesso ruolo
+  condividono il cursore e i messaggi non registrano quale istanza abbia scritto.
+  Non serve un lease per correggerlo (cursore per istanza != prenotazione), ma
+  tocca il punto in cui `_assert_role` garantisce la sicurezza leggendo un file:
+  card sua, con quella batteria in mano.
+- **La lavagna fra sotto-agenti non copre il durante.** Due che leggono all'inizio
+  e scrivono alla fine non condividono nulla di cio' che scoprono nel mezzo. La
+  correzione non e' svegliare nessuno: e' che chi delega dica nel compito quali
+  messaggi leggere e su quale versione, e chi torna dica a cosa si e' attenuto.
+- **Un commento di `bus.sh` puo' creare un file se un mutante gli toglie il `#`.**
+  Trovato dal vivo: `# ... snapshot -> rendered, so a loss ...` senza cancelletto
+  esegue `delivery ... > rendered,` e lascia un file vuoto nella working tree,
+  che il controllo delle zone nuove poi segnala. Innocuo e confinato ai test.
+  Diventa una card se un mutante arriva a creare qualcosa di NON vuoto.

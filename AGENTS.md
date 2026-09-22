@@ -171,11 +171,17 @@ under a repo named after the card.
 un sotto-agente a colpo singolo **non può essere svegliato** — finisce prima che chiunque
 risponda. Quindi fra loro il bus è una **lavagna durevole**, non una conversazione: ogni
 sotto-agente legge il thread all'inizio e ci scrive il suo esito alla fine, con `--as
-explorer` (o il ruolo che gli dai nel prompt) e il `--session` del padre. Serve a due cose che
-altrimenti si perdono: il contesto di un sotto-agente **muore con lui**, e due sotto-agenti in
-parallelo non sanno l'uno dell'altro. Per un vero scambio a turni dentro la sessione esiste il
-canale nativo dell'host (i suoi agenti in background), che il bus non sostituisce e non
-imita.
+explorer` (o il ruolo che gli dai nel prompt) e **un nome di sessione suo**, mai quello del
+padre — `<sessione-padre>-<nome>`. *(Corretto 2026-09-22: qui c'era scritto di riusare il
+`--session` del padre. La presenza tiene l'ultimo evento per ogni nome di sessione, quindi il
+`hello` del figlio faceva sparire il padre dai presenti e il suo `bye` li toglieva tutti e
+due — riprodotto in revisione avversariale.)* Serve a due cose che altrimenti si perdono: il
+contesto di un sotto-agente **muore con lui**, e due sotto-agenti in parallelo non sanno l'uno
+dell'altro. Per un vero scambio a turni dentro la sessione esiste il canale nativo dell'host
+(i suoi agenti in background), che il bus non sostituisce e non imita. **E una lavagna che
+nessuno è obbligato a leggere vale quanto nessuna lavagna**: chi delega scrive nel compito
+*quali* messaggi leggere e su quale versione del lavoro, e chi torna dice a quali si è
+attenuto — altrimenti la lettura è una buona intenzione, non una condizione del lavoro.
 
 **Roles are files.** A role is addressable if `bus/roles/<role>.json` exists and claims no
 human-gated action. Two sessions claiming the *same* role share one cursor and split the mail
@@ -185,12 +191,14 @@ Delivery stays opt-in: the doorbell reports a count, bodies arrive only through 
 `kb` does not know the bus exists. What changed on 2026-09-22 is that `context-inject.sh`
 **announces the session** at start and tells it which role it is — a presence record and a
 line of text, never a delivery: it carries no message, and nothing it writes can wake anyone.
-On Copilot the goodbye is automatic too (`onSessionEnd` → `hooks/bus-bye.sh`), wired **there
-and nowhere else**: `Stop` and `onAgentStop` fire at the end of every *turn*, and a session
-that declared itself finished after every turn would make the presence view entirely of
-ghosts. It is best-effort by nature — a crash, a kill or a closed lid delivers no callback,
-and **Claude Code has no session-end event at all**, so there `bus bye` is a command the agent
-runs. A declared presence that is never withdrawn is therefore a *normal* state, which is
+The goodbye is automatic on **both** hosts — Copilot's `onSessionEnd` and Claude's
+`SessionEnd`, both running `hooks/bus-bye.sh` — and wired **there and nowhere else**: `Stop`
+and `onAgentStop` fire at the end of every *turn*, and a session that declared itself finished
+after every turn would make the presence view entirely of ghosts. *(Corrected 2026-09-22 by an
+adversarial review: this used to say Claude had no session-end event at all. It does, and
+`bin/sync.sh` was already wiring another hook to it — the claim was never checked against the
+file it was about.)* It stays best-effort by nature: a crash, a kill or a closed lid delivers
+no callback, so a declared presence that is never withdrawn is a *normal* state — which is
 exactly why `bus who` prints the declaration next to the last observed action instead of
 believing it.
 

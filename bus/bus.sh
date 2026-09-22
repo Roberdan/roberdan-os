@@ -110,26 +110,35 @@ _ident_role() {
 # keep up to date. This file is not liveness. Nothing expires it, nothing renews
 # it, `who` never reads it, and delivery does not know it exists. It answers one
 # question and only one: when nobody said who I am, who was I last time.
-_role_from_file() {
-  local dir="$PWD"
-  while [ -n "$dir" ] && [ "$dir" != "/" ]; do
-    if [ -f "$dir/.bus-role" ]; then
-      tr -d '[:space:]' < "$dir/.bus-role" 2>/dev/null || true
+_id_from_file() {
+  local name="$1" dir="$PWD"
+  while :; do
+    if [ -f "$dir/$name" ]; then
+      tr -d '[:space:]' < "$dir/$name" 2>/dev/null || true
       return 0
     fi
+    # The root is CHECKED and then ends the walk. Stopping at "$dir" != "/"
+    # tested every directory except the one the loop was walking towards
+    # (@rex, low severity, and true).
+    [ -n "$dir" ] && [ "$dir" != "/" ] || return 0
     dir="${dir%/*}"
   done
-  return 0
 }
+
+_role_from_file() { _id_from_file .bus-role; }
 
 # Written by `hello` at the top of the worktree, so every later command of that
 # session - and every sub-agent that runs one - starts out knowing who it is.
-_write_role_file() {
-  local role="$1" dir top
+_write_identity_files() {
+  local role="$1" session="$2" dir top
   top="$(git rev-parse --show-toplevel 2>/dev/null || true)"
   dir="${top:-$PWD}"
   [ -d "$dir" ] && [ -w "$dir" ] || return 0
   printf '%s\n' "$role" > "$dir/.bus-role" 2>/dev/null || true
+  # The session name is written for the same reason as the role and it is the
+  # one that makes `bye` reach the session that said `hello`. Without it the
+  # goodbye is addressed to a session id invented one microsecond earlier.
+  printf '%s\n' "$session" > "$dir/.bus-session" 2>/dev/null || true
 }
 
 # The session id names an INSTANCE, never an addressee. Mail is addressed to
@@ -139,9 +148,30 @@ _write_role_file() {
 _ident_session() {
   local given="$1"
   [ -n "$given" ] || given="${RDA_BUS_SESSION:-}"
-  # A session that never says who it is still gets a stable name for the life of
-  # the process, rather than being refused: a presence record with a synthetic
-  # name is worth more than no presence record at all.
+  # THE SAME FILE FALLBACK AS THE ROLE, and leaving it out was a real ghost
+  # factory. @rex reproduced it: `hello` in one process invents
+  # `pid69092-...`, `bye` in the next process invents `pid69278-...`, the
+  # goodbye lands on a session nobody ever announced, and the first one stays
+  # DECLARED forever. That is precisely the sequence every agents/*.md teaches
+  # — hello in one command, bye in another — so the failure was not exotic, it
+  # was the documented path. The role had a file for this exact reason and the
+  # session did not; the asymmetry was the bug.
+  #
+  # BUT `hello` MUST NOT READ IT, which is why this takes an argument. A role is
+  # a job description and inheriting it is right; a session name is an INSTANCE,
+  # and a new session that picks one up from a parent directory is two different
+  # sessions answering to one name — so its `bye` withdraws somebody else's
+  # presence. That is the stray session renewing a lease behind your back, the
+  # thing the 2026-07 board cut leases to prevent, walking back in through a
+  # file. Found by this suite one minute after the file was introduced: a
+  # sub-directory check inherited the session of the directory above it and its
+  # goodbye killed that one instead.
+  if [ -z "$given" ] && [ "${2:-read}" = "read" ]; then
+    given="$(_id_from_file .bus-session)"
+  fi
+  # Minted as a last resort, and ALWAYS minted for `hello`: a presence record
+  # under a made-up name is worth more than no presence record at all, and a
+  # fresh name is the only honest answer to "who is announcing themselves now".
   [ -n "$given" ] || given="pid$$-$(date -u '+%Y%m%d%H%M%S')"
   printf '%s' "$given"
 }
@@ -827,6 +857,25 @@ _cmd_close() {
 # Both are ordinary appends to the presence log; neither delivers, consumes or
 # blocks anything, and neither can start a session - they are written BY a
 # session that already exists, about itself.
+# THE SAME FAIL-CLOSED PRIVACY GATE AS A MESSAGE BODY. `--doing` and `--why` are
+# free prose written by a human or an agent and kept forever in a store that
+# lives outside every git tree, so nothing else will ever scan them. `send` runs
+# leak-check on every body; presence was a second door into the same permanent
+# archive with a weaker policy, which is how a declared property quietly stops
+# being true (@baccio, adversarial review — a path, not a demonstrated leak).
+_scan_note() {
+  local what="$1" text="$2"
+  [ -n "$text" ] || return 0
+  [ -x "$LEAKCHECK" ] || die "$what: leak-check is not executable at $LEAKCHECK — refusing to write an unscanned note"
+  local nf; nf="$(mktemp)"
+  printf '%s\n' "$text" > "$nf"
+  if ! "$LEAKCHECK" --only "$nf" >/dev/null 2>&1; then
+    rm -f "$nf"
+    die "$what: BLOCKED — leak-check found a confidential term in the note"
+  fi
+  rm -f "$nf"
+}
+
 _presence_append() {
   local pfile="$1" event="$2" repo="$3" session="$4" role="$5" card="$6" note="$7"
   jq -cn --arg ts "$(now)" --arg event "$event" --arg repo "$repo" --arg session "$session" \
@@ -870,15 +919,17 @@ _cmd_hello() {
   as="$(_ident_role "$as" "hello")"
   _assert_role "$as"
   as="$(_slug "--as" "$as")"
-  session="$(_slug "--session" "$(_ident_session "$session")")"
+  # `mint`: announcing yourself never inherits a name from the filesystem.
+  session="$(_slug "--session" "$(_ident_session "$session" mint)")"
   [ -z "$card" ] || card="$(_slug "--card" "$card")"
+  _scan_note "hello --doing" "$doing"
   local pfile; pfile="$(_presence_path "$repo")"
   mkdir -p "$(dirname "$pfile")"
   _with_lock "$pfile" _presence_append "$pfile" hello "$repo" "$session" "$as" "$card" "$doing"
   # Identity that survives the next command, and the one after that. See
   # _role_from_file: on a host where every command is a fresh process, the
   # environment alone gives an identity that lasts exactly one call.
-  _write_role_file "$as"
+  _write_identity_files "$as" "$session"
   # Printed as shell assignments ON STDOUT so the caller can `eval` it and have
   # the identity for the rest of the session, sub-agents included. Everything
   # human goes to stderr, so `eval "$(bus hello ...)"` cannot swallow a diagnostic
@@ -918,6 +969,7 @@ _cmd_bye() {
   # alternative is a session that crashed, restarted and now cannot mark itself
   # gone — and the presence view reads the last event per session, so a bye that
   # answers nothing is simply the last word of a session nobody saw arrive.
+  _scan_note "bye --why" "$why"
   _with_lock "$pfile" _presence_append "$pfile" bye "$repo" "$session" "$as" "" "$why"
   local owed_n; owed_n="$(_owed_count "$repo" "" "$as")"
   if [ "$owed_n" != "0" ]; then
@@ -927,7 +979,12 @@ _cmd_bye() {
     echo "bus: @$as left $repo — but $owed_n message(s) addressed to @$as were never answered." >&2
     echo "     they stay listed for whoever plays @$as next:  bus owed --repo $repo --as $as" >&2
   else
-    echo "bus: @$as left $repo (session $session). Nothing was left unanswered." >&2
+    local blind; blind="$(_unreadable_threads "$repo")"
+    if [ "$blind" != "0" ]; then
+      echo "bus: @$as left $repo (session $session). Nothing owed in the threads that could be READ — $blind could not be, so this is not a clean bill." >&2
+    else
+      echo "bus: @$as left $repo (session $session). Nothing was left unanswered." >&2
+    fi
   fi
   printf 'unset RDA_BUS_ROLE RDA_BUS_SESSION RDA_BUS_REPO\n'
 }
@@ -951,12 +1008,21 @@ _cmd_bye() {
 # and `--re` proves only that a message was cited, never that it was addressed.
 # An agent may reply "I disagree" and the question is discharged. The honest
 # claim is that an unanswered question is now VISIBLE, not that it is resolved.
+# A CITATION ONLY DISCHARGES A QUESTION IF IT REACHED THE PERSON WHO ASKED IT.
+# It used to be enough to cite the record at all, so a message citing #3 and
+# addressed to a THIRD role cleared the debt while the asker received nothing —
+# "no answer owed" printed next to an asker who had been answered by nobody
+# (@baccio, adversarial review, reproduced on the query itself). The addressee of
+# the reply must be the asker, or the broadcast, which everyone including the
+# asker receives.
 _owed_jq='
-  (map(select(.from == $me and ((.re // null) != null)) | (.re | tonumber))) as $answered
+  (map(select(.from == $me and ((.re // null) != null)) | {r: (.re | tonumber), to: .to})) as $cites
   | to_entries
   | map(select(.value.kind == "question" or .value.kind == "request"))
   | map(select(.value.to == $me or (.value.to == $all and .value.from != $me)))
-  | map(select((.key + 1) as $s | ($answered | index($s)) == null))
+  | map(select(
+      (.key + 1) as $s | .value.from as $asker
+      | ($cites | any(.r == $s and (.to == $asker or .to == $all))) | not))
   | .[]
   | [$card, (.key + 1), .value.from, .value.kind, .value.ts,
      ((.value.body | split("\n") | .[0])[0:90])]
@@ -989,13 +1055,43 @@ _owed_count() {
   printf '%s' "${n:-0}"
 }
 
+# HOW MANY THREADS COULD NOT BE READ. `_owed_records` skips a damaged thread with
+# a warning, and every caller of `_owed_count` swallowed that warning and then
+# reported the number as if it were complete — `bye` announced "Nothing was left
+# unanswered" about a repo whose threads it had failed to open (@baccio).
+# A zero computed after ignoring unreadable data is not a zero, and the
+# difference between "none" and "none that I could see" is the whole value of
+# the answer.
+_unreadable_threads() {
+  local repo="$1" f n=0
+  local dir="$BUS_HOME/$repo"
+  [ -d "$dir" ] || { printf '0'; return 0; }
+  for f in "$dir"/*.jsonl; do
+    [ -e "$f" ] && [ -s "$f" ] || continue
+    jq -e . "$f" >/dev/null 2>&1 || n=$((n + 1))
+  done
+  printf '%s' "$n"
+}
+
 _cmd_owed() {
-  local repo="" card="" as=""
+  local repo="" card="" as="" brief=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --repo) _need $# "--repo"; repo="$2"; shift 2;;
       --card) _need $# "--card"; card="$2"; shift 2;;
       --as)   _need $# "--as";   as="$2";   shift 2;;
+      # --brief RENDERS NO BODY, and it exists because of a boundary this file
+      # was breaking. `hooks/bus-doorbell.sh` pushes its output into the model's
+      # context automatically, and the full form prints the first 90 characters
+      # of somebody else's message — prose by another agent, arriving as context,
+      # without the UNVERIFIED stamp that `_emit` puts on every delivered line.
+      # That is exactly the harm the 2026-07 board cut context-inject delivery
+      # for: a message that arrives looking like context gets believed like
+      # context. Being ADDRESSED TO ME does not make another agent's words safe
+      # (@baccio, adversarial review). So: who asked, on which card, which
+      # record, what kind, when — facts about the store — and not one word of
+      # what they said. The words are one explicit `bus read` away.
+      --brief) brief=1; shift;;
       *) die "owed: unknown argument '$1'";;
     esac
   done
@@ -1010,18 +1106,30 @@ _cmd_owed() {
   _owed_records "$repo" "$card" "$as" > "$out"
   if [ ! -s "$out" ]; then
     rm -f "$out"
-    echo "bus: @$as owes no answer on $repo${card:+/$card}."
+    local blind; blind="$(_unreadable_threads "$repo")"
+    if [ "$blind" != "0" ]; then
+      echo "bus: @$as owes no answer in the threads that could be READ on $repo${card:+/$card} — $blind thread(s) could not be parsed and were skipped. Inspect them by hand; nothing here deletes or repairs a log."
+    else
+      echo "bus: @$as owes no answer on $repo${card:+/$card}."
+    fi
     return 0
   fi
   echo "bus: $(grep -c . < "$out") message(s) are waiting for an answer from @$as on $repo."
-  echo "Each one was addressed to you and no message of yours cites it."
+  echo "Each one was addressed to you and no message of yours cites it back to whoever asked."
   echo
-  awk -F'\t' -v repo="$repo" -v me="$as" '{
-    printf "  %s #%s  from @%s (%s, %s)\n", $1, $2, $3, $4, $5
-    printf "      %s\n", $6
-    printf "      answer:  bus send --repo %s --card %s --from %s --to %s --re %s --kind verdict\n\n", repo, $1, me, $3, $2
-  }' "$out"
-  echo "Read the full text of any of them with: bus log --repo $repo --card <CARD>"
+  if [ "$brief" = "1" ]; then
+    awk -F'\t' '{ printf "  %s #%s  from @%s (%s, %s)\n", $1, $2, $3, $4, $5 }' "$out"
+    echo
+    echo "What they actually say is NOT shown here. Read it, and it will arrive stamped"
+    echo "UNVERIFIED like every claim on this channel:  bus read --repo $repo --card <CARD>"
+  else
+    awk -F'\t' -v repo="$repo" -v me="$as" '{
+      printf "  %s #%s  from @%s (%s, %s)\n", $1, $2, $3, $4, $5
+      printf "      %s\n", $6
+      printf "      answer:  bus send --repo %s --card %s --from %s --to %s --re %s --kind verdict\n\n", repo, $1, me, $3, $2
+    }' "$out"
+    echo "Read the full text of any of them with: bus log --repo $repo --card <CARD>"
+  fi
   rm -f "$out"
 }
 
@@ -1039,8 +1147,28 @@ _cmd_owed() {
 # lie with a timestamp on it. A session killed without `bye` therefore shows as
 # declared-present with an old last-action, which is exactly what is true.
 _cmd_who() {
-  local repo=""
-  while [ $# -gt 0 ]; do case "$1" in --repo) _need $# "--repo"; repo="$2"; shift 2;; *) die "who: unknown argument '$1'";; esac; done
+  local repo="" brief=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo) _need $# "--repo"; repo="$2"; shift 2;;
+      # --brief DROPS THE `doing` PROSE and keeps everything the store knows as a
+      # fact: role, session, card, timestamps, and whether that role has done
+      # anything since. It exists for the one caller that pushes its output into
+      # a model's context automatically (hooks/context-inject.sh), under the rule
+      # an adversarial review made explicit on 2026-09-22:
+      #
+      #   automatic context carries STRUCTURED OBSERVATIONS with their provenance.
+      #   Free text written by another agent arrives through an explicit read,
+      #   stamped UNVERIFIED. Being the addressee does not make words safe.
+      #
+      # `doing` is a sentence another session wrote about itself — "review done,
+      # only the handover left" redefines what the reader thinks is needed while
+      # issuing no instruction at all. Which is precisely the laundering the 2026-07
+      # board cut context-inject delivery to prevent.
+      --brief) brief=1; shift;;
+      *) die "who: unknown argument '$1'";;
+    esac
+  done
   repo="$(_ident_repo "$repo")"
   [ -n "$repo" ] || die "who: could not work out which repo this is — pass --repo"
   repo="$(_slug "--repo" "$repo")"
@@ -1052,7 +1180,7 @@ _cmd_who() {
   # command that dies of SIGPIPE mid-report under `set -e` turns a successful
   # answer into a failed one. Found exactly that way: adding the declared block
   # after the table gave the table a reader that was already gone.
-  local report; report="$(mktemp)"
+  local report acts; report="$(mktemp)"; acts="$(mktemp)"
   {
   {
     for f in "$dir"/*.jsonl; do
@@ -1090,9 +1218,12 @@ _cmd_who() {
       printf '%s\t%s\tread\t%s\n' "$rolename" "$(date -u -r "$f" '+%Y-%m-%dT%H:%M:%SZ')" "$cardname"
     done
   } | sort -k1,1 -k2,2r \
-    | awk -F'\t' '!seen[$1]++ {printf "%-20s %-21s %-7s %s\n", $1, $2, $3, $4}' \
-    | { echo "OBSERVED — what the store shows (an append or a read is the evidence)"; \
-        echo "role                 last seen (UTC)       how     card"; cat; }
+    | awk -F'\t' '!seen[$1]++' > "$acts"
+  {
+    echo "OBSERVED — what the store shows (an append or a read is the evidence)"
+    echo "role                 last seen (UTC)       how     card"
+    awk -F'\t' '{printf "%-20s %-21s %-7s %s\n", $1, $2, $3, $4}' "$acts"
+  }
   # DECLARED, printed second and kept separate. Second because the evidence
   # should be read before the claim, and separate because a session that was
   # killed cannot retract its hello: what is true is "it said it was here and
@@ -1107,14 +1238,40 @@ _cmd_who() {
     echo "    eval \"\$(bus hello --repo $repo --as <ROLE> --card <CARD> --doing '<one line>')\""
   else
     echo "DECLARED — sessions that said hello and have not said bye (a claim, not evidence)"
-    printf '%-20s %-24s %-14s %-21s %s\n' "role" "session" "card" "since (UTC)" "doing"
+    if [ "$brief" = "1" ]; then
+      printf '%-20s %-24s %-14s %-21s %s\n' "role" "session" "card" "since (UTC)" "state"
+    else
+      printf '%-20s %-24s %-14s %-21s %s\n' "role" "session" "card" "since (UTC)" "doing / state"
+    fi
+    # SILENT SINCE HELLO. A declaration cannot be retracted by a session that was
+    # killed, so the list of "who is here" grows and nobody ever leaves it —
+    # which is the failure this whole change started from, one level along.
+    # There is no timeout here and deliberately so: a timeout needs date
+    # arithmetic that differs by platform, and worse, it would DECIDE that
+    # somebody is gone. This decides nothing. It states one fact the store
+    # already holds — whether that role has appended or read anything since the
+    # moment it announced itself — and leaves the reader to draw the conclusion.
+    # ISO-8601 in UTC with a fixed width sorts lexicographically, so the
+    # comparison needs no date parsing at all.
     printf '%s\n' "$declared" \
-      | awk -F'\t' '{printf "%-20s %-24s %-14s %-21s %s\n", $1, $2, $3, $4, $5}'
+      | awk -F'\t' -v actsfile="$acts" -v brief="$brief" '
+          BEGIN { while ((getline line < actsfile) > 0) {
+                    n = split(line, f, "\t"); if (n >= 2) last[f[1]] = f[2] } }
+          { state = (brief == "1") ? "" : $5
+            seen = ($1 in last) ? last[$1] : ""
+            # THE UNIT MEASURED IS THE ROLE, AND THE LABEL SAYS SO. Activity is
+            # observed per role; presence is declared per session. If two
+            # sessions share a role, a recent action by one says nothing about
+            # the other, so a label reading "this session is idle" would be a
+            # claim the store cannot support (@baccio, adversarial review).
+            if (seen == "" || seen <= $4)
+              state = state (state == "" ? "" : "  ") "[no @" $1 " activity since]"
+            printf "%-20s %-24s %-14s %-21s %s\n", $1, $2, $3, $4, state }'
   fi
   } > "$report"
   # A reader that has stopped reading is not an error here — see above.
   cat "$report" 2>/dev/null || true
-  rm -f "$report"
+  rm -f "$report" "$acts"
 }
 
 _cmd_roles() {

@@ -96,6 +96,33 @@ pafter="$(wc -l < "$RDA_BUS_HOME/$R/.presence.jsonl" | tr -d ' ')"
   || fail "a second hello REWROTE the presence record: that is a lease being renewed, not an event being appended"
 ok "presence is append-only: a second hello adds a record, it never refreshes one"
 
+# 1d. FREE PROSE ON THE PRESENCE LOG PASSES THE SAME PRIVACY GATE AS A MESSAGE.
+#     `--doing` and `--why` are prose kept forever in a store that lives outside
+#     every git tree, so nothing else will ever scan them. `send` runs
+#     leak-check on every body; presence was a second door into the same
+#     permanent archive with a weaker policy — which is how a declared property
+#     stops being true without anybody deciding to drop it.
+cat > "$TMP/leak-stub.sh" <<'LEAKEOF'
+#!/usr/bin/env bash
+# Refuses anything containing the marker, the way the real one refuses a term.
+grep -q "zzconfidentialzz" "$2" && exit 1
+exit 0
+LEAKEOF
+chmod +x "$TMP/leak-stub.sh"
+refused="$(env RDA_BUS_ROLE=architect RDA_BUS_SESSION=sess-leak RDA_BUS_REPO="$R" \
+  RDA_BUS_HOME="$RDA_BUS_HOME" RDA_LEAKCHECK="$TMP/leak-stub.sh" \
+  bash "$BUS" hello --repo "$R" --as architect --doing "zzconfidentialzz" 2>&1 || true)"
+grep -qi "leak-check\|BLOCKED" <<<"$refused" \
+  || fail "a presence note went into the permanent store without the privacy gate a message body gets: $refused"
+grep -q "zzconfidentialzz" "$RDA_BUS_HOME/$R/.presence.jsonl" \
+  && fail "the refused note was written anyway"
+missing="$(env RDA_BUS_ROLE=architect RDA_BUS_HOME="$RDA_BUS_HOME" \
+  RDA_LEAKCHECK="$TMP/nothing-here.sh" \
+  bash "$BUS" hello --repo "$R" --as architect --doing "anything" 2>&1 || true)"
+grep -qi "not executable\|leak-check" <<<"$missing" \
+  || fail "a missing leak-check did not fail closed on the presence path: $missing"
+ok "a presence note is scanned like a message body, and fails closed when the scanner is gone"
+
 # ---------------------------------------------------------------------------
 # 2. A QUESTION SURVIVES THE CURSOR.
 #    THE failure this whole change exists for. A question used to be delivered
@@ -151,6 +178,67 @@ grep -q "owes no answer" <<<"$cleared" \
   || fail "citing the question with --re did not discharge it"
 ok "citing the question with --re discharges it, and nothing else does"
 
+# 3c. AND THE CITATION HAS TO REACH THE ASKER. Citing the record was enough on
+#     its own until an adversarial review reproduced it: a message citing #N and
+#     addressed to a THIRD role cleared the debt while the asker received
+#     nothing, so the channel printed "no answer owed" next to somebody who had
+#     been answered by nobody.
+echo "third-party question" \
+  | as architect sess-A send --card "$C" --to implementer --kind question >/dev/null 2>&1
+owedout="$(as implementer sess-B owed 2>/dev/null)"
+grep -q 'third-party' <<<"$owedout" || fail "the setup for the third-party check did not land"
+# The record number is READ OUT OF THE LISTING, never assumed. Hard-coding it got
+# this check wrong on the first run for exactly the reason the number exists: the
+# position of a record depends on everything sent before it.
+SEQ3="$(awk '/third-party/ {print prev} {prev=$0}' <<<"$owedout" | grep -oE '#[0-9]+' | tr -d '#' | tail -1)"
+[ -n "$SEQ3" ] || fail "could not read the record number out of the owed listing"
+echo "answering, but to somebody else" \
+  | as implementer sess-B send --card "$C" --to qa-gate --re "$SEQ3" --kind verdict >/dev/null 2>&1
+still3="$(as implementer sess-B owed 2>/dev/null | grep -c 'third-party' || true)"
+[ "$still3" = "1" ] \
+  || fail "a citation addressed to a THIRD role discharged the question: the asker got nothing and the channel called it answered"
+echo "answering the asker" \
+  | as implementer sess-B send --card "$C" --to architect --re "$SEQ3" --kind verdict >/dev/null 2>&1
+gone3="$(as implementer sess-B owed 2>/dev/null | grep -c 'third-party' || true)"
+[ "$gone3" = "0" ] \
+  || fail "a citation addressed to the asker did not discharge the question"
+ok "a citation only discharges a question when it is addressed to the one who asked"
+
+# 3d. WHAT THE DOORBELL MAY PUSH INTO A MODEL'S CONTEXT CARRIES NO BODY.
+#     `bus owed` renders the first line of each unanswered message. That output
+#     was being injected automatically at PostToolUse, which rebuilds by hand the
+#     exact harm the 2026-07 board cut context-inject delivery for: another
+#     agent's prose arriving as context, without the UNVERIFIED stamp. Being the
+#     addressee is not a reason: it says nothing about whether the words are safe.
+SECRET="zzmarkerzz-body-that-must-not-be-pushed"
+printf '%s\n' "$SECRET" \
+  | as architect sess-A send --card "$C" --to implementer --kind question >/dev/null 2>&1
+full="$(as implementer sess-B owed 2>/dev/null)"
+grep -q "$SECRET" <<<"$full" \
+  || fail "the explicit form stopped showing the body: then this check proves nothing"
+brief="$(as implementer sess-B owed --brief 2>/dev/null)"
+grep -q "$SECRET" <<<"$brief" \
+  && fail "--brief rendered a body — this is what the doorbell pushes into the model's context"
+grep -q "#" <<<"$brief" \
+  || fail "--brief rendered nothing useful: it must still say who asked, where, and which record"
+ok "--brief names the asker, the card and the record, and never a word of what was said"
+
+# 3e. AND THE DOORBELL ACTUALLY USES IT. A flag nobody calls is not a boundary.
+grep -q 'owed .*--brief' "$ROOT/hooks/bus-doorbell.sh" \
+  || fail "hooks/bus-doorbell.sh does not ask for --brief, so a body can still reach the context"
+ok "the doorbell asks for the body-free form"
+
+# 3f. AND SO DOES THE SESSION-START CONTEXT, which is the other place output is
+#     pushed at a model rather than asked for. It shows the roster now — the
+#     first version only printed the COMMAND, which is the same failure one
+#     level up: the mail was fixed and the list of who is here stayed behind a
+#     command nobody types.
+grep -q 'who .*--brief' "$ROOT/hooks/context-inject.sh" \
+  || fail "hooks/context-inject.sh does not ask for the facts-only roster, so another agent's prose can reach the context at startup"
+grep -q 'bus.sh" who --repo "\$_brepo" 2>/dev/null' "$ROOT/hooks/context-inject.sh" \
+  && fail "hooks/context-inject.sh injects the full roster, prose included"
+ok "the session-start roster is the facts-only form"
+
 # 3b. --re IS VALIDATED, NOT TRUSTED. A reply pointing at a record that does not
 #     exist would discharge an obligation that was never met.
 out="$(echo "x" | as implementer sess-B send --card "$C" --to architect --re 999 --kind verdict 2>&1 || true)"
@@ -182,6 +270,50 @@ ok "identity survives into a later, unrelated command, from a sub-directory too"
 [ ! -e "$RDA_BUS_HOME/$R/.bus-role" ] \
   || fail "the identity file was written into the bus store, where it becomes a registry"
 ok "the identity file lives in the worktree, not in the bus store"
+
+# 4c. THE SESSION NAME SURVIVES TOO, AND LEAVING OUT THIS CHECK BUILT A GHOST.
+#     Found by @rex, reproduced live: the role had a file fallback and the session
+#     did not, so `hello` in one process invented one name and `bye` in the next
+#     process invented another. The goodbye landed on a session nobody had ever
+#     announced and the first one stayed DECLARED forever — and that is the exact
+#     sequence every agents/*.md teaches, hello in one command and bye in another.
+#     It survived the first version of this suite because the helper above passes
+#     the SAME session literal on every call, which is a usage nobody has.
+GHOST="$TMP/ghost"; mkdir -p "$GHOST"
+( cd "$GHOST" && env -u RDA_BUS_ROLE -u RDA_BUS_SESSION RDA_BUS_HOME="$RDA_BUS_HOME" \
+    bash "$BUS" hello --repo "$R" --as reviewer --card "$C" --doing "two processes" >/dev/null 2>&1 ) \
+  || fail "hello failed in the ghost check"
+( cd "$GHOST" && env -u RDA_BUS_ROLE -u RDA_BUS_SESSION RDA_BUS_HOME="$RDA_BUS_HOME" \
+    bash "$BUS" bye --repo "$R" >/dev/null 2>&1 ) \
+  || fail "bye failed in the ghost check"
+ghosts="$(b who --repo "$R" 2>/dev/null | grep -c "reviewer" || true)"
+[ "$ghosts" = "0" ] \
+  || fail "a session that said hello in one process and bye in the next is still DECLARED present: the goodbye went to a different session id"
+ok "hello and bye in two separate processes name the SAME session, so nobody is left behind"
+
+# 4d. AND A NEW SESSION MUST NOT INHERIT SOMEBODY ELSE'S NAME. The check above
+#     created the hazard the moment it fixed the first one: a role is a job
+#     description and inheriting it is right, but a session name is an INSTANCE.
+#     A session that picks one up from a parent directory is two sessions
+#     answering to one name, and its `bye` withdraws the other one's presence —
+#     the stray session renewing a lease behind your back, which is what the
+#     2026-07 board cut leases to prevent, walking back in through a file.
+#     This suite caught it BY ACCIDENT, one directory deep. An accident is not a
+#     net, so it is pinned here.
+INNER="$GHOST/inner"; mkdir -p "$INNER"
+( cd "$GHOST" && env -u RDA_BUS_ROLE -u RDA_BUS_SESSION RDA_BUS_HOME="$RDA_BUS_HOME" \
+    bash "$BUS" hello --repo "$R" --as architect --session sess-outer --card "$C" >/dev/null 2>&1 )
+( cd "$INNER" && env -u RDA_BUS_ROLE -u RDA_BUS_SESSION RDA_BUS_HOME="$RDA_BUS_HOME" \
+    bash "$BUS" hello --repo "$R" --as qa-gate --card "$C" >/dev/null 2>&1 ) \
+  || fail "hello failed in a sub-directory"
+( cd "$INNER" && env -u RDA_BUS_ROLE -u RDA_BUS_SESSION RDA_BUS_HOME="$RDA_BUS_HOME" \
+    bash "$BUS" bye --repo "$R" >/dev/null 2>&1 )
+outer="$(b who --repo "$R" 2>/dev/null | grep -c "sess-outer" || true)"
+[ "$outer" = "1" ] \
+  || fail "a session announced in a sub-directory inherited the session name above it, and its goodbye withdrew that one's presence"
+( cd "$GHOST" && env -u RDA_BUS_ROLE -u RDA_BUS_SESSION RDA_BUS_HOME="$RDA_BUS_HOME" \
+    bash "$BUS" bye --repo "$R" --session sess-outer >/dev/null 2>&1 )
+ok "announcing a session mints a fresh name: it never inherits the one above it"
 
 # ---------------------------------------------------------------------------
 # 5. THE REPO IS WORKED OUT FROM THE MAIN CHECKOUT, NEVER FROM THE WORKTREE.

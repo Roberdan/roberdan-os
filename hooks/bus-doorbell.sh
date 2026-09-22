@@ -150,16 +150,25 @@ fi
 # and advances no cursor, so this hook cannot consume the mail it announces.
 out="$(bash "$BUS" count --repo "$repo" 2>/dev/null || true)"
 
-# AND what this session OWES, when it has said who it is. `bus owed` renders the
-# first line of each unanswered question, which is a body — so it is asked for
-# ONLY when RDA_BUS_ROLE names this session's role, i.e. when the answer is about
-# mail addressed to the reader rather than to somebody else. The count above
-# stays role-agnostic and stays a count; this is the one place where knowing the
-# role buys something, and it buys the thing the whole channel was failing at:
-# a question that was read and never answered is invisible from everywhere else.
+# AND what this session OWES, when it has said who it is — WITHOUT A SINGLE WORD
+# OF WHAT ANYONE SAID. `--brief` exists for exactly this caller.
+#
+# The first version of this block called plain `bus owed`, which prints the first
+# 90 characters of each unanswered message, and put that straight into
+# `additionalContext`. That is the harm the 2026-07 board cut context-inject
+# delivery for, rebuilt by hand: another agent's prose arriving as context,
+# without the UNVERIFIED stamp that `_emit` puts on every delivered line. The
+# excuse available at the time — "but it is addressed to me" — is not one: being
+# the addressee says nothing about whether the words are safe to believe
+# (@baccio, adversarial review, 2026-09-22).
+#
+# What goes in now is what the STORE knows: who asked, on which card, which
+# record, what kind, when. The words are one explicit `bus read` away, and they
+# arrive stamped.
 owed=""
 if [ -n "${RDA_BUS_ROLE:-}" ]; then
-  owed="$(bash "$BUS" owed --repo "$repo" --as "$RDA_BUS_ROLE" 2>/dev/null | grep -E '^  |^bus: [0-9]' || true)"
+  owed="$(bash "$BUS" owed --repo "$repo" --as "$RDA_BUS_ROLE" --brief 2>/dev/null \
+            | grep -E '^  [A-Za-z0-9]' || true)"
 fi
 
 write_stamp() { printf '%s\n%s\n%s\n' "$sig" "$now" "$1" > "$stamp" 2>/dev/null || true; }

@@ -644,10 +644,10 @@ const hooks = {
         // and a session that declared itself finished after every turn would be a
         // presence view made entirely of ghosts.
         // BEST EFFORT, AND IT IS ONLY THAT: a crash, a kill or a closed lid never
-        // delivers this callback, and Claude Code has no session-end event at all.
-        // So a declared presence that is never withdrawn is a normal state, which
-        // is exactly why `bus who` prints the declaration next to the last
-        // observed action instead of believing it.
+        // delivers this callback. So a declared presence that is never withdrawn
+        // is a normal state, which is exactly why `bus who` prints the
+        // declaration next to the last observed action instead of believing it.
+        // Claude runs the same script from its own SessionEnd (bin/sync.sh).
         const bye = join(HOOKS, "bus-bye.sh");
         if (existsSync(bye)) await runScript(bye, hookPayload(input && input.workingDirectory), input && input.workingDirectory);
         return undefined;

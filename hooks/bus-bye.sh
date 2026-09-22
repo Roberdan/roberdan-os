@@ -7,11 +7,16 @@
 # non dice piu' chi c'e', dice solo chi c'e' stato — ed e' il punto da cui questa
 # riprogettazione e' partita.
 #
-# DOVE E' AGGANCIATO, E DOVE NO. Solo su `onSessionEnd` (Copilot CLI). NON su
+# DOVE E' AGGANCIATO, E DOVE NO. Sull'evento di FINE SESSIONE di entrambi gli
+# ospiti: `onSessionEnd` su Copilot CLI e `SessionEnd` su Claude Code. NON su
 # `Stop` ne' su `onAgentStop`: quelli scattano alla fine di OGNI TURNO, e una
 # sessione che si dichiara finita dopo ogni turno riempie la vista di fantasmi.
-# Claude Code non ha alcun evento di fine sessione — li' il congedo resta un
-# comando che l'agente esegue, ed e' scritto in AGENTS.md.
+# CORRETTO il 2026-09-22 da una revisione avversariale: qui c'era scritto che
+# Claude Code non ha alcun evento di fine sessione. Ce l'ha, e bin/sync.sh ci
+# agganciava gia' un altro hook — l'affermazione non era mai stata verificata
+# contro il file di cui parlava. Una limitazione dichiarata e falsa costa quanto
+# una vera non dichiarata: per settimane nessuno avrebbe cercato il congedo su
+# Claude, perche' c'era scritto che non si poteva.
 #
 # E' AL MEGLIO DELLE POSSIBILITA', e solo quello. Un crash, un kill o il coperchio
 # chiuso non consegnano nessun callback. Per questo una presenza dichiarata e mai

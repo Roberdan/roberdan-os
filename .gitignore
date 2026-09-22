@@ -90,3 +90,4 @@ handoff/resume.md
 # Sta nella copia di lavoro perche' deve sopravvivere fra un comando e il successivo,
 # non nel negozio del bus, dove sarebbe il registro che test 12 rifiuta.
 .bus-role
+.bus-session

@@ -176,12 +176,34 @@ if [ -r "$ROOT/bus/bus.sh" ] && command -v jq >/dev/null 2>&1; then
              --session "$_bsess" --doing "sessione aperta" >/dev/null 2>&1 || true
         ;;
     esac
-    _bowed="$(bash "$ROOT/bus/bus.sh" owed --repo "$_brepo" --as "$_brole" 2>/dev/null | grep -cE '^  [a-zA-Z0-9]' || echo 0)"
+    _bowed="$(bash "$ROOT/bus/bus.sh" owed --repo "$_brepo" --as "$_brole" --brief 2>/dev/null | grep -cE '^  [a-zA-Z0-9]' || echo 0)"
     echo
     echo "### 📻 Sul bus sei **@$_brole** (sessione \`$_bsess\`, repo \`$_brepo\`)."
     echo "  Usalo cosi', e passalo ai tuoi sotto-agenti:"
     echo "    export RDA_BUS_ROLE=$_brole RDA_BUS_SESSION=$_bsess RDA_BUS_REPO=$_brepo"
-    echo "  Chi altro c'e': \`bus who --repo $_brepo\` · i ruoli e chi li interpreta: \`bus roles\`"
+    # CHI ALTRO C'E', MOSTRATO — non un comando da ricordare.
+    # Roberto, 2026-09-22: "come fanno i vari agenti/sessioni a sapere chi altro c'e'?"
+    # Prima qui c'era scritto solo `bus who --repo X`, cioe' lo stesso difetto un piano
+    # sopra: la posta l'avevo sistemata e l'elenco dei presenti era rimasto dietro a un
+    # comando che nessuno digita. Ma non si puo' semplicemente versare qui `bus who`:
+    # la colonna `doing` e' una frase scritta da un'altra sessione, e una frase di un
+    # altro agente che arriva COME CONTESTO viene creduta come contesto — che e'
+    # esattamente cio' per cui il board taglio' la consegna dei messaggi da qui nel
+    # luglio 2026. La regola, resa esplicita da una revisione avversariale:
+    #   nel contesto automatico entrano OSSERVAZIONI STRUTTURATE con la loro provenienza;
+    #   il testo libero di un altro agente entra da una lettura esplicita, marcato
+    #   NON VERIFICATO. Essere il destinatario non rende sicure le parole di nessuno.
+    # Quindi `--brief`: ruolo, sessione, card, orari, e se quel ruolo ha fatto qualcosa
+    # da quando si e' presentato. Nessuna prosa.
+    _bwho="$(bash "$ROOT/bus/bus.sh" who --repo "$_brepo" --brief 2>/dev/null \
+               | awk '/^DECLARED/{d=1;next} d && NF && $0 !~ /^role /{print "  " $0}' | head -8 || true)"
+    if [ -n "$_bwho" ]; then
+      echo "  Chi altro si e' dichiarato su \`$_brepo\` (dichiarazioni, non prove — cosa fanno lo dicono loro, non questo elenco):"
+      printf '%s\n' "$_bwho"
+      echo "  Cosa stanno facendo davvero: \`bus who --repo $_brepo\` · i ruoli e chi li interpreta: \`bus roles\`"
+    else
+      echo "  Non c'e' nessun altro dichiarato su \`$_brepo\`. I ruoli e chi li interpreta: \`bus roles\`"
+    fi
     if [ "${_bowed:-0}" -gt 0 ] 2>/dev/null; then
       echo "  ⚠️  $_bowed messaggi aspettano una risposta DA TE: \`bus owed\` — rispondere significa citarli con \`--re N\`."
     fi

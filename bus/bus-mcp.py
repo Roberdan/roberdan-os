@@ -134,6 +134,18 @@ def _run_bus(args, *, stdin_path=None):
         # blind, which is worse than the message itself.
         detail = (proc.stderr or proc.stdout or "").strip()
         raise ToolError(detail or f"bus exited {proc.returncode}")
+
+    # SUCCESS IS NOT SILENCE. bus.sh writes real information to stderr on a
+    # SUCCESSFUL run — "you still owe an answer to 3 messages", "this thread is
+    # damaged and was skipped", "you left with mail unanswered" — and this
+    # function used to return stdout alone, so a caller on the typed surface got
+    # the reassuring half of the answer and never the warning (@baccio,
+    # adversarial review, reproduced). Dropping the part that says "I could not
+    # read everything" is how a zero stops meaning zero.
+    warnings = (proc.stderr or "").strip()
+    if warnings:
+        return proc.stdout + ("\n" if proc.stdout and not proc.stdout.endswith("\n") else "") \
+             + "--- bus also said, on stderr ---\n" + warnings + "\n"
     return proc.stdout
 
 
@@ -258,6 +270,15 @@ def tool_bus_bye(args):
     repo = _slug("repo", args.get("repo"))
     as_role = _slug("as_role", args.get("as_role"))
     argv = ["bye", "--repo", repo, "--as", as_role]
+    # THE SESSION NAME, which `bus_hello` accepted and this did not. Without it
+    # the goodbye is addressed to a session id minted one instant earlier, the
+    # session that actually said hello is never withdrawn, and `bus who` carries
+    # it as present forever (@baccio, adversarial review; the same defect @rex
+    # reproduced on the CLI side). An asymmetry between the two ends of a
+    # lifecycle is not a missing convenience, it is a leak in the lifecycle.
+    session = args.get("session")
+    if session:
+        argv += ["--session", _slug("session", session)]
     why = args.get("why")
     if why is not None:
         if not isinstance(why, str):
@@ -375,6 +396,7 @@ TOOLS = {
             "properties": {
                 "repo": {"type": "string"},
                 "as_role": {"type": "string"},
+                "session": {"type": "string", "description": "The SAME name passed to bus_hello. Without it the goodbye lands on a different session and this one is never withdrawn."},
                 "why": {"type": "string", "description": "One line: why this session is stopping"},
             },
             "required": ["repo", "as_role"],

@@ -562,6 +562,14 @@ chmod +x "$TMP/lc2-leak-check.sh"
 # mutant wide, and an absolute path inside an untabled refusal branch walked
 # through it while the suite printed PASS.
 
+# REVISED 2026-09-22 after an @rex finding, and the finding is the argument for
+# this table existing at all: `hello`, `bye` and `owed` were added to bus.sh and
+# to a suite of their own (test-bus-team.sh) that runs them on a NORMAL PATH,
+# with no canary and no allowlist. So the three newest verbs were the only three
+# never measured by the check that makes "this thing cannot start an agent" a
+# behaviour rather than a promise. Reading the code said they were clean; the
+# whole point of this gate is that reading the code is not the evidence.
+#
 # EVERY path through the bus, not every subcommand NAME. The broadcast branch,
 # the ref resolvers, the stdin body and the failing sends were all unreached, and
 # an unreached path is an ungated path. Worse: checks 24-29 exercise --to all with
@@ -613,6 +621,14 @@ who --repo $R
 send --repo $R --card locked$1 --from implementer --to sol-gate --body-file $TMP/body.txt
 read --repo $R --card empty$1 --as sol-gate
 log --repo $R --card empty$1
+hello --repo $R --as implementer --session gatesess$1 --card $C --doing under the gate
+hello --repo $R --as nosuchrole --session gatesess$1
+hello --as implementer --session gatesess$1
+owed --repo $R --as implementer
+owed --repo $R --card $C --as sol-gate
+owed --repo $R --as nosuchrole
+bye --repo $R --as implementer --session gatesess$1 --why finished under the gate
+bye --repo ../escape --as implementer
 count --repo $R --card dmg$1
 count --repo $R --card empty$1
 PATHS
