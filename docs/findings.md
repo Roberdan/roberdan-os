@@ -394,3 +394,31 @@ renderebbe card e' scritta accanto.
   campanello serve proprio a questo: toglie il rumore **a monte**, senza dipendere
   dal fatto che qualcuno si ricordi di fare pulizia. Una capacita' che esiste e
   non parte da sola vale, in pratica, quanto una che non esiste.
+
+### 2026-09-22 — tre limiti che scattavano sul caso sano, in tre file diversi
+
+Trovati tutti in una notte, e sono la stessa cosa scritta tre volte: **un tempo
+massimo tarato su un'ipotesi invece che su una misura**. Due corretti, uno no.
+
+- **Corretto** — `test/test-bus-mutants.sh`: 300 s per una passata che ne dura
+  322. Un mutante catturato fallisce subito, uno NON catturato arriva in fondo:
+  quindi il limite non distingueva "sopravvissuto" da "troppo lento", e riportava
+  il secondo. Portato a 900 s.
+- **Corretto** — `test/lib-suites.sh`: il budget di 15 minuti partiva da quando
+  si comincia ad ASPETTARE, ma le cinque suite del gruppo seriale girano in fila,
+  quindi l'ultima pagava anche l'attesa delle altre quattro. `test-twin-install`
+  passa da solo in 2m48s ed e' stata dichiarata bloccata in tre validazioni di
+  fila. Ora il conto parte quando la suite parte davvero.
+- **NON corretto, e dichiarato** — `test/test-audit-hooks.sh` e' sensibile al
+  carico: da sola passa sempre, dentro una validazione completa ha fallito 2
+  volte su 8, una su un'asserzione di tempo (2,139 s contro un limite di 2) e una
+  su "l'observer Copilot non ha scritto nel registro reale". Non e' toccata da
+  questo lavoro e non ho misurato dove sia la soglia giusta. Diventa una card se
+  fallisce di nuovo: la correzione e' della stessa famiglia delle due qui sopra —
+  misurare quanto dura davvero e tarare su quello, invece di indovinare.
+
+La regola che ne esce, e vale piu' delle tre correzioni: **un limite che puo'
+scattare sul caso sano non e' un margine di sicurezza, e' un rosso a caso.** E un
+rosso a caso su un innocente insegna a non leggere piu' il referto — che e' il
+modo piu' costoso in cui un cancello smette di funzionare, perche' continua a
+sembrare acceso.
