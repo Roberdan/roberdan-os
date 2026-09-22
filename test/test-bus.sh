@@ -655,7 +655,16 @@ teardown_degraded() {
   rm -f "$RDA_BUS_HOME/$R/dmg$1.jsonl" "$RDA_BUS_HOME/$R/empty$1.jsonl" "$RDA_BUS_HOME/$R/locked$1.jsonl"
 }
 
-canary_run() ( RDA_LEAKCHECK="$TMP/lc/leak-check.sh" busrun "$@" >/dev/null 2>&1 || true )
+# RUN FROM A SCRATCH DIRECTORY, NOT FROM THE CHECKOUT. `hello` leaves a
+# `.bus-role` and a `.bus-session` at the top of the worktree it runs in — that is
+# the whole point of them, and it is how a later command of the same session
+# knows who it is. Inside this suite the cwd is the developer's checkout, which
+# on this machine is a per-card worktree under ~/GitHub/worktrees, so the table
+# below was writing two files into real work and test-worktree-sweep.sh caught it
+# ("la suite ha creato o tolto qualcosa"). A test that leaves anything behind in
+# the tree it is testing has already stopped being a test of that tree.
+mkdir -p "$TMP/cwd"
+canary_run() ( cd "$TMP/cwd" && RDA_LEAKCHECK="$TMP/lc/leak-check.sh" busrun "$@" >/dev/null 2>&1 || true )
 echo "a plain note" > "$TMP/body.txt"
 # A real sha and a real card so the ref-resolution branches are actually entered
 # rather than bailing out early.
