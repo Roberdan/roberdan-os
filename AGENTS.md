@@ -185,6 +185,14 @@ Delivery stays opt-in: the doorbell reports a count, bodies arrive only through 
 `kb` does not know the bus exists. What changed on 2026-09-22 is that `context-inject.sh`
 **announces the session** at start and tells it which role it is — a presence record and a
 line of text, never a delivery: it carries no message, and nothing it writes can wake anyone.
+On Copilot the goodbye is automatic too (`onSessionEnd` → `hooks/bus-bye.sh`), wired **there
+and nowhere else**: `Stop` and `onAgentStop` fire at the end of every *turn*, and a session
+that declared itself finished after every turn would make the presence view entirely of
+ghosts. It is best-effort by nature — a crash, a kill or a closed lid delivers no callback,
+and **Claude Code has no session-end event at all**, so there `bus bye` is a command the agent
+runs. A declared presence that is never withdrawn is therefore a *normal* state, which is
+exactly why `bus who` prints the declaration next to the last observed action instead of
+believing it.
 
 ## Loop Protocol
 
