@@ -67,9 +67,12 @@ else
   err "an unknown tool name was not refused: $out"
 fi
 
-section "the advertised surface is exactly send/read/peek/log — no close, no open, no roles"
+# REVISED 2026-09-22 alongside the dispatch check below, and for the same reason:
+# hello/bye say something about a SESSION, who/owed read what was said. close,
+# open and roles stay off, because closing a thread is a decision about the work.
+section "the advertised surface is exactly send/read/peek/log/hello/bye/who/owed — no close, no open, no roles"
 names="$(printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | rpc | jq -r '.result.tools[].name' | LC_ALL=C sort | tr '\n' ' ')"
-if [ "$names" = "bus_log bus_peek bus_read bus_send " ]; then
+if [ "$names" = "bus_bye bus_hello bus_log bus_owed bus_peek bus_read bus_send bus_who " ]; then
   ok "surface is exactly: $names"
 else
   err "unexpected tool surface: '$names'"
@@ -180,6 +183,13 @@ fi
 # --- 5. the surface cannot mutate kanban state ------------------------------
 # Property 2 is Roberto's approval gate. The MCP layer must not offer a way in.
 section "no tool on this surface can move a card (property 2, the human gate)"
+# REVISED 2026-09-22: the expected set grew from `log read send` to seven verbs,
+# and that is the mechanism working rather than being weakened. A new verb here is
+# a test failure somebody has to answer in writing, which is the whole point of
+# pinning the set instead of describing it. What was added says something about a
+# SESSION (hello, bye) or reads what was said (who, owed); `close`, `open` and
+# `roles` are still absent, because closing a thread is a decision about the work.
+#
 # Grepping for the word "kanban" was the first version of this check and it was
 # wrong: the only occurrences are tool DESCRIPTIONS stating that kanban state is
 # not touched, so the check failed on the file promising the very property it was
@@ -221,10 +231,10 @@ for node in ast.walk(tree):
 print("DYNAMIC" if dynamic else " ".join(sorted(found)))
 PYEOF
 )"
-if [ "$verbs" = "log read send" ]; then
+if [ "$verbs" = "bye hello log owed read send who" ]; then
   ok "the only dispatchable verbs are exactly: $verbs (no kb, no close, no open)"
 else
-  err "unexpected dispatch surface: '$verbs' (expected 'log read send')"
+  err "unexpected dispatch surface: '$verbs' (expected 'bye hello log owed read send who')"
 fi
 
 # --- 6. the file itself cannot reach a shell --------------------------------

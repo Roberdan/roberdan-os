@@ -37,6 +37,13 @@ WHAT IS DELIBERATELY NOT EXPOSED
     about the work, and this file exists so that an agent's reach is exactly
     "say something, read what was said". A human still has the whole CLI.
 
+    `hello`, `bye`, `who` and `owed` were ADDED on 2026-09-22 and belong on the
+    same side of that line rather than widening it: the first two say something
+    about THIS SESSION, the last two read what was said. Before them an agent
+    reaching the bus only through this surface could not announce itself, could
+    not see who else was there, and could not discover what had been asked of it
+    and never answered — which is exactly how a channel becomes a noticeboard.
+
 Transport: MCP over stdio, JSON-RPC 2.0, standard library only.
 """
 
@@ -158,6 +165,16 @@ def tool_bus_send(args):
         if not re.match(r"^(git|kb):[A-Za-z0-9][A-Za-z0-9._/-]*$", ref):
             raise ToolError("ref: must look like git:<sha> or kb:<card>")
 
+    # `re` is what turns a reply into an ANSWER. Without it the asker cannot tell
+    # an answer from silence, which is the state the whole store was in: a
+    # question stays listed by bus_owed until a message of the addressee cites
+    # it. Validated as a record number here and validated AGAIN against the
+    # thread by bus.sh, which is the only side that can know how deep it is.
+    answers = args.get("re")
+    if answers is not None:
+        if isinstance(answers, bool) or not isinstance(answers, int) or answers < 1:
+            raise ToolError("re: must be the number of a record in this thread (1 or more)")
+
     # The body travels as a FILE, never as an argument. bus.sh chose this
     # because a 3MB verdict through argv hit ARG_MAX; it is also why no body
     # content is ever visible in a process listing.
@@ -169,6 +186,8 @@ def tool_bus_send(args):
                 "--to", to, "--kind", kind, "--body-file", path]
         if ref is not None:
             argv += ["--ref", ref]
+        if answers is not None:
+            argv += ["--re", str(answers)]
         return _run_bus(argv)
     finally:
         # The body may be the only copy of a verdict; it must not be left in
@@ -203,6 +222,65 @@ def tool_bus_log(args):
     return _run_bus(["log", "--repo", repo, "--card", card])
 
 
+# --- presence and debt ------------------------------------------------------
+# Added 2026-09-22. An agent that reaches the bus only through this surface could
+# not announce itself, could not see who else was there, and could not find out
+# what had been asked of it and never answered. It could therefore reproduce, on
+# its own, every failure measured on the real store that day: 13 threads with one
+# sender, 14 nobody ever opened.
+#
+# These four fit the rule this file already states — "say something, read what
+# was said" — rather than widening it. `hello` and `bye` say something about THIS
+# SESSION, not about the work; `who` and `owed` read what was said. `close`,
+# `open` and `roles` stay absent for the reason given above: closing a thread is a
+# decision about the work.
+def tool_bus_hello(args):
+    repo = _slug("repo", args.get("repo"))
+    as_role = _slug("as_role", args.get("as_role"))
+    argv = ["hello", "--repo", repo, "--as", as_role]
+    session = args.get("session")
+    if session:
+        argv += ["--session", _slug("session", session)]
+    card = args.get("card")
+    if card:
+        argv += ["--card", _slug("card", card)]
+    doing = args.get("doing")
+    if doing is not None:
+        if not isinstance(doing, str):
+            raise ValueError("doing: must be a string")
+        # Free text, never a slug — but it is one line of a record, so a newline
+        # would split it across fields for every later reader.
+        argv += ["--doing", doing.replace("\n", " ").strip()]
+    return _run_bus(argv)
+
+
+def tool_bus_bye(args):
+    repo = _slug("repo", args.get("repo"))
+    as_role = _slug("as_role", args.get("as_role"))
+    argv = ["bye", "--repo", repo, "--as", as_role]
+    why = args.get("why")
+    if why is not None:
+        if not isinstance(why, str):
+            raise ValueError("why: must be a string")
+        argv += ["--why", why.replace("\n", " ").strip()]
+    return _run_bus(argv)
+
+
+def tool_bus_owed(args):
+    repo = _slug("repo", args.get("repo"))
+    as_role = _slug("as_role", args.get("as_role"))
+    argv = ["owed", "--repo", repo, "--as", as_role]
+    card = args.get("card")
+    if card:
+        argv += ["--card", _slug("card", card)]
+    return _run_bus(argv)
+
+
+def tool_bus_who(args):
+    repo = _slug("repo", args.get("repo"))
+    return _run_bus(["who", "--repo", repo])
+
+
 TOOLS = {
     "bus_send": {
         "handler": tool_bus_send,
@@ -222,6 +300,7 @@ TOOLS = {
                 "kind": {"type": "string", "enum": list(KINDS)},
                 "body": {"type": "string", "description": "The message text"},
                 "ref": {"type": "string", "description": "Optional citation: git:<sha> or kb:<card>. Required when the body claims a human approval."},
+                "re": {"type": "integer", "description": "The number of the record this message answers. Citing it is what clears the question from bus_owed; without it the asker cannot tell an answer from silence.", "minimum": 1},
             },
             "required": ["repo", "card", "from_role", "to_role", "kind", "body"],
         },
@@ -262,6 +341,76 @@ TOOLS = {
                 "card": {"type": "string"},
             },
             "required": ["repo", "card"],
+        },
+    },
+    "bus_hello": {
+        "handler": tool_bus_hello,
+        "description": (
+            "Announce this session on a repo, once, at the start: which role it plays, "
+            "which card it is on, and what it is doing. Presence is an append-only "
+            "record about the session itself — it delivers nothing, starts nothing, "
+            "and gives the session no capability it did not already have."
+        ),
+        "schema": {
+            "type": "object",
+            "properties": {
+                "repo": {"type": "string", "description": "Repository slug, e.g. roberdan-os"},
+                "as_role": {"type": "string", "description": "The role this session plays, must exist in bus/roles/"},
+                "session": {"type": "string", "description": "A unique name for this session. Omitted, one is generated."},
+                "card": {"type": "string", "description": "Optional kanban card id this session is working"},
+                "doing": {"type": "string", "description": "One line: what this session is doing"},
+            },
+            "required": ["repo", "as_role"],
+        },
+    },
+    "bus_bye": {
+        "handler": tool_bus_bye,
+        "description": (
+            "Declare this session finished, so whoever arrives next does not address "
+            "an agent that is gone. It reports anything addressed to this role that "
+            "was never answered, and never blocks."
+        ),
+        "schema": {
+            "type": "object",
+            "properties": {
+                "repo": {"type": "string"},
+                "as_role": {"type": "string"},
+                "why": {"type": "string", "description": "One line: why this session is stopping"},
+            },
+            "required": ["repo", "as_role"],
+        },
+    },
+    "bus_owed": {
+        "handler": tool_bus_owed,
+        "description": (
+            "List the questions and requests addressed to a role that no message of "
+            "that role cites. A question read once used to vanish behind the cursor; "
+            "this is what survives it. Answer by sending with 're' set to its number."
+        ),
+        "schema": {
+            "type": "object",
+            "properties": {
+                "repo": {"type": "string"},
+                "as_role": {"type": "string", "description": "Whose unanswered mail to list"},
+                "card": {"type": "string", "description": "Optional: only this card"},
+            },
+            "required": ["repo", "as_role"],
+        },
+    },
+    "bus_who": {
+        "handler": tool_bus_who,
+        "description": (
+            "Who else is working this repo: OBSERVED activity (an append or a read is "
+            "the evidence) and DECLARED presence (what a session said about itself). "
+            "The two are printed separately and never merged — a session that was "
+            "killed cannot retract what it declared."
+        ),
+        "schema": {
+            "type": "object",
+            "properties": {
+                "repo": {"type": "string"},
+            },
+            "required": ["repo"],
         },
     },
 }
