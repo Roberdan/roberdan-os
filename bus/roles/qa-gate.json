@@ -14,5 +14,6 @@
     "commit, push or merge",
     "start, spawn or dispatch another agent",
     "declare work done: a verdict on the bus is a message, not a transition"
-  ]
+  ],
+  "agent": "@thor"
 }

@@ -129,4 +129,64 @@ if [ -r "$_wt" ]; then
   fi
 fi
 
+# --- il bus: presentarsi, una volta, all'inizio ------------------------------
+# Roberto, 2026-09-22: "ogni sessione all'inizio deve presentarsi sul bus con un nome univoco
+# e dichiarare su che repo sta lavorando, senno come cazzo fanno a sapere chi sta facendo cosa?"
+#
+# Fino a oggi nessuno si presentava, e `bus who` rispondeva deducendo dall'ultimo messaggio
+# scritto: diceva "qualcuno e' passato di qui", mai "ci sono io, su questa card". Misurato sul
+# negozio vero: 167 messaggi, 31 conversazioni, 14 delle quali nessuno ha MAI aperto.
+#
+# Qui la presentazione avviene da sola. Tre limiti, dichiarati perche' sono veri:
+#  - un hook gira in un processo suo, quindi NON puo' esportare variabili nella sessione: il
+#    nome se lo deve ricordare l'agente, e per questo glielo scriviamo qui sotto in chiaro.
+#  - il ruolo predefinito e' `implementer` (chi lavora sulla card). Un agente che ne ha un altro
+#    lo dichiara da se' con `bus hello --as <ruolo>`; la seconda presentazione e' un altro record,
+#    non un conflitto.
+#  - nessun hook affidabile esiste per la FINE di una sessione, quindi il congedo resta un
+#    comando che l'agente esegue (`bus bye`). Una presenza mai chiusa resta dichiarata: per
+#    questo `bus who` la stampa accanto all'ultima attivita' osservata, mai al posto di quella.
+if [ -r "$ROOT/bus/bus.sh" ] && command -v jq >/dev/null 2>&1; then
+  # Il nome del repo e' quello del CHECKOUT PRINCIPALE, mai quello della copia di lavoro.
+  # `kb start` apre una copia per ogni card (~/GitHub/worktrees/<repo>/<card-id>) ed e' li'
+  # che il canone dice di lavorare: dentro, `--show-toplevel` risponde <card-id>, e due agenti
+  # sullo stesso progetto ma su card diverse finivano in due bus diversi senza vedersi mai.
+  # `--git-common-dir` punta al .git PRINCIPALE da qualunque copia, quindi il suo genitore
+  # e' il progetto.
+  _bcommon="$(git -C "$PWD" rev-parse --git-common-dir 2>/dev/null || true)"
+  _btop=""
+  if [ -n "$_bcommon" ]; then
+    case "$_bcommon" in /*) : ;; *) _bcommon="$PWD/$_bcommon";; esac
+    _btop="$(cd "$_bcommon/.." 2>/dev/null && pwd || true)"
+  fi
+  [ -n "$_btop" ] || _btop="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
+  _brepo="$(basename "${_btop:-$PWD}")"
+  case "$_brepo" in
+    ''|.|..) _brepo="" ;;
+  esac
+  if [ -n "$_brepo" ]; then
+    _brole="${RDA_BUS_ROLE:-implementer}"
+    _bsess="${RDA_BUS_SESSION:-${_sid:-sess-$$}}"
+    # Solo su sessione NUOVA: una ripresa o una compattazione e' la stessa sessione di prima,
+    # e ripresentarla ogni volta trasformerebbe la presenza in rumore.
+    case "$_src" in
+      resume|compact|fork) : ;;
+      *)
+        bash "$ROOT/bus/bus.sh" hello --repo "$_brepo" --as "$_brole" \
+             --session "$_bsess" --doing "sessione aperta" >/dev/null 2>&1 || true
+        ;;
+    esac
+    _bowed="$(bash "$ROOT/bus/bus.sh" owed --repo "$_brepo" --as "$_brole" 2>/dev/null | grep -cE '^  [a-zA-Z0-9]' || echo 0)"
+    echo
+    echo "### 📻 Sul bus sei **@$_brole** (sessione \`$_bsess\`, repo \`$_brepo\`)."
+    echo "  Usalo cosi', e passalo ai tuoi sotto-agenti:"
+    echo "    export RDA_BUS_ROLE=$_brole RDA_BUS_SESSION=$_bsess RDA_BUS_REPO=$_brepo"
+    echo "  Chi altro c'e': \`bus who --repo $_brepo\` · i ruoli e chi li interpreta: \`bus roles\`"
+    if [ "${_bowed:-0}" -gt 0 ] 2>/dev/null; then
+      echo "  ⚠️  $_bowed messaggi aspettano una risposta DA TE: \`bus owed\` — rispondere significa citarli con \`--re N\`."
+    fi
+    echo "  Quando hai finito: \`bus bye --repo $_brepo\` (senno' risulti ancora qui a chi arriva dopo)."
+  fi
+fi
+
 exit 0
