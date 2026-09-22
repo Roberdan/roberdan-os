@@ -207,6 +207,17 @@ if [ -r "$ROOT/bus/bus.sh" ] && command -v jq >/dev/null 2>&1; then
     if [ "${_bowed:-0}" -gt 0 ] 2>/dev/null; then
       echo "  ⚠️  $_bowed messaggi aspettano una risposta DA TE: \`bus owed\` — rispondere significa citarli con \`--re N\`."
     fi
+    # LA POSTA NON LETTA DEL TUO RUOLO, per intero. Il campanello durante la sessione
+    # suona solo per i ruoli che qualcuno sta interpretando (senno' diventa il rumore che
+    # Roberto ha visto: dodici righe per quattro ruoli assenti, su card gia' chiuse). Il
+    # rovescio di quel filtro e' che un ruolo che ARRIVA ORA deve vedere tutto cio' che lo
+    # aspetta, comprese le note e i verdetti che `bus owed` non copre — quello elenca solo
+    # domande e richieste. Un NUMERO, non i messaggi: i corpi arrivano solo da `bus read`.
+    _bunread="$(bash "$ROOT/bus/bus.sh" count --repo "$_brepo" --as "$_brole" 2>/dev/null \
+                 | awk -F'\t' '{n+=$3} END{print n+0}' || echo 0)"
+    if [ "${_bunread:-0}" -gt 0 ] 2>/dev/null; then
+      echo "  📬 $_bunread messaggi non letti indirizzati a @$_brole: \`bus read --card <CARD>\` (i corpi arrivano solo cosi', marcati NON VERIFICATI)."
+    fi
     echo "  Quando hai finito: \`bus bye --repo $_brepo\` (senno' risulti ancora qui a chi arriva dopo)."
   fi
 fi

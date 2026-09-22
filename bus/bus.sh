@@ -748,12 +748,32 @@ _count_unread() {
 }
 
 _cmd_count() {
-  local repo="" card="" as=""
+  local repo="" card="" as="" present=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --repo) _need $# "--repo"; repo="$2"; shift 2;;
       --card) _need $# "--card"; card="$2"; shift 2;;
       --as)   _need $# "--as";   as="$2";   shift 2;;
+      # --present COUNTS ONLY FOR ROLES SOMEBODY IS ACTUALLY PLAYING, and it
+      # exists because Roberto opened a session on 2026-09-22 and got twelve
+      # lines of this:
+      #
+      #   260913-150759: 3 unread for @architect
+      #   260913-150759: 3 unread for @qa-gate      ... and so on, four roles,
+      #   260917-111539: 1 unread for @architect        three cards, forever
+      #
+      # Two of those cards were already in `done/` and the third had no card at
+      # all. Nobody was playing any of those roles, and nobody was going to: the
+      # mail was addressed to `all` months earlier, so every role that never read
+      # it counted it as unread for the rest of time. A doorbell that rings for
+      # mail NOBODY CAN ACT ON teaches exactly one thing — to stop hearing it —
+      # and then it is worse than no doorbell, because the real message arrives
+      # in the middle of noise somebody has already learned to skip.
+      #
+      # "Playing it" means: declared present with `hello` and not yet gone, or
+      # this very session's role. Not "has a manifest" — a manifest says the role
+      # is addressable, never that anyone is there.
+      --present) present=1; shift;;
       *) die "count: unknown argument '$1'";;
     esac
   done
@@ -777,7 +797,21 @@ _cmd_count() {
       rf="${rf##*/}"
       roles="$roles ${rf%.json}"
     done
+    if [ "$present" = "1" ]; then
+      local here="" r
+      # The reader's own role first: a session always counts as present to
+      # itself, whether or not the hook that announces it ever ran.
+      [ -z "${RDA_BUS_ROLE:-}" ] || here=" ${RDA_BUS_ROLE}"
+      while IFS= read -r r; do
+        [ -n "$r" ] || continue
+        case " $here " in *" $r "*) ;; *) here="$here $r";; esac
+      done < <(_declared_present "$(_presence_path "$repo")" 2>/dev/null | awk -F'\t' '{print $1}')
+      roles="$here"
+    fi
   fi
+  # Nobody is here: there is nothing to ring about, and saying so would be the
+  # noise this flag exists to remove.
+  [ "$present" != "1" ] || [ -n "$(printf '%s' "$roles" | tr -d '[:space:]')" ] || return 0
   local dir="$BUS_HOME/$repo"
   # Silence, not an error: a repo with no traffic is the normal case, and this
   # runs on every tool call. Anything printed at zero is context spent for nothing.
@@ -1161,6 +1195,86 @@ _cmd_owed() {
   rm -f "$out"
 }
 
+# --- tidy: i thread di un lavoro finito smettono di chiamare -----------------
+# Roberto, 2026-09-22, aprendo una sessione: "vorrei che il sistema riuscisse a
+# tenersi pulito e evitare ste robe che non si capisce che cazzo sono". Aveva
+# davanti dodici righe di posta non letta su tre thread: due appartenevano a card
+# gia' in `done/`, il terzo a una card che non esiste. Quei thread avrebbero
+# continuato a chiamare per sempre, perche' niente li chiude quando il lavoro
+# finisce.
+#
+# Due cose che questo comando NON fa, e sono il motivo per cui e' un comando e non
+# un effetto collaterale:
+#  - NON legge lo stato kanban per DECIDERE da solo. Lo legge per PROPORRE, e la
+#    chiusura la scrive solo con `--yes`. Il bus non muove card e le card non
+#    muovono il bus: qui le guarda, e basta.
+#  - NON cancella niente. `close` e' un record in piu' in un registro che non
+#    dimentica: il thread resta leggibile per intero con `bus log`, smette solo di
+#    essere consegnato e di farsi contare. Il ragionamento e' la cosa che il
+#    kanban non conserva, ed e' l'ultima che si butta.
+_card_is_done() {
+  local card="$1" board
+  while IFS= read -r board; do
+    [ -n "$board" ] || continue
+    [ ! -f "$board/done/$card.md" ] || { printf 'done'; return 0; }
+    for state in todo doing; do
+      [ ! -f "$board/$state/$card.md" ] || { printf 'open'; return 0; }
+    done
+  done < <(_card_boards)
+  printf 'missing'
+}
+
+_cmd_tidy() {
+  local repo="" by="" yes=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo) _need $# "--repo"; repo="$2"; shift 2;;
+      --by|--as) _need $# "$1"; by="$2"; shift 2;;
+      --yes)  yes=1; shift;;
+      *) die "tidy: unknown argument '$1'";;
+    esac
+  done
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] || die "tidy: could not work out which repo this is — pass --repo"
+  repo="$(_slug "--repo" "$repo")"
+  local dir="$BUS_HOME/$repo" f cname state n=0 closed=0
+  [ -d "$dir" ] || { echo "bus: no traffic for $repo — nothing to tidy."; return 0; }
+  if [ "$yes" = "1" ]; then
+    by="$(_ident_role "$by" "tidy")"
+    _assert_role "$by"
+    by="$(_slug "--by" "$by")"
+  fi
+  for f in "$dir"/*.jsonl; do
+    [ -e "$f" ] && [ -s "$f" ] || continue
+    jq -e . "$f" >/dev/null 2>&1 || continue
+    [ "$(_thread_state "$f")" != "closed" ] || continue
+    cname="${f##*/}"; cname="${cname%.jsonl}"
+    state="$(_card_is_done "$cname")"
+    [ "$state" != "open" ] || continue
+    n=$((n + 1))
+    if [ "$yes" = "1" ]; then
+      local bf; bf="$(mktemp)"
+      printf 'thread closed by tidy: the card is %s
+' "$state" > "$bf"
+      _with_lock "$f" _append_record "$f" "$repo" "$cname" "$by" "$BROADCAST" closed "" "$bf" ""
+      rm -f "$bf"
+      closed=$((closed + 1))
+      echo "  chiuso  $cname  (card $state)"
+    else
+      echo "  $cname  — card $state, il thread e ancora aperto e continua a farsi contare"
+    fi
+  done
+  if [ "$n" = "0" ]; then
+    echo "bus: $repo e a posto — nessun thread aperto su lavoro finito."
+  elif [ "$yes" = "1" ]; then
+    echo "bus: chiusi $closed thread su $repo. Niente e stato cancellato: bus log li legge ancora per intero."
+  else
+    echo "bus: $n thread aperti su card finite o inesistenti in $repo."
+    echo "     Continuano a farsi contare dal campanello finche restano aperti."
+    echo "     Chiudili (senza perdere una parola):  bus tidy --repo $repo --yes"
+  fi
+}
+
 # --- who -------------------------------------------------------------------
 # Liveness WITHOUT leases: a role that appended or read four minutes ago is
 # alive. Presence is observed, not declared - and there is no lease for a stray
@@ -1430,6 +1544,7 @@ case "${1:-}" in
   hello) shift; _cmd_hello "$@";;
   bye)   shift; _cmd_bye "$@";;
   owed)  shift; _cmd_owed "$@";;
+  tidy)  shift; _cmd_tidy "$@";;
   close) shift; _cmd_close "" "$@";;
   open)  shift; _cmd_close "reopen" "$@";;
   roles) shift; _cmd_roles "$@";;

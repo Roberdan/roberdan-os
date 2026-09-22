@@ -239,6 +239,72 @@ grep -q 'bus.sh" who --repo "\$_brepo" 2>/dev/null' "$ROOT/hooks/context-inject.
   && fail "hooks/context-inject.sh injects the full roster, prose included"
 ok "the session-start roster is the facts-only form"
 
+# 3g. THE DOORBELL DOES NOT RING FOR MAIL NOBODY CAN ACT ON.
+#     Roberto, 2026-09-22, opening a session: twelve lines of unread counts for
+#     four roles nobody was playing, on two cards already in done/ and one card
+#     that does not exist. "vorrei che il sistema riuscisse a tenersi pulito e
+#     evitare ste robe che non si capisce che cazzo sono."
+#     The cost is not the twelve lines: a doorbell that rings for mail nobody can
+#     act on teaches the reader to stop hearing it, and then the message that
+#     mattered arrives inside noise already learned away.
+NOISE="$TMP/noise"; mkdir -p "$NOISE"
+NR=noise-repo
+echo "broadcast nobody will ever read" \
+  | env RDA_BUS_ROLE=architect RDA_BUS_SESSION=n1 RDA_BUS_HOME="$RDA_BUS_HOME" \
+      bash "$BUS" send --repo "$NR" --card ghost --from architect --to all >/dev/null 2>&1
+allroles="$(b count --repo "$NR" 2>/dev/null | grep -c . || true)"
+[ "$allroles" -gt 1 ] \
+  || fail "the plain count no longer fans out across roles: then this check proves nothing"
+quiet="$(b count --repo "$NR" --present 2>/dev/null | grep -c . || true)"
+[ "$quiet" = "0" ] \
+  || fail "the doorbell still rings for roles nobody is playing ($quiet lines)"
+env RDA_BUS_ROLE=qa-gate RDA_BUS_SESSION=n2 RDA_BUS_HOME="$RDA_BUS_HOME" \
+  bash "$BUS" hello --repo "$NR" --as qa-gate --session n2 >/dev/null 2>&1
+loud="$(b count --repo "$NR" --present 2>/dev/null | grep -c 'qa-gate' || true)"
+[ "$loud" = "1" ] \
+  || fail "once a role is actually present, its unread mail must ring — it did not"
+ok "the doorbell rings for roles that are present, and is silent for the ones that are not"
+
+# 3h. AND NOTHING IS HIDDEN BY THAT FILTER. The mail is not dropped: it waits,
+#     and the role that arrives later is told about it. A filter that made a
+#     message unreachable would be the one failure durable delivery cannot have.
+arrived="$(env RDA_BUS_ROLE=sol-gate RDA_BUS_HOME="$RDA_BUS_HOME" \
+             bash "$BUS" count --repo "$NR" --as sol-gate 2>/dev/null | grep -c 'sol-gate' || true)"
+[ "$arrived" = "1" ] \
+  || fail "a role that asks for its own count is not told about mail the doorbell chose not to ring for"
+ok "mail the doorbell stays quiet about is still there, and still counted when that role asks"
+
+# 3i. A THREAD WHOSE WORK IS FINISHED STOPS CALLING — and loses not one word.
+#     This is the other half of the same complaint: the three noisy threads
+#     belonged to cards in done/, and nothing ever closed them, so they would
+#     have counted forever.
+TIDYBOARD="$TMP/board"; mkdir -p "$TIDYBOARD/done" "$TIDYBOARD/doing" "$TIDYBOARD/todo"
+printf -- '---\ntitle: finita\n---\n' > "$TIDYBOARD/done/ghost.md"
+before="$(b log --repo "$NR" --card ghost 2>/dev/null | grep -c 'broadcast nobody' || true)"
+[ "$before" = "1" ] || fail "the tidy fixture did not land"
+env RDA_KANBAN="$TIDYBOARD" RDA_BUS_HOME="$RDA_BUS_HOME" RDA_BUS_ROLE=orchestrator \
+  bash "$BUS" tidy --repo "$NR" --by orchestrator --yes >/dev/null 2>&1 \
+  || fail "tidy failed on a card that is done"
+after="$(b count --repo "$NR" 2>/dev/null | grep -c 'ghost' || true)"
+[ "$after" = "0" ] \
+  || fail "a thread whose card is done still counts: it will nag forever"
+kept="$(b log --repo "$NR" --card ghost 2>/dev/null | grep -c 'broadcast nobody' || true)"
+[ "$kept" = "1" ] \
+  || fail "tidy LOST the thread — closing must keep every word, the reasoning is what the kanban does not store"
+ok "a thread on finished work stops counting, and every word of it is still readable"
+
+# 3j. AND TIDY NEVER TOUCHES WORK THAT IS STILL OPEN.
+echo "live thread" \
+  | env RDA_BUS_ROLE=architect RDA_BUS_HOME="$RDA_BUS_HOME" \
+      bash "$BUS" send --repo "$NR" --card alive --from architect --to qa-gate >/dev/null 2>&1
+printf -- '---\ntitle: in corso\n---\n' > "$TIDYBOARD/doing/alive.md"
+env RDA_KANBAN="$TIDYBOARD" RDA_BUS_HOME="$RDA_BUS_HOME" RDA_BUS_ROLE=orchestrator \
+  bash "$BUS" tidy --repo "$NR" --by orchestrator --yes >/dev/null 2>&1
+stillalive="$(b count --repo "$NR" --as qa-gate 2>/dev/null | grep -c 'alive' || true)"
+[ "$stillalive" = "1" ] \
+  || fail "tidy closed a thread whose card is still being worked on"
+ok "tidy leaves alone every thread whose card is still open"
+
 # 3b. --re IS VALIDATED, NOT TRUSTED. A reply pointing at a record that does not
 #     exist would discharge an obligation that was never met.
 out="$(echo "x" | as implementer sess-B send --card "$C" --to architect --re 999 --kind verdict 2>&1 || true)"

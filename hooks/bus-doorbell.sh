@@ -148,7 +148,15 @@ fi
 
 # Only now is the bus touched at all, and only for a COUNT: it renders no body
 # and advances no cursor, so this hook cannot consume the mail it announces.
-out="$(bash "$BUS" count --repo "$repo" 2>/dev/null || true)"
+# --present: only roles SOMEBODY IS PLAYING. Roberto, 2026-09-22, opening a
+# session and getting twelve lines of unread counts for four roles nobody was
+# playing, on two cards already in done/ and one card that does not exist:
+# "vorrei che il sistema riuscisse a tenersi pulito e evitare ste robe che non si
+# capisce che cazzo sono". He is right, and the cost is not the twelve lines: a
+# doorbell that rings for mail nobody can act on teaches the reader to stop
+# hearing it, and then the message that mattered arrives inside noise that has
+# already been learned away.
+out="$(bash "$BUS" count --repo "$repo" --present 2>/dev/null || true)"
 
 # AND what this session OWES, when it has said who it is — WITHOUT A SINGLE WORD
 # OF WHAT ANYONE SAID. `--brief` exists for exactly this caller.
