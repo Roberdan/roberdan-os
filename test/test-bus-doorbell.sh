@@ -50,7 +50,11 @@ echo "$BODY" | bash "$BUS" send --repo "$REPO" --card d1 \
 # bent to fit the code: without it this suite would be asserting that the channel
 # must nag about mail with no recipient, which is the defect, written down as a
 # requirement.
-bash "$BUS" hello --repo "$REPO" --as implementer --session doorbell-sess >/dev/null 2>&1 \
+# FROM THE FIXTURE DIRECTORY, not from the checkout: `hello` leaves a `.bus-role`
+# and a `.bus-session` at the top of the worktree it runs in, which is the whole
+# point of them — and inside this suite the cwd is the developer's real work.
+# test-worktree-sweep.sh catches exactly that, and did.
+( cd "$WORK" && bash "$BUS" hello --repo "$REPO" --as implementer --session doorbell-sess >/dev/null 2>&1 ) \
   || fail "could not declare the addressee present"
 
 payload() { printf '{"session_id":"%s","cwd":"%s","hook_event_name":"PostToolUse"}' "$1" "$WORK"; }
@@ -118,7 +122,7 @@ echo "mail for the other repo" | bash "$BUS" send --repo "$REPO_B" --card d9 \
   --from sol-gate --to implementer --kind note >/dev/null || fail "could not seed the second repo"
 # Presence is per repo, like everything else here: being declared on repo A says
 # nothing about repo B, so the addressee has to be announced on both.
-bash "$BUS" hello --repo "$REPO_B" --as implementer --session doorbell-sess-b >/dev/null 2>&1 \
+( cd "$WORK_B" && bash "$BUS" hello --repo "$REPO_B" --as implementer --session doorbell-sess-b >/dev/null 2>&1 ) \
   || fail "could not declare the addressee present on the second repo"
 payload_b() { printf '{"session_id":"%s","cwd":"%s","hook_event_name":"PostToolUse"}' "$1" "$WORK_B"; }
 

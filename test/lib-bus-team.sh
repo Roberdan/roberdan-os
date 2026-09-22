@@ -41,6 +41,7 @@ cd "$TMP" || exit 1
 
 export RDA_BUS_HOME="$TMP/bus"
 R="team-repo"
+# shellcheck disable=SC2034  # used by the suites that source this file
 C="260922-card"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
