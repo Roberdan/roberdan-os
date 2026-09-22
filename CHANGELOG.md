@@ -3,6 +3,66 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.55.0 — 2026-09-22
+
+### Changed
+
+- The agent-to-agent bus works as a team channel instead of a noticeboard. Measured on the
+  live store before any change: 167 messages across 31 threads, 13 threads with exactly one
+  sender, 14 threads with no reader at all. Sessions and sub-agents now announce themselves
+  with a unique name and the repo they are on (`bus hello`), see who else is there
+  (`bus who`, observed activity and declared presence printed separately and never merged),
+  and say when they leave (`bus bye`, automatic on session end on both hosts). A question or
+  request addressed to a role stays listed by `bus owed` until that role answers it with
+  `--re <N>` citing it back to whoever asked; the state is derived from the append-only log,
+  so there is no second store to disagree with the thread. Identity resolves from the flag,
+  then the environment, then a `.bus-role`/`.bus-session` file next to the work, because on
+  at least one host every command runs in a fresh process and an exported identity lasts one
+  call. Presence is an append-only event log: nothing expires, nothing is renewed, and no
+  session is ever an addressee.
+- The doorbell rings only for roles somebody is actually playing (`bus count --present`), and
+  `bus tidy` closes the threads of finished work — report by default, `--yes` to act, nothing
+  ever deleted. A doorbell that rings for mail nobody can act on teaches the reader to stop
+  hearing it. Nothing is hidden by the filter: the session-start context shows the unread
+  count for the reader's own role, which `owed` does not cover.
+- Every agent file states which role it plays on the bus and what that role owes the channel;
+  advisory agents state that they are deliberately not on it. `bus roles` names the agent
+  behind each role.
+
+### Fixed
+
+- The repo name is derived from the main checkout, not the worktree. Inside a per-card
+  worktree — where the canon says the work happens — it resolved to the card id, so two
+  agents on two cards of one project wrote to different repos on the bus and never met, and
+  the doorbell looked for mail under a repo named after a card and rang nothing.
+- The session-end goodbye is wired on Claude as well as Copilot. The previous note claiming
+  Claude had no session-end event was false and had never been checked against the file it
+  described; `bin/sync.sh` was already wiring another hook to that event.
+- The doorbell no longer pushes another agent's message text into the model's context. It
+  used to inject the first 90 characters of each unanswered message without the UNVERIFIED
+  stamp, which rebuilds by hand the harm that context-inject delivery was cut for in
+  2026-07. Presence notes (`--doing`, `--why`) now pass the same fail-closed privacy scan as
+  a message body.
+- `bus owed` no longer treats a citation addressed to a third role as an answer, and a zero
+  says whether any thread could not be read. The typed MCP surface passes the session name to
+  `bus_bye` and no longer discards warnings written on a successful run.
+- The reminder printed after every message no longer re-reads the whole store: with an 8MB
+  thread present a message cost 0.823s against a 0.305s baseline, and the overhead grew with
+  the archive. It is now scoped to the card on the hot path (0.446s, constant) and repo-wide
+  only where it is paid once.
+
+### Testing
+
+- `test/test-bus-team.sh`: 26 checks for the properties above, each named after the failure it
+  would have caught, wired into `test/validate.sh`. `hello`, `bye` and `owed` now run under
+  the behavioural canary and the external-command allowlist in `test/test-bus.sh` — they were
+  the only verbs never measured by the gate that makes "this cannot start an agent" a
+  behaviour rather than a promise.
+- The mutation harness inner timeout is raised from 300s to 900s: a clean run of
+  `test/test-bus.sh` takes 322s, so at 300s the harness could not tell a surviving mutant
+  from a slow one. Seven mutants that pinned a machine-wide sweep deliberately removed from
+  `test-bus.sh` are now declared expected survivors rather than reported as regressions.
+
 ## 2.54.0 — 2026-09-20
 
 ### Added

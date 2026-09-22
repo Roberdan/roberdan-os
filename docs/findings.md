@@ -374,3 +374,23 @@ renderebbe card e' scritta accanto.
   esegue `delivery ... > rendered,` e lascia un file vuoto nella working tree,
   che il controllo delle zone nuove poi segnala. Innocuo e confinato ai test.
   Diventa una card se un mutante arriva a creare qualcosa di NON vuoto.
+
+### 2026-09-22 — due cose viste chiudendo il rumore del campanello
+
+- **`bus tidy` e la sezione 3 di `kanban/checkup.sh` decidono la stessa cosa in
+  due posti.** Entrambe chiedono "la card di questo thread e' ancora viva?" e
+  chiudono se no; `checkup` in piu' aspetta che il thread sia fermo da N giorni,
+  ed e' una prudenza giusta (una card appena chiusa puo' avere ancora un verdetto
+  in arrivo). Due definizioni della stessa regola divergono, e quella che diverge
+  e' sempre quella che nessuno legge finche' non sbaglia. **Non unificate qui**
+  perche' `test-checkup.sh` fissa le parole esatte del referto ("MORTA", "VIVA …
+  non si tocca") e riscrivere un componente funzionante e testato per un dedup
+  cosmetico, a fine giornata, e' il refactor che il protocollo del ciclo rifiuta.
+  Diventa una card quando una delle due cambia regola: quel giorno si fa
+  decidere a `bus tidy` e si lascia a `checkup` solo il referto.
+- **La pulizia c'era gia' e non era mai partita.** `checkup` sapeva chiudere quei
+  thread da prima; il rumore di Roberto e' rimasto sullo schermo lo stesso,
+  perche' e' un comando che qualcuno deve digitare. Il filtro `--present` sul
+  campanello serve proprio a questo: toglie il rumore **a monte**, senza dipendere
+  dal fatto che qualcuno si ricordi di fare pulizia. Una capacita' che esiste e
+  non parte da sola vale, in pratica, quanto una che non esiste.

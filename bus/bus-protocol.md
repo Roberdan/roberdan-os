@@ -591,6 +591,58 @@ its background agents is the thing that works, and this file does not imitate it
 A bus that pretended to deliver to something that cannot be woken would be a
 channel with a hole in it exactly where it looks strongest.
 
+## The doorbell must not ring for mail nobody can act on
+
+Added 2026-09-22, and the reason is one screenshot. Roberto opened a session and
+found twelve lines of this:
+
+```
+260913-150759: 3 unread for @architect
+260913-150759: 3 unread for @qa-gate       ... four roles, three cards, forever
+260917-111539: 1 unread for @architect
+```
+
+Two of those cards were already in `done/`; the third had no card at all. Nobody
+was playing any of those roles and nobody was going to: the mail had been sent
+`--to all` months earlier, so **every role that never read it counted it as
+unread for the rest of time**. His words: *"vorrei che il sistema riuscisse a
+tenersi pulito e evitare ste robe che non si capisce che cazzo sono."*
+
+**The cost is not the twelve lines.** A doorbell that rings for mail nobody can
+act on teaches the reader exactly one thing — to stop hearing it — and from that
+moment the message that mattered arrives inside noise that has already been
+learned away. A channel does not fail by going silent; it fails by becoming
+background.
+
+Two changes, and they attack different halves:
+
+- **`count --present`** rings only for roles somebody is **actually playing** —
+  declared present with `hello` and not gone, plus the reader's own. Having a
+  manifest means a role is *addressable*; it never meant anyone was there, and
+  the count had been treating the two as the same thing.
+- **`bus tidy`** closes the threads of work that is finished: the card is in
+  `done/`, or there is no card. It **reports by default and writes only with
+  `--yes`**, it reads kanban state to *propose* and never to decide, and it
+  deletes nothing — `close` is one more record in a log that does not forget, so
+  the thread stops being delivered and stays readable in full.
+
+**Nothing is hidden by the filter, and that is pinned by a test.** Mail the
+doorbell stays quiet about is not dropped: it waits, and the role that arrives is
+told. The session-start block therefore shows the unread count for *your own*
+role as well as `owed` — because `owed` lists only questions and requests, and a
+note or a verdict addressed to you would otherwise never be mentioned.
+
+Measured on the real store the same evening: 19 dead threads closed across six
+projects, nothing deleted, and the doorbell went from twelve lines of noise to
+none.
+
+**One honest limit, found while doing it.** `kanban/checkup.sh` already knew how
+to close those threads, and they were still on the screen — because it is a
+command somebody has to type. That is why the filter matters more than the
+cleanup: it removes the noise *upstream*, without depending on anyone
+remembering. A capability that exists and never runs is worth, in practice, what
+one that does not exist is worth.
+
 ## Retention: nothing is cleaned automatically
 
 The bus **never deletes anything**, and there is no expiry, no `processed/`, no
@@ -710,7 +762,9 @@ bus send --repo R --card C --to ROLE|all [--from ROLE] [--kind request|verdict|n
          [--re N] [--ref kb:<card>|git:<sha>] [--body-file F]   # body on stdin if --body-file is absent
 bus read --repo R --card C [--as ROLE] [--peek]           # unread for ROLE (direct + broadcast)
 bus owed [--repo R] [--card C] [--as ROLE]                # asked of you, never answered
-bus who  --repo R                                         # OBSERVED (append/read) + DECLARED (hello/bye)
+bus who  --repo R [--brief]                               # OBSERVED (append/read) + DECLARED (hello/bye)
+bus tidy [--repo R] [--by ROLE] [--yes]                   # threads on finished work stop counting
+bus count --repo R [--card C] [--as ROLE] [--present]     # HOW MANY are unread, never what they say
 bus roles                                                 # addressable roles, and which agent plays each
 bus log  --repo R --card C                                # the whole permanent thread, numbered
 bus close/open --repo R --card C --by ROLE                # stop/resume delivery, keep everything

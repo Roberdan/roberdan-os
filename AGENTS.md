@@ -130,6 +130,7 @@ bus read  --card <CARD>                 # what is new for you
 bus owed                                # what was asked of YOU and never answered
 bus send  --card <CARD> --to <ROLE>|all --kind request|verdict|note|question \
           [--re <N>] [--ref git:<sha>|kb:<card>]           # body on stdin
+bus tidy                                # threads whose card is finished stop calling (--yes to close)
 bus bye                                 # once, when you finish
 ```
 
@@ -191,6 +192,18 @@ Delivery stays opt-in: the doorbell reports a count, bodies arrive only through 
 `kb` does not know the bus exists. What changed on 2026-09-22 is that `context-inject.sh`
 **announces the session** at start and tells it which role it is — a presence record and a
 line of text, never a delivery: it carries no message, and nothing it writes can wake anyone.
+
+**And the doorbell only rings for somebody who is there.** Roberto opened a session that day
+and got twelve lines of unread counts for four roles nobody was playing, on two cards already
+in `done/` and one card that does not exist: *"vorrei che il sistema riuscisse a tenersi pulito
+e evitare ste robe che non si capisce che cazzo sono."* The cost is not the twelve lines — a
+doorbell that rings for mail nobody can act on teaches the reader to stop hearing it, and then
+the message that mattered arrives inside noise already learned away. So `bus count --present`
+counts only for roles that are **declared present**, and `bus tidy` closes the threads of
+finished work (report by default, `--yes` to act, and **nothing is ever deleted** — `bus log`
+still reads every word). Nothing is hidden by the filter: mail the doorbell stays quiet about
+is still there, and the session-start block shows the unread count for **your own** role,
+because `owed` covers only questions and requests, never notes and verdicts.
 The goodbye is automatic on **both** hosts — Copilot's `onSessionEnd` and Claude's
 `SessionEnd`, both running `hooks/bus-bye.sh` — and wired **there and nowhere else**: `Stop`
 and `onAgentStop` fire at the end of every *turn*, and a session that declared itself finished
