@@ -87,10 +87,49 @@ _ident_role() {
   local given="$1" what="$2"
   if [ -z "$given" ]; then
     given="${RDA_BUS_ROLE:-}"
-    [ -n "$given" ] || die "$what: no role given and RDA_BUS_ROLE is not set. Either pass it, or announce yourself once for the whole session:
-    eval \"\$(bus hello --repo <REPO> --as <ROLE> --card <CARD>)\"   (bus roles lists the roles)"
   fi
+  if [ -z "$given" ]; then
+    given="$(_role_from_file)"
+  fi
+  [ -n "$given" ] || die "$what: no role given, RDA_BUS_ROLE is not set and no .bus-role was found above $PWD. Either pass it, or announce yourself once for the whole session:
+    bus hello --repo <REPO> --as <ROLE> --card <CARD>          (bus roles lists them)"
   printf '%s' "$given"
+}
+
+# THE ENVIRONMENT IS NOT ENOUGH, and finding out why cost a working design.
+# On at least one host every shell command runs in a FRESH process: an `export`
+# in one call is gone by the next one, so `eval "$(bus hello ...)"` gave the
+# session an identity that lasted exactly one command. The environment still
+# works where it is inherited (a sub-process started from the same shell, which
+# is the sub-agent case), so it is tried first — and this file is what makes the
+# identity survive between two unrelated commands of the same session.
+#
+# It lives in the WORKTREE, next to the work, exactly like `.gbrain-source`, and
+# NOT in the bus store: a per-instance file inside the store is the registry test
+# 12 refuses, and for its stated reason - liveness must not become something to
+# keep up to date. This file is not liveness. Nothing expires it, nothing renews
+# it, `who` never reads it, and delivery does not know it exists. It answers one
+# question and only one: when nobody said who I am, who was I last time.
+_role_from_file() {
+  local dir="$PWD"
+  while [ -n "$dir" ] && [ "$dir" != "/" ]; do
+    if [ -f "$dir/.bus-role" ]; then
+      tr -d '[:space:]' < "$dir/.bus-role" 2>/dev/null || true
+      return 0
+    fi
+    dir="${dir%/*}"
+  done
+  return 0
+}
+
+# Written by `hello` at the top of the worktree, so every later command of that
+# session - and every sub-agent that runs one - starts out knowing who it is.
+_write_role_file() {
+  local role="$1" dir top
+  top="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  dir="${top:-$PWD}"
+  [ -d "$dir" ] && [ -w "$dir" ] || return 0
+  printf '%s\n' "$role" > "$dir/.bus-role" 2>/dev/null || true
 }
 
 # The session id names an INSTANCE, never an addressee. Mail is addressed to
@@ -104,6 +143,31 @@ _ident_session() {
   # the process, rather than being refused: a presence record with a synthetic
   # name is worth more than no presence record at all.
   [ -n "$given" ] || given="pid$$-$(date -u '+%Y%m%d%H%M%S')"
+  printf '%s' "$given"
+}
+
+# WHICH REPO, without being told. Typing `--repo` on every call is the same tax
+# as typing `--as`, and it was paid in the same coin: it was not paid.
+#
+# It is the MAIN checkout's name, never the worktree's. `kb start` gives every
+# card its own worktree (~/GitHub/worktrees/<repo>/<card-id>) and the canon says
+# to work there, so `--show-toplevel` answers `<card-id>`: two agents on two
+# cards of the SAME project would land in two different repos on this bus and
+# could never meet. `--git-common-dir` points at the main `.git` from inside any
+# worktree, so its parent is the project.
+_ident_repo() {
+  local given="$1"
+  [ -n "$given" ] || given="${RDA_BUS_REPO:-}"
+  if [ -z "$given" ]; then
+    local common top=""
+    common="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+    if [ -n "$common" ]; then
+      case "$common" in /*) : ;; *) common="$PWD/$common";; esac
+      top="$(cd "$common/.." 2>/dev/null && pwd || true)"
+    fi
+    [ -n "$top" ] || top="$PWD"
+    given="${top##*/}"
+  fi
   printf '%s' "$given"
 }
 
@@ -265,7 +329,7 @@ _cmd_send() {
       *) die "send: unknown argument '$1'";;
     esac
   done
-  [ -n "$repo" ] || repo="${RDA_BUS_REPO:-}"
+  repo="$(_ident_repo "$repo")"
   [ -n "$from" ] || from="$(_ident_role "$from" "send")"
   [ -n "$repo" ] && [ -n "$card" ] && [ -n "$to" ] \
     || die "send: --repo, --card and --to are required (--from too, unless RDA_BUS_ROLE is set)"
@@ -484,7 +548,7 @@ _cmd_read() {
       *) die "read: unknown argument '$1'";;
     esac
   done
-  [ -n "$repo" ] || repo="${RDA_BUS_REPO:-}"
+  repo="$(_ident_repo "$repo")"
   [ -n "$as" ] || as="$(_ident_role "$as" "read")"
   [ -n "$repo" ] && [ -n "$card" ] && [ -n "$as" ] || die "read: --repo and --card are required (--as too, unless RDA_BUS_ROLE is set)"
   repo="$(_slug "--repo" "$repo")"; card="$(_slug "--card" "$card")"
@@ -800,7 +864,8 @@ _cmd_hello() {
       *) die "hello: unknown argument '$1'";;
     esac
   done
-  [ -n "$repo" ] || die "hello: --repo is required — presence is per repo, because that is the unit of work agents share"
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] || die "hello: could not work out which repo this is — pass --repo"
   repo="$(_slug "--repo" "$repo")"
   as="$(_ident_role "$as" "hello")"
   _assert_role "$as"
@@ -810,6 +875,10 @@ _cmd_hello() {
   local pfile; pfile="$(_presence_path "$repo")"
   mkdir -p "$(dirname "$pfile")"
   _with_lock "$pfile" _presence_append "$pfile" hello "$repo" "$session" "$as" "$card" "$doing"
+  # Identity that survives the next command, and the one after that. See
+  # _role_from_file: on a host where every command is a fresh process, the
+  # environment alone gives an identity that lasts exactly one call.
+  _write_role_file "$as"
   # Printed as shell assignments ON STDOUT so the caller can `eval` it and have
   # the identity for the rest of the session, sub-agents included. Everything
   # human goes to stderr, so `eval "$(bus hello ...)"` cannot swallow a diagnostic
@@ -836,8 +905,8 @@ _cmd_bye() {
       *) die "bye: unknown argument '$1'";;
     esac
   done
-  [ -n "$repo" ] || repo="${RDA_BUS_REPO:-}"
-  [ -n "$repo" ] || die "bye: --repo is required (or set RDA_BUS_REPO, which bus hello prints)"
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] || die "bye: could not work out which repo this is — pass --repo"
   repo="$(_slug "--repo" "$repo")"
   as="$(_ident_role "$as" "bye")"
   _assert_role "$as"
@@ -930,8 +999,8 @@ _cmd_owed() {
       *) die "owed: unknown argument '$1'";;
     esac
   done
-  [ -n "$repo" ] || repo="${RDA_BUS_REPO:-}"
-  [ -n "$repo" ] || die "owed: --repo is required (or set RDA_BUS_REPO, which bus hello prints)"
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] || die "owed: could not work out which repo this is — pass --repo"
   repo="$(_slug "--repo" "$repo")"
   as="$(_ident_role "$as" "owed")"
   _assert_role "$as"
@@ -972,8 +1041,8 @@ _cmd_owed() {
 _cmd_who() {
   local repo=""
   while [ $# -gt 0 ]; do case "$1" in --repo) _need $# "--repo"; repo="$2"; shift 2;; *) die "who: unknown argument '$1'";; esac; done
-  [ -n "$repo" ] || repo="${RDA_BUS_REPO:-}"
-  [ -n "$repo" ] || die "who: --repo is required"
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] || die "who: could not work out which repo this is — pass --repo"
   repo="$(_slug "--repo" "$repo")"
   local dir="$BUS_HOME/$repo" f
   [ -d "$dir" ] || { echo "bus: no traffic for $repo."; return 0; }
@@ -1078,8 +1147,8 @@ _cmd_log() {
       *) die "log: unknown argument '$1'";;
     esac
   done
-  [ -n "$repo" ] || repo="${RDA_BUS_REPO:-}"
-  [ -n "$repo" ] && [ -n "$card" ] || die "log: --repo and --card are required"
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] && [ -n "$card" ] || die "log: --card is required"
   repo="$(_slug "--repo" "$repo")"; card="$(_slug "--card" "$card")"
   local log; log="$(_log_path "$repo" "$card")"
   [ -f "$log" ] || { echo "bus: no traffic on $repo/$card."; return 0; }

@@ -288,6 +288,22 @@ greps forbade and passed every one of them.
   A lease binds a role to N instances and splits the stream; and there is always a
   second stray session renewing it behind your back. Test 12 asserts no
   `subscribers/` directory ever appears.
+  **Revised 2026-09-22, and the distinction is the whole of it.** Presence is now
+  *also* declared — `bus hello` / `bus bye` — and neither reason above applies to
+  what was added, because both are properties of a **renewable reservation**. What
+  is written is an **append-only log of two events**, in the same shape and with
+  the same permanence as every other record here: nothing expires, nothing is
+  refreshed, nothing is collected, no session is ever an addressee, and delivery
+  does not know it exists — a session that said hello receives not one byte more
+  than one that did not. Test 12 still holds, and `test-bus-team.sh` adds the
+  check that a second `hello` **appends** rather than rewriting, because the day
+  it rewrites is the day it has become a lease.
+  Why it was needed: observation answers *"somebody was here"* and can never
+  answer *"who is here, on what, and are they still on it"*. It also cannot tell
+  a session that finished cleanly from one that was killed — neither leaves a
+  trace. A declaration can, and when the declaration is wrong `bus who` says so by
+  printing it **next to** the observation instead of believing it. A claim printed
+  as evidence would be the one thing this document refuses everywhere else.
 - **The anti-laundering was blocking the wrong vector.** The real vector is not
   "the agent lies about an approval", it is *framing*: who defines what counts as
   done. Hence non-goal 3. Approval claims are not forbidden — they are made
@@ -356,7 +372,10 @@ Two agents hid the interesting questions. With a third on the thread:
   everyone. There is no private channel, on purpose: a side-channel between two
   agents is exactly where an unaudited agreement about "done" would form.
 - **`bus roles` is discovery** — who can be addressed and what each may not do —
-  and `bus who --repo R` is liveness, observed from the last append *or read*.
+  and `bus who --repo R` is liveness, observed from the last append *or read* —
+  and, since 2026-09-22, printed next to what each session **declared** about
+  itself with `hello`/`bye`, never merged with it (see § the three @board
+  corrections).
 
 ## The doorbell — how anyone learns there is mail, without being woken
 
@@ -419,6 +438,13 @@ rather than assumed.
   own send makes the log newer and the recipient's count non-zero. The line names
   the recipient, so it is noise, not a false claim. Fixing it needs a session→role
   identity this system does not have — see the next section.
+  **Revised 2026-09-22: that identity now exists, and the count still does not use
+  it.** `RDA_BUS_ROLE` would let the doorbell filter, and it deliberately does not:
+  the count is the part that carries no claim and must stay cheap and dumb. What
+  the role buys is a *second* line, printed only when it is known — `bus owed`,
+  which reports the questions addressed to **this** role and never answered. That
+  one renders the first line of a body, which is why it is asked for only when the
+  reader is the addressee, and never in the repo-wide form.
 - **The count is taken without the append lock.** Taking it would let a hook that
   fires on every tool call block behind a 3MB send for up to 10 seconds, and a
   slow doorbell gets deleted. So a count taken mid-append can be short by one and
@@ -433,24 +459,137 @@ one being looked for. The assertion now uses a marker that is unread *at the
 moment of the count*. A leak test that greps for the wrong string is a leak test
 that always passes.
 
-## Two sessions, one job — deliberately still not solved
+## Two sessions, one job — half built on 2026-09-22, half deliberately still not
 
 "Register every session automatically with an exact name" is the natural next
 request, and it is two different needs wearing one sentence:
 
 - **More than two agents** needs no registration at all. A role is addressable if
   `bus/roles/<role>.json` exists; the code knows nothing about the number two.
-  `architect`, `qa-gate` and `security` were added by writing three files.
+  `architect`, `qa-gate` and `security` were added by writing three files, and
+  `orchestrator`, `reviewer` and `explorer` by writing three more.
 - **Two sessions playing the same role** is the only case that needs per-instance
   identity, and it is the expensive one: it requires `_assert_role` to accept a
   name with no manifest, and that function is the single reason the safety
   property is checkable *by reading a file* instead of being a promise.
 
-If it is ever built, two constraints are already known: an instance id may be a
-**read-side cursor key and never an addressee** (mail to a dead instance would
-vanish in silence), and the id must be **machine-assigned** (`session_id`), never
-self-chosen — a session that names itself is self-declaration, which is what the
-board cut leases for.
+**What was built, and it is the first half only.** A session now announces itself
+with a name (`bus hello --session <id>`) and that name is recorded, so `bus who`
+answers *who is here, on what, since when*. The two constraints stated below were
+respected rather than worked around: **the session id is a label on a presence
+record and never an addressee** — mail is addressed to roles, so no message can be
+stranded on a session that has gone away — and it **does not enter delivery at
+all**, so `_assert_role` still refuses every name without a manifest and the
+safety property is still checkable by reading one file.
+
+**What is still not built, and the honest reason.** Two sessions on the same role
+still **share one cursor and split the mail**. Nothing about presence changes
+that, because the cursor is keyed by role and making it per-instance is exactly
+the expensive change described above. What *did* change is that the collision is
+no longer invisible: both sessions appear in `bus who`, so "my messages are going
+missing" has somewhere to be seen. For two workers, still use two roles.
+
+The id is now **self-chosen** where the host does not supply one, which is a
+weakening of the second constraint below and is stated as such: the hook passes
+the host's `session_id` when there is one, and falls back to a
+process-and-timestamp name when there is not. A self-chosen name is a
+self-declaration — and it buys nothing an attacker would want, because the id
+grants no capability, receives no mail and is never consulted by delivery.
+
+The constraints, as they were written before any of this existed: an instance id
+may be a **read-side cursor key and never an addressee** (mail to a dead instance
+would vanish in silence), and the id should be **machine-assigned**
+(`session_id`), never self-chosen — a session that names itself is
+self-declaration, which is what the board cut leases for.
+
+## Identity: knowing which role you are, without being told twice
+
+Added 2026-09-22, and it is the plainest of the three changes made that day
+because it fixes the plainest of the three causes.
+
+`--as` was a string the caller had to remember and retype on every single call,
+and a sub-agent handed a task prompt had no way at all to discover which one it
+was. So it sent nothing, or it sent as a name it invented, which has no manifest
+and is refused. Measured consequence: 14 of 31 threads had no reader cursor —
+messages nobody ever opened, by anybody.
+
+Resolution order, and each step exists because the one before it is not enough:
+
+1. **the flag** — `--as` / `--from` still wins, always;
+2. **the environment** — `RDA_BUS_ROLE`, `RDA_BUS_SESSION`, `RDA_BUS_REPO`, which
+   a sub-process **inherits**, and that is precisely the sub-agent case;
+3. **`.bus-role`** in the worktree, written by `hello`. On at least one host every
+   shell command runs in a *fresh process*, so an exported identity lasts exactly
+   one call; without a file the whole mechanism works in a demo and evaporates in
+   use. It sits next to the work, like `.gbrain-source`, and **not** in the bus
+   store, where a per-instance file is the registry shape test 12 refuses. It is
+   not liveness: nothing expires it, nothing renews it, `who` never reads it, and
+   delivery does not know it exists.
+
+The repo is worked out the same way, from `--git-common-dir` rather than
+`--show-toplevel`, and that one line was a silent hole rather than a convenience.
+`kb start` gives every card its own worktree and the canon says to work there;
+`--show-toplevel` answers `<card-id>` inside one. So two agents on two cards of
+the same project were writing into two different repos on this bus and could
+never meet, and `hooks/bus-doorbell.sh` was looking for mail under a repo named
+after a card — it took its fast path out and rang nothing, **in exactly the place
+all the work is done**, while looking perfectly healthy from outside.
+
+**What identity is not, and the wording matters because it would be easy to
+assume otherwise:** this is not authentication. `--from` was self-declared before
+and it still is; every delivered line still says so. What changed is that
+*forgetting who you are* is no longer the default.
+
+## Owed: a question that was read is not a question that was answered
+
+The failure this exists for, in one sentence: a question used to be delivered
+exactly once and then become invisible. `read` rendered it, the cursor moved past
+it, and from that moment nothing in the system knew it had ever been asked. The
+reader who meant to answer after one more thing had no artifact to come back to;
+the asker could not tell *read and ignored* from *never arrived*. Measured: 13 of
+31 threads had exactly one sender.
+
+A `question` or a `request` addressed to a role stays listed by `bus owed` until
+**that role** sends a message citing it with `--re <N>`. Four properties, each
+chosen against a specific way this goes wrong:
+
+- **It is derived, never stored.** Owed-ness is recomputed from the append-only
+  log every time it is asked, so there is no second state that can drift from the
+  thread, nothing to migrate, and no repair path to write.
+- **It is the addressee's debt, not everyone's.** A reminder shown to people who
+  cannot discharge it is how a reminder becomes noise and then becomes ignored.
+- **It outlives the session.** The debt belongs to the ROLE, because the question
+  was addressed to a role: whoever plays it next inherits the conversation instead
+  of starting a new one on the same subject.
+- **A closed thread owes nothing.** Finished work re-listed forever is the same
+  noise by a different route.
+
+**Two limits, both real.** It cannot make anyone answer — it makes an unanswered
+question *visible*, which is a smaller claim and the only true one. And `--re`
+proves that a message was **cited**, never that it was **addressed**: a reply of
+"I disagree" discharges the question, exactly as a human "noted" would. The
+control for the second one is the same as for acceptance criteria — a human
+reading a random sample — and not a filter over natural language.
+
+## Inside one session: sub-agents share a blackboard, not a conversation
+
+Roberto, 2026-09-22: *"non so se deve funzionare anche per la comunicazione tra
+agenti dentro la stessa sessione."* It does, with a limit that has to be stated
+before the mechanism, because the mechanism looks like more than it is.
+
+**A one-shot sub-agent cannot be woken.** It ends before anyone can reply to it.
+So between sub-agents of one session the bus is a **durable blackboard**, not a
+dialogue: each reads the thread when it starts and writes its result when it
+finishes, with `--as explorer` (or whatever role its prompt gives it) and the
+parent's `--session`. That is worth doing for two reasons that have nothing to do
+with real-time: **a sub-agent's context dies with it**, so what is not written
+down was never found; and **two sub-agents running in parallel cannot see each
+other**, so the second one re-derives what the first already knows.
+
+For an actual turn-by-turn exchange inside a session, the host's own channel for
+its background agents is the thing that works, and this file does not imitate it.
+A bus that pretended to deliver to something that cannot be woken would be a
+channel with a hole in it exactly where it looks strongest.
 
 ## Retention: nothing is cleaned automatically
 
@@ -564,14 +703,23 @@ would ever scan it.
 ## Commands
 
 ```
-bus send --repo R --card C --from ROLE --to ROLE|all [--kind request|verdict|note|question]
-         [--ref kb:<card>|git:<sha>] [--body-file F]      # body on stdin if --body-file is absent
-bus read --repo R --card C --as ROLE [--peek]             # unread for ROLE (direct + broadcast)
-bus who  --repo R                                         # who is alive, from last append AND last read
-bus roles                                                 # addressable roles + manifests
-bus log  --repo R --card C                                # the whole permanent thread
+bus hello --repo R [--as ROLE] [--card C] [--session ID] [--doing "..."]
+                                                          # announce this session, once, at the start
+bus bye  [--repo R] [--as ROLE] [--why "..."]             # declare it finished
+bus send --repo R --card C --to ROLE|all [--from ROLE] [--kind request|verdict|note|question]
+         [--re N] [--ref kb:<card>|git:<sha>] [--body-file F]   # body on stdin if --body-file is absent
+bus read --repo R --card C [--as ROLE] [--peek]           # unread for ROLE (direct + broadcast)
+bus owed [--repo R] [--card C] [--as ROLE]                # asked of you, never answered
+bus who  --repo R                                         # OBSERVED (append/read) + DECLARED (hello/bye)
+bus roles                                                 # addressable roles, and which agent plays each
+bus log  --repo R --card C                                # the whole permanent thread, numbered
 bus close/open --repo R --card C --by ROLE                # stop/resume delivery, keep everything
 ```
+
+`--repo` and `--as` may be omitted: the repo is derived from the checkout (the
+**project**, even inside a per-card worktree) and the role from `RDA_BUS_ROLE` or
+the `.bus-role` that `hello` leaves next to the work. See § Identity — and note
+that none of it is authentication, which that section says at greater length.
 
 `send` reads the body from a **file**, and it never lets the body enter a shell
 variable: it travels as a file from `--body-file`/stdin through the leak-check to

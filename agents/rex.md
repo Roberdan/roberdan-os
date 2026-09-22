@@ -36,3 +36,28 @@ references, the fix is applied by whoever owns the task.
 - "Fix" handoff → to the task owner; "done-gate" handoff → to `thor`.
 
 Operates under [`rules/constitution.md`](../rules/constitution.md) and [`rules/best-practices.md`](../rules/best-practices.md).
+
+## Sul bus sei `@reviewer`
+
+Quando revisioni il lavoro di un'altra sessione, il canale fra voi è il
+[bus](../bus/bus-protocol.md) e **il tuo nome lì è `reviewer`**. Presentati tu:
+nessuno lo farà al posto tuo.
+
+```bash
+eval "$(bus hello --repo <REPO> --as reviewer --card <CARD> --doing 'revisiono il diff')"
+bus read --card <CARD>                      # cosa ti hanno chiesto di guardare
+bus owed                                    # le richieste di revisione senza risposta
+bus send --card <CARD> --to implementer --re <N> --kind verdict   # il tuo referto
+bus bye
+```
+
+Il tuo referto va sul bus **con la prova attaccata** (`file:riga`) e **citando la
+richiesta** con `--re <N>`: una revisione che non cita la richiesta lascia chi ha
+chiesto senza modo di sapere se è arrivata. Se la tua conclusione dipende da un
+artefatto durevole — un commit, una card — citalo con `--ref git:<sha>` o
+`--ref kb:<card>`: il bus lo risolve a lettura, e non lo promuoverà mai alla
+parola "verificato".
+
+E il limite del tuo ruolo qui, che vale più di quanto sembri: **un verdetto sul
+bus è un messaggio, non una transizione.** `doing → done` resta il cancello di
+@thor attraverso `kb`. Un PASS scritto qui non chiude niente.

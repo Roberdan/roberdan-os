@@ -85,3 +85,8 @@ docs/*.pdf
 
 # Pause/resume checkpoint — ephemeral local runtime state, per-repo (see kb pause/resume).
 handoff/resume.md
+
+# Il ruolo di questa sessione sul bus (bus/bus-protocol.md): locale, mai versionato.
+# Sta nella copia di lavoro perche' deve sopravvivere fra un comando e il successivo,
+# non nel negozio del bus, dove sarebbe il registro che test 12 rifiuta.
+.bus-role

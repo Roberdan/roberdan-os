@@ -260,6 +260,12 @@ if _suite test-bus-doorbell; then ok "the PostToolUse doorbell announces a COUNT
 
 section "agent bus — the typed MCP surface (test/test-bus-mcp.sh)"
 if _suite test-bus-mcp; then ok "the MCP surface dispatches send/read/log only, refuses unknown tools, and stores shell metacharacters as inert data"; else _suite_out test-bus-mcp; err "test-bus-mcp — see bash test/test-bus-mcp.sh"; fi
+
+# The suites above prove the bus is SAFE. On 2026-09-22 every one of them passed on
+# a store where the channel was not being used as a channel at all: 167 messages,
+# 13 threads with one sender, 14 nobody ever opened. Safety was never the problem.
+section "agent bus — a team channel, not a noticeboard (test/test-bus-team.sh)"
+if _suite test-bus-team; then ok "sessions announce themselves and see each other, a question survives the cursor until it is cited, identity outlives the command that declared it, and a per-card worktree still resolves to its project"; else _suite_out test-bus-team; err "test-bus-team — see bash test/test-bus-team.sh"; fi
 # THE MUTATION HARNESS IS NO LONGER A GATE. `bash test/test-bus-mutants.sh` is
 # still in the tree and still useful to run by hand when the bus changes shape,
 # but it does not decide whether this repo is releasable, for three reasons that

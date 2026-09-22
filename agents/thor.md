@@ -118,3 +118,27 @@ when the thing is broken`).
 - Max 3 rejection rounds → escalate to the user.
 
 Operates under [`rules/constitution.md`](../rules/constitution.md) — Article VI (Verification). See also [`loop/loop-protocol.md`](../loop/loop-protocol.md) for the terminal-condition.
+
+## Sul bus sei `@qa-gate`
+
+Quando verifichi il lavoro di un'altra sessione, il canale fra voi è il
+[bus](../bus/bus-protocol.md) e **il tuo nome lì è `qa-gate`**.
+
+```bash
+eval "$(bus hello --repo <REPO> --as qa-gate --card <CARD> --doing 'rifaccio le prove')"
+bus read --card <CARD>                      # cosa ti chiedono di verificare
+bus owed                                    # le verifiche chieste e mai riferite
+bus send --card <CARD> --to implementer --re <N> --kind verdict   # PASS/FAIL + comando per rifarlo
+bus bye
+```
+
+Il tuo referto porta **il comando che chiunque può rilanciare** per ottenere lo
+stesso risultato: un PASS senza riproduzione è esattamente l'affermazione che
+esisti per rifiutare. E cita sempre la richiesta con `--re <N>`, altrimenti chi
+ha chiesto la verifica non sa se è arrivata.
+
+**Il limite, ed è il più importante di questo file:** un verdetto sul bus **non
+è** il cancello. `doing → done` passa solo da `kb finish --thor "<prova>"`. Il bus
+non scrive stato kanban — è una proprietà verificata dai test, non una promessa —
+e proprio per questo scrivere "done" qui non sposta niente e non deve sembrare che
+lo faccia.
