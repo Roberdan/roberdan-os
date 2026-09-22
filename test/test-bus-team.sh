@@ -24,6 +24,14 @@ BUS="$ROOT/bus/bus.sh"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# RUN FROM THE TEMP DIRECTORY, NOT FROM THE CHECKOUT. `bus hello` leaves a
+# `.bus-role` at the top of the worktree it is run in — that is the whole point
+# of it — so a suite that ran from the repo would write into the real checkout,
+# and when that checkout is a per-card worktree it also trips
+# test-worktree-sweep.sh, which asserts that no suite creates or removes anything
+# under ~/GitHub/worktrees. Caught exactly that way, by that suite, not by review.
+cd "$TMP" || exit 1
+
 export RDA_BUS_HOME="$TMP/bus"
 R="team-repo"
 C="260922-card"

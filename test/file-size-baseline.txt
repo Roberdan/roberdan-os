@@ -124,10 +124,36 @@
 # chiusa, e goal-gate.sh non tratteneva mai nessuno — agenti fermi dopo la prima card mentre
 # Roberto dormiva. Righe: lettura dell'id, rinnovo per sessione nuova, card bloccate fuori e
 # saltate, segno ENTRATA ORA. Quattro mutazioni provate rosse in test-kb-queue.sh.
+# 2026-09-22, diciottesima: +480 bus/bus.sh (774 -> 1254), +13 hooks/copilot/
+# extension.template.mjs (699 -> 712), +6 test/validate.sh (305 -> 311). E' la crescita piu'
+# grossa mai chiesta a questo file, quindi la misura prima della giustificazione: delle 480
+# righe, 282 sono codice (482 -> 764) e 198 sono commento e righe vuote. Il rapporto e' quello
+# che questo repo tiene ovunque, non un modo di gonfiare il conto.
+# Perche' valgono. Il bus passava OGNI controllo di sicurezza — non avvia agenti, non scrive
+# stato kanban, non perde messaggi — su un negozio in cui non era un canale: misurato il
+# 2026-09-22, 167 messaggi in 31 conversazioni, 13 con UN SOLO mittente, 14 che nessuno ha mai
+# aperto. Roberto: "o si parlano e non si ascoltano o si ascoltano e non si parlano". Le tre
+# cause erano strutturali, non di diligenza: nessuno sapeva quale ruolo fosse (--as da
+# riscrivere a ogni comando, e un sotto-agente non aveva modo di scoprirlo), nessuno sapeva chi
+# ci fosse (la presenza si deduceva dall'ultimo messaggio scritto), e una domanda letta una
+# volta spariva per sempre dietro al cursore. Le righe sono hello/bye/owed, la risoluzione di
+# identita' e repo, e --re. In piu' un difetto che nessuna delle tre avrebbe risolto: dentro
+# una copia di lavoro per-card il campanello cercava la posta sotto un repo chiamato come la
+# CARD, quindi non suonava mai esattamente dove il canone dice di lavorare.
+# Le 13 righe in extension.template.mjs sono l'aggancio del congedo su onSessionEnd — e solo
+# li': Stop e onAgentStop scattano a ogni TURNO, e una sessione che si dichiara finita a ogni
+# turno riempie la vista di fantasmi. Le 6 in validate.sh agganciano test-bus-team.sh (225
+# righe, 15 controlli, ognuno nominato con il fallimento che avrebbe preso).
+# LO SPLIT E' REALE E RESTA NON FATTO, e la ragione non e' la fretta: test/test-bus.sh misura
+# l'ALLOWLIST dei comandi esterni su una traccia di esecuzione di QUESTO file, e
+# test-bus-mutants.sh deriva i propri controlli da test-bus.sh. Spostare presenza e debito in
+# un bus/lib-*.sh sourced cambia la superficie tracciata e va rivisto con quella batteria in
+# mano: e' una card sua, con la sua revisione, non una riga di contorno a questa. Chi tocca
+# bus.sh per un motivo di PRODOTTO lo spezza, non lo allarga una seconda volta.
 1777 kanban/kb.sh
 1390 test/test-bus.sh
 1133 test/test-bus-mutants.sh
-774 bus/bus.sh
+1254 bus/bus.sh
 651 bin/sync.sh
 601 test/test-federated-kb.sh
 578 test/test-factory-kb.sh
@@ -135,5 +161,5 @@
 446 test/test-kb-views.sh
 344 eval/report.sh
 377 test/test-copilot-adapter.sh
-305 test/validate.sh
-699 hooks/copilot/extension.template.mjs
+311 test/validate.sh
+712 hooks/copilot/extension.template.mjs

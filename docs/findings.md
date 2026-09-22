@@ -317,3 +317,26 @@ _Aggiornato: 2026-08-03._
   **The condition that would make it a card:** confirming `apply_patch` (or another freeform-arg
   tool) is a real write path that should be in `WRITE_TOOLS`/`SHELL_TOOLS` and currently is not —
   that would be a guard-coverage gap, not a parsing nicety.
+
+## 2026-09-22 — dal lavoro sul bus (card 260922-125159)
+
+Tre cose viste mentre si riprogettava il canale fra agenti. Nessuna e' una card:
+sono righe con la condizione che le renderebbe tali, e solo Roberto le promuove.
+
+- **`kb checkup` non guarda le domande fra agenti rimaste senza risposta.** Ora
+  esistono e sono interrogabili (`bus owed --as <ruolo>`). Diventa una card il
+  giorno in cui una domanda fra agenti resta appesa abbastanza a lungo da costare
+  qualcosa — prima e' una colonna in piu' su un referto che nessuno ha chiesto.
+- **Il nome del repo dedotto dalla copia di lavoro e' un difetto di FORMA, non di
+  un solo hook.** `git rev-parse --show-toplevel` dentro una copia per-card
+  risponde `<card-id>`, e questo lavoro l'ha corretto in tre punti
+  (`bus-doorbell.sh`, `context-inject.sh`, `bus.sh`). Nessuno ha controllato se
+  altri strumenti facciano la stessa deduzione. Diventa una card se si trova un
+  secondo strumento che ci casca davvero — cercarlo a tappeto ora sarebbe
+  esattamente il PR da +6000 righe che il protocollo del ciclo rifiuta.
+- **`bus/bus.sh` e' a 1254 righe e va spezzato.** Presenza e debito starebbero in
+  un file sourced. Non e' stato fatto qui perche' `test/test-bus.sh` misura
+  l'allowlist dei comandi esterni su una traccia di esecuzione di quel file e
+  `test-bus-mutants.sh` deriva i propri controlli da test-bus.sh: lo split cambia
+  la superficie tracciata e vuole quella batteria in mano. Diventa una card quando
+  qualcuno tocca bus.sh per un motivo di prodotto.
