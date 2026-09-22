@@ -442,11 +442,21 @@ _cmd_send() {
   echo "bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log"
   # Say what is still owed AFTER a send, not only after a read. An agent that has
   # just written is the one agent guaranteed to be awake and looking at this
-  # channel, and it is the cheapest possible moment to notice that something else
-  # has been waiting for it.
-  local still; still="$(_owed_count "$repo" "" "$from")"
+  # channel, and it is the cheapest possible moment to notice that something has
+  # been waiting for it.
+  #
+  # THIS CARD ONLY, and the reason is measured. The first version scanned every
+  # thread in the repo on every single send, which means reading the whole store
+  # to print one reminder: with an 8MB thread present a send went from 0.023s to
+  # 0.823s and a read from 0.021s to 0.739s — 35x, on the hot path, forever. It
+  # was not found by reading the code: the mutation suite stopped FAILING and
+  # started TIMING OUT, which is the shape a performance regression takes when it
+  # is big enough. Repo-wide belongs where it is paid once — `hello`, `bye`, the
+  # explicit `bus owed`, and the doorbell, which exists precisely to be the
+  # periodic nudge and is throttled for it.
+  local still; still="$(_owed_count "$repo" "$card" "$from")"
   [ "$still" = "0" ] \
-    || echo "bus: @$from still owes an answer to $still message(s) on $repo — bus owed --repo $repo --as $from" >&2
+    || echo "bus: @$from still owes an answer to $still message(s) on $repo/$card — bus owed --repo $repo --as $from" >&2
 }
 
 _append_record() {
@@ -695,14 +705,13 @@ _cmd_read() {
   echo "bus: $total record(s) on $repo/$card, $mine deliverable to @$as."
   # THE TRAILER THAT CLOSES THE LOOP. The cursor has just moved past everything
   # above, so without this line a question read at 10:02 and postponed at 10:03
-  # is gone. This is derived from the whole repo, not only this card: an agent
-  # that reads one thread is looking at this channel, and that is the moment to
-  # say that another thread has been waiting for it. It never blocks and never
-  # re-delivers a body — it says how many and where.
-  local owed_n; owed_n="$(_owed_count "$repo" "" "$as")"
+  # is gone. Scoped to THIS CARD for the measured reason in `send` above — the
+  # repo-wide scan cost 35x on every read — and the repo-wide view is one command
+  # away, said here by name.
+  local owed_n; owed_n="$(_owed_count "$repo" "$card" "$as")"
   if [ "$owed_n" != "0" ]; then
-    echo "bus: @$as owes an answer to $owed_n message(s) on $repo. They stay listed until you cite them with --re:"
-    echo "     bus owed --repo $repo --as $as"
+    echo "bus: @$as owes an answer to $owed_n message(s) on $repo/$card. They stay listed until you cite them with --re:"
+    echo "     bus owed --repo $repo --as $as      (every card, not only this one)"
   fi
 }
 
@@ -1015,7 +1024,15 @@ _cmd_bye() {
 # (@baccio, adversarial review, reproduced on the query itself). The addressee of
 # the reply must be the asker, or the broadcast, which everyone including the
 # asker receives.
+# ONE jq PER THREAD, not three. It used to validate the file, then ask
+# `_thread_state` (another jq) whether the thread was closed, then run the query.
+# Three interpreter start-ups per thread is most of the cost of an answer that is
+# printed after every message, so the closed check is folded in here and an
+# unparsable file is detected by this same call failing.
 _owed_jq='
+  if ((map(select(.kind == "closed" or .kind == "opened")) | last | .kind?) == "closed")
+  then empty
+  else
   (map(select(.from == $me and ((.re // null) != null)) | {r: (.re | tonumber), to: .to})) as $cites
   | to_entries
   | map(select(.value.kind == "question" or .value.kind == "request"))
@@ -1026,7 +1043,8 @@ _owed_jq='
   | .[]
   | [$card, (.key + 1), .value.from, .value.kind, .value.ts,
      ((.value.body | split("\n") | .[0])[0:90])]
-  | @tsv'
+  | @tsv
+  end'
 
 # Emits one TSV line per unanswered message: card, seq, from, kind, ts, first line.
 _owed_records() {
@@ -1038,14 +1056,24 @@ _owed_records() {
     [ -s "$f" ] || continue
     card="${f##*/}"; card="${card%.jsonl}"
     [ -z "$only_card" ] || [ "$card" = "$only_card" ] || continue
+    # CHEAP FIRST PASS, and it can only ever be wrong in the safe direction.
+    # Nothing can be owed on a thread that holds no question and no request at
+    # all, and deciding that with a literal scan costs a fraction of slurping the
+    # file into jq. A body that happens to contain the words only causes the real
+    # query to run, which is the answer anyway; the reverse — missing a real
+    # question — cannot happen, because every record here is written by `jq -c`
+    # from one fixed object shape, so the key is always spelled this way.
+    # Measured: this is what takes the reminder printed after every message from
+    # 0.26s down to the cost of the send itself.
+    grep -q '"kind":"question"\|"kind":"request"' "$f" 2>/dev/null || continue
     # A damaged thread must not take down the summary, for the same reason `who`
     # skips one: refusing to answer "what do I owe" because an unrelated card is
-    # corrupt hides work from the only person who could do it.
-    jq -e . "$f" >/dev/null 2>&1 || { echo "bus: WARNING — $f is damaged and was skipped by owed." >&2; continue; }
-    # A closed thread owes nothing: the work is finished, and re-listing it
-    # forever is how a reminder becomes noise and then becomes ignored.
-    [ "$(_thread_state "$f")" != "closed" ] || continue
-    jq -r -s --arg me "$me" --arg all "$BROADCAST" --arg card "$card" "$_owed_jq" "$f"
+    # corrupt hides work from the only person who could do it. The query failing
+    # IS the detection now — a file jq cannot parse makes this call non-zero.
+    # A closed thread owes nothing (the query returns nothing for one): the work
+    # is finished, and re-listing it forever is how a reminder becomes noise.
+    jq -r -s --arg me "$me" --arg all "$BROADCAST" --arg card "$card" "$_owed_jq" "$f" 2>/dev/null \
+      || echo "bus: WARNING — $f is damaged and was skipped by owed." >&2
   done
 }
 
