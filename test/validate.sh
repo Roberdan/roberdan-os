@@ -22,7 +22,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test
           test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery test-verify-done test-audit test-audit-hooks \
           test-kb-root-resolution test-kb-start-worktree-cause test-worktree-sweep test-junk-clean test-checkup test-twin-export-drift test-kb-top test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
-          test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
+          test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-model-economy \
           test-model-registry test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage test-optional-skills test-jev test-jev-routing test-publication-check test-film-preflight test-gbrain-recovery; do
@@ -260,6 +260,13 @@ if _suite test-bus-doorbell; then ok "the PostToolUse doorbell announces a COUNT
 
 section "agent bus — the typed MCP surface (test/test-bus-mcp.sh)"
 if _suite test-bus-mcp; then ok "the MCP surface dispatches send/read/log only, refuses unknown tools, and stores shell metacharacters as inert data"; else _suite_out test-bus-mcp; err "test-bus-mcp — see bash test/test-bus-mcp.sh"; fi
+
+# The suites above prove the bus is SAFE. On 2026-09-22 every one of them passed on
+# a store where the channel was not being used as a channel at all: 167 messages,
+# 13 threads with one sender, 14 nobody ever opened. Safety was never the problem.
+section "agent bus — who is here (test/test-bus-presence.sh) · what is owed (test/test-bus-owed.sh)"
+if _suite test-bus-presence; then ok "sessions announce themselves and see each other, identity outlives the command that declared it, a goodbye reaches the session that said hello, and a per-card worktree still resolves to its project"; else _suite_out test-bus-presence; err "test-bus-presence — see bash test/test-bus-presence.sh"; fi
+if _suite test-bus-owed; then ok "a question survives the cursor until it is cited back to whoever asked, the doorbell is silent for roles nobody is playing and pushes no body into the context, and a thread on finished work stops counting without losing a word"; else _suite_out test-bus-owed; err "test-bus-owed — see bash test/test-bus-owed.sh"; fi
 # THE MUTATION HARNESS IS NO LONGER A GATE. `bash test/test-bus-mutants.sh` is
 # still in the tree and still useful to run by hand when the bus changes shape,
 # but it does not decide whether this repo is releasable, for three reasons that

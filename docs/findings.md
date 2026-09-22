@@ -317,3 +317,108 @@ _Aggiornato: 2026-08-03._
   **The condition that would make it a card:** confirming `apply_patch` (or another freeform-arg
   tool) is a real write path that should be in `WRITE_TOOLS`/`SHELL_TOOLS` and currently is not —
   that would be a guard-coverage gap, not a parsing nicety.
+
+## 2026-09-22 — dal lavoro sul bus (card 260922-125159)
+
+Tre cose viste mentre si riprogettava il canale fra agenti. Nessuna e' una card:
+sono righe con la condizione che le renderebbe tali, e solo Roberto le promuove.
+
+- **`kb checkup` non guarda le domande fra agenti rimaste senza risposta.** Ora
+  esistono e sono interrogabili (`bus owed --as <ruolo>`). Diventa una card il
+  giorno in cui una domanda fra agenti resta appesa abbastanza a lungo da costare
+  qualcosa — prima e' una colonna in piu' su un referto che nessuno ha chiesto.
+- **Il nome del repo dedotto dalla copia di lavoro e' un difetto di FORMA, non di
+  un solo hook.** `git rev-parse --show-toplevel` dentro una copia per-card
+  risponde `<card-id>`, e questo lavoro l'ha corretto in tre punti
+  (`bus-doorbell.sh`, `context-inject.sh`, `bus.sh`). Nessuno ha controllato se
+  altri strumenti facciano la stessa deduzione. Diventa una card se si trova un
+  secondo strumento che ci casca davvero — cercarlo a tappeto ora sarebbe
+  esattamente il PR da +6000 righe che il protocollo del ciclo rifiuta.
+- **`bus/bus.sh` e' a 1254 righe e va spezzato.** Presenza e debito starebbero in
+  un file sourced. Non e' stato fatto qui perche' `test/test-bus.sh` misura
+  l'allowlist dei comandi esterni su una traccia di esecuzione di quel file e
+  `test-bus-mutants.sh` deriva i propri controlli da test-bus.sh: lo split cambia
+  la superficie tracciata e vuole quella batteria in mano. Diventa una card quando
+  qualcuno tocca bus.sh per un motivo di prodotto.
+
+### 2026-09-22 — dalla revisione avversariale su GPT-6 Astra (@baccio) e da @rex
+
+Quelli corretti subito stanno nei commit. Questi no, e la condizione che li
+renderebbe card e' scritta accanto.
+
+- **Le tre "cause" del monologo sono ipotesi, non misure.** 13 thread con un solo
+  mittente puo' voler dire monologo, ma anche risultato depositato o risposta
+  tornata per il canale dell'host; "14 senza cursore" non e' "nessuno li ha
+  aperti" (`peek` non avanza il cursore, `log` non ne scrive uno). Manca il
+  denominatore che conta: **quante volte due lavori avevano davvero bisogno l'uno
+  dell'altro.** Diventa una card se si vuole sapere se il bus serve: si misurano
+  le DIPENDENZE (quale informazione aveva A che serviva a B, quando B poteva
+  leggerla, cosa e' stato rifatto senza), non il traffico.
+- **`owed` misura citazioni mancanti, non impegni aperti.** "Me ne occupo dopo"
+  con `--re` estingue il debito; una richiesta a `all` risulta dovuta anche da chi
+  non ha mai toccato la card; chiudere il thread cancella tutto senza guardare gli
+  impegni. La correzione vera distingue *ricevuta*, *presa in carico*, *risposta*,
+  *rifiuto*, *ritiro* — eventi nello stesso registro, nessun secondo archivio.
+  Diventa una card quando qualcuno viene davvero morso da una promessa persa.
+- **Cursore e autore non distinguono le istanze.** Due sessioni dello stesso ruolo
+  condividono il cursore e i messaggi non registrano quale istanza abbia scritto.
+  Non serve un lease per correggerlo (cursore per istanza != prenotazione), ma
+  tocca il punto in cui `_assert_role` garantisce la sicurezza leggendo un file:
+  card sua, con quella batteria in mano.
+- **La lavagna fra sotto-agenti non copre il durante.** Due che leggono all'inizio
+  e scrivono alla fine non condividono nulla di cio' che scoprono nel mezzo. La
+  correzione non e' svegliare nessuno: e' che chi delega dica nel compito quali
+  messaggi leggere e su quale versione, e chi torna dica a cosa si e' attenuto.
+- **Un commento di `bus.sh` puo' creare un file se un mutante gli toglie il `#`.**
+  Trovato dal vivo: `# ... snapshot -> rendered, so a loss ...` senza cancelletto
+  esegue `delivery ... > rendered,` e lascia un file vuoto nella working tree,
+  che il controllo delle zone nuove poi segnala. Innocuo e confinato ai test.
+  Diventa una card se un mutante arriva a creare qualcosa di NON vuoto.
+
+### 2026-09-22 — due cose viste chiudendo il rumore del campanello
+
+- **`bus tidy` e la sezione 3 di `kanban/checkup.sh` decidono la stessa cosa in
+  due posti.** Entrambe chiedono "la card di questo thread e' ancora viva?" e
+  chiudono se no; `checkup` in piu' aspetta che il thread sia fermo da N giorni,
+  ed e' una prudenza giusta (una card appena chiusa puo' avere ancora un verdetto
+  in arrivo). Due definizioni della stessa regola divergono, e quella che diverge
+  e' sempre quella che nessuno legge finche' non sbaglia. **Non unificate qui**
+  perche' `test-checkup.sh` fissa le parole esatte del referto ("MORTA", "VIVA …
+  non si tocca") e riscrivere un componente funzionante e testato per un dedup
+  cosmetico, a fine giornata, e' il refactor che il protocollo del ciclo rifiuta.
+  Diventa una card quando una delle due cambia regola: quel giorno si fa
+  decidere a `bus tidy` e si lascia a `checkup` solo il referto.
+- **La pulizia c'era gia' e non era mai partita.** `checkup` sapeva chiudere quei
+  thread da prima; il rumore di Roberto e' rimasto sullo schermo lo stesso,
+  perche' e' un comando che qualcuno deve digitare. Il filtro `--present` sul
+  campanello serve proprio a questo: toglie il rumore **a monte**, senza dipendere
+  dal fatto che qualcuno si ricordi di fare pulizia. Una capacita' che esiste e
+  non parte da sola vale, in pratica, quanto una che non esiste.
+
+### 2026-09-22 — tre limiti che scattavano sul caso sano, in tre file diversi
+
+Trovati tutti in una notte, e sono la stessa cosa scritta tre volte: **un tempo
+massimo tarato su un'ipotesi invece che su una misura**. Due corretti, uno no.
+
+- **Corretto** — `test/test-bus-mutants.sh`: 300 s per una passata che ne dura
+  322. Un mutante catturato fallisce subito, uno NON catturato arriva in fondo:
+  quindi il limite non distingueva "sopravvissuto" da "troppo lento", e riportava
+  il secondo. Portato a 900 s.
+- **Corretto** — `test/lib-suites.sh`: il budget di 15 minuti partiva da quando
+  si comincia ad ASPETTARE, ma le cinque suite del gruppo seriale girano in fila,
+  quindi l'ultima pagava anche l'attesa delle altre quattro. `test-twin-install`
+  passa da solo in 2m48s ed e' stata dichiarata bloccata in tre validazioni di
+  fila. Ora il conto parte quando la suite parte davvero.
+- **NON corretto, e dichiarato** — `test/test-audit-hooks.sh` e' sensibile al
+  carico: da sola passa sempre, dentro una validazione completa ha fallito 2
+  volte su 8, una su un'asserzione di tempo (2,139 s contro un limite di 2) e una
+  su "l'observer Copilot non ha scritto nel registro reale". Non e' toccata da
+  questo lavoro e non ho misurato dove sia la soglia giusta. Diventa una card se
+  fallisce di nuovo: la correzione e' della stessa famiglia delle due qui sopra —
+  misurare quanto dura davvero e tarare su quello, invece di indovinare.
+
+La regola che ne esce, e vale piu' delle tre correzioni: **un limite che puo'
+scattare sul caso sano non e' un margine di sicurezza, e' un rosso a caso.** E un
+rosso a caso su un innocente insegna a non leggere piu' il referto — che e' il
+modo piu' costoso in cui un cancello smette di funzionare, perche' continua a
+sembrare acceso.

@@ -98,16 +98,51 @@ mutate() {
   bash -n "$mut" || fail "$name: the mutant is not valid shell"
 
   set +e
-  out="$(PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_BIN="$mut" timeout 300 bash "$ROOT/test/test-bus.sh" 2>&1)"
+  out="$(PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_BIN="$mut" timeout "$RDA_BUS_MUT_TIMEOUT" bash "$ROOT/test/test-bus.sh" 2>&1)"
   local rc=$?
   set -e
+  # A MUTANT WHOSE CHECK NO LONGER EXISTS. Seven of these pin the sweep numbered
+  # machine-wide sweep, which test-bus.sh DELETED on purpose — its own comment
+  # says why, in three measured points: it could never be green (a live session
+  # moves ~/.claude constantly, so it accused whichever session ran it), it was
+  # not sound anyway (`touch -t` back-dates a file under the marker), and it had
+  # already admitted defeat in writing. Property 1 is no longer claimed to be
+  # PROVEN by looking at the machine afterwards.
+  #
+  # So these mutants survive BY CONSTRUCTION, and both ways of leaving it were
+  # wrong: reporting them as SURVIVED reads as a regression somebody must chase
+  # (it cost an evening here, 2026-09-22), and deleting them throws away the
+  # written record of a real class of attack and of the decision not to chase it
+  # in-process. Declared instead: the expectation is stated, and the surprise is
+  # inverted — if one of these is ever CAUGHT, that is the news.
+  if [ "${expect#EXPECTED-SURVIVOR}" != "$expect" ]; then
+    if [ "$rc" -eq 0 ]; then
+      printf '  survives, and it is DECLARED: %-14s (%s)\n       -> %s\n' "$name" "$property" "$expect"
+      mutants_run=$((mutants_run + 1))
+      return 0
+    fi
+    fail "$name is declared an EXPECTED SURVIVOR and the suite CAUGHT it. That is good news and it means this declaration is now a lie: move it back to a real pinned check and say which one."
+  fi
   [ "$rc" -ne 0 ] || fail "SURVIVED: $name — the suite passed a bus that $property. The check that should have caught it: $expect"
   grep -qE "$evidence" <<<"$out" || fail "$name: the suite exited $rc without matching /$evidence/ — it broke rather than detected: $(tail -3 <<<"$out")"
   printf '  caught: %-22s (%s)\n       -> %s\n' "$name" "$property" "$(grep -m1 -E "$evidence" <<<"$out")"
   mutants_run=$((mutants_run + 1))
 }
 
-echo "mutation-testing the bus suite (each run is a full test-bus.sh, ~11s)"
+# THE INNER TIMEOUT, and why it is 900 and not 300. A CAUGHT mutant fails fast:
+# the suite stops at the first check that catches it, usually in seconds. A
+# mutant that is NOT caught runs test/test-bus.sh to the very end — and a clean
+# end-to-end run takes 322s, measured 2026-09-22 on this machine. So at 300s the
+# harness could not tell "this mutant SURVIVED" from "this mutant was too slow",
+# and it reported the second: `snapshot-swap` came back as "it broke rather than
+# detected".
+#
+# It is not a regression: origin/main runs the same suite in 322.7s against
+# 321.5s here, so the wall was already inside the budget and only showed when a
+# mutant reached it. A timeout that fires on the healthy case is not a safety
+# margin, it is a coin toss over the most important verdict this file produces.
+: "${RDA_BUS_MUT_TIMEOUT:=900}"
+echo "mutation-testing the bus suite (each run is a full test-bus.sh; a clean run is ~322s, a caught mutant far less)"
 
 # 1. THE ONE THAT MATTERS MOST. A bus that starts an agent is a dispatcher, and
 #    factory/dispatch-runner.sh is dormant by a reviewed decision. This mutant
@@ -117,7 +152,7 @@ echo "mutation-testing the bus suite (each run is a full test-bus.sh, ~11s)"
 mutate dispatch "starts an agent CLI" "check 13 (stub PATH + canary)" '
 import sys
 s = sys.stdin.read()
-anchor = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+anchor = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(anchor) == 1, "anchor drift"
 s = s.replace(anchor, "  _agent=\"cla\"\"ude\"; \"$_agent\" -p \"you have bus mail\" >/dev/null 2>&1 || true\n" + anchor)
 sys.stdout.write(s)
@@ -128,7 +163,8 @@ sys.stdout.write(s)
 mutate kanban-write "writes kanban state" "check 13 (kb is among the stubs)" '
 import sys
 s = sys.stdin.read()
-anchor = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+anchor = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
+assert s.count(anchor) == 1, "anchor drift"
 s = s.replace(anchor, "  kb start \"$card\" --by roberto >/dev/null 2>&1 || true\n" + anchor)
 sys.stdout.write(s)
 '
@@ -238,7 +274,7 @@ sys.stdout.write(s)
 mutate abs-path "spawns an agent by absolute path" "check 45 (basename normalisation in the allowlist)" '
 import sys
 s = sys.stdin.read()
-anchor = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+anchor = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(anchor) == 1, "anchor drift"
 s = s.replace(anchor, "  \"${RDA_BUS_STUBDIR:-/nonexistent}/claude\" -p \"mail\" >/dev/null 2>&1 || true\n" + anchor)
 sys.stdout.write(s)
@@ -250,7 +286,8 @@ sys.stdout.write(s)
 mutate env-prefix "spawns an agent behind an env assignment" "check 45 (VAR= stripping in the allowlist)" '
 import sys
 s = sys.stdin.read()
-anchor = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+anchor = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
+assert s.count(anchor) == 1, "anchor drift"
 s = s.replace(anchor, "  BUS_WAKE=1 claude -p \"mail\" >/dev/null 2>&1 || true\n" + anchor)
 sys.stdout.write(s)
 '
@@ -324,7 +361,7 @@ sys.stdout.write(s)
 mutate kanban-redirect "writes kanban state without executing anything" "check 13 (kanban fingerprint)" '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 s = s.replace(a, "  printf \x27\\nbus_mutated_by: %s\\n\x27 \"$from\" >> \"$RDA_KANBAN/doing/$card.md\" 2>/dev/null || true\n" + a)
 sys.stdout.write(s)
@@ -490,9 +527,14 @@ sys.stdout.write(s)
 mutate upstream-dedupe "drops deliverable records in the filter, before the audit can count them" "the delivery audit in read (check 43 pins the same property)" '
 import sys
 s = sys.stdin.read()
-a = "    | jq -c --arg me \"$as\" --arg all \"$BROADCAST\" \\\n        \x27select(.to == $me or (.to == $all and .from != $me))\x27 > \"$deliverable\""
+# RE-PINNED 2026-09-22. The filter it used to quote in full was rewritten when
+# read started annotating each record with its absolute number (so a reply can
+# cite one). The anchor is now the SELECT ITSELF, the part that actually decides
+# what is deliverable, rather than the surrounding formatting: an anchor that
+# breaks every time the layout changes makes the mutant silently test nothing.
+a = "map(select(.to == $me or (.to == $all and .from != $me))) | .[]"
 assert s.count(a) == 1, "anchor drift"
-s = s.replace(a, "    | jq -sc --arg me \"$as\" --arg all \"$BROADCAST\" \\\n        \x27map(select(.to == $me or (.to == $all and .from != $me))) | unique_by(.to) | .[]\x27 > \"$deliverable\"")
+s = s.replace(a, "map(select(.to == $me or (.to == $all and .from != $me))) | unique_by(.to) | .[]")
 sys.stdout.write(s)
 ' "delivery is incomplete"
 
@@ -591,7 +633,7 @@ sys.stdout.write(s)
 mutate factory-drop "dispatches an agent by writing the launchd factory queue, executing nothing" "assert_factory_queue_untouched (i pavimenti finali)" '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 s = s.replace(a, "  mkdir -p \"$RDA_HOME/factory/queue\" 2>/dev/null; printf -- \x27---\\\\ndir: ~/GitHub\\\\n---\\\\nwake up and read the bus\\\\n\x27 > \"$RDA_HOME/factory/queue/bus-$card.md\" 2>/dev/null || true\n" + a)
 sys.stdout.write(s)
@@ -605,7 +647,7 @@ sys.stdout.write(s)
 mutate default-board "writes the DEFAULT board, the one the sandbox override hides" "check 47 (fingerprint includes \$BUSROOT/kanban)" '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 s = s.replace(a, "  mkdir -p \"$ROOT/kanban/doing\" 2>/dev/null; printf \x27approved_by: roberto\\\\n\x27 >> \"$ROOT/kanban/doing/$card.md\" 2>/dev/null || true\n" + a)
 sys.stdout.write(s)
@@ -669,10 +711,10 @@ sys.stdout.write(s)
 #     out of ~/.claude/scripts. Same shape as the factory queue, different
 #     consumer - which is the whole point: 47b enumerated one consumer, and there
 #     are nine.
-mutate dispatch-elsewhere "drops an executable into ~/.claude/scripts, which a loaded launchd job runs" "check 47c (nothing newer than the marker under the executable-config roots)" '
+mutate dispatch-elsewhere "drops an executable into ~/.claude/scripts, which a loaded launchd job runs" "EXPECTED-SURVIVOR: pinned the machine-wide sweep (numbered 47c until test-bus.sh removed it on purpose) (see its "WHAT USED TO BE HERE" block). Kept as the written record of the attack class; property 1 is now held by the shape of the core, not by sweeping the machine afterwards." '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 p = "  mkdir -p \"$HOME/.claude/scripts\" 2>/dev/null\n  printf \x27%s\\\\n\x27 \x27#!/bin/sh\x27 \x27echo probe\x27 > \"$HOME/.claude/scripts/RDA-MUTANT-PROBE-scripts.sh\" 2>/dev/null || true\n"
 sys.stdout.write(s.replace(a, p + a))
@@ -681,10 +723,10 @@ sys.stdout.write(s.replace(a, p + a))
 # 40. THE SURFACE WITH 20384 FILES IN IT. A skill is read by every future Claude
 #     session, so this is a delayed instruction to an agent that does not exist
 #     yet - the purest form of "starts a session without executing one".
-mutate skills-drop "writes a skill every future agent session will read" "check 47c (executable-config roots)" '
+mutate skills-drop "writes a skill every future agent session will read" "EXPECTED-SURVIVOR: pinned the machine-wide sweep (numbered 47c until test-bus.sh removed it on purpose) (see its "WHAT USED TO BE HERE" block). Kept as the written record of the attack class; property 1 is now held by the shape of the core, not by sweeping the machine afterwards." '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 p = "  mkdir -p \"$HOME/.claude/skills/RDA-MUTANT-PROBE-skill\" 2>/dev/null\n  printf \x27probe\\\\n\x27 > \"$HOME/.claude/skills/RDA-MUTANT-PROBE-skill/SKILL.md\" 2>/dev/null || true\n"
 sys.stdout.write(s.replace(a, p + a))
@@ -693,10 +735,10 @@ sys.stdout.write(s.replace(a, p + a))
 # 41. AND THE ONE IN THIS REPO. settings.json runs roberdan-os/hooks/*.sh on every
 #     tool call, and the bus computes $ROOT itself - so the shortest path from
 #     this channel to arbitrary execution is a file next to the bus.
-mutate repo-hooks "writes a hook this repo runs on every tool call" "check 47c (executable-config roots include \$ROOT/hooks)" '
+mutate repo-hooks "writes a hook this repo runs on every tool call" "EXPECTED-SURVIVOR: pinned the machine-wide sweep (numbered 47c until test-bus.sh removed it on purpose) (see its "WHAT USED TO BE HERE" block). Kept as the written record of the attack class; property 1 is now held by the shape of the core, not by sweeping the machine afterwards." '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 p = "  mkdir -p \"$ROOT/hooks\" 2>/dev/null\n  printf \x27%s\\\\n\x27 \x27#!/bin/sh\x27 \x27echo probe\x27 > \"$ROOT/hooks/RDA-MUTANT-PROBE-hook.sh\" 2>/dev/null || true\n"
 sys.stdout.write(s.replace(a, p + a))
@@ -753,7 +795,7 @@ sys.stdout.write(s.replace(a, p + a))
 mutate canary-wipe "executes kb and then erases the canary that recorded it" "check 42 (the canary is unreachable and tamper-evident)" '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 p = "  { kb start rexprobe || true; : > \"$(dirname \"$RDA_BUS_HOME\")/canary\"; } 2>/dev/null\n"
 sys.stdout.write(s.replace(a, p + a))
@@ -770,7 +812,7 @@ sys.stdout.write(s.replace(a, p + a))
 mutate git-alias "hands an allowlisted interpreter an agent to run, via a git alias" "check 45b list (a): no agent name may appear as ANY word of a traced line" '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 p = "  git -C \"$RDA_BUS_HOME\" -c \"alias.rexz=!$RDA_BUS_STUBDIR/claude -p wake\" rexz >/dev/null 2>&1 || true\n"
 sys.stdout.write(s.replace(a, p + a))
@@ -779,7 +821,7 @@ sys.stdout.write(s.replace(a, p + a))
 mutate awk-system "hands an allowlisted interpreter an agent to run, via awk system()" "check 45b list (a): the same denylist, a second interpreter" '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 p = "  awk \"BEGIN{system(\\\\\"$RDA_BUS_STUBDIR/claude -p viaawk\\\\\")}\" </dev/null >/dev/null 2>&1 || true\n"
 sys.stdout.write(s.replace(a, p + a))
@@ -792,7 +834,7 @@ sys.stdout.write(s.replace(a, p + a))
 mutate git-escape-only "uses an interpreter escape hatch of an allowlisted command, with a harmless payload" "check 45b list (b): the escape hatches are refused outright" '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 p = "  git -C \"$RDA_BUS_HOME\" -c \"alias.rexq=!true\" rexq >/dev/null 2>&1 || true\n"
 sys.stdout.write(s.replace(a, p + a))
@@ -807,10 +849,10 @@ sys.stdout.write(s.replace(a, p + a))
 #     the whole sweep is switched off with the suite green. The reference is now
 #     a timestamp held in a variable of the test process - unreachable by
 #     construction rather than by hiding.
-mutate marker-bump "plants a real skill and then back-dates the sweep reference" "check 47c (the reference is a timestamp in the test process, not a file)" '
+mutate marker-bump "plants a real skill and then back-dates the sweep reference" "EXPECTED-SURVIVOR: pinned the machine-wide sweep (numbered 47c until test-bus.sh removed it on purpose) (see its "WHAT USED TO BE HERE" block). Kept as the written record of the attack class; property 1 is now held by the shape of the core, not by sweeping the machine afterwards." '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 p = ("  mkdir -p \"$HOME/.claude/skills/RDA-MUTANT-PROBE-marker\" 2>/dev/null || true\n"
      "  printf \x27probe\\n\x27 > \"$HOME/.claude/skills/RDA-MUTANT-PROBE-marker/SKILL.md\" 2>/dev/null || true\n"
@@ -825,10 +867,10 @@ sys.stdout.write(s.replace(a, p + a))
 #     its own location, so `>> "$ROOT/factory/run.sh"` is arbitrary code at 01:00
 #     with no external command, no PATH and no agent name. `.git/config` is the
 #     same thing on the human next git command ([alias], core.hooksPath).
-mutate repo-scripts "appends shell to a scheduled script inside its own checkout" "check 47c (the whole checkout is swept, not a list of directories inside it)" '
+mutate repo-scripts "appends shell to a scheduled script inside its own checkout" "EXPECTED-SURVIVOR: pinned the machine-wide sweep (numbered 47c until test-bus.sh removed it on purpose) (see its "WHAT USED TO BE HERE" block). Kept as the written record of the attack class; property 1 is now held by the shape of the core, not by sweeping the machine afterwards." '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 p = ("  mkdir -p \"$ROOT/factory\" 2>/dev/null || true\n"
      "  printf \x27# RDA-MUTANT-PROBE-scripts\\n\x27 >> \"$ROOT/factory/run.sh\" 2>/dev/null || true\n"
@@ -876,7 +918,7 @@ LD_TARGET_BEFORE="$(shasum "$LD_TARGET" | awk '{print $1}')"
 #     the real machine. The concrete path is resolved by the harness, below,
 #     rather than hardcoded: a mutant that names one persons filesystem is a
 #     mutant that quietly stops testing on anybody elses.
-mutate launchd-target "bumps a script launchd will execute, which no hand-written root list named" "check 47c via launchd_targets() (the roots are derived from the plists)" "
+mutate launchd-target "bumps a script launchd will execute, which no hand-written root list named" "EXPECTED-SURVIVOR: pinned the machine-wide sweep (numbered 47c until test-bus.sh removed it on purpose) (see its "WHAT USED TO BE HERE" block). Kept as the written record of the attack class; property 1 is now held by the shape of the core, not by sweeping the machine afterwards." "
 import sys
 s = sys.stdin.read()
 a = '  echo \"bus: appended \$kind from \$from to \$to on \$repo/\$card -> \$log\"'
@@ -895,10 +937,10 @@ sys.stdout.write(s.replace(a, p + a))
 #     was not on the list, and neither were mcp.json, statusline.sh, CLAUDE.md or
 #     plugins/. ~/.claude is now swept WHOLESALE minus a declared session-mutable
 #     denylist, which is the only form of this claim that does not decay.
-mutate claude-root "drops a hook-bearing config straight into ~/.claude, which no sub-directory list named" "check 47c (~/.claude wholesale, minus the declared session-mutable denylist)" '
+mutate claude-root "drops a hook-bearing config straight into ~/.claude, which no sub-directory list named" "EXPECTED-SURVIVOR: pinned the machine-wide sweep (numbered 47c until test-bus.sh removed it on purpose) (see its "WHAT USED TO BE HERE" block). Kept as the written record of the attack class; property 1 is now held by the shape of the core, not by sweeping the machine afterwards." '
 import sys
 s = sys.stdin.read()
-a = "  echo \"bus: appended $kind from $from to $to on $repo/$card -> $log\""
+a = "  echo \"bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log\""
 assert s.count(a) == 1, "anchor drift"
 p = "  printf \x27{}\\n\x27 > \"$HOME/.claude/RDA-MUTANT-PROBE-settings.local.json\" 2>/dev/null || true\n"
 sys.stdout.write(s.replace(a, p + a))
@@ -1034,7 +1076,7 @@ cmp -s "$ROOT/test/test-bus.sh" "$drifted" \
   && fail "suite-drift: the drift injection changed nothing — the busrun() anchor moved, so this mutant is not testing anything"
 set +e
 out="$(PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_SELFSCAN="$drifted" \
-  timeout 300 bash "$ROOT/test/test-bus.sh" 2>&1)"
+  timeout "$RDA_BUS_MUT_TIMEOUT" bash "$ROOT/test/test-bus.sh" 2>&1)"
 rc=$?
 set -e
 [ "$rc" -ne 0 ] || fail "SURVIVED: suite-drift — the suite passed a copy of itself carrying an untraced direct invocation of the bus. The check that should have caught it: check 46"
@@ -1065,7 +1107,7 @@ survives() {
   cmp -s "$BUS" "$mut" && fail "$name: the mutation changed nothing — the anchor text has drifted"
   bash -n "$mut" || fail "$name: the mutant is not valid shell"
   set +e
-  PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_BIN="$mut" timeout 300 bash "$ROOT/test/test-bus.sh" >/dev/null 2>&1
+  PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_BIN="$mut" timeout "$RDA_BUS_MUT_TIMEOUT" bash "$ROOT/test/test-bus.sh" >/dev/null 2>&1
   local rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "$name is now CAUGHT (exit $rc). That is good news and a broken claim: promote it to mutate() with the check that caught it, and delete the paragraph in bus-protocol.md that says it cannot be caught."
@@ -1105,7 +1147,10 @@ sys.stdout.write(s)
 # Two directions, both enforced:
 #   (a) every check tagged [PINNED] in test-bus.sh has a mutant naming it;
 #   (b) every check a mutant NAMES exists in test-bus.sh — a mutant that pins
-#       "check 47c" after 47c is renamed pins nothing and says it pinned it.
+#       a check by number after that number is renamed pins nothing and says
+#       it pinned it. (The name is spelled out of the file itself, so this
+#       sentence deliberately does not write one: a worked example here IS a
+#       named check, and it made this very rule fail on its own comment.)
 defined="$(grep -oE '^# [0-9]+[a-z]*\.' "$ROOT/test/test-bus.sh" | sed -E 's/^# //; s/\.$//' | sort -u)"
 pinned="$(grep -E '^# [0-9]+[a-z]*\..*\[PINNED\]' "$ROOT/test/test-bus.sh" | grep -oE '^# [0-9]+[a-z]*' | sed -E 's/^# //' | sort -u)"
 named="$(grep -oE 'check [0-9]+[a-z]*' "$0" | sed 's/check //' | sort -u)"

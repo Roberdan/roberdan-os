@@ -253,7 +253,10 @@ EOF
       { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/context-inject.sh 2>/dev/null || true", "timeout": 15 }] },
       { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/audit.sh", "timeout": 5 }] }
     ],
-    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/audit.sh", "timeout": 5 }] }],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/audit.sh", "timeout": 5 }] },
+      { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/bus-bye.sh 2>/dev/null || true", "timeout": 10 }] }
+    ],
     "PreToolUse": [
       { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/main-guard.sh", "timeout": 10 }] },
       { "matcher": "Bash",        "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/bash-guard.sh", "timeout": 10 }] },

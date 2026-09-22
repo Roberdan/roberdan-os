@@ -17,7 +17,15 @@ fail() { printf '  FAIL — %s\n' "$1"; FAILS=$((FAILS+1)); }
 # lo scopre lui guardando l'editor. E' successo il 2026-09-13 — una riga rimasta indietro
 # creava "$ROOT/../fake", cioe' ~/GitHub/worktrees/roberdan-os/fake, a ogni esecuzione.
 REAL_HOME="$HOME"
-REAL_WT_BEFORE="$(ls -1 "$REAL_HOME/GitHub/worktrees"/*/ 2>/dev/null | sort)"
+# `-d`: l'ELENCO DELLE COPIE, non il loro contenuto. Senza, `ls -1 .../*/` elenca
+# i FILE dentro ogni copia di ogni progetto, e questo controllo — che dichiara di
+# accorgersi se la suite "ha creato o tolto" una copia — falliva perche' un'altra
+# sessione, su un altro progetto, aveva salvato un file mentre la suite girava.
+# Misurato il 2026-09-22: VirtualBPMFy27/glance-kpis-live/README.md, toccato da
+# chi ci stava lavorando in quel momento. Un controllo che accusa il lavoro di
+# qualcun altro e' un controllo che si impara a ignorare, e in una macchina dove
+# girano piu' sessioni insieme falliva a caso — cioe' nel modo piu' costoso.
+REAL_WT_BEFORE="$(ls -1d "$REAL_HOME/GitHub/worktrees"/*/ 2>/dev/null | sort)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 export HOME="$TMP/home"; mkdir -p "$HOME/GitHub"
 export RDA_WORKTREES="$HOME/GitHub/worktrees"
@@ -96,7 +104,7 @@ rm -f "$RDA_HOME"/autosweep-*
 RDA_NO_AUTOSWEEP=1 bash -c "cd '$REPO' && bash '$WT' autosweep >/dev/null 2>&1"
 [ -d "$CLEAN4" ] && ok "RDA_NO_AUTOSWEEP=1 lo spegne davvero" || fail "ha pulito anche con RDA_NO_AUTOSWEEP=1"
 
-REAL_WT_AFTER="$(ls -1 "$REAL_HOME/GitHub/worktrees"/*/ 2>/dev/null | sort)"
+REAL_WT_AFTER="$(ls -1d "$REAL_HOME/GitHub/worktrees"/*/ 2>/dev/null | sort)"
 [ "$REAL_WT_BEFORE" = "$REAL_WT_AFTER" ] && ok "la suite non ha toccato il parco vero delle copie di lavoro" \
   || fail "la suite ha creato o tolto qualcosa in $REAL_HOME/GitHub/worktrees"
 

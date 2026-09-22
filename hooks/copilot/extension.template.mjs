@@ -637,6 +637,19 @@ const hooks = {
         if (auditObserver) await auditObserver.stop();
         const p = join(HOOKS, "auto-checkpoint.sh");
         if (existsSync(p)) await runScript(p, hookPayload(input && input.workingDirectory), input && input.workingDirectory);
+        // Say goodbye on the agent bus, so whoever arrives next is not addressing
+        // a session that is gone. This is the counterpart of the `hello` that
+        // context-inject.sh writes at SessionStart, and it is deliberately wired
+        // HERE and not on onAgentStop/Stop: those fire at the end of every turn,
+        // and a session that declared itself finished after every turn would be a
+        // presence view made entirely of ghosts.
+        // BEST EFFORT, AND IT IS ONLY THAT: a crash, a kill or a closed lid never
+        // delivers this callback. So a declared presence that is never withdrawn
+        // is a normal state, which is exactly why `bus who` prints the
+        // declaration next to the last observed action instead of believing it.
+        // Claude runs the same script from its own SessionEnd (bin/sync.sh).
+        const bye = join(HOOKS, "bus-bye.sh");
+        if (existsSync(bye)) await runScript(bye, hookPayload(input && input.workingDirectory), input && input.workingDirectory);
         return undefined;
     },
 

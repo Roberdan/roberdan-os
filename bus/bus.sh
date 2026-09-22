@@ -67,6 +67,140 @@ _slug() {
 # `--flag` with no value used to crash with `$2: unbound variable`.
 _need() { [ "$1" -ge 2 ] || die "$2 requires a value"; }
 
+# --- identity --------------------------------------------------------------
+# WHO AM I ON THIS CHANNEL. Measured on the real store on 2026-09-22: 167
+# messages over 31 threads, 13 of them with exactly ONE sender and 14 with no
+# reader cursor at all. A large part of that is this: the role was a string the
+# caller had to remember and type on every single call, and a sub-agent handed a
+# task prompt had no way to know which one it was. So it sent nothing, or it
+# sent as whatever name it invented, which has no manifest and is refused.
+#
+# `RDA_BUS_ROLE` and `RDA_BUS_SESSION` make identity a property of the session
+# rather than an argument of the command, and they are INHERITED by every
+# sub-process - which is the whole point, because a sub-agent inherits the
+# environment of the session that spawned it.
+#
+# This is NOT authentication and it is not claimed to be: `--from` was
+# self-declared before and it still is (see the UNVERIFIED stamp in _emit). What
+# changes is that forgetting who you are is no longer the default.
+_ident_role() {
+  local given="$1" what="$2"
+  if [ -z "$given" ]; then
+    given="${RDA_BUS_ROLE:-}"
+  fi
+  if [ -z "$given" ]; then
+    given="$(_role_from_file)"
+  fi
+  [ -n "$given" ] || die "$what: no role given, RDA_BUS_ROLE is not set and no .bus-role was found above $PWD. Either pass it, or announce yourself once for the whole session:
+    bus hello --repo <REPO> --as <ROLE> --card <CARD>          (bus roles lists them)"
+  printf '%s' "$given"
+}
+
+# THE ENVIRONMENT IS NOT ENOUGH, and finding out why cost a working design.
+# On at least one host every shell command runs in a FRESH process: an `export`
+# in one call is gone by the next one, so `eval "$(bus hello ...)"` gave the
+# session an identity that lasted exactly one command. The environment still
+# works where it is inherited (a sub-process started from the same shell, which
+# is the sub-agent case), so it is tried first — and this file is what makes the
+# identity survive between two unrelated commands of the same session.
+#
+# It lives in the WORKTREE, next to the work, exactly like `.gbrain-source`, and
+# NOT in the bus store: a per-instance file inside the store is the registry test
+# 12 refuses, and for its stated reason - liveness must not become something to
+# keep up to date. This file is not liveness. Nothing expires it, nothing renews
+# it, `who` never reads it, and delivery does not know it exists. It answers one
+# question and only one: when nobody said who I am, who was I last time.
+_id_from_file() {
+  local name="$1" dir="$PWD"
+  while :; do
+    if [ -f "$dir/$name" ]; then
+      tr -d '[:space:]' < "$dir/$name" 2>/dev/null || true
+      return 0
+    fi
+    # The root is CHECKED and then ends the walk. Stopping at "$dir" != "/"
+    # tested every directory except the one the loop was walking towards
+    # (@rex, low severity, and true).
+    [ -n "$dir" ] && [ "$dir" != "/" ] || return 0
+    dir="${dir%/*}"
+  done
+}
+
+_role_from_file() { _id_from_file .bus-role; }
+
+# Written by `hello` at the top of the worktree, so every later command of that
+# session - and every sub-agent that runs one - starts out knowing who it is.
+_write_identity_files() {
+  local role="$1" session="$2" dir top
+  top="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  dir="${top:-$PWD}"
+  [ -d "$dir" ] && [ -w "$dir" ] || return 0
+  printf '%s\n' "$role" > "$dir/.bus-role" 2>/dev/null || true
+  # The session name is written for the same reason as the role and it is the
+  # one that makes `bye` reach the session that said `hello`. Without it the
+  # goodbye is addressed to a session id invented one microsecond earlier.
+  printf '%s\n' "$session" > "$dir/.bus-session" 2>/dev/null || true
+}
+
+# The session id names an INSTANCE, never an addressee. Mail is addressed to
+# roles only, and this constraint is the reason the board could cut leases in
+# 2026-07 without cutting identity with them: nothing can be sent to a session,
+# so a message can never be stranded on a session that has gone away.
+_ident_session() {
+  local given="$1"
+  [ -n "$given" ] || given="${RDA_BUS_SESSION:-}"
+  # THE SAME FILE FALLBACK AS THE ROLE, and leaving it out was a real ghost
+  # factory. @rex reproduced it: `hello` in one process invents
+  # `pid69092-...`, `bye` in the next process invents `pid69278-...`, the
+  # goodbye lands on a session nobody ever announced, and the first one stays
+  # DECLARED forever. That is precisely the sequence every agents/*.md teaches
+  # — hello in one command, bye in another — so the failure was not exotic, it
+  # was the documented path. The role had a file for this exact reason and the
+  # session did not; the asymmetry was the bug.
+  #
+  # BUT `hello` MUST NOT READ IT, which is why this takes an argument. A role is
+  # a job description and inheriting it is right; a session name is an INSTANCE,
+  # and a new session that picks one up from a parent directory is two different
+  # sessions answering to one name — so its `bye` withdraws somebody else's
+  # presence. That is the stray session renewing a lease behind your back, the
+  # thing the 2026-07 board cut leases to prevent, walking back in through a
+  # file. Found by this suite one minute after the file was introduced: a
+  # sub-directory check inherited the session of the directory above it and its
+  # goodbye killed that one instead.
+  if [ -z "$given" ] && [ "${2:-read}" = "read" ]; then
+    given="$(_id_from_file .bus-session)"
+  fi
+  # Minted as a last resort, and ALWAYS minted for `hello`: a presence record
+  # under a made-up name is worth more than no presence record at all, and a
+  # fresh name is the only honest answer to "who is announcing themselves now".
+  [ -n "$given" ] || given="pid$$-$(date -u '+%Y%m%d%H%M%S')"
+  printf '%s' "$given"
+}
+
+# WHICH REPO, without being told. Typing `--repo` on every call is the same tax
+# as typing `--as`, and it was paid in the same coin: it was not paid.
+#
+# It is the MAIN checkout's name, never the worktree's. `kb start` gives every
+# card its own worktree (~/GitHub/worktrees/<repo>/<card-id>) and the canon says
+# to work there, so `--show-toplevel` answers `<card-id>`: two agents on two
+# cards of the SAME project would land in two different repos on this bus and
+# could never meet. `--git-common-dir` points at the main `.git` from inside any
+# worktree, so its parent is the project.
+_ident_repo() {
+  local given="$1"
+  [ -n "$given" ] || given="${RDA_BUS_REPO:-}"
+  if [ -z "$given" ]; then
+    local common top=""
+    common="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+    if [ -n "$common" ]; then
+      case "$common" in /*) : ;; *) common="$PWD/$common";; esac
+      top="$(cd "$common/.." 2>/dev/null && pwd || true)"
+    fi
+    [ -n "$top" ] || top="$PWD"
+    given="${top##*/}"
+  fi
+  printf '%s' "$given"
+}
+
 # --- roles -----------------------------------------------------------------
 # A role is addressable only if it has a manifest enumerating what it may do AND
 # claiming no human-gated action. The safety property lives on the RECEIVER,
@@ -115,6 +249,35 @@ _log_path()    { printf '%s/%s/%s.jsonl' "$BUS_HOME" "$1" "$2"; }
 # resolved to the same file, and the second one silently skipped a message it had
 # never been shown. Silent loss is the one failure this design exists to avoid.
 _cursor_path() { printf '%s/%s/.cursor/%s/%s' "$BUS_HOME" "$1" "$2" "$3"; }
+
+# --- presence --------------------------------------------------------------
+# DECLARED presence, and the distinction from a lease is the whole design.
+#
+# The board cut leases in 2026-07 for two stated reasons: a lease binds a role to
+# N instances and splits the stream, and there is always a second stray session
+# renewing it behind your back. Both are properties of a RENEWABLE RESERVATION.
+# What is written here is neither renewable nor a reservation: it is an
+# append-only log of two events, `hello` and `bye`, in the same shape and with
+# the same permanence as every other record in this system. Nothing expires,
+# nothing is refreshed, nothing is garbage-collected, and nothing about it
+# changes delivery - mail is still addressed to a ROLE, still delivered by a
+# per-role cursor, and a session that has said hello receives not one byte more
+# than one that has not.
+#
+# Why it is needed at all: `who` used to answer "who is alive" by observing the
+# last append or read. That answers "someone was here" and never "who is here,
+# on what, and are they still on it" - so an agent had nobody to address, and
+# addressed nobody. Observation cannot distinguish a session that finished
+# cleanly from one that was killed, because neither leaves a trace; a declaration
+# can, and when the declaration is wrong `who` says so by putting it next to the
+# observation rather than believing it (see _cmd_who).
+#
+# It is a FILE, not a directory of per-instance registrations: test 12 forbids a
+# `subscribers/` registry, and the reason it gives - liveness must not become a
+# thing to maintain - applies to any per-instance file that has to be created,
+# updated and removed. An append-only log has no such lifecycle.
+_presence_path() { printf '%s/%s/.presence.jsonl' "$BUS_HOME" "$1"; }
+
 
 # A durable log that interleaves two concurrent appends is not durable. Two 20KB
 # sends in parallel corrupted it in review, permanently - there is no GC and no
@@ -182,7 +345,7 @@ APPROVAL_RE='approv|autorizz|sign-?off|roberto (ha |has )?(detto|said|ok|approv)
 SCOPE_RE='^[[:space:]]*[-*]?[[:space:]]*(acceptance([[:space:]]criteria)?|criteri[[:space:]]di[[:space:]]accettazione|dod|definition[[:space:]]of[[:space:]]done|done[[:space:]]when|ac)[[:space:]]*:'
 
 _cmd_send() {
-  local repo="" card="" from="" to="" kind="note" ref="" body_file=""
+  local repo="" card="" from="" to="" kind="note" ref="" body_file="" re=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --repo) _need $# "--repo"; repo="$2"; shift 2;;
@@ -191,12 +354,15 @@ _cmd_send() {
       --to)   _need $# "--to";   to="$2";   shift 2;;
       --kind) _need $# "--kind"; kind="$2"; shift 2;;
       --ref)  _need $# "--ref";  ref="$2";  shift 2;;
+      --re)   _need $# "--re";   re="$2";   shift 2;;
       --body-file) _need $# "--body-file"; body_file="$2"; shift 2;;
       *) die "send: unknown argument '$1'";;
     esac
   done
-  [ -n "$repo" ] && [ -n "$card" ] && [ -n "$from" ] && [ -n "$to" ] \
-    || die "send: --repo, --card, --from and --to are all required"
+  repo="$(_ident_repo "$repo")"
+  [ -n "$from" ] || from="$(_ident_role "$from" "send")"
+  [ -n "$repo" ] && [ -n "$card" ] && [ -n "$to" ] \
+    || die "send: --repo, --card and --to are required (--from too, unless RDA_BUS_ROLE is set)"
   repo="$(_slug "--repo" "$repo")"; card="$(_slug "--card" "$card")"
   case "$kind" in request|verdict|note|question) ;; *) die "send: --kind must be request|verdict|note|question";; esac
   _assert_role "$from"
@@ -257,19 +423,55 @@ _cmd_send() {
   local log; log="$(_log_path "$repo" "$card")"
   [ ! -f "$log" ] || [ "$(_thread_state "$log")" != "closed" ] \
     || die "send: $repo/$card is closed. Reopen it deliberately with: bus open --repo $repo --card $card --by <role>"
-  _with_lock "$log" _append_record "$log" "$repo" "$card" "$from" "$to" "$kind" "$ref" "$body"
-  echo "bus: appended $kind from $from to $to on $repo/$card -> $log"
+
+  # `--re N` — THIS MESSAGE ANSWERS RECORD N OF THIS THREAD. A pointer, not a
+  # claim: it says which question is being addressed, and says nothing about
+  # whether the answer is any good. Validated against the thread rather than
+  # trusted, because a reply pointing at a record that does not exist discharges
+  # an obligation that was never met, which is worse than no linkage at all.
+  if [ -n "$re" ]; then
+    [[ "$re" =~ ^[0-9]+$ ]] && [ "$re" -ge 1 ] \
+      || die "send: --re must be the number of a record in this thread (they are printed as '#N' by bus read and bus log), not '$re'"
+    [ -f "$log" ] || die "send: --re $re, but there is no thread at $repo/$card yet"
+    local depth; depth="$(wc -l < "$log" | tr -d ' ')"
+    [ "$re" -le "$depth" ] \
+      || die "send: --re $re, but $repo/$card holds only $depth record(s). Check the number with: bus log --repo $repo --card $card"
+  fi
+
+  _with_lock "$log" _append_record "$log" "$repo" "$card" "$from" "$to" "$kind" "$ref" "$body" "$re"
+  echo "bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log"
+  # Say what is still owed AFTER a send, not only after a read. An agent that has
+  # just written is the one agent guaranteed to be awake and looking at this
+  # channel, and it is the cheapest possible moment to notice that something has
+  # been waiting for it.
+  #
+  # THIS CARD ONLY, and the reason is measured. The first version scanned every
+  # thread in the repo on every single send, which means reading the whole store
+  # to print one reminder: with an 8MB thread present a send went from 0.023s to
+  # 0.823s and a read from 0.021s to 0.739s — 35x, on the hot path, forever. It
+  # was not found by reading the code: the mutation suite stopped FAILING and
+  # started TIMING OUT, which is the shape a performance regression takes when it
+  # is big enough. Repo-wide belongs where it is paid once — `hello`, `bye`, the
+  # explicit `bus owed`, and the doorbell, which exists precisely to be the
+  # periodic nudge and is throttled for it.
+  local still; still="$(_owed_count "$repo" "$card" "$from")"
+  [ "$still" = "0" ] \
+    || echo "bus: @$from still owes an answer to $still message(s) on $repo/$card — bus owed --repo $repo --as $from" >&2
 }
 
 _append_record() {
-  local log="$1" repo="$2" card="$3" from="$4" to="$5" kind="$6" ref="$7" body="$8"
+  local log="$1" repo="$2" card="$3" from="$4" to="$5" kind="$6" ref="$7" body="$8" re="${9:-}"
   # $body is a PATH here, and --rawfile reads it directly: as `--arg` this hit
   # ARG_MAX at roughly a megabyte and died as a raw `jq: Argument list too long`
   # with no `bus:` message at all - an undocumented ceiling reported in a way
   # nobody could act on.
+  #
+  # `re` is an ADDITIVE field and is written as null when absent, so every record
+  # ever written before it existed reads back exactly as it did: no selector in
+  # this file asserts the key set, and `.re // null` is how every reader asks.
   jq -cn --arg ts "$(now)" --arg repo "$repo" --arg card "$card" --arg from "$from" \
-        --arg to "$to" --arg kind "$kind" --arg ref "$ref" --rawfile body "$body" \
-    '{ts:$ts,repo:$repo,card:$card,from:$from,to:$to,kind:$kind,ref:(if $ref=="" then null else $ref end),body:$body}' \
+        --arg to "$to" --arg kind "$kind" --arg ref "$ref" --arg re "$re" --rawfile body "$body" \
+    '{ts:$ts,repo:$repo,card:$card,from:$from,to:$to,kind:$kind,ref:(if $ref=="" then null else $ref end),re:(if $re=="" then null else ($re|tonumber) end),body:$body}' \
     >> "$log" || die "send: could not encode the record — nothing was appended"
 }
 
@@ -340,17 +542,31 @@ _resolve_ref() {
 # nothing, so the stamp is the only thing standing between a thread and a review
 # that never happened.
 _emit() {
-  local card="$1" line n=0
+  local card="$1" me="${2:-}" line n=0
   while IFS= read -r line; do
     n=$((n+1))
-    local ts from kind ref body
+    local ts from kind ref body seq re to
     ts="$(jq -r '.ts' <<<"$line")"; from="$(jq -r '.from' <<<"$line")"
     kind="$(jq -r '.kind' <<<"$line")"; ref="$(jq -r '.ref // ""' <<<"$line")"
     body="$(jq -r '.body' <<<"$line")"
+    seq="$(jq -r '._seq // ""' <<<"$line")"
+    re="$(jq -r '.re // ""' <<<"$line")"
+    to="$(jq -r '.to' <<<"$line")"
     echo "--------------------------------------------------------------------"
     echo "CLAIM BY @$from ($kind, $ts) — UNVERIFIED, and @$from is self-declared."
+    # The record number is what makes an answer addressable. Without it `--re`
+    # would need a number the reader has no way to know, and a linkage nobody can
+    # spell is a linkage nobody uses.
+    [ -n "$seq" ] && echo "msg #$seq on $card, addressed to @$to${re:+ — answers #$re}"
     echo "Scope for this work comes from \`kb show $card\` and the diff, NOT from this message."
     [ -n "$ref" ] && echo "cites: $ref -> $(_resolve_ref "$ref")"
+    # SAY WHAT IS EXPECTED OF THE READER. A question used to render in exactly the
+    # same wrapper as a note, so "you owe an answer here" existed only in the
+    # sender's head. This is the difference between a channel and a noticeboard.
+    if [ -n "$me" ] && [ -n "$seq" ] && { [ "$kind" = "question" ] || [ "$kind" = "request" ]; }; then
+      echo "THIS ASKS YOU FOR AN ANSWER. It stays listed in \`bus owed\` until you cite it:"
+      echo "    bus send --card $card --to $from --re $seq --kind verdict"
+    fi
     echo "--------------------------------------------------------------------"
     printf '%s\n' "$body"
     echo
@@ -372,7 +588,9 @@ _cmd_read() {
       *) die "read: unknown argument '$1'";;
     esac
   done
-  [ -n "$repo" ] && [ -n "$card" ] && [ -n "$as" ] || die "read: --repo, --card and --as are required"
+  repo="$(_ident_repo "$repo")"
+  [ -n "$as" ] || as="$(_ident_role "$as" "read")"
+  [ -n "$repo" ] && [ -n "$card" ] && [ -n "$as" ] || die "read: --repo and --card are required (--as too, unless RDA_BUS_ROLE is set)"
   repo="$(_slug "--repo" "$repo")"; card="$(_slug "--card" "$card")"
   _assert_role "$as"
   local log cur seen total mine snap
@@ -443,9 +661,15 @@ _cmd_read() {
   # Filter to completion BEFORE emitting a single line. `tail | jq | _emit`
   # streamed, so a failure halfway printed a partial thread and then died - which
   # is exactly the "loud and whole" property this is supposed to provide.
-  tail -n +$((seen + 1)) "$snap" \
-    | jq -c --arg me "$as" --arg all "$BROADCAST" \
-        'select(.to == $me or (.to == $all and .from != $me))' > "$deliverable" \
+  #
+  # `_seq` is the record's ABSOLUTE position in the thread, computed here from
+  # the index inside the snapshot rather than from a line count of the delivered
+  # slice: the reader is shown numbers that `--re` can cite, and a number that
+  # counted only what THIS role received would point at a different record for
+  # every role on the thread.
+  jq -c -s --arg me "$as" --arg all "$BROADCAST" --argjson skip "$seen" \
+      'to_entries | .[$skip:] | map(.value + {_seq: (.key + 1)})
+       | map(select(.to == $me or (.to == $all and .from != $me))) | .[]' "$snap" > "$deliverable" \
     || { rm -f "$snap" "$deliverable"; die "the snapshot of $log could not be filtered — nothing was delivered, so nothing is half-read"; }
   local emitted_f emitted want
   emitted_f="$(mktemp)"
@@ -457,7 +681,7 @@ _cmd_read() {
   want="$(jq -s --arg me "$as" --arg all "$BROADCAST" --argjson skip "$seen" \
       '.[$skip:] | map(select(.to == $me or (.to == $all and .from != $me))) | length' "$snap")" \
     || { rm -f "$snap" "$deliverable" "$emitted_f"; die "the snapshot of $log could not be counted — nothing was delivered, so nothing is half-read"; }
-  RDA_BUS_EMITTED="$emitted_f" _emit "$card" < "$deliverable"
+  RDA_BUS_EMITTED="$emitted_f" _emit "$card" "$as" < "$deliverable"
   emitted="$(cat "$emitted_f" 2>/dev/null || echo 0)"; rm -f "$emitted_f"
   # THE DELIVERY AUDIT. The cursor advances past everything in the snapshot, and
   # the log is append-only, so a record that was deliverable but not rendered is
@@ -479,6 +703,16 @@ _cmd_read() {
             'select(.to == $me or (.to == $all and .from != $me))' "$snap" | wc -l | tr -d ' ')"
   rm -f "$snap" "$deliverable"
   echo "bus: $total record(s) on $repo/$card, $mine deliverable to @$as."
+  # THE TRAILER THAT CLOSES THE LOOP. The cursor has just moved past everything
+  # above, so without this line a question read at 10:02 and postponed at 10:03
+  # is gone. Scoped to THIS CARD for the measured reason in `send` above — the
+  # repo-wide scan cost 35x on every read — and the repo-wide view is one command
+  # away, said here by name.
+  local owed_n; owed_n="$(_owed_count "$repo" "$card" "$as")"
+  if [ "$owed_n" != "0" ]; then
+    echo "bus: @$as owes an answer to $owed_n message(s) on $repo/$card. They stay listed until you cite them with --re:"
+    echo "     bus owed --repo $repo --as $as      (every card, not only this one)"
+  fi
 }
 
 # --- count: HOW MANY, never WHAT -------------------------------------------
@@ -514,12 +748,32 @@ _count_unread() {
 }
 
 _cmd_count() {
-  local repo="" card="" as=""
+  local repo="" card="" as="" present=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --repo) _need $# "--repo"; repo="$2"; shift 2;;
       --card) _need $# "--card"; card="$2"; shift 2;;
       --as)   _need $# "--as";   as="$2";   shift 2;;
+      # --present COUNTS ONLY FOR ROLES SOMEBODY IS ACTUALLY PLAYING, and it
+      # exists because Roberto opened a session on 2026-09-22 and got twelve
+      # lines of this:
+      #
+      #   260913-150759: 3 unread for @architect
+      #   260913-150759: 3 unread for @qa-gate      ... and so on, four roles,
+      #   260917-111539: 1 unread for @architect        three cards, forever
+      #
+      # Two of those cards were already in `done/` and the third had no card at
+      # all. Nobody was playing any of those roles, and nobody was going to: the
+      # mail was addressed to `all` months earlier, so every role that never read
+      # it counted it as unread for the rest of time. A doorbell that rings for
+      # mail NOBODY CAN ACT ON teaches exactly one thing — to stop hearing it —
+      # and then it is worse than no doorbell, because the real message arrives
+      # in the middle of noise somebody has already learned to skip.
+      #
+      # "Playing it" means: declared present with `hello` and not yet gone, or
+      # this very session's role. Not "has a manifest" — a manifest says the role
+      # is addressable, never that anyone is there.
+      --present) present=1; shift;;
       *) die "count: unknown argument '$1'";;
     esac
   done
@@ -543,7 +797,21 @@ _cmd_count() {
       rf="${rf##*/}"
       roles="$roles ${rf%.json}"
     done
+    if [ "$present" = "1" ]; then
+      local here="" r
+      # The reader's own role first: a session always counts as present to
+      # itself, whether or not the hook that announces it ever ran.
+      [ -z "${RDA_BUS_ROLE:-}" ] || here=" ${RDA_BUS_ROLE}"
+      while IFS= read -r r; do
+        [ -n "$r" ] || continue
+        case " $here " in *" $r "*) ;; *) here="$here $r";; esac
+      done < <(_declared_present "$(_presence_path "$repo")" 2>/dev/null | awk -F'\t' '{print $1}')
+      roles="$here"
+    fi
   fi
+  # Nobody is here: there is nothing to ring about, and saying so would be the
+  # noise this flag exists to remove.
+  [ "$present" != "1" ] || [ -n "$(printf '%s' "$roles" | tr -d '[:space:]')" ] || return 0
   local dir="$BUS_HOME/$repo"
   # Silence, not an error: a repo with no traffic is the normal case, and this
   # runs on every tool call. Anything printed at zero is context spent for nothing.
@@ -592,10 +860,21 @@ _cmd_count() {
 # The closure is itself a RECORD in the log, not a flag in a side file: who
 # closed a thread and when is exactly the kind of fact this channel exists to
 # keep, and a side file could go missing while the thread it described stayed.
+# CHIESTO CON grep, NON CON jq, e la ragione e che questa e la domanda piu fatta
+# di tutto il file: la fanno `read`, `count`, `who`, `owed`, `tidy` e `send`, una
+# volta per thread, e ogni jq e un interprete che parte. Misurato: l apertura di
+# una sessione pagava quasi un secondo quasi tutto in avvii di jq.
+#
+# Non e un'euristica sulla forma del testo: i record li scrive SOLO `jq -c` da un
+# unico oggetto, quindi `"kind":"closed"` si scrive sempre cosi, senza spazi. E un
+# corpo che contenesse quelle stesse lettere non puo essere scambiato per il
+# campo, perche dentro una stringa JSON le virgolette sono sfuggite (\") e non
+# corrispondono al modello. Il campo `body` e l unico posto dove un testo
+# arbitrario arriva, ed e sempre una stringa JSON.
 _thread_state() {
   local log="$1"
   [ -s "$log" ] || { echo open; return 0; }
-  jq -r 'select(.kind=="closed" or .kind=="opened") | .kind' "$log" 2>/dev/null \
+  grep -oE '"kind":"(closed|opened)"' "$log" 2>/dev/null \
     | tail -1 | grep -q closed && echo closed || echo open
 }
 
@@ -627,18 +906,471 @@ _cmd_close() {
   echo "bus: $repo/$card is now $want — the thread is kept in full, 'bus log' still reads it."
 }
 
+# --- hello / bye -----------------------------------------------------------
+# Announce yourself once, at the start of the session, and say when you leave.
+# Both are ordinary appends to the presence log; neither delivers, consumes or
+# blocks anything, and neither can start a session - they are written BY a
+# session that already exists, about itself.
+# THE SAME FAIL-CLOSED PRIVACY GATE AS A MESSAGE BODY. `--doing` and `--why` are
+# free prose written by a human or an agent and kept forever in a store that
+# lives outside every git tree, so nothing else will ever scan them. `send` runs
+# leak-check on every body; presence was a second door into the same permanent
+# archive with a weaker policy, which is how a declared property quietly stops
+# being true (@baccio, adversarial review — a path, not a demonstrated leak).
+_scan_note() {
+  local what="$1" text="$2"
+  [ -n "$text" ] || return 0
+  [ -x "$LEAKCHECK" ] || die "$what: leak-check is not executable at $LEAKCHECK — refusing to write an unscanned note"
+  local nf; nf="$(mktemp)"
+  printf '%s\n' "$text" > "$nf"
+  if ! "$LEAKCHECK" --only "$nf" >/dev/null 2>&1; then
+    rm -f "$nf"
+    die "$what: BLOCKED — leak-check found a confidential term in the note"
+  fi
+  rm -f "$nf"
+}
+
+_presence_append() {
+  local pfile="$1" event="$2" repo="$3" session="$4" role="$5" card="$6" note="$7"
+  jq -cn --arg ts "$(now)" --arg event "$event" --arg repo "$repo" --arg session "$session" \
+        --arg role "$role" --arg card "$card" --arg note "$note" \
+    '{ts:$ts,event:$event,repo:$repo,session:$session,role:$role,
+      card:(if $card=="" then null else $card end),
+      note:(if $note=="" then null else $note end)}' \
+    >> "$pfile" || die "presence: could not encode the record — nothing was appended"
+}
+
+# The last event per session wins, and "last" is FILE ORDER, not timestamp order.
+# `ts` has one-second resolution, so a hello and a bye inside the same second
+# sort arbitrarily against each other and a session that had just left could come
+# back from the dead. Append order is the only total order this log has.
+_declared_present() {
+  local pfile="$1"
+  [ -s "$pfile" ] || return 0
+  jq -e . "$pfile" >/dev/null 2>&1 || {
+    echo "bus: WARNING — $pfile is damaged and was skipped by who." >&2
+    return 0
+  }
+  jq -r -s 'group_by(.session) | map(last) | map(select(.event=="hello"))
+            | sort_by(.ts) | .[] | [.role,.session,(.card // "-"),.ts,(.note // "")] | @tsv' "$pfile"
+}
+
+_cmd_hello() {
+  local repo="" as="" session="" card="" doing="" arrival=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo)    _need $# "--repo";    repo="$2";    shift 2;;
+      --as)      _need $# "--as";      as="$2";      shift 2;;
+      --session) _need $# "--session"; session="$2"; shift 2;;
+      --card)    _need $# "--card";    card="$2";    shift 2;;
+      --doing)   _need $# "--doing";   doing="$2";   shift 2;;
+      # --arrival: TUTTO IL BENVENUTO IN UN PROCESSO SOLO, ed e una questione di
+      # secondi pagati sempre. Il blocco di avvio chiamava questo file quattro
+      # volte — hello, who, owed, count — e ogni chiamata e un bash nuovo piu la
+      # validazione del ruolo a colpi di jq: misurato, l apertura di una sessione
+      # era passata da 2,28s a 3,71s. In questo repo c e gia una cicatrice scritta
+      # su 2,5s pagati prima che Roberto potesse scrivere, in ogni sessione di
+      # ogni progetto: "righe pagate una volta contro secondi pagati sempre".
+      # Qui le quattro risposte si calcolano dove i dati sono gia aperti.
+      --arrival) arrival=1; shift;;
+      *) die "hello: unknown argument '$1'";;
+    esac
+  done
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] || die "hello: could not work out which repo this is — pass --repo"
+  repo="$(_slug "--repo" "$repo")"
+  as="$(_ident_role "$as" "hello")"
+  _assert_role "$as"
+  as="$(_slug "--as" "$as")"
+  # `mint`: announcing yourself never inherits a name from the filesystem.
+  session="$(_slug "--session" "$(_ident_session "$session" mint)")"
+  [ -z "$card" ] || card="$(_slug "--card" "$card")"
+  _scan_note "hello --doing" "$doing"
+  local pfile; pfile="$(_presence_path "$repo")"
+  mkdir -p "$(dirname "$pfile")"
+  _with_lock "$pfile" _presence_append "$pfile" hello "$repo" "$session" "$as" "$card" "$doing"
+  # Identity that survives the next command, and the one after that. See
+  # _role_from_file: on a host where every command is a fresh process, the
+  # environment alone gives an identity that lasts exactly one call.
+  _write_identity_files "$as" "$session"
+  # Printed as shell assignments ON STDOUT so the caller can `eval` it and have
+  # the identity for the rest of the session, sub-agents included. Everything
+  # human goes to stderr, so `eval "$(bus hello ...)"` cannot swallow a diagnostic
+  # or execute one.
+  local owed_n; owed_n="$(_owed_count "$repo" "" "$as")"
+
+  if [ "$arrival" = "1" ]; then
+    # Il benvenuto, su stdout perche chi lo chiama lo inietta nel contesto della
+    # sessione. Solo FATTI: ruoli, sessioni, card, orari, numeri. Mai la prosa che
+    # un altro agente ha scritto su di se — quella si legge apposta, e arriva
+    # marcata NON VERIFICATA. Essere il destinatario non rende sicure le parole
+    # di nessuno.
+    local unread declared
+    unread="$(_cmd_count --repo "$repo" --as "$as" 2>/dev/null | awk -F'\t' '{n+=$3} END{print n+0}')"
+    declared="$(_declared_present "$(_presence_path "$repo")" 2>/dev/null \
+                | awk -F'\t' -v me="$session" '$2 != me {printf "  %-18s %-22s %-14s %s\n", $1, $2, $3, $4}')"
+    printf '### 📻 Sul bus sei **@%s** (sessione `%s`, repo `%s`).\n' "$as" "$session" "$repo"
+    printf '  Passalo ai tuoi sotto-agenti (con un nome di sessione LORO, non il tuo):\n'
+    printf '    export RDA_BUS_ROLE=%s RDA_BUS_SESSION=%s RDA_BUS_REPO=%s\n' "$as" "$session" "$repo"
+    if [ -n "$declared" ]; then
+      printf '  Chi altro si e dichiarato qui (dichiarazioni, non prove — cosa fanno lo dicono loro):\n'
+      printf '%s\n' "$declared"
+    else
+      printf '  Non ce nessun altro dichiarato su `%s`. I ruoli e chi li interpreta: `bus roles`\n' "$repo"
+    fi
+    [ "$owed_n" = "0" ] \
+      || printf '  ⚠️  %s messaggi aspettano una risposta DA TE: `bus owed` — rispondere significa citarli con `--re N`.\n' "$owed_n"
+    [ "${unread:-0}" = "0" ] \
+      || printf '  📬 %s non letti per @%s: `bus read --card <CARD>` (i corpi arrivano solo cosi, marcati NON VERIFICATI).\n' "$unread" "$as"
+    printf '  Quando hai finito: `bus bye --repo %s` (senno risulti ancora qui a chi arriva dopo).\n' "$repo"
+    return 0
+  fi
+
+  {
+    echo "bus: @$as is present on $repo${card:+ (card $card)} as session $session."
+    echo "     others see you with: bus who --repo $repo"
+    echo "     when you finish:     bus bye --repo $repo"
+    [ "$owed_n" = "0" ] || echo "     NOTE: $owed_n message(s) are waiting for YOUR answer — bus owed --repo $repo"
+  } >&2
+  printf 'export RDA_BUS_ROLE=%s RDA_BUS_SESSION=%s RDA_BUS_REPO=%s\n' "$as" "$session" "$repo"
+}
+
+_cmd_bye() {
+  local repo="" as="" session="" why=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo)    _need $# "--repo";    repo="$2";    shift 2;;
+      --as)      _need $# "--as";      as="$2";      shift 2;;
+      --session) _need $# "--session"; session="$2"; shift 2;;
+      --why)     _need $# "--why";     why="$2";     shift 2;;
+      *) die "bye: unknown argument '$1'";;
+    esac
+  done
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] || die "bye: could not work out which repo this is — pass --repo"
+  repo="$(_slug "--repo" "$repo")"
+  as="$(_ident_role "$as" "bye")"
+  _assert_role "$as"
+  as="$(_slug "--as" "$as")"
+  session="$(_slug "--session" "$(_ident_session "$session")")"
+  local pfile; pfile="$(_presence_path "$repo")"
+  mkdir -p "$(dirname "$pfile")"
+  # A bye WITHOUT a matching hello is recorded anyway rather than refused. The
+  # alternative is a session that crashed, restarted and now cannot mark itself
+  # gone — and the presence view reads the last event per session, so a bye that
+  # answers nothing is simply the last word of a session nobody saw arrive.
+  _scan_note "bye --why" "$why"
+  _with_lock "$pfile" _presence_append "$pfile" bye "$repo" "$session" "$as" "" "$why"
+  local owed_n; owed_n="$(_owed_count "$repo" "" "$as")"
+  if [ "$owed_n" != "0" ]; then
+    # Not a refusal: nothing here may block a session from ending. It is said
+    # out loud because leaving with unanswered mail is the exact failure this
+    # whole change exists to make visible.
+    echo "bus: @$as left $repo — but $owed_n message(s) addressed to @$as were never answered." >&2
+    echo "     they stay listed for whoever plays @$as next:  bus owed --repo $repo --as $as" >&2
+  else
+    local blind; blind="$(_unreadable_threads "$repo")"
+    if [ "$blind" != "0" ]; then
+      echo "bus: @$as left $repo (session $session). Nothing owed in the threads that could be READ — $blind could not be, so this is not a clean bill." >&2
+    else
+      echo "bus: @$as left $repo (session $session). Nothing was left unanswered." >&2
+    fi
+  fi
+  printf 'unset RDA_BUS_ROLE RDA_BUS_SESSION RDA_BUS_REPO\n'
+}
+
+# --- owed: the questions nobody answered -----------------------------------
+# THE FIX FOR "THEY LISTEN AND THEY DON'T TALK". A question used to be delivered
+# exactly once and then become invisible: `read` renders it, the cursor moves
+# past it, and from that moment nothing in the system knows it was ever asked.
+# The reader who meant to answer after finishing one more thing had no artifact
+# left to come back to, and the asker had no way to tell "read and ignored" from
+# "never arrived". Measured on the real store: 13 of 31 threads had exactly one
+# sender.
+#
+# So a `question` or a `request` addressed to a role stays listed until THAT
+# role sends a message citing it with `--re`. This is deliberately not a state
+# machine and writes no state at all: owed-ness is DERIVED from the append-only
+# log every time it is asked, so there is nothing to keep in sync, nothing to
+# migrate, and no way for the two to disagree.
+#
+# What it cannot do, stated rather than implied: it cannot make anyone answer,
+# and `--re` proves only that a message was cited, never that it was addressed.
+# An agent may reply "I disagree" and the question is discharged. The honest
+# claim is that an unanswered question is now VISIBLE, not that it is resolved.
+# A CITATION ONLY DISCHARGES A QUESTION IF IT REACHED THE PERSON WHO ASKED IT.
+# It used to be enough to cite the record at all, so a message citing #3 and
+# addressed to a THIRD role cleared the debt while the asker received nothing —
+# "no answer owed" printed next to an asker who had been answered by nobody
+# (@baccio, adversarial review, reproduced on the query itself). The addressee of
+# the reply must be the asker, or the broadcast, which everyone including the
+# asker receives.
+# ONE jq PER THREAD, not three. It used to validate the file, then ask
+# `_thread_state` (another jq) whether the thread was closed, then run the query.
+# Three interpreter start-ups per thread is most of the cost of an answer that is
+# printed after every message, so the closed check is folded in here and an
+# unparsable file is detected by this same call failing.
+_owed_jq='
+  if ((map(select(.kind == "closed" or .kind == "opened")) | last | .kind?) == "closed")
+  then empty
+  else
+  (map(select(.from == $me and ((.re // null) != null)) | {r: (.re | tonumber), to: .to})) as $cites
+  | to_entries
+  | map(select(.value.kind == "question" or .value.kind == "request"))
+  | map(select(.value.to == $me or (.value.to == $all and .value.from != $me)))
+  | map(select(
+      (.key + 1) as $s | .value.from as $asker
+      | ($cites | any(.r == $s and (.to == $asker or .to == $all))) | not))
+  | .[]
+  | [$card, (.key + 1), .value.from, .value.kind, .value.ts,
+     ((.value.body | split("\n") | .[0])[0:90])]
+  | @tsv
+  end'
+
+# Emits one TSV line per unanswered message: card, seq, from, kind, ts, first line.
+_owed_records() {
+  local repo="$1" only_card="$2" me="$3" f card
+  local dir="$BUS_HOME/$repo"
+  [ -d "$dir" ] || return 0
+  for f in "$dir"/*.jsonl; do
+    [ -e "$f" ] || continue
+    [ -s "$f" ] || continue
+    card="${f##*/}"; card="${card%.jsonl}"
+    [ -z "$only_card" ] || [ "$card" = "$only_card" ] || continue
+    # CHEAP FIRST PASS, and it can only ever be wrong in the safe direction.
+    # Nothing can be owed on a thread that holds no question and no request at
+    # all, and deciding that with a literal scan costs a fraction of slurping the
+    # file into jq. A body that happens to contain the words only causes the real
+    # query to run, which is the answer anyway; the reverse — missing a real
+    # question — cannot happen, because every record here is written by `jq -c`
+    # from one fixed object shape, so the key is always spelled this way.
+    # Measured: this is what takes the reminder printed after every message from
+    # 0.26s down to the cost of the send itself.
+    grep -q '"kind":"question"\|"kind":"request"' "$f" 2>/dev/null || continue
+    # A damaged thread must not take down the summary, for the same reason `who`
+    # skips one: refusing to answer "what do I owe" because an unrelated card is
+    # corrupt hides work from the only person who could do it. The query failing
+    # IS the detection now — a file jq cannot parse makes this call non-zero.
+    # A closed thread owes nothing (the query returns nothing for one): the work
+    # is finished, and re-listing it forever is how a reminder becomes noise.
+    jq -r -s --arg me "$me" --arg all "$BROADCAST" --arg card "$card" "$_owed_jq" "$f" 2>/dev/null \
+      || echo "bus: WARNING — $f is damaged and was skipped by owed." >&2
+  done
+}
+
+_owed_count() {
+  local n
+  n="$(_owed_records "$1" "$2" "$3" 2>/dev/null | grep -c . || true)"
+  printf '%s' "${n:-0}"
+}
+
+# HOW MANY THREADS COULD NOT BE READ. `_owed_records` skips a damaged thread with
+# a warning, and every caller of `_owed_count` swallowed that warning and then
+# reported the number as if it were complete — `bye` announced "Nothing was left
+# unanswered" about a repo whose threads it had failed to open (@baccio).
+# A zero computed after ignoring unreadable data is not a zero, and the
+# difference between "none" and "none that I could see" is the whole value of
+# the answer.
+_unreadable_threads() {
+  local repo="$1" f n=0
+  local dir="$BUS_HOME/$repo"
+  [ -d "$dir" ] || { printf '0'; return 0; }
+  for f in "$dir"/*.jsonl; do
+    [ -e "$f" ] && [ -s "$f" ] || continue
+    jq -e . "$f" >/dev/null 2>&1 || n=$((n + 1))
+  done
+  printf '%s' "$n"
+}
+
+_cmd_owed() {
+  local repo="" card="" as="" brief=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo) _need $# "--repo"; repo="$2"; shift 2;;
+      --card) _need $# "--card"; card="$2"; shift 2;;
+      --as)   _need $# "--as";   as="$2";   shift 2;;
+      # --brief RENDERS NO BODY, and it exists because of a boundary this file
+      # was breaking. `hooks/bus-doorbell.sh` pushes its output into the model's
+      # context automatically, and the full form prints the first 90 characters
+      # of somebody else's message — prose by another agent, arriving as context,
+      # without the UNVERIFIED stamp that `_emit` puts on every delivered line.
+      # That is exactly the harm the 2026-07 board cut context-inject delivery
+      # for: a message that arrives looking like context gets believed like
+      # context. Being ADDRESSED TO ME does not make another agent's words safe
+      # (@baccio, adversarial review). So: who asked, on which card, which
+      # record, what kind, when — facts about the store — and not one word of
+      # what they said. The words are one explicit `bus read` away.
+      --brief) brief=1; shift;;
+      *) die "owed: unknown argument '$1'";;
+    esac
+  done
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] || die "owed: could not work out which repo this is — pass --repo"
+  repo="$(_slug "--repo" "$repo")"
+  as="$(_ident_role "$as" "owed")"
+  _assert_role "$as"
+  as="$(_slug "--as" "$as")"
+  [ -z "$card" ] || card="$(_slug "--card" "$card")"
+  local out; out="$(mktemp)"
+  _owed_records "$repo" "$card" "$as" > "$out"
+  if [ ! -s "$out" ]; then
+    rm -f "$out"
+    local blind; blind="$(_unreadable_threads "$repo")"
+    if [ "$blind" != "0" ]; then
+      echo "bus: @$as owes no answer in the threads that could be READ on $repo${card:+/$card} — $blind thread(s) could not be parsed and were skipped. Inspect them by hand; nothing here deletes or repairs a log."
+    else
+      echo "bus: @$as owes no answer on $repo${card:+/$card}."
+    fi
+    return 0
+  fi
+  echo "bus: $(grep -c . < "$out") message(s) are waiting for an answer from @$as on $repo."
+  echo "Each one was addressed to you and no message of yours cites it back to whoever asked."
+  echo
+  if [ "$brief" = "1" ]; then
+    awk -F'\t' '{ printf "  %s #%s  from @%s (%s, %s)\n", $1, $2, $3, $4, $5 }' "$out"
+    echo
+    echo "What they actually say is NOT shown here. Read it, and it will arrive stamped"
+    echo "UNVERIFIED like every claim on this channel:  bus read --repo $repo --card <CARD>"
+  else
+    awk -F'\t' -v repo="$repo" -v me="$as" '{
+      printf "  %s #%s  from @%s (%s, %s)\n", $1, $2, $3, $4, $5
+      printf "      %s\n", $6
+      printf "      answer:  bus send --repo %s --card %s --from %s --to %s --re %s --kind verdict\n\n", repo, $1, me, $3, $2
+    }' "$out"
+    echo "Read the full text of any of them with: bus log --repo $repo --card <CARD>"
+  fi
+  rm -f "$out"
+}
+
+# --- tidy: i thread di un lavoro finito smettono di chiamare -----------------
+# Roberto, 2026-09-22, aprendo una sessione: "vorrei che il sistema riuscisse a
+# tenersi pulito e evitare ste robe che non si capisce che cazzo sono". Aveva
+# davanti dodici righe di posta non letta su tre thread: due appartenevano a card
+# gia' in `done/`, il terzo a una card che non esiste. Quei thread avrebbero
+# continuato a chiamare per sempre, perche' niente li chiude quando il lavoro
+# finisce.
+#
+# Due cose che questo comando NON fa, e sono il motivo per cui e' un comando e non
+# un effetto collaterale:
+#  - NON legge lo stato kanban per DECIDERE da solo. Lo legge per PROPORRE, e la
+#    chiusura la scrive solo con `--yes`. Il bus non muove card e le card non
+#    muovono il bus: qui le guarda, e basta.
+#  - NON cancella niente. `close` e' un record in piu' in un registro che non
+#    dimentica: il thread resta leggibile per intero con `bus log`, smette solo di
+#    essere consegnato e di farsi contare. Il ragionamento e' la cosa che il
+#    kanban non conserva, ed e' l'ultima che si butta.
+_card_is_done() {
+  local card="$1" board
+  while IFS= read -r board; do
+    [ -n "$board" ] || continue
+    [ ! -f "$board/done/$card.md" ] || { printf 'done'; return 0; }
+    for state in todo doing; do
+      [ ! -f "$board/$state/$card.md" ] || { printf 'open'; return 0; }
+    done
+  done < <(_card_boards)
+  printf 'missing'
+}
+
+_cmd_tidy() {
+  local repo="" by="" yes=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo) _need $# "--repo"; repo="$2"; shift 2;;
+      --by|--as) _need $# "$1"; by="$2"; shift 2;;
+      --yes)  yes=1; shift;;
+      *) die "tidy: unknown argument '$1'";;
+    esac
+  done
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] || die "tidy: could not work out which repo this is — pass --repo"
+  repo="$(_slug "--repo" "$repo")"
+  local dir="$BUS_HOME/$repo" f cname state n=0 closed=0
+  [ -d "$dir" ] || { echo "bus: no traffic for $repo — nothing to tidy."; return 0; }
+  if [ "$yes" = "1" ]; then
+    by="$(_ident_role "$by" "tidy")"
+    _assert_role "$by"
+    by="$(_slug "--by" "$by")"
+  fi
+  for f in "$dir"/*.jsonl; do
+    [ -e "$f" ] && [ -s "$f" ] || continue
+    jq -e . "$f" >/dev/null 2>&1 || continue
+    [ "$(_thread_state "$f")" != "closed" ] || continue
+    cname="${f##*/}"; cname="${cname%.jsonl}"
+    state="$(_card_is_done "$cname")"
+    [ "$state" != "open" ] || continue
+    n=$((n + 1))
+    if [ "$yes" = "1" ]; then
+      local bf; bf="$(mktemp)"
+      printf 'thread closed by tidy: the card is %s
+' "$state" > "$bf"
+      _with_lock "$f" _append_record "$f" "$repo" "$cname" "$by" "$BROADCAST" closed "" "$bf" ""
+      rm -f "$bf"
+      closed=$((closed + 1))
+      echo "  chiuso  $cname  (card $state)"
+    else
+      echo "  $cname  — card $state, il thread e ancora aperto e continua a farsi contare"
+    fi
+  done
+  if [ "$n" = "0" ]; then
+    echo "bus: $repo e a posto — nessun thread aperto su lavoro finito."
+  elif [ "$yes" = "1" ]; then
+    echo "bus: chiusi $closed thread su $repo. Niente e stato cancellato: bus log li legge ancora per intero."
+  else
+    echo "bus: $n thread aperti su card finite o inesistenti in $repo."
+    echo "     Continuano a farsi contare dal campanello finche restano aperti."
+    echo "     Chiudili (senza perdere una parola):  bus tidy --repo $repo --yes"
+  fi
+}
+
 # --- who -------------------------------------------------------------------
 # Liveness WITHOUT leases: a role that appended or read four minutes ago is
 # alive. Presence is observed, not declared - and there is no lease for a stray
 # second session to refresh behind your back. Reads count too: a review agent
 # that has been reading for three minutes used to show as dead.
+#
+# Since 2026-09-22 it answers with BOTH halves, and never merges them into one
+# number. DECLARED is what a session said about itself (`hello`/`bye`); OBSERVED
+# is what the store shows it doing. Merging them would be the same laundering
+# this file refuses everywhere else: a declaration is a claim, and a claim
+# printed next to the evidence is useful, while a claim printed AS evidence is a
+# lie with a timestamp on it. A session killed without `bye` therefore shows as
+# declared-present with an old last-action, which is exactly what is true.
 _cmd_who() {
-  local repo=""
-  while [ $# -gt 0 ]; do case "$1" in --repo) _need $# "--repo"; repo="$2"; shift 2;; *) die "who: unknown argument '$1'";; esac; done
-  [ -n "$repo" ] || die "who: --repo is required"
+  local repo="" brief=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo) _need $# "--repo"; repo="$2"; shift 2;;
+      # --brief DROPS THE `doing` PROSE and keeps everything the store knows as a
+      # fact: role, session, card, timestamps, and whether that role has done
+      # anything since. It exists for the one caller that pushes its output into
+      # a model's context automatically (hooks/context-inject.sh), under the rule
+      # an adversarial review made explicit on 2026-09-22:
+      #
+      #   automatic context carries STRUCTURED OBSERVATIONS with their provenance.
+      #   Free text written by another agent arrives through an explicit read,
+      #   stamped UNVERIFIED. Being the addressee does not make words safe.
+      #
+      # `doing` is a sentence another session wrote about itself — "review done,
+      # only the handover left" redefines what the reader thinks is needed while
+      # issuing no instruction at all. Which is precisely the laundering the 2026-07
+      # board cut context-inject delivery to prevent.
+      --brief) brief=1; shift;;
+      *) die "who: unknown argument '$1'";;
+    esac
+  done
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] || die "who: could not work out which repo this is — pass --repo"
   repo="$(_slug "--repo" "$repo")"
   local dir="$BUS_HOME/$repo" f
   [ -d "$dir" ] || { echo "bus: no traffic for $repo."; return 0; }
+  # The whole report is assembled into a file and written out ONCE, at the end.
+  # `who` is a display command and its reader is allowed to stop reading — a
+  # `bus who | grep -q something` closes the pipe on its first match, and a
+  # command that dies of SIGPIPE mid-report under `set -e` turns a successful
+  # answer into a failed one. Found exactly that way: adding the declared block
+  # after the table gave the table a reader that was already gone.
+  local report acts; report="$(mktemp)"; acts="$(mktemp)"
+  {
   {
     for f in "$dir"/*.jsonl; do
       [ -e "$f" ] || continue
@@ -675,8 +1407,60 @@ _cmd_who() {
       printf '%s\t%s\tread\t%s\n' "$rolename" "$(date -u -r "$f" '+%Y-%m-%dT%H:%M:%SZ')" "$cardname"
     done
   } | sort -k1,1 -k2,2r \
-    | awk -F'\t' '!seen[$1]++ {printf "%-20s %-21s %-7s %s\n", $1, $2, $3, $4}' \
-    | { echo "role                 last seen (UTC)       how     card"; cat; }
+    | awk -F'\t' '!seen[$1]++' > "$acts"
+  {
+    echo "OBSERVED — what the store shows (an append or a read is the evidence)"
+    echo "role                 last seen (UTC)       how     card"
+    awk -F'\t' '{printf "%-20s %-21s %-7s %s\n", $1, $2, $3, $4}' "$acts"
+  }
+  # DECLARED, printed second and kept separate. Second because the evidence
+  # should be read before the claim, and separate because a session that was
+  # killed cannot retract its hello: what is true is "it said it was here and
+  # has done nothing since", and that is what this prints.
+  local pfile declared
+  pfile="$(_presence_path "$repo")"
+  declared="$(_declared_present "$pfile" || true)"
+  echo
+  if [ -z "$declared" ]; then
+    echo "DECLARED — nobody has announced a session on $repo."
+    echo "  An agent announces itself once, and then everyone knows who is on what:"
+    echo "    eval \"\$(bus hello --repo $repo --as <ROLE> --card <CARD> --doing '<one line>')\""
+  else
+    echo "DECLARED — sessions that said hello and have not said bye (a claim, not evidence)"
+    if [ "$brief" = "1" ]; then
+      printf '%-20s %-24s %-14s %-21s %s\n' "role" "session" "card" "since (UTC)" "state"
+    else
+      printf '%-20s %-24s %-14s %-21s %s\n' "role" "session" "card" "since (UTC)" "doing / state"
+    fi
+    # SILENT SINCE HELLO. A declaration cannot be retracted by a session that was
+    # killed, so the list of "who is here" grows and nobody ever leaves it —
+    # which is the failure this whole change started from, one level along.
+    # There is no timeout here and deliberately so: a timeout needs date
+    # arithmetic that differs by platform, and worse, it would DECIDE that
+    # somebody is gone. This decides nothing. It states one fact the store
+    # already holds — whether that role has appended or read anything since the
+    # moment it announced itself — and leaves the reader to draw the conclusion.
+    # ISO-8601 in UTC with a fixed width sorts lexicographically, so the
+    # comparison needs no date parsing at all.
+    printf '%s\n' "$declared" \
+      | awk -F'\t' -v actsfile="$acts" -v brief="$brief" '
+          BEGIN { while ((getline line < actsfile) > 0) {
+                    n = split(line, f, "\t"); if (n >= 2) last[f[1]] = f[2] } }
+          { state = (brief == "1") ? "" : $5
+            seen = ($1 in last) ? last[$1] : ""
+            # THE UNIT MEASURED IS THE ROLE, AND THE LABEL SAYS SO. Activity is
+            # observed per role; presence is declared per session. If two
+            # sessions share a role, a recent action by one says nothing about
+            # the other, so a label reading "this session is idle" would be a
+            # claim the store cannot support (@baccio, adversarial review).
+            if (seen == "" || seen <= $4)
+              state = state (state == "" ? "" : "  ") "[no @" $1 " activity since]"
+            printf "%-20s %-24s %-14s %-21s %s\n", $1, $2, $3, $4, state }'
+  fi
+  } > "$report"
+  # A reader that has stopped reading is not an error here — see above.
+  cat "$report" 2>/dev/null || true
+  rm -f "$report" "$acts"
 }
 
 _cmd_roles() {
@@ -691,7 +1475,11 @@ _cmd_roles() {
   for f in "$ROLES_DIR"/*.json; do
     [ -e "$f" ] || break
     found=1
-    jq -r '"@\(.role): may \(.may|join(", ")) | may NOT \(.may_not|join(", "))"' "$f"
+    # The agent line is what makes this discovery instead of a glossary: an agent
+    # reading `bus roles` has to find ITSELF in the list, and "architect" did not
+    # tell @baccio that @baccio is the architect. Every role file carries the
+    # mapping, and a role without one says so rather than guessing.
+    jq -r '"@\(.role)  — played by: \(.agent // "nobody has claimed this role yet")\n   may \(.may|join(", "))\n   may NOT \(.may_not|join(", "))\n"' "$f"
   done
   [ "$found" = "1" ] || echo "bus: no roles defined."
 }
@@ -705,27 +1493,49 @@ _cmd_log() {
       *) die "log: unknown argument '$1'";;
     esac
   done
-  [ -n "$repo" ] && [ -n "$card" ] || die "log: --repo and --card are required"
+  repo="$(_ident_repo "$repo")"
+  [ -n "$repo" ] && [ -n "$card" ] || die "log: --card is required"
   repo="$(_slug "--repo" "$repo")"; card="$(_slug "--card" "$card")"
   local log; log="$(_log_path "$repo" "$card")"
   [ -f "$log" ] || { echo "bus: no traffic on $repo/$card."; return 0; }
   _assert_readable_log "$log"
-  _emit "$card" < "$log"
+  # Numbered, because a thread you cannot cite is a thread you can only talk
+  # past: `--re N` needs the same N the reader is looking at.
+  jq -c -s 'to_entries | map(.value + {_seq: (.key + 1)}) | .[]' "$log" \
+    | _emit "$card" "${RDA_BUS_ROLE:-}"
 }
 
 _usage() {
   cat <<'USAGE'
 bus — durable agent-to-agent messages. Pull-only: it never starts an agent.
 
-  bus send --repo R --card C --from ROLE --to ROLE|all [--kind request|verdict|note|question]
-           [--ref kb:<card>|git:<sha>] [--body-file F]      (body on stdin if no --body-file)
-  bus read --repo R --card C --as ROLE [--peek]              unread for ROLE (--peek: don't advance)
-  bus count --repo R [--card C] [--as ROLE]                  HOW MANY are unread, never what they say
-  bus who  --repo R                                          who is alive, from the last append or read
-  bus roles                                                  addressable roles + their manifests
-  bus close --repo R --card C --by ROLE                       finished: stop delivering, keep every word
-  bus open  --repo R --card C --by ROLE                       deliberately reopen a closed thread
-  bus log  --repo R --card C                                 the whole permanent thread
+THE SHAPE OF A SESSION. Announce yourself, read, answer what you owe, say bye.
+  eval "$(bus hello --repo R --as ROLE --card C --doing 'one line')"   # once, at the start
+  bus who --repo R                                                     # who else is on this repo
+  bus owed                                                             # what is waiting for ME
+  bus bye --repo R                                                     # once, when you finish
+
+  bus hello --repo R [--as ROLE] [--card C] [--session ID] [--doing "..."]
+           announce this session. Prints shell assignments on stdout: eval them and
+           --as/--from/--repo become optional for every later call, sub-agents included.
+  bus bye  --repo R [--as ROLE] [--why "..."]        declare this session finished
+  bus send --repo R --card C --to ROLE|all [--from ROLE] [--kind request|verdict|note|question]
+           [--re N] [--ref kb:<card>|git:<sha>] [--body-file F]   (body on stdin if no --body-file)
+           --re N answers record #N of this thread, and is what clears it from `owed`.
+  bus read --repo R --card C [--as ROLE] [--peek]    unread for ROLE (--peek: don't advance)
+  bus owed [--repo R] [--card C] [--as ROLE]         questions addressed to you that you never answered
+  bus count --repo R [--card C] [--as ROLE]          HOW MANY are unread, never what they say
+  bus who  --repo R                                  who is here: OBSERVED activity + DECLARED presence
+  bus roles                                          addressable roles + their manifests
+  bus close --repo R --card C --by ROLE              finished: stop delivering, keep every word
+  bus open  --repo R --card C --by ROLE              deliberately reopen a closed thread
+  bus log  --repo R --card C                         the whole permanent thread, numbered
+
+Identity, and what it is NOT:
+  RDA_BUS_ROLE / RDA_BUS_SESSION / RDA_BUS_REPO are read when a flag is absent, and
+  they are INHERITED by sub-processes - which is how a sub-agent knows who it is.
+  This is not authentication: `--from` is self-declared and always was, and every
+  delivered line still says so. What changed is that forgetting is no longer the default.
 
 Nobody is woken, so how does anyone know there is mail?
   `bus count` prints one `card<TAB>role<TAB>n` line per role with unread mail and
@@ -733,6 +1543,14 @@ Nobody is woken, so how does anyone know there is mail?
   that is already running. A count carries no claim; bodies still only arrive
   through `read`. It never advances a cursor, and it is taken without the append
   lock, so it can be short by one mid-append and is corrected by the next one.
+
+Why `owed` exists:
+  a question used to be delivered once and then vanish behind the cursor, so
+  "read it and meant to answer" was indistinguishable from "never arrived".
+  A question or request stays listed until the addressee sends something citing
+  it with --re. It is DERIVED from the log, so there is no second state to
+  disagree with the thread. It cannot make anyone answer, and --re proves only
+  that a message was cited - never that the answer was any good.
 
 Cost, since it is the usual worry:
   - `read` delivers only what is NEW to that role; history is never re-sent.
@@ -745,6 +1563,7 @@ With three or more agents:
     message addressed to two roles is delivered to both, in full.
   - The addressee is a ROLE, not a process. Two sessions claiming the same role
     share one cursor and will split the mail between them - give them two roles.
+    `bus who` now shows both sessions, so the collision is visible instead of silent.
   - Delivery is targeted, but the record is public: `bus log` shows every message
     to everyone. There is no private channel, on purpose.
 
@@ -752,10 +1571,14 @@ Enforced here, not asked of you:
   - nothing in bus/ executes an agent CLI, a scheduler or kb (behavioural test + allowlist)
   - a role is addressable only with a manifest that claims no human-gated action
   - a citation resolves to exactly what it proves, and never to the word "verified"
+  - presence is an append-only log of hello/bye events: nothing expires, nothing is
+    renewed, nothing is collected, and no session is ever an addressee.
 
 Heuristic, and declared as one:
   - acceptance criteria are refused in the obvious spellings; a rephrasing gets through.
     Scope comes from the card. The real control is a human reading a random sample.
+  - a DECLARED presence is a claim. A session killed without `bye` keeps claiming it
+    is here; `who` prints the claim next to the last observed action, never instead of it.
 USAGE
 }
 
@@ -765,6 +1588,10 @@ case "${1:-}" in
   peek)  shift; _cmd_read "$@" --peek;;
   count) shift; _cmd_count "$@";;
   who)   shift; _cmd_who "$@";;
+  hello) shift; _cmd_hello "$@";;
+  bye)   shift; _cmd_bye "$@";;
+  owed)  shift; _cmd_owed "$@";;
+  tidy)  shift; _cmd_tidy "$@";;
   close) shift; _cmd_close "" "$@";;
   open)  shift; _cmd_close "reopen" "$@";;
   roles) shift; _cmd_roles "$@";;

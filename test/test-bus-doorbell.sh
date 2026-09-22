@@ -39,6 +39,24 @@ echo "$BODY" | bash "$BUS" send --repo "$REPO" --card d1 \
   --from sol-gate --to implementer --kind verdict >/dev/null \
   || fail "could not seed the thread"
 
+# THE ADDRESSEE HAS TO BE SOMEBODY, and since 2026-09-22 that is not a formality.
+# The doorbell counts only for roles that are DECLARED PRESENT (or the reader's
+# own), because Roberto opened a session and got twelve lines of unread counts
+# for four roles nobody was playing, on two cards already in done/ and one card
+# that does not exist. Mail nobody can act on does not ring; it waits, undamaged,
+# and rings the moment that role announces itself.
+#
+# So the fixture now declares the addressee present. That is not the test being
+# bent to fit the code: without it this suite would be asserting that the channel
+# must nag about mail with no recipient, which is the defect, written down as a
+# requirement.
+# FROM THE FIXTURE DIRECTORY, not from the checkout: `hello` leaves a `.bus-role`
+# and a `.bus-session` at the top of the worktree it runs in, which is the whole
+# point of them — and inside this suite the cwd is the developer's real work.
+# test-worktree-sweep.sh catches exactly that, and did.
+( cd "$WORK" && bash "$BUS" hello --repo "$REPO" --as implementer --session doorbell-sess >/dev/null 2>&1 ) \
+  || fail "could not declare the addressee present"
+
 payload() { printf '{"session_id":"%s","cwd":"%s","hook_event_name":"PostToolUse"}' "$1" "$WORK"; }
 
 # --- 1. it rings, in the dialect the model can hear -------------------------
@@ -102,6 +120,10 @@ REPO_B=doorbell-repo-b
 WORK_B="$TMP/$REPO_B"; mkdir -p "$WORK_B"
 echo "mail for the other repo" | bash "$BUS" send --repo "$REPO_B" --card d9 \
   --from sol-gate --to implementer --kind note >/dev/null || fail "could not seed the second repo"
+# Presence is per repo, like everything else here: being declared on repo A says
+# nothing about repo B, so the addressee has to be announced on both.
+( cd "$WORK_B" && bash "$BUS" hello --repo "$REPO_B" --as implementer --session doorbell-sess-b >/dev/null 2>&1 ) \
+  || fail "could not declare the addressee present on the second repo"
 payload_b() { printf '{"session_id":"%s","cwd":"%s","hook_event_name":"PostToolUse"}' "$1" "$WORK_B"; }
 
 [ -n "$(payload   s-two-repos | bash "$HOOK" 2>/dev/null)" ] || fail "no ring for repo A on a fresh session"

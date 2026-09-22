@@ -114,24 +114,35 @@ a different model. Capability listings are not proof of comparative quality or p
 | [`wanda`](agents/wanda.md) | Loop orchestrator | executor | sonnet |
 | [`twin`](agents/twin.md) | Digital twin: voice + cognitive engine (knows when to convene board/framework); persona in [`identity/`](identity/README.md) | decider | opus |
 
-## Agent bus — talking to another agent on the same card
+## Agent bus — lavorare come una squadra, non come estranei nella stessa stanza
 
-→ [`bus/bus-protocol.md`](bus/bus-protocol.md) — the protocol, its three properties and the
-limits it declares. `bus/bus.sh` is the whole implementation.
+→ [`bus/bus-protocol.md`](bus/bus-protocol.md) — the protocol, its properties and the limits
+it declares. `bus/bus.sh` is the whole implementation.
 
-**When two or more sessions work the same card**, they exchange messages through the bus
-instead of a human relaying them. Your role is a name from `bus roles`.
+**When two or more sessions work the same repo**, they talk through the bus instead of a
+human relaying them. **Announce yourself, read, answer what you owe, say when you leave** —
+in that order, every session, and it is four commands.
 
 ```
-bus read  --repo <REPO> --card <CARD> --as <ROLE>      # what is new for you
-bus send  --repo <REPO> --card <CARD> --from <ROLE> --to <ROLE>|all \
-          --kind request|verdict|note|question [--ref git:<sha>|kb:<card>]   # body on stdin
-bus count --repo <REPO>                                # HOW MANY are unread, never what
-bus log   --repo <REPO> --card <CARD>                  # the whole thread
-bus close --repo <REPO> --card <CARD> --by <ROLE>      # done talking
+bus hello --as <ROLE> --card <CARD> --doing '<one line>'   # once, at the start
+bus who                                 # who else is here: OBSERVED activity + DECLARED presence
+bus read  --card <CARD>                 # what is new for you
+bus owed                                # what was asked of YOU and never answered
+bus send  --card <CARD> --to <ROLE>|all --kind request|verdict|note|question \
+          [--re <N>] [--ref git:<sha>|kb:<card>]           # body on stdin
+bus tidy                                # threads whose card is finished stop calling (--yes to close)
+bus bye                                 # once, when you finish
 ```
 
-Three rules, and they are the point:
+`--repo` and `--as` are worked out for you: the repo from the checkout (the **project**, even
+inside a per-card worktree), the role from `RDA_BUS_ROLE` or from the `.bus-role` that `hello`
+leaves next to the work. `bus roles` lists every role **and which agent plays it** —
+`@baccio` is `architect`, `@rex` is `reviewer`, `@thor` is `qa-gate`, `@luca` is `security`,
+`@wanda` is `orchestrator`, a research sub-agent is `explorer`, the session doing the work is
+`implementer`. Advisory agents (`@socrates`, `@board`, `@coach`, `@twin`) are deliberately
+**not** on it: they think with Roberto, they do not work a repo beside anyone.
+
+Four rules, and they are the point:
 
 1. **The bus never starts anyone.** Nothing wakes you. A hook may ring a **doorbell** —
    `bus count` says *how many* messages are unread and never *what they say*, on
@@ -142,15 +153,67 @@ Three rules, and they are the point:
    define when you are done.
 3. **The bus never writes kanban state.** `doing → done` stays [@thor](agents/thor.md)'s gate,
    through `kb`. A verdict on the bus is a message about a card, not a move of it.
+4. **Answering means citing.** A `question` or a `request` addressed to you stays listed in
+   `bus owed` until you send something with `--re <N>`. Without the citation the asker cannot
+   tell an answer from silence — and silence is what the channel was made of.
 
-**Roles are files, not a fixed pair.** A role is addressable if `bus/roles/<role>.json`
-exists and claims no human-gated action: `implementer`, `sol-gate`, `architect`, `qa-gate`,
-`security` today, one more file tomorrow. Two sessions claiming the *same* role share one
-cursor and split the mail — for two workers, use two roles.
+**Why this shape, and it is measured, not felt.** On 2026-09-22 the real store held 167
+messages across 31 threads: **13 threads had exactly one sender**, **14 had no reader at
+all**, and one had a role that read 37 of 38 messages and replied once. Roberto: *"o si
+parlano e non si ascoltano o si ascoltano e non si parlano."* Three causes, all structural,
+none about anyone's diligence — nobody knew which role they were (`--as` was a string to
+retype on every call), nobody knew who was there (presence was guessed from the last message
+written), and a question read once became invisible forever (the cursor moved past it and
+nothing remembered it had been asked). Plus the one that made the rest moot: **the doorbell
+never rang where the work happens**, because inside a per-card worktree it looked for mail
+under a repo named after the card.
 
-Delivery stays opt-in: the only hook that touches the bus reports a count, `context-inject.sh`
-does not read it, and `kb` does not know it exists. An announcement nothing can act on cannot
-surprise anyone.
+**Dentro UNA sessione, fra i suoi sotto-agenti.** Stesso canale, limite diverso e dichiarato:
+un sotto-agente a colpo singolo **non può essere svegliato** — finisce prima che chiunque
+risponda. Quindi fra loro il bus è una **lavagna durevole**, non una conversazione: ogni
+sotto-agente legge il thread all'inizio e ci scrive il suo esito alla fine, con `--as
+explorer` (o il ruolo che gli dai nel prompt) e **un nome di sessione suo**, mai quello del
+padre — `<sessione-padre>-<nome>`. *(Corretto 2026-09-22: qui c'era scritto di riusare il
+`--session` del padre. La presenza tiene l'ultimo evento per ogni nome di sessione, quindi il
+`hello` del figlio faceva sparire il padre dai presenti e il suo `bye` li toglieva tutti e
+due — riprodotto in revisione avversariale.)* Serve a due cose che altrimenti si perdono: il
+contesto di un sotto-agente **muore con lui**, e due sotto-agenti in parallelo non sanno l'uno
+dell'altro. Per un vero scambio a turni dentro la sessione esiste il canale nativo dell'host
+(i suoi agenti in background), che il bus non sostituisce e non imita. **E una lavagna che
+nessuno è obbligato a leggere vale quanto nessuna lavagna**: chi delega scrive nel compito
+*quali* messaggi leggere e su quale versione del lavoro, e chi torna dice a quali si è
+attenuto — altrimenti la lettura è una buona intenzione, non una condizione del lavoro.
+
+**Roles are files.** A role is addressable if `bus/roles/<role>.json` exists and claims no
+human-gated action. Two sessions claiming the *same* role share one cursor and split the mail
+— now visibly, because `bus who` shows both sessions; for two workers, use two roles.
+
+Delivery stays opt-in: the doorbell reports a count, bodies arrive only through `read`, and
+`kb` does not know the bus exists. What changed on 2026-09-22 is that `context-inject.sh`
+**announces the session** at start and tells it which role it is — a presence record and a
+line of text, never a delivery: it carries no message, and nothing it writes can wake anyone.
+
+**And the doorbell only rings for somebody who is there.** Roberto opened a session that day
+and got twelve lines of unread counts for four roles nobody was playing, on two cards already
+in `done/` and one card that does not exist: *"vorrei che il sistema riuscisse a tenersi pulito
+e evitare ste robe che non si capisce che cazzo sono."* The cost is not the twelve lines — a
+doorbell that rings for mail nobody can act on teaches the reader to stop hearing it, and then
+the message that mattered arrives inside noise already learned away. So `bus count --present`
+counts only for roles that are **declared present**, and `bus tidy` closes the threads of
+finished work (report by default, `--yes` to act, and **nothing is ever deleted** — `bus log`
+still reads every word). Nothing is hidden by the filter: mail the doorbell stays quiet about
+is still there, and the session-start block shows the unread count for **your own** role,
+because `owed` covers only questions and requests, never notes and verdicts.
+The goodbye is automatic on **both** hosts — Copilot's `onSessionEnd` and Claude's
+`SessionEnd`, both running `hooks/bus-bye.sh` — and wired **there and nowhere else**: `Stop`
+and `onAgentStop` fire at the end of every *turn*, and a session that declared itself finished
+after every turn would make the presence view entirely of ghosts. *(Corrected 2026-09-22 by an
+adversarial review: this used to say Claude had no session-end event at all. It does, and
+`bin/sync.sh` was already wiring another hook to it — the claim was never checked against the
+file it was about.)* It stays best-effort by nature: a crash, a kill or a closed lid delivers
+no callback, so a declared presence that is never withdrawn is a *normal* state — which is
+exactly why `bus who` prints the declaration next to the last observed action instead of
+believing it.
 
 ## Loop Protocol
 

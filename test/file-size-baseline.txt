@@ -124,16 +124,86 @@
 # chiusa, e goal-gate.sh non tratteneva mai nessuno — agenti fermi dopo la prima card mentre
 # Roberto dormiva. Righe: lettura dell'id, rinnovo per sessione nuova, card bloccate fuori e
 # saltate, segno ENTRATA ORA. Quattro mutazioni provate rosse in test-kb-queue.sh.
+# 2026-09-22, diciottesima: +480 bus/bus.sh (774 -> 1254), +13 hooks/copilot/
+# extension.template.mjs (699 -> 712), +6 test/validate.sh (305 -> 311). E' la crescita piu'
+# grossa mai chiesta a questo file, quindi la misura prima della giustificazione: delle 480
+# righe, 282 sono codice (482 -> 764) e 198 sono commento e righe vuote. Il rapporto e' quello
+# che questo repo tiene ovunque, non un modo di gonfiare il conto.
+# Perche' valgono. Il bus passava OGNI controllo di sicurezza — non avvia agenti, non scrive
+# stato kanban, non perde messaggi — su un negozio in cui non era un canale: misurato il
+# 2026-09-22, 167 messaggi in 31 conversazioni, 13 con UN SOLO mittente, 14 che nessuno ha mai
+# aperto. Roberto: "o si parlano e non si ascoltano o si ascoltano e non si parlano". Le tre
+# cause erano strutturali, non di diligenza: nessuno sapeva quale ruolo fosse (--as da
+# riscrivere a ogni comando, e un sotto-agente non aveva modo di scoprirlo), nessuno sapeva chi
+# ci fosse (la presenza si deduceva dall'ultimo messaggio scritto), e una domanda letta una
+# volta spariva per sempre dietro al cursore. Le righe sono hello/bye/owed, la risoluzione di
+# identita' e repo, e --re. In piu' un difetto che nessuna delle tre avrebbe risolto: dentro
+# una copia di lavoro per-card il campanello cercava la posta sotto un repo chiamato come la
+# CARD, quindi non suonava mai esattamente dove il canone dice di lavorare.
+# Le 13 righe in extension.template.mjs sono l'aggancio del congedo su onSessionEnd — e solo
+# li': Stop e onAgentStop scattano a ogni TURNO, e una sessione che si dichiara finita a ogni
+# turno riempie la vista di fantasmi. Le 6 in validate.sh agganciano test-bus-team.sh (225
+# righe, 15 controlli, ognuno nominato con il fallimento che avrebbe preso).
+# LO SPLIT E' REALE E RESTA NON FATTO, e la ragione non e' la fretta: test/test-bus.sh misura
+# l'ALLOWLIST dei comandi esterni su una traccia di esecuzione di QUESTO file, e
+# test-bus-mutants.sh deriva i propri controlli da test-bus.sh. Spostare presenza e debito in
+# un bus/lib-*.sh sourced cambia la superficie tracciata e va rivisto con quella batteria in
+# mano: e' una card sua, con la sua revisione, non una riga di contorno a questa. Chi tocca
+# bus.sh per un motivo di PRODOTTO lo spezza, non lo allarga una seconda volta.
+# 2026-09-22, diciannovesima (stessa giornata della diciottesima, e va detto cosi'):
+# +300 bus/bus.sh (1254 -> 1554), +16 test/test-bus.sh (1390 -> 1406), +45
+# test/test-bus-mutants.sh (1133 -> 1178), +3 bin/sync.sh (651 -> 654), +1
+# test/validate.sh (311 -> 312).
+# La causa e uno screenshot: Roberto apre una sessione e trova dodici righe di posta
+# non letta per quattro ruoli che nessuno stava interpretando, su due card gia' in
+# done/ e una card che non esiste. "vorrei che il sistema riuscisse a tenersi pulito
+# e evitare ste robe che non si capisce che cazzo sono". Il costo non sono le dodici
+# righe: un campanello che suona per posta su cui nessuno puo' agire insegna a non
+# sentirlo piu', e da quel momento il messaggio che conta arriva dentro un rumore
+# gia' imparato a memoria. Le righe sono `count --present` (suona solo per chi c'e'
+# davvero) e `bus tidy` (i thread di lavoro finito smettono di chiamare, referto di
+# default, chiude solo con --yes, non cancella niente). Piu' le correzioni di una
+# revisione avversariale: il corpo di un messaggio altrui non entra piu' nel contesto
+# del modello, le note di presenza passano il controllo di riservatezza, una citazione
+# vale come risposta solo se raggiunge chi ha chiesto.
+# In test-bus.sh le 25 righe mettono hello/bye/owed nella tabella comportamentale e
+# fanno girare quella tabella da una directory di servizio invece che dal checkout:
+# `hello` lascia .bus-role/.bus-session in cima alla copia in cui gira — e il suo
+# scopo — quindi la suite scriveva due file dentro il lavoro vero, e
+# test-worktree-sweep se ne e accorto. Un test che lascia qualcosa nell albero che
+# sta provando ha gia smesso di essere un test di quell albero. Le righe erano 16:
+# erano gli unici tre verbi mai passati sotto il canary e l'allowlist, e il senso di
+# quel cancello e' che leggere il codice non e' la prova. In test-bus-mutants.sh sono
+# il timeout interno portato a 900s (una passata pulita dura 322s, il limite era 300:
+# non distingueva "sopravvissuto" da "troppo lento") e i sette mutanti che puntano a
+# una scansione rimossa apposta, ora DICHIARATI invece che riportati come regressione.
+# La riga di sync.sh aggancia il congedo al SessionEnd di Claude — che esiste, contro
+# quanto avevo scritto io in quattro posti senza mai verificarlo.
+# LA SUITE NUOVA NON ENTRA IN LISTA: e' nata a 431 righe e l'ho SPEZZATA, perche' la
+# regola su un file nuovo e' giusta ed era mia da rispettare. Ora sono
+# test/lib-bus-team.sh (60, il banco di prova condiviso), test-bus-presence.sh (199,
+# chi c'e' e chi se n'e' andato) e test-bus-owed.sh (203, cosa si deve e il rumore che
+# lo copriva). Il taglio e' per argomento, non per contare righe.
+# Aggiunta in giornata: `hello --arrival`, il benvenuto in UNA chiamata invece di
+# quattro. Aprire una sessione era passato da 2,28s a 3,71s — 1,4s pagati ogni
+# volta, contro la cicatrice gia scritta qui sopra sui 2,5s all avvio. Ora e
+# 0,55s per quella chiamata, e `_thread_state` chiede con grep invece che con jq
+# la domanda piu frequente del file (la fanno read, count, who, owed, tidy e send,
+# una volta per thread).
+# E resta in piedi, per la quinta volta in questo file: bus.sh va spezzato.
+# Non qui: test-bus.sh misura l'allowlist su una traccia di esecuzione di QUEL file e
+# test-bus-mutants.sh deriva i suoi controlli da test-bus.sh, quindi lo split cambia la
+# superficie tracciata e vuole quella batteria in mano. E' una card sua.
 1777 kanban/kb.sh
-1390 test/test-bus.sh
-1133 test/test-bus-mutants.sh
-774 bus/bus.sh
-651 bin/sync.sh
+1415 test/test-bus.sh
+1178 test/test-bus-mutants.sh
+1601 bus/bus.sh
+654 bin/sync.sh
 601 test/test-federated-kb.sh
 578 test/test-factory-kb.sh
 438 eval/test-eval-pipeline.sh
 446 test/test-kb-views.sh
 344 eval/report.sh
 377 test/test-copilot-adapter.sh
-305 test/validate.sh
-699 hooks/copilot/extension.template.mjs
+312 test/validate.sh
+712 hooks/copilot/extension.template.mjs

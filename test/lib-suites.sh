@@ -55,6 +55,15 @@ _spawn() {
 _spawn_serial_group() {
   _SPAWNED="$_SPAWNED $*"
   ( for _g in "$@"; do
+      # QUANDO QUESTA SUITE E' PARTITA DAVVERO. Le cinque del gruppo girano in
+      # FILA, e senza questo segnale il budget di 15 minuti di _suite partiva da
+      # quando si comincia ad aspettare: l'ultima della fila pagava anche l'attesa
+      # delle altre quattro e veniva dichiarata "hung". Misurato il 2026-09-22:
+      # test-twin-install passa da solo in 2m48s e veniva riportato bloccato in
+      # tre validazioni di fila. Un limite che scatta sul caso sano non e' un
+      # margine, e' un rosso a caso — e un rosso a caso su un innocente insegna a
+      # non leggere piu' il referto.
+      printf '%s' "$(date +%s)" > "$_PARDIR/$_g.start"
       bash "test/$_g.sh" > "$_PARDIR/$_g.out" 2>&1
       printf '%s' "$?" > "$_PARDIR/$_g.rc.part" && mv "$_PARDIR/$_g.rc.part" "$_PARDIR/$_g.rc"
     done ) &
@@ -66,11 +75,18 @@ _suite() {
   case " $_SPAWNED " in *" $1 "*) ;;
     *) printf '  FAIL: %s is awaited by _suite but was never handed to _spawn — add it to the launch list in this file\n' "$1"; return 1 ;;
   esac
+  local started=0
   while [ ! -f "$rc_file" ]; do
     sleep 0.2
     waited=$((waited+1))
-    # 15 minutes. A suite that has not finished by then is hung, and hanging
-    # forever inside a CI gate is the one failure mode nobody ever debugs.
+    # 15 minutes OF ITS OWN RUN. A suite queued behind others in a serial group
+    # has not started yet, and counting that queue against it turns a slow
+    # neighbour into its failure. The countdown restarts the moment this suite
+    # actually begins; suites launched by `_spawn` have no start marker and are
+    # timed as before, because they begin immediately.
+    if [ "$started" = "0" ] && [ -f "$_PARDIR/$1.start" ]; then
+      started=1; waited=0
+    fi
     if [ "$waited" -gt 4500 ]; then
       printf '  FAIL: %s did not finish within 15 minutes (hung)\n' "$1"
       return 1

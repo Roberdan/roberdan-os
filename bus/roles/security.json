@@ -14,5 +14,6 @@
     "start, spawn or dispatch another agent",
     "write to the repo under review",
     "treat its own finding as a decision: what to do about it is a human call"
-  ]
+  ],
+  "agent": "@luca"
 }

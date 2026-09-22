@@ -14,5 +14,6 @@
     "move a kanban card to any state",
     "start, spawn or dispatch another agent",
     "assert a human decision without citing a durable artifact"
-  ]
+  ],
+  "agent": "the session doing the work on the card"
 }
