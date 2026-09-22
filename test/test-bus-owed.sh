@@ -119,11 +119,27 @@ ok "the doorbell asks for the body-free form"
 #     first version only printed the COMMAND, which is the same failure one
 #     level up: the mail was fixed and the list of who is here stayed behind a
 #     command nobody types.
-grep -q 'who .*--brief' "$ROOT/hooks/context-inject.sh" \
-  || fail "hooks/context-inject.sh does not ask for the facts-only roster, so another agent's prose can reach the context at startup"
-grep -q 'bus.sh" who --repo "\$_brepo" 2>/dev/null' "$ROOT/hooks/context-inject.sh" \
-  && fail "hooks/context-inject.sh injects the full roster, prose included"
-ok "the session-start roster is the facts-only form"
+# Checked by BEHAVIOUR, not by grepping for a command name: the briefing was four
+# calls and became one (`hello --arrival`) to stop paying 1.4s at every session
+# start, and a check that pins the spelling would have failed on a change that
+# preserved the property perfectly. What must hold is that another agent's prose
+# never lands in the context automatically.
+PROSE="zzprosezz-another-agents-sentence"
+env RDA_BUS_ROLE=architect RDA_BUS_HOME="$RDA_BUS_HOME" \
+  bash "$BUS" hello --repo "$R" --as architect --session prose-sess --doing "$PROSE" >/dev/null 2>&1
+briefing="$(env RDA_BUS_ROLE=qa-gate RDA_BUS_HOME="$RDA_BUS_HOME" \
+  bash "$BUS" hello --repo "$R" --as qa-gate --session reader-sess --arrival 2>/dev/null)"
+[ -n "$briefing" ] || fail "the arrival briefing printed nothing"
+grep -q "prose-sess" <<<"$briefing" \
+  || fail "the arrival briefing does not name the other session at all: then nobody learns who is here"
+grep -q "$PROSE" <<<"$briefing" \
+  && fail "the arrival briefing carries another agent's own sentence into the context automatically"
+# Two greps, not one: the call is split across lines with a continuation, and a
+# single-line pattern would report the hook as broken while it works.
+grep -q 'bus.sh" hello' "$ROOT/hooks/context-inject.sh" \
+  && grep -q -- '--arrival' "$ROOT/hooks/context-inject.sh" \
+  || fail "hooks/context-inject.sh does not use the facts-only arrival briefing"
+ok "the session-start briefing names who is here and carries none of their prose"
 
 # 3g. THE DOORBELL DOES NOT RING FOR MAIL NOBODY CAN ACT ON.
 #     Roberto, 2026-09-22, opening a session: twelve lines of unread counts for

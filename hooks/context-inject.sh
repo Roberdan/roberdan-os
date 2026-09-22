@@ -167,58 +167,28 @@ if [ -r "$ROOT/bus/bus.sh" ] && command -v jq >/dev/null 2>&1; then
   if [ -n "$_brepo" ]; then
     _brole="${RDA_BUS_ROLE:-implementer}"
     _bsess="${RDA_BUS_SESSION:-${_sid:-sess-$$}}"
-    # Solo su sessione NUOVA: una ripresa o una compattazione e' la stessa sessione di prima,
-    # e ripresentarla ogni volta trasformerebbe la presenza in rumore.
+    # UNA CHIAMATA SOLA. Prima erano quattro (hello, who, owed, count) e ognuna e
+    # un processo nuovo con la sua validazione del ruolo: l apertura di una
+    # sessione era passata da 2,28s a 3,71s, cioe 1,4s pagati ogni volta che
+    # Roberto apre qualcosa. Questo file porta gia scritta la cicatrice dei 2,5s
+    # pagati all avvio. `--arrival` calcola le quattro risposte dove i dati sono
+    # gia aperti, e stampa solo FATTI: niente prosa scritta da un altro agente.
+    # Su ripresa/compattazione non ci si ripresenta — e la stessa sessione — ma il
+    # benvenuto si ristampa lo stesso, perche il contesto e andato e chi riprende
+    # deve sapere chi e.
     case "$_src" in
-      resume|compact|fork) : ;;
-      *)
-        bash "$ROOT/bus/bus.sh" hello --repo "$_brepo" --as "$_brole" \
-             --session "$_bsess" --doing "sessione aperta" >/dev/null 2>&1 || true
-        ;;
+      resume|compact|fork) _bhello="" ;;
+      *) _bhello="$(bash "$ROOT/bus/bus.sh" hello --repo "$_brepo" --as "$_brole" \
+                      --session "$_bsess" --doing "sessione aperta" --arrival 2>/dev/null || true)" ;;
     esac
-    _bowed="$(bash "$ROOT/bus/bus.sh" owed --repo "$_brepo" --as "$_brole" --brief 2>/dev/null | grep -cE '^  [a-zA-Z0-9]' || echo 0)"
-    echo
-    echo "### 📻 Sul bus sei **@$_brole** (sessione \`$_bsess\`, repo \`$_brepo\`)."
-    echo "  Usalo cosi', e passalo ai tuoi sotto-agenti:"
-    echo "    export RDA_BUS_ROLE=$_brole RDA_BUS_SESSION=$_bsess RDA_BUS_REPO=$_brepo"
-    # CHI ALTRO C'E', MOSTRATO — non un comando da ricordare.
-    # Roberto, 2026-09-22: "come fanno i vari agenti/sessioni a sapere chi altro c'e'?"
-    # Prima qui c'era scritto solo `bus who --repo X`, cioe' lo stesso difetto un piano
-    # sopra: la posta l'avevo sistemata e l'elenco dei presenti era rimasto dietro a un
-    # comando che nessuno digita. Ma non si puo' semplicemente versare qui `bus who`:
-    # la colonna `doing` e' una frase scritta da un'altra sessione, e una frase di un
-    # altro agente che arriva COME CONTESTO viene creduta come contesto — che e'
-    # esattamente cio' per cui il board taglio' la consegna dei messaggi da qui nel
-    # luglio 2026. La regola, resa esplicita da una revisione avversariale:
-    #   nel contesto automatico entrano OSSERVAZIONI STRUTTURATE con la loro provenienza;
-    #   il testo libero di un altro agente entra da una lettura esplicita, marcato
-    #   NON VERIFICATO. Essere il destinatario non rende sicure le parole di nessuno.
-    # Quindi `--brief`: ruolo, sessione, card, orari, e se quel ruolo ha fatto qualcosa
-    # da quando si e' presentato. Nessuna prosa.
-    _bwho="$(bash "$ROOT/bus/bus.sh" who --repo "$_brepo" --brief 2>/dev/null \
-               | awk '/^DECLARED/{d=1;next} d && NF && $0 !~ /^role /{print "  " $0}' | head -8 || true)"
-    if [ -n "$_bwho" ]; then
-      echo "  Chi altro si e' dichiarato su \`$_brepo\` (dichiarazioni, non prove — cosa fanno lo dicono loro, non questo elenco):"
-      printf '%s\n' "$_bwho"
-      echo "  Cosa stanno facendo davvero: \`bus who --repo $_brepo\` · i ruoli e chi li interpreta: \`bus roles\`"
-    else
-      echo "  Non c'e' nessun altro dichiarato su \`$_brepo\`. I ruoli e chi li interpreta: \`bus roles\`"
+    if [ -z "$_bhello" ]; then
+      _bhello="$(bash "$ROOT/bus/bus.sh" hello --repo "$_brepo" --as "$_brole" \
+                   --session "$_bsess" --arrival 2>/dev/null || true)"
     fi
-    if [ "${_bowed:-0}" -gt 0 ] 2>/dev/null; then
-      echo "  ⚠️  $_bowed messaggi aspettano una risposta DA TE: \`bus owed\` — rispondere significa citarli con \`--re N\`."
+    if [ -n "$_bhello" ]; then
+      echo
+      printf '%s\n' "$_bhello"
     fi
-    # LA POSTA NON LETTA DEL TUO RUOLO, per intero. Il campanello durante la sessione
-    # suona solo per i ruoli che qualcuno sta interpretando (senno' diventa il rumore che
-    # Roberto ha visto: dodici righe per quattro ruoli assenti, su card gia' chiuse). Il
-    # rovescio di quel filtro e' che un ruolo che ARRIVA ORA deve vedere tutto cio' che lo
-    # aspetta, comprese le note e i verdetti che `bus owed` non copre — quello elenca solo
-    # domande e richieste. Un NUMERO, non i messaggi: i corpi arrivano solo da `bus read`.
-    _bunread="$(bash "$ROOT/bus/bus.sh" count --repo "$_brepo" --as "$_brole" 2>/dev/null \
-                 | awk -F'\t' '{n+=$3} END{print n+0}' || echo 0)"
-    if [ "${_bunread:-0}" -gt 0 ] 2>/dev/null; then
-      echo "  📬 $_bunread messaggi non letti indirizzati a @$_brole: \`bus read --card <CARD>\` (i corpi arrivano solo cosi', marcati NON VERIFICATI)."
-    fi
-    echo "  Quando hai finito: \`bus bye --repo $_brepo\` (senno' risulti ancora qui a chi arriva dopo)."
   fi
 fi
 

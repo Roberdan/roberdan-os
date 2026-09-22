@@ -860,10 +860,21 @@ _cmd_count() {
 # The closure is itself a RECORD in the log, not a flag in a side file: who
 # closed a thread and when is exactly the kind of fact this channel exists to
 # keep, and a side file could go missing while the thread it described stayed.
+# CHIESTO CON grep, NON CON jq, e la ragione e che questa e la domanda piu fatta
+# di tutto il file: la fanno `read`, `count`, `who`, `owed`, `tidy` e `send`, una
+# volta per thread, e ogni jq e un interprete che parte. Misurato: l apertura di
+# una sessione pagava quasi un secondo quasi tutto in avvii di jq.
+#
+# Non e un'euristica sulla forma del testo: i record li scrive SOLO `jq -c` da un
+# unico oggetto, quindi `"kind":"closed"` si scrive sempre cosi, senza spazi. E un
+# corpo che contenesse quelle stesse lettere non puo essere scambiato per il
+# campo, perche dentro una stringa JSON le virgolette sono sfuggite (\") e non
+# corrispondono al modello. Il campo `body` e l unico posto dove un testo
+# arbitrario arriva, ed e sempre una stringa JSON.
 _thread_state() {
   local log="$1"
   [ -s "$log" ] || { echo open; return 0; }
-  jq -r 'select(.kind=="closed" or .kind=="opened") | .kind' "$log" 2>/dev/null \
+  grep -oE '"kind":"(closed|opened)"' "$log" 2>/dev/null \
     | tail -1 | grep -q closed && echo closed || echo open
 }
 
@@ -945,7 +956,7 @@ _declared_present() {
 }
 
 _cmd_hello() {
-  local repo="" as="" session="" card="" doing=""
+  local repo="" as="" session="" card="" doing="" arrival=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --repo)    _need $# "--repo";    repo="$2";    shift 2;;
@@ -953,6 +964,15 @@ _cmd_hello() {
       --session) _need $# "--session"; session="$2"; shift 2;;
       --card)    _need $# "--card";    card="$2";    shift 2;;
       --doing)   _need $# "--doing";   doing="$2";   shift 2;;
+      # --arrival: TUTTO IL BENVENUTO IN UN PROCESSO SOLO, ed e una questione di
+      # secondi pagati sempre. Il blocco di avvio chiamava questo file quattro
+      # volte — hello, who, owed, count — e ogni chiamata e un bash nuovo piu la
+      # validazione del ruolo a colpi di jq: misurato, l apertura di una sessione
+      # era passata da 2,28s a 3,71s. In questo repo c e gia una cicatrice scritta
+      # su 2,5s pagati prima che Roberto potesse scrivere, in ogni sessione di
+      # ogni progetto: "righe pagate una volta contro secondi pagati sempre".
+      # Qui le quattro risposte si calcolano dove i dati sono gia aperti.
+      --arrival) arrival=1; shift;;
       *) die "hello: unknown argument '$1'";;
     esac
   done
@@ -977,12 +997,39 @@ _cmd_hello() {
   # the identity for the rest of the session, sub-agents included. Everything
   # human goes to stderr, so `eval "$(bus hello ...)"` cannot swallow a diagnostic
   # or execute one.
+  local owed_n; owed_n="$(_owed_count "$repo" "" "$as")"
+
+  if [ "$arrival" = "1" ]; then
+    # Il benvenuto, su stdout perche chi lo chiama lo inietta nel contesto della
+    # sessione. Solo FATTI: ruoli, sessioni, card, orari, numeri. Mai la prosa che
+    # un altro agente ha scritto su di se — quella si legge apposta, e arriva
+    # marcata NON VERIFICATA. Essere il destinatario non rende sicure le parole
+    # di nessuno.
+    local unread declared
+    unread="$(_cmd_count --repo "$repo" --as "$as" 2>/dev/null | awk -F'\t' '{n+=$3} END{print n+0}')"
+    declared="$(_declared_present "$(_presence_path "$repo")" 2>/dev/null \
+                | awk -F'\t' -v me="$session" '$2 != me {printf "  %-18s %-22s %-14s %s\n", $1, $2, $3, $4}')"
+    printf '### 📻 Sul bus sei **@%s** (sessione `%s`, repo `%s`).\n' "$as" "$session" "$repo"
+    printf '  Passalo ai tuoi sotto-agenti (con un nome di sessione LORO, non il tuo):\n'
+    printf '    export RDA_BUS_ROLE=%s RDA_BUS_SESSION=%s RDA_BUS_REPO=%s\n' "$as" "$session" "$repo"
+    if [ -n "$declared" ]; then
+      printf '  Chi altro si e dichiarato qui (dichiarazioni, non prove — cosa fanno lo dicono loro):\n'
+      printf '%s\n' "$declared"
+    else
+      printf '  Non ce nessun altro dichiarato su `%s`. I ruoli e chi li interpreta: `bus roles`\n' "$repo"
+    fi
+    [ "$owed_n" = "0" ] \
+      || printf '  ⚠️  %s messaggi aspettano una risposta DA TE: `bus owed` — rispondere significa citarli con `--re N`.\n' "$owed_n"
+    [ "${unread:-0}" = "0" ] \
+      || printf '  📬 %s non letti per @%s: `bus read --card <CARD>` (i corpi arrivano solo cosi, marcati NON VERIFICATI).\n' "$unread" "$as"
+    printf '  Quando hai finito: `bus bye --repo %s` (senno risulti ancora qui a chi arriva dopo).\n' "$repo"
+    return 0
+  fi
+
   {
     echo "bus: @$as is present on $repo${card:+ (card $card)} as session $session."
     echo "     others see you with: bus who --repo $repo"
     echo "     when you finish:     bus bye --repo $repo"
-    local owed_n
-    owed_n="$(_owed_count "$repo" "" "$as")"
     [ "$owed_n" = "0" ] || echo "     NOTE: $owed_n message(s) are waiting for YOUR answer — bus owed --repo $repo"
   } >&2
   printf 'export RDA_BUS_ROLE=%s RDA_BUS_SESSION=%s RDA_BUS_REPO=%s\n' "$as" "$session" "$repo"

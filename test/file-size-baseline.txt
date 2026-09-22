@@ -184,14 +184,20 @@
 # test/lib-bus-team.sh (60, il banco di prova condiviso), test-bus-presence.sh (199,
 # chi c'e' e chi se n'e' andato) e test-bus-owed.sh (203, cosa si deve e il rumore che
 # lo copriva). Il taglio e' per argomento, non per contare righe.
-# E resta in piedi, per la quinta volta in questo file: bus.sh a 1554 righe va spezzato.
+# Aggiunta in giornata: `hello --arrival`, il benvenuto in UNA chiamata invece di
+# quattro. Aprire una sessione era passato da 2,28s a 3,71s — 1,4s pagati ogni
+# volta, contro la cicatrice gia scritta qui sopra sui 2,5s all avvio. Ora e
+# 0,55s per quella chiamata, e `_thread_state` chiede con grep invece che con jq
+# la domanda piu frequente del file (la fanno read, count, who, owed, tidy e send,
+# una volta per thread).
+# E resta in piedi, per la quinta volta in questo file: bus.sh va spezzato.
 # Non qui: test-bus.sh misura l'allowlist su una traccia di esecuzione di QUEL file e
 # test-bus-mutants.sh deriva i suoi controlli da test-bus.sh, quindi lo split cambia la
 # superficie tracciata e vuole quella batteria in mano. E' una card sua.
 1777 kanban/kb.sh
 1415 test/test-bus.sh
 1178 test/test-bus-mutants.sh
-1554 bus/bus.sh
+1601 bus/bus.sh
 654 bin/sync.sh
 601 test/test-federated-kb.sh
 578 test/test-factory-kb.sh
