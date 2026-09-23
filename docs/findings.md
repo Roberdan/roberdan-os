@@ -1,5 +1,20 @@
 # Findings — cose vere che nessuno ha chiesto
 
+### 2026-09-23 — skill osservate, non presunte
+
+Il referto sulle fonti locali osserva sei sessioni con avvio nominativo di
+`roberdan-twin`; per `film-director` non osserva avvii ne' occasioni candidate
+basate sui file nella finestra di trenta giorni. Non significa "mai usata":
+l'audit contiene 953 eventi senza data e la copertura e' parziale.
+Il denominatore del bisogno reale non si ricava dalla semplice disponibilita'
+della skill. Le voci senza un criterio verificabile dichiarano non misurabile.
+
+Una lacuna concreta, indipendente da queste incertezze: prima della modifica la
+tabella di instradamento non aveva una riga per i video. Ora rimanda a
+`film-director` prima di pianificare o produrre, con fallback al file canonico.
+`test/test-skill-routing.sh` prova il collegamento e diventa rosso togliendolo.
+Questo dimostra raggiungibilita', non un aumento gia' misurato dell'utilizzo. — cose vere che nessuno ha chiesto
+
 Esiste perché il 30 luglio 2026 c'erano **33 card in attesa dell'approvazione di Roberto**, quasi
 tutte nate come rilievi di revisione, e il board non sapeva distinguerle dal lavoro che aveva
 chiesto lui. Un rilievo **non diventa una card**: solo Roberto promuove.

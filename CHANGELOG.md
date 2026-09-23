@@ -3,6 +3,16 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.57.0 — 2026-09-23
+
+### Added
+
+- Per-skill telemetry distinguishes observed invocations from textual mentions
+  and reports candidate work opportunities only when existing metadata supports
+  them. Missing evidence is not reported as zero usage.
+- Video work now routes to `film-director` before planning or production, with
+  a declared fallback and a regression test that fails when the route is removed.
+
 ## 2.56.0 — 2026-09-23
 
 ### Added

@@ -22,7 +22,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test
           test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery test-verify-done test-audit test-audit-hooks \
           test-kb-root-resolution test-kb-start-worktree-cause test-worktree-sweep test-junk-clean test-checkup test-twin-export-drift test-kb-top test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
-          test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-telemetry test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
+          test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-telemetry test-telemetry-skills test-skill-routing test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-model-economy \
           test-model-registry test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
           test-drift test-links test-privacy test-plan-coverage test-optional-skills test-jev test-jev-routing test-publication-check test-film-preflight test-gbrain-recovery; do
@@ -262,7 +262,7 @@ section "agent bus — the typed MCP surface (test/test-bus-mcp.sh)"
 if _suite test-bus-mcp; then ok "the MCP surface dispatches send/read/log only, refuses unknown tools, and stores shell metacharacters as inert data"; else _suite_out test-bus-mcp; err "test-bus-mcp — see bash test/test-bus-mcp.sh"; fi
 
 section "telemetria del valore — misura, non stima, e non spia (test/test-telemetry.sh)"
-if _suite test-telemetry; then ok "il referto sul valore separa la fonte esatta da quella approssimata, porta il denominatore delle occasioni, dichiara cosa non sa, conta righe senza leggerne il contenuto, e puo' solo aggiungere in coda a findings"; else _suite_out test-telemetry; err "test-telemetry — see bash test/test-telemetry.sh"; fi
+for _t in test-telemetry test-telemetry-skills test-skill-routing; do if _suite "$_t"; then ok "$_t: controlli superati"; else _suite_out "$_t"; err "$_t failed"; fi; done; unset _t
 
 # The suites above prove the bus is SAFE. On 2026-09-22 every one of them passed on
 # a store where the channel was not being used as a channel at all: 167 messages,
