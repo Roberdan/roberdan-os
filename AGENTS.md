@@ -403,6 +403,12 @@ componente e una ricerca di testo nello storico non sono la stessa qualità di
 prova; ogni riga dice da dove viene. È la stessa disciplina di `bus who`, che
 stampa la presenza dichiarata **accanto** a quella osservata e mai al posto.
 
+**Skill:** una menzione non è un'invocazione, e una skill disponibile non è
+necessariamente utile al compito. Il referto distingue gli usi osservati dalle
+occasioni candidate ricavate dai metadati del lavoro. Un rapporto confronta solo
+sessioni della stessa finestra e dello stesso gruppo. Dove i dati mancano,
+scrive **non misurabile**: zero osservazioni non significa "mai usata".
+
 **Il denominatore è la parte che mancava.** "Usato 20 volte" non risponde a
 niente: venti su quante occasioni? Per un canale fra agenti l'occasione è
 misurabile — due sessioni sullo stesso progetto nello stesso momento. Ogni coppia
@@ -605,6 +611,7 @@ and say which one you used.** Never tell Roberto to install something to answer 
 | Request | Preferred (if the host declares it) | Fallback — always available here |
 |---|---|---|
 | Apple application UI (mandatory before UI work) | `apple-designer` | [`apple-designer`](skills/apple-designer/skill.md) |
+| Video, demo film, trailer or other moving-image deliverable (before planning or production) | `film-director` | [`film-director`](skills/film-director/skill.md) |
 | Product ideas / brainstorming | `office-hours` | [`board`](agents/board.md) + [`focus-group`](skills/focus-group/skill.md) |
 | Strategy / scope | `plan-ceo-review` | [`board`](agents/board.md) (red-team) + [`problem-validation`](skills/problem-validation/skill.md) |
 | Architecture | `plan-eng-review` | [`baccio`](agents/baccio.md) |
