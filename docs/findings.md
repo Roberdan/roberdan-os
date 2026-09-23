@@ -452,88 +452,15 @@ come e' stata descritta.
 
 ### 2026-09-23 — rettifica delle prime misure di telemetria
 
-I referti preliminari qui sotto NON sono una baseline affidabile. La query
+I referti preliminari conservati nella storia Git NON sono una baseline affidabile. La query
 contava entrambe le direzioni di ogni coppia; confrontava poi coppie e sessioni,
 due unita' diverse. Le menzioni testuali non dimostrano invocazioni ne' valore.
 I referti con quattro messaggi sono dati sintetici: il test di `kb checkup --yes`
-scriveva erroneamente nei findings reali. Restano identificati per non cancellare
-la traccia dell'errore; i test ora scrivono in una destinazione isolata.
+scriveva erroneamente nei findings reali. Le copie sintetiche sono state rimosse
+dal documento; la storia conserva la traccia. I test ora scrivono in una
+destinazione isolata, verificando che questo file non cambi.
 Le conclusioni sull'uso del twin piu' sotto sono ipotesi, non prove di efficacia.
 I nomi dei progetti e i percorsi temporanei non servono alla misura e sono omessi.
-
-### 2026-09-23 — telemetria del valore (generata da bin/telemetry.sh)
-
-Finestra: ultimi 30 giorni. Nessuna raccolta: letto dagli artefatti esistenti e
-dallo storico delle sessioni. Le due fonti non si sommano.
-
-```
-TELEMETRIA — finestra: ultimi 30 giorni
-Nessuna raccolta: si legge cio' che esiste gia'. Ogni riga dice da dove viene.
-
-1. Uso — misurato sull'artefatto della funzionalita' (esatto)
-  bus            244 messaggi in tutto · 179 negli ultimi 30 giorni
-                 33 conversazioni · 7 progetti · 5 ruoli diversi hanno scritto
-                 1 presentazioni registrate (bus hello)
-  evolve         87 referti prodotti
-
-2. Uso — cercato nello storico delle sessioni (approssimato: dice che e' stato scritto)
-  jev            1 sessioni · 1 turni · ultimo: 2026-09-20
-  twin           24 sessioni · 37 turni · ultimo: 2026-09-22
-  kb checkup     2 sessioni · 2 turni · ultimo: 2026-09-22
-  premortem      7 sessioni · 7 turni · ultimo: 2026-09-13
-  focus-group    4 sessioni · 4 turni · ultimo: 2026-09-13
-  bus            1 sessioni · 2 turni · ultimo: 2026-08-30
-  (claude)       8677 righe di storico presenti, non analizzate qui
-
-3. Occasioni — quante volte due sessioni hanno lavorato insieme allo stesso progetto
-  (nomi omessi: conteggi preliminari non validi per il confronto)
-
-  RAPPORTO       132 occasioni di lavoro in parallelo · il canale e' comparso in 1 sessioni
-
-4. Copertura — quanti agenti e skill spiegano come si usa
-  bus            agenti 5/9 · skill 5/16 (di cui quelle che coordinano: 5/5) · canone: si
-  jev            agenti 3/9 · skill 1/16 (di cui quelle che coordinano: 0/5) · canone: si
-  twin           agenti 0/9 · skill 0/16 (di cui quelle che coordinano: 0/5) · canone: si
-
-5. Cosa si puo' dire, e dove ci si ferma
-  Questo referto misura USO e OCCASIONI. Non misura il valore, e non sa perche'
-  qualcosa non viene usato: la copertura qui sopra e' una causa CANDIDATA, la piu'
-  economica da escludere, non una spiegazione. Una funzionalita' ben documentata e
-  mai usata su molte occasioni e' un'altra storia, e va guardata da vicino.
-```
-
-### 2026-09-23 — telemetria del valore (generata da bin/telemetry.sh)
-
-Finestra: ultimi 30 giorni. Nessuna raccolta: letto dagli artefatti esistenti e
-dallo storico delle sessioni. Le due fonti non si sommano.
-
-```
-TELEMETRIA — finestra: ultimi 30 giorni
-Nessuna raccolta: si legge cio' che esiste gia'. Ogni riga dice da dove viene.
-
-1. Uso — misurato sull'artefatto della funzionalita' (esatto)
-  bus            4 messaggi in tutto · 1 negli ultimi 30 giorni
-                 2 conversazioni · 1 progetti · 2 ruoli diversi hanno scritto
-                 0 presentazioni registrate (bus hello)
-  evolve         0 referti prodotti
-
-2. Uso — cercato nello storico delle sessioni (approssimato: dice che e' stato scritto)
-  (storico)      fixture sintetica: database assente
-
-3. Occasioni — quante volte due sessioni hanno lavorato insieme allo stesso progetto
-  (storico)      non leggibile: il denominatore non e' calcolabile, e non si stima
-
-4. Copertura — quanti agenti e skill spiegano come si usa
-  bus            agenti 5/9 · skill 5/16 (di cui quelle che coordinano: 5/5) · canone: si
-  jev            agenti 3/9 · skill 1/16 (di cui quelle che coordinano: 0/5) · canone: si
-  twin           agenti 0/9 · skill 0/16 (di cui quelle che coordinano: 0/5) · canone: si
-
-5. Cosa si puo' dire, e dove ci si ferma
-  Questo referto misura USO e OCCASIONI. Non misura il valore, e non sa perche'
-  qualcosa non viene usato: la copertura qui sopra e' una causa CANDIDATA, la piu'
-  economica da escludere, non una spiegazione. Una funzionalita' ben documentata e
-  mai usata su molte occasioni e' un'altra storia, e va guardata da vicino.
-```
 
 ### 2026-09-23 — il twin risulta a zero, e la cifra va letta bene
 
@@ -565,49 +492,23 @@ TELEMETRIA — finestra: ultimi 30 giorni
 Nessuna raccolta: si legge cio' che esiste gia'. Ogni riga dice da dove viene.
 
 1. Uso — misurato sull'artefatto della funzionalita' (esatto)
-  bus            4 messaggi in tutto · 1 negli ultimi 30 giorni
-                 2 conversazioni · 1 progetti · 2 ruoli diversi hanno scritto
-                 0 presentazioni registrate (bus hello)
-  evolve         0 referti prodotti
+  bus            253 messaggi in tutto · 188 negli ultimi 30 giorni
+                 34 conversazioni · 7 progetti · 6 ruoli diversi hanno scritto
+                 12 presentazioni registrate (bus hello)
+  evolve         87 referti prodotti
 
-2. Uso — cercato nello storico delle sessioni (approssimato: dice che e' stato scritto)
-  (storico)      fixture sintetica: database assente
-
-3. Occasioni — quante volte due sessioni hanno lavorato insieme allo stesso progetto
-  (storico)      non leggibile: il denominatore non e' calcolabile, e non si stima
-
-4. Copertura — quanti agenti e skill spiegano come si usa
-  bus            agenti 5/9 · skill 5/16 (di cui quelle che coordinano: 5/5) · canone: si
-  jev            agenti 3/9 · skill 1/16 (di cui quelle che coordinano: 0/5) · canone: si
-  twin           agenti 0/9 · skill 0/16 (di cui quelle che coordinano: 0/5) · canone: si
-
-5. Cosa si puo' dire, e dove ci si ferma
-  Questo referto misura USO e OCCASIONI. Non misura il valore, e non sa perche'
-  qualcosa non viene usato: la copertura qui sopra e' una causa CANDIDATA, la piu'
-  economica da escludere, non una spiegazione. Una funzionalita' ben documentata e
-  mai usata su molte occasioni e' un'altra storia, e va guardata da vicino.
-```
-
-### 2026-09-23 — telemetria del valore (generata da bin/telemetry.sh)
-
-Finestra: ultimi 30 giorni. Nessuna raccolta: letto dagli artefatti esistenti e
-dallo storico delle sessioni. Le due fonti non si sommano.
-
-```
-TELEMETRIA — finestra: ultimi 30 giorni
-Nessuna raccolta: si legge cio' che esiste gia'. Ogni riga dice da dove viene.
-
-1. Uso — misurato sull'artefatto della funzionalita' (esatto)
-  bus            4 messaggi in tutto · 1 negli ultimi 30 giorni
-                 2 conversazioni · 1 progetti · 2 ruoli diversi hanno scritto
-                 0 presentazioni registrate (bus hello)
-  evolve         0 referti prodotti
-
-2. Uso — cercato nello storico delle sessioni (approssimato: dice che e' stato scritto)
-  (storico)      fixture sintetica: database assente
+2. Uso — cercato nello storico delle sessioni (approssimato: menzioni testuali, non invocazioni)
+  jev            1 sessioni · 1 turni · ultimo: 2026-09-20
+  twin           25 sessioni · 38 turni · ultimo: 2026-09-23
+  kb checkup     2 sessioni · 4 turni · ultimo: 2026-09-23
+  premortem      7 sessioni · 7 turni · ultimo: 2026-09-13
+  focus-group    4 sessioni · 4 turni · ultimo: 2026-09-13
+  bus            1 sessioni · 2 turni · ultimo: 2026-08-30
+  (claude)       8677 righe di storico presenti, non analizzate qui
 
 3. Occasioni — quante volte due sessioni hanno lavorato insieme allo stesso progetto
-  (storico)      non leggibile: il denominatore non e' calcolabile, e non si stima
+  TOTALE         46 coppie sovrapposte su 6 progetti
+  (limite)       le menzioni non misurano l'uso del canale fra le coppie
 
 4. Copertura — quanti agenti e skill spiegano come si usa
   bus            agenti 5/9 · skill 5/16 (di cui quelle che coordinano: 5/5) · canone: si
