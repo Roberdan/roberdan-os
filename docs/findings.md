@@ -422,3 +422,30 @@ scattare sul caso sano non e' un margine di sicurezza, e' un rosso a caso.** E u
 rosso a caso su un innocente insegna a non leggere piu' il referto — che e' il
 modo piu' costoso in cui un cancello smette di funzionare, perche' continua a
 sembrare acceso.
+
+### 2026-09-23 — un mutante dichiarato morto era vivo, e la dichiarazione lo ha detto
+
+Sette mutanti erano stati dichiarati "sopravvivono per costruzione" perche'
+puntavano a una scansione della macchina che `test-bus.sh` ha rimosso di
+proposito. Uno dei sette — `launchd-target`, che tocca uno script che launchd
+eseguira' — **viene catturato lo stesso**, e la suite lo ha riportato come
+notizia invece che come rumore: *"is declared an EXPECTED SURVIVOR and the suite
+CAUGHT it. That is good news and it means this declaration is now a lie."*
+
+Chi lo ferma, verificato eseguendo quel solo mutante e leggendo la riga:
+`the bus executed the external command 'touch', which is not on the allowlist`.
+Non la scansione rimossa — quella e' rimossa davvero — ma l'**allowlist dei
+comandi esterni**, che osserva il processo del bus invece della macchina intorno,
+ed e' deterministica dove l'altra non poteva esserlo.
+
+**Vale la pena scriverlo perche' e' una garanzia migliore di quella che credevo
+persa.** Per toccare qualcosa che verra' eseguito piu' tardi, il bus ha bisogno di
+un comando che non ha il permesso di eseguire — e quel permesso e' una riga che
+qualcuno dovrebbe aggiungere di proposito, in un file sotto revisione. Gli altri
+sei restano dichiarati: scrivono file con comandi che il bus PUO' gia' usare
+(`mkdir`, `printf`), quindi li' l'allowlist non dice niente.
+
+Il meccanismo che ha prodotto questa scoperta e' l'inversione della sorpresa: una
+dichiarazione che si limita a spegnere un allarme nasconde il giorno in cui
+l'allarme aveva ragione. Questa invece fallisce quando la realta' e' migliore di
+come e' stata descritta.

@@ -940,7 +940,17 @@ LD_TARGET_BEFORE="$(shasum "$LD_TARGET" | awk '{print $1}')"
 #     the real machine. The concrete path is resolved by the harness, below,
 #     rather than hardcoded: a mutant that names one persons filesystem is a
 #     mutant that quietly stops testing on anybody elses.
-mutate launchd-target "bumps a script launchd will execute, which no hand-written root list named" "EXPECTED-SURVIVOR: pinned the machine-wide sweep (numbered 47c until test-bus.sh removed it on purpose) (see the WHAT-USED-TO-BE-HERE block in that file). Kept as the written record of the attack class; property 1 is now held by the shape of the core, not by sweeping the machine afterwards." "
+# RI-AGGANCIATO 2026-09-23, e la suite me lo ha imposto: lo avevo dichiarato
+# sopravvissuto atteso insieme agli altri sei, e invece viene CATTURATO. La
+# dichiarazione prevede questo caso e lo tratta come notizia, non come rumore.
+# Chi lo ferma, con la prova: "the bus executed the external command 'touch',
+# which is not on the allowlist". Non la scansione della macchina — quella e'
+# rimossa davvero — ma l'ALLOWLIST dei comandi esterni, che e' process-scoped e
+# deterministica. E una garanzia migliore di quella che credevo persa: per
+# toccare uno script che launchd eseguira', il bus ha bisogno di un comando che
+# non ha il permesso di eseguire, e quel permesso e' una riga che qualcuno
+# dovrebbe aggiungere di proposito.
+mutate launchd-target "bumps a script launchd will execute, which no hand-written root list named" "check 45 (the external-command allowlist: touch is not on it)" "
 import sys
 s = sys.stdin.read()
 a = '  echo \"bus: appended \$kind from \$from to \$to on \$repo/\$card\${re:+ (answers #\$re)} -> \$log\"'
