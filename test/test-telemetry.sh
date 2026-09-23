@@ -13,12 +13,16 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/repo/bin" "$TMP/repo/docs" "$TMP/tools"
 cp "$ROOT/bin/telemetry.sh" "$TMP/repo/bin/"
+cp "$ROOT"/bin/telemetry_*.py "$TMP/repo/bin/"
+mkdir -p "$TMP/repo/kanban"
+cp "$ROOT"/kanban/audit_{schema,store}.py "$TMP/repo/kanban/"
 cp -R "$ROOT/agents" "$ROOT/skills" "$TMP/repo/"
 cp "$ROOT/AGENTS.md" "$TMP/repo/"
 T="$TMP/repo/bin/telemetry.sh"
 export RDA_HOME="$TMP/home" RDA_BUS_HOME="$TMP/bus"
 export RDA_SESSION_STORE="$TMP/store.db" RDA_CLAUDE_HISTORY="$TMP/history.jsonl"
 export RDA_TELEMETRY_DAYS=30
+export RDA_AUDIT_HOME="$TMP/audit" RDA_TELEMETRY_SKILL_DIRS="$TMP/installed"
 unset RDA_TELEMETRY_FINDINGS
 export TELEMETRY_SQLITE
 TELEMETRY_SQLITE="$(command -v sqlite3)"

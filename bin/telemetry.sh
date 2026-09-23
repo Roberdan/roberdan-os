@@ -64,6 +64,7 @@ telemetry — quanto si usa ogni pezzo, su quante occasioni, e chi sa che esiste
   --giorni N   finestra di osservazione, 1..999999 giorni (default 30; alias --days)
   --write      aggiunge il referto datato a docs/findings.md
                RDA_TELEMETRY_FINDINGS cambia il file di destinazione
+  RDA_TELEMETRY_SKILL_DIRS sostituisce le directory skill installate (separate da :).
 
 Non raccoglie niente: legge gli artefatti che esistono gia' (il registro del bus)
 e lo storico che l'ospite scrive comunque. Conta righe, non ne stampa mai il
@@ -264,11 +265,14 @@ _copertura "bus"  'bus (hello|read|send|owed|who|tidy)|bus/bus[.]sh'
 _copertura "jev"  'bin/jev[.]py|jev evaluate|skills/jev'
 _copertura "twin" 'roberdan-twin|@twin'
 
+_hr "5. Skill — invocazioni osservate e occasioni candidate"
+python3 -B "$ROOT/bin/telemetry_skills.py" --root "$ROOT" --days "$GIORNI"
+
 # --- 5) VERDETTO -------------------------------------------------------------
 # Dice cosa e' vero, e si ferma prima del perche'. Il perche' non e' misurato qui
 # e affermarlo lo stesso sarebbe la stessa cosa che questo file rifiuta: una
 # dichiarazione presentata come evidenza.
-_hr "5. Cosa si puo' dire, e dove ci si ferma"
+_hr "6. Cosa si puo' dire, e dove ci si ferma"
 echo "  Questo referto misura USO e OCCASIONI. Non misura il valore, e non sa perche'"
 echo "  qualcosa non viene usato: la copertura qui sopra e' una causa CANDIDATA, la piu'"
 echo "  economica da escludere, non una spiegazione. Una funzionalita' ben documentata e"
