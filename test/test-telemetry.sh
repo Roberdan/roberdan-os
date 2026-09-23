@@ -52,12 +52,18 @@ export PATH="$TMP/tools:$PATH"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ok()   { echo "  ok: $*"; }
 has()  { grep -qE "$1" <<< "$out" || fail "$2"; }
+private_free() {
+  if grep -q 'PRIVATE_' <<< "$out" || grep -Fq "$TMP" <<< "$out"; then
+    fail "nome privato, contenuto o percorso locale nell'output"
+  fi
+}
 
 echo "== telemetria: misura, non stima, e non spia =="
 
 [ -x "$T" ] || fail "bin/telemetry.sh non e' eseguibile"
 out="$(bash "$T" 2>&1)" || fail "il referto esce non-zero su un sistema senza dati"
 has 'non disponibile' "lo storico assente non e' dichiarato indisponibile"
+private_free
 [ ! -e "$RDA_SESSION_STORE" ] || fail "la lettura ha creato uno storico assente"
 grep -q '0 sessioni\|nessuna sovrapposizione' <<< "$out" \
   && fail "lo storico assente e' presentato come zero"
@@ -142,31 +148,37 @@ INSERT INTO sessions VALUES
  ('n','future','2026-10-01 00:00:00','2026-10-02 00:00:00'),
  ('o','instant','2026-09-22 10:00:00','2026-09-22 10:00:00'),
  ('p','instant','2026-09-22 09:00:00','2026-09-22 11:00:00');
+UPDATE sessions SET repository = 'PRIVATE_PROJECT_' || repository;
 INSERT INTO turns VALUES
  ('a','2026-09-22T22:30:00-02:00','PRIVATE_USER bus.sh','PRIVATE_RESPONSE'),
  ('b','2026-09-22 23:00:00','PRIVATE_USER','PRIVATE_RESPONSE bus.sh'),
  ('b','2026-08-23T23:30:00-02:00','PRIVATE_USER bus.sh','PRIVATE_RESPONSE'),
  ('c','2026-08-24T00:30:00+02:00','PRIVATE_USER bus.sh','PRIVATE_RESPONSE');
 SQL
+cp "$RDA_SESSION_STORE" "$TMP/pair.db"
+"$TELEMETRY_SQLITE" "$TMP/pair.db" "DELETE FROM sessions WHERE id NOT IN ('a','b');"
+out="$(RDA_SESSION_STORE="$TMP/pair.db" bash "$T" 2>&1)" || fail "due sessioni non leggibili"
+private_free
+has 'TOTALE +1 coppie sovrapposte su 1 progetti' "due sessioni non danno una sola coppia aggregata"
+"$TELEMETRY_SQLITE" "$TMP/pair.db" \
+  "INSERT INTO sessions SELECT 'q', repository, '2026-09-22 11:15:00', '2026-09-22 11:45:00' FROM sessions WHERE id='a';"
+out="$(RDA_SESSION_STORE="$TMP/pair.db" bash "$T" 2>&1)" || fail "tre sessioni non leggibili"
+has 'TOTALE +3 coppie sovrapposte su 1 progetti' "i progetti non sono contati una sola volta"
 : > "$TELEMETRY_CALLS"
 out="$(bash "$T" 2>&1)" || fail "database valido non leggibile"
-has 'overlap +1 coppie sovrapposte' "due sessioni sovrapposte non danno una sola coppia"
-has 'offset +1 coppie sovrapposte' "fusi orari non normalizzati"
-has 'crossing +1 coppie sovrapposte' "sessione iniziata prima della finestra esclusa"
-has 'TOTALE +3 coppie sovrapposte' "totale delle coppie errato"
-grep -qE '(separate|touching|old|future|instant) +[0-9]+ coppie' <<< "$out" \
-  && fail "intervalli disgiunti o fuori finestra contati"
+has 'TOTALE +3 coppie sovrapposte su 3 progetti' "totali anonimi delle coppie o dei progetti errati"
 has 'bus +2 sessioni · 3 turni · ultimo: 2026-09-23' "menzioni o ultima data non normalizzate"
 has 'menzioni testuali, non invocazioni' "menzioni presentate come invocazioni"
 grep -q 'RAPPORTO' <<< "$out" && fail "coppie e sessioni usate come rapporto"
-grep -q 'PRIVATE_' <<< "$out" && fail "contenuto privato nel referto"
-ok "coppie uniche, date UTC, confini e menzioni testuali misurati su dati isolati"
+private_free
+ok "coppie uniche, date UTC e confini: solo aggregati, nessun nome privato"
 query_count="$(wc -l < "$TELEMETRY_CALLS")"
 
 printf 'sentinella: dati preesistenti\n' > "$TMP/repo/docs/findings.md"
 cp "$TMP/repo/docs/findings.md" "$TMP/before"
 : > "$TELEMETRY_CALLS"
 out="$(bash "$T" --write 2>&1)" || fail "--write fallisce"
+private_free
 [ "$(wc -l < "$TELEMETRY_CALLS")" = "$query_count" ] || fail "--write ripete la misura"
 head -n 1 "$TMP/repo/docs/findings.md" > "$TMP/prefix"
 cmp -s "$TMP/before" "$TMP/prefix" || fail "--write tronca dati preesistenti"
@@ -188,12 +200,14 @@ head -n 1 "$redirected" > "$TMP/prefix"
 cmp -s "$TMP/redirected-before" "$TMP/prefix" || fail "override tronca la destinazione"
 awk '/^```$/ {inside=!inside; next} inside' "$redirected" > "$TMP/redirected-report"
 cmp -s "$TMP/appended" "$TMP/redirected-report" || fail "override salva un referto diverso"
-grep -Fq "referto aggiunto a $redirected" <<< "$out" || fail "override indica una destinazione errata"
+has 'referto aggiunto alla destinazione configurata' "override indica una destinazione errata"
+private_free
 for invalid_destination in "" "$TMP/missing-parent/findings.md"; do
   if out="$(RDA_TELEMETRY_FINDINGS="$invalid_destination" bash "$T" --write 2>&1)"; then
     fail "destinazione override invalida accettata"
   fi
   has 'scrittura del referto fallita' "errore di destinazione override non dichiarato"
+  private_free
   cmp -s "$TMP/default-before" "$TMP/repo/docs/findings.md" || fail "override invalido ricade sul default"
 done
 ok "RDA_TELEMETRY_FINDINGS isola la scrittura, preserva i dati e non ricade sul default"
@@ -217,6 +231,7 @@ for bad in "$TMP/corrupt.db" "$TMP/schema.db"; do
     fail "database corrotto o schema mancante restituito come successo"
   fi
   has 'non disponibile' "database corrotto non dichiarato indisponibile"
+  private_free
   grep -q '0 sessioni\|PRIVATE_' <<< "$out" && fail "database corrotto: zero inventato o contenuto esposto"
 done
 "$TELEMETRY_SQLITE" "$RDA_SESSION_STORE" "UPDATE sessions SET updated_at='invalid' WHERE id='a';"
@@ -256,7 +271,14 @@ ok "database valido vuoto distinto da database assente o corrotto"
 mv "$TMP/repo/docs/findings.md" "$TMP/report-saved"
 mkdir "$TMP/repo/docs/findings.md"
 if out="$(bash "$T" --write 2>&1)"; then fail "scrittura fallita restituita come successo"; fi
+private_free
 grep -q 'referto aggiunto' <<< "$out" && fail "scrittura fallita dichiarata riuscita"
 ok "errore di scrittura restituito esplicitamente senza dichiarare salvataggio"
+
+mkdir -p "$TMP/bad-bus/repo/.presence.jsonl"
+if out="$(RDA_BUS_HOME="$TMP/bad-bus" bash "$T" 2>&1)"; then fail "errore di lettura del bus ignorato"; fi
+has 'non disponibile' "errore del bus non dichiarato"
+private_free
+ok "errori di lettura e scrittura non espongono percorsi locali"
 
 echo "PASS: test-telemetry.sh"

@@ -30,8 +30,8 @@
 #
 # PRIVACY. Si contano righe, mai se ne stampa il contenuto. Lo storico delle
 # sessioni contiene le conversazioni di Roberto per intero: questo comando puo'
-# dire QUANTE volte una parola compare e non ha nessun modo di mostrare la riga
-# in cui compare. Stessa regola del campanello del bus, per la stessa ragione.
+# dire QUANTE volte una parola compare, mai mostrare righe, nomi di progetti
+# o percorsi locali. Stessa regola del campanello del bus, per la stessa ragione.
 #
 # LIMITE DICHIARATO, e non e' piccolo: cercare un comando nel testo di una
 # sessione dice che e' stato SCRITTO, non che sia servito a qualcosa. Nessuna
@@ -71,7 +71,7 @@ contenuto. Dice da dove viene ogni cifra, e non somma mai fonti di qualita'
 diversa in un numero solo.
 USAGE
       exit 0;;
-    *) echo "telemetry: argomento sconosciuto '$1'" >&2; exit 1;;
+    *) _fail "argomento sconosciuto";;
   esac
 done
 [[ "$GIORNI" =~ ^[0-9]{1,6}$ ]] && [ "$((10#$GIORNI))" -gt 0 ] \
@@ -82,8 +82,8 @@ _hr() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 _riga() { printf '  %-14s %s\n' "$1" "$2"; }
 _grep() {
   local rc=0
-  grep "$@" || rc=$?
-  [ "$rc" -le 1 ] || return "$rc"
+  grep "$@" 2>/dev/null || rc=$?
+  [ "$rc" -le 1 ] || _fail "registro o copertura non disponibile: lettura fallita"
 }
 
 _sql() {
@@ -166,7 +166,7 @@ else
   _riga "bus" "non disponibile: nessun registro"
 fi
 if [ -d "$RDA_HOME/evolve" ]; then
-  n_evolve="$(ls "$RDA_HOME/evolve" | wc -l | tr -d ' ')"
+  n_evolve="$(ls "$RDA_HOME/evolve" 2>/dev/null | wc -l | tr -d ' ')"
   _riga "evolve" "$n_evolve referti prodotti"
 else
   [ ! -e "$RDA_HOME/evolve" ] || _fail "evolve non disponibile: archivio non leggibile"
@@ -188,7 +188,7 @@ else
 fi
 if [ -e "$CLAUDE_HISTORY" ]; then
   [ -f "$CLAUDE_HISTORY" ] && [ -r "$CLAUDE_HISTORY" ] || _fail "storico Claude non disponibile: file non leggibile"
-  n="$(wc -l < "$CLAUDE_HISTORY" | tr -d ' ')"
+  n="$( (wc -l < "$CLAUDE_HISTORY") 2>/dev/null | tr -d ' ')"
   _riga "(claude)" "$n righe di storico presenti, non analizzate qui"
 fi
 
@@ -204,18 +204,13 @@ if [ "$storico" = 1 ]; then
                  AND julianday(updated_at) > julianday(date('now','-$GIORNI days'))
                  AND julianday(created_at) < julianday('now')
                  AND julianday(updated_at) > julianday(created_at))
-    SELECT a.repository || '|' || count(*)
+    SELECT count(*) || '|' || count(DISTINCT a.repository)
     FROM s a JOIN s b ON a.repository = b.repository AND a.id < b.id
-         AND a.start < b.end AND b.start < a.end
-    GROUP BY a.repository ORDER BY count(*) DESC, a.repository;")"
-  if [ -n "$occ" ]; then
-    tot=0
-    while IFS='|' read -r r n; do
-      [ -n "$r" ] || continue
-      tot=$((tot + n))
-      _riga "${r##*/}" "$n coppie sovrapposte"
-    done <<< "$occ"
-    _riga "TOTALE" "$tot coppie sovrapposte; le menzioni non misurano l'uso del canale fra le coppie"
+         AND a.start < b.end AND b.start < a.end;")"
+  IFS='|' read -r tot progetti <<< "$occ"
+  if [ "$tot" -gt 0 ]; then
+    _riga "TOTALE" "$tot coppie sovrapposte su $progetti progetti"
+    _riga "(limite)" "le menzioni non misurano l'uso del canale fra le coppie"
   else
     _riga "(nessuna)" "nessuna sovrapposizione osservata nello storico nella finestra"
   fi
@@ -282,10 +277,15 @@ printf '%s\n' "$REPORT"
 if [ "$WRITE" = "1" ]; then
   stamp="$(date +%Y-%m-%d)"
   plain="$(printf '%s\n' "$REPORT" | sed $'s/\033\\[[0-9;]*m//g')"
-  printf '\n### %s — telemetria del valore (generata da bin/telemetry.sh)\n\n%s\n%s\n\n```\n%s\n```\n' \
-    "$stamp" "Finestra: ultimi $GIORNI giorni. Nessuna raccolta: letto dagli artefatti esistenti e" \
-    "dallo storico delle sessioni. Le due fonti non si sommano." "$plain" >> "$FINDINGS" \
-    || _fail "scrittura del referto fallita"
+  if ! {
+    printf '\n### %s — telemetria del valore (generata da bin/telemetry.sh)\n\n%s\n%s\n\n```\n%s\n```\n' \
+      "$stamp" "Finestra: ultimi $GIORNI giorni. Nessuna raccolta: letto dagli artefatti esistenti e" \
+      "dallo storico delle sessioni. Le due fonti non si sommano." "$plain" >> "$FINDINGS"
+  } 2>/dev/null; then _fail "scrittura del referto fallita"; fi
   echo
-  echo "referto aggiunto a ${FINDINGS#"$ROOT/"}"
+  if [ "$FINDINGS" = "$ROOT/docs/findings.md" ]; then
+    echo "referto aggiunto a docs/findings.md"
+  else
+    echo "referto aggiunto alla destinazione configurata"
+  fi
 fi
