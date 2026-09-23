@@ -76,11 +76,11 @@ class History(unittest.TestCase):
         self.findings.write_text("# PRIVATE_note\nlegacy report\n")
         self.assertIn("legacy", self.run_report())
         self.run_report(True)
-        self.assertIn("bus: messaggi totali +0", self.run_report())
+        self.assertIn("conteggi con delta +0", self.run_report())
         with self.findings.open("a") as file:
             file.write("### 2026-09-23 — telemetria del valore (generata da bin/telemetry.sh)\nlegacy\n")
         self.assertIn("ultimo referto legacy", self.run_report())
-        self.assertNotIn("delta +0", self.run_report())
+        self.assertIn("0 conteggi con delta +0", self.run_report())
 
     def test_positive_negative_zero_counts_without_claiming_value(self):
         self.run_report(True)
@@ -89,7 +89,7 @@ class History(unittest.TestCase):
         output = self.run_report()
         self.assertIn("bus: messaggi totali +3", output)
         self.assertIn("mention.jev: sessioni -1", output)
-        self.assertIn("mention.twin: sessioni +0", output)
+        self.assertIn("conteggi con delta +0", output)
         self.assertIn("non valore, bisogno o miglioramento causale", output)
         self.assertIn("nessun metadato affidabile del bisogno", output)
 
@@ -150,7 +150,7 @@ class History(unittest.TestCase):
         hostile = b"PRIVATE_SECRET <script>alert(1)</script> \x1b[2J $(touch nope)\n"
         self.findings.write_bytes(hostile + self.block(current) + b"# ordinary later note\n" + hostile)
         output = self.run_report()
-        self.assertIn("bus: messaggi totali +0", output)
+        self.assertIn("conteggi con delta +0", output)
         for sentinel in ("PRIVATE_", "<script>", "\x1b[2J", "$(touch", str(self.root)):
             self.assertNotIn(sentinel, output)
         broken = deepcopy(current)
@@ -241,7 +241,7 @@ class History(unittest.TestCase):
         self.assertEqual(second.returncode, 0, second.stderr)
         self.assertIn("bus: messaggi totali +2", second.stdout)
         self.assertIn("mention.jev: sessioni -1", second.stdout)
-        self.assertIn("mention.twin: sessioni +0", second.stdout)
+        self.assertIn("conteggi con delta +0", second.stdout)
         appended = self.findings.read_bytes()[len(prefix):].decode()
         rendered = second.stdout.removesuffix("\nreferto aggiunto alla destinazione configurata\n").rstrip()
         rendered = re.sub(r"\x1b\[[0-9;]*m", "", rendered)
@@ -251,7 +251,7 @@ class History(unittest.TestCase):
         with patch.dict(os.environ, {"RDA_BUS_HOME": str(self.root / "OTHER_BUS")}):
             third = subprocess.run(command[:-1], capture_output=True, text=True, timeout=15)
         self.assertEqual(third.returncode, 0, third.stderr)
-        self.assertIn("bus: delta non confrontabile", third.stdout)
+        self.assertIn("Non confrontabile", third.stdout)
         self.assertIn("fonte/perimetro diverso", third.stdout)
         self.assertEqual(self.findings.read_bytes()[:len(prefix)], prefix)
 
@@ -277,14 +277,14 @@ class History(unittest.TestCase):
         unchanged = deepcopy(current)
         output = render(current, comparison(current, unchanged, None))
         rows = [line for line in output.splitlines() if line.startswith("  skill:")]
-        self.assertEqual(len(rows), 1)
-        self.assertIn("osservate +0", rows[0])
-        self.assertIn("occasioni non confrontabile", rows[0])
-        self.assertIn("occasioni/rapporto non misurabile", rows[0])
+        self.assertEqual(len(rows), 0)
+        self.assertIn("Invariate nelle misure confrontabili: 17 voci, 53 conteggi con delta +0.", output)
+        self.assertIn("dati mancanti in una delle osservazioni — 1 voce", output)
         self.assertEqual(output.count("nessun criterio di occasione per questa skill"), 1)
         legacy = render(current, comparison(current, None, "prima osservazione legacy"))
         self.assertEqual(legacy.count("prima osservazione legacy"), 1)
-        self.assertIn("skill:film-director: delta non confrontabile", legacy)
+        self.assertNotIn("  skill:", legacy)
+        self.assertIn("prima osservazione legacy — 17 voci", legacy)
         self.assertEqual(current, unchanged)
         current["metrics"]["skill:film-director:observed"]["value"] = None
         current["metrics"]["skill:film-director:candidate_sessions"]["value"] = 4

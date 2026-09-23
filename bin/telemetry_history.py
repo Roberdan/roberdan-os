@@ -133,24 +133,35 @@ def comparison(current, previous, reason):
 def render(current, changes):
     lines = ["", "7. Confronto con l'ultima osservazione scritta e stato dei denominatori",
              "  Delta di CONTEGGI osservati, totali o su finestre mobili: non valore, bisogno o miglioramento causale.",
-             "  Una riga per voce; +0 = invariato, non confrontabile = delta sconosciuto. Tutte le misure restano nello snapshot."]
+             "  Estese solo le voci cambiate; +0 = invariato. Le parti sconosciute sono conteggiate separatamente; snapshot completo."]
     labels = {"observed": "osservate", "candidate_sessions": "candidate", "cohort_sessions": "coorte",
               "invoked_in_cohort": "usi in coorte", "uses_outside_cohort": "fuori coorte",
               "messages_total": "messaggi totali", "messages_recent": "messaggi recenti",
               "sessions": "sessioni", "turns": "turni", "pairs": "coppie", "projects": "progetti"}
     reasons = list(dict.fromkeys(change["reason"] for change in changes.values() if change["reason"]))
-    for index, reason in enumerate(reasons, 1):
-        lines.append(f"  Non confrontabile [C{index}]: {reason}.")
-    denominator_reasons = list(dict.fromkeys(metric["denominator"]["reason"]
-                               for metric in current["metrics"].values()
-                               if metric["denominator"]["status"] != "misurabile"))
-    for index, reason in enumerate(denominator_reasons, 1):
-        lines.append(f"  Denominatore non misurabile [D{index}]: {REASONS[reason]}.")
     groups = {}
     for key, metric in current["metrics"].items():
         group, field = key.rsplit(":" if key.startswith("skill:") else ".", 1)
         groups.setdefault(group, {})[field] = (metric, changes[key])
+    for index, reason in enumerate(reasons, 1):
+        affected = sum(any(change["reason"] == reason for _, change in fields.values()) for fields in groups.values())
+        lines.append(f"  Non confrontabile [C{index}]: {reason} — {affected} {'voce' if affected == 1 else 'voci'}.")
+    denominator_reasons = list(dict.fromkeys(metric["denominator"]["reason"]
+                               for metric in current["metrics"].values()
+                               if metric["denominator"]["status"] != "misurabile"))
+    for index, reason in enumerate(denominator_reasons, 1):
+        affected = sum(any(metric["denominator"]["reason"] == reason and
+                           metric["denominator"]["status"] != "misurabile"
+                           for metric, _ in fields.values()) for fields in groups.values())
+        lines.append(f"  Denominatore non misurabile [D{index}]: {REASONS[reason]} — {affected} {'voce' if affected == 1 else 'voci'}.")
+    unchanged = zeros = expanded = 0
     for group, fields in groups.items():
+        if not any(change["delta"] not in (None, 0) for _, change in fields.values()):
+            n = sum(change["delta"] == 0 for _, change in fields.values())
+            unchanged += bool(n)
+            zeros += n
+            continue
+        expanded += 1
         parts, unavailable, missing, denominators = [], {}, set(), {}
         for field, (metric, change) in fields.items():
             label = labels.get(field, field)
@@ -195,6 +206,8 @@ def render(current, changes):
         if missing:
             parts.append("denominatori non misurabili [" + ",".join(f"D{index}" for index in sorted(missing)) + "]")
         lines.append(f"  {group}: " + "; ".join(parts))
+    lines.append(f"  Invariate nelle misure confrontabili: {unchanged} voci, {zeros} conteggi con delta +0.")
+    lines.append(f"  Voci con cambiamenti: {expanded}. Non confrontabile non significa invariato.")
     return "\n".join(lines)
 
 
