@@ -449,3 +449,51 @@ Il meccanismo che ha prodotto questa scoperta e' l'inversione della sorpresa: un
 dichiarazione che si limita a spegnere un allarme nasconde il giorno in cui
 l'allarme aveva ragione. Questa invece fallisce quando la realta' e' migliore di
 come e' stata descritta.
+
+### 2026-09-23 — telemetria del valore (generata da bin/telemetry.sh)
+
+Finestra: ultimi 30 giorni. Nessuna raccolta: letto dagli artefatti esistenti e
+dallo storico delle sessioni. Le due fonti non si sommano.
+
+```
+TELEMETRIA — finestra: ultimi 30 giorni
+Nessuna raccolta: si legge cio' che esiste gia'. Ogni riga dice da dove viene.
+
+1. Uso — misurato sull'artefatto della funzionalita' (esatto)
+  bus            244 messaggi in tutto · 179 negli ultimi 30 giorni
+                 33 conversazioni · 7 progetti · 5 ruoli diversi hanno scritto
+                 1 presentazioni registrate (bus hello)
+  evolve         87 referti prodotti
+
+2. Uso — cercato nello storico delle sessioni (approssimato: dice che e' stato scritto)
+  jev            1 sessioni · 1 turni · ultimo: 2026-09-20
+  twin           24 sessioni · 37 turni · ultimo: 2026-09-22
+  kb checkup     2 sessioni · 2 turni · ultimo: 2026-09-22
+  premortem      7 sessioni · 7 turni · ultimo: 2026-09-13
+  focus-group    4 sessioni · 4 turni · ultimo: 2026-09-13
+  bus            1 sessioni · 2 turni · ultimo: 2026-08-30
+  (claude)       8677 righe di storico presenti, non analizzate qui
+
+3. Occasioni — quante volte due sessioni hanno lavorato insieme allo stesso progetto
+  MirrorScopio   40 coppie sovrapposte
+  MirrorBuddy    34 coppie sovrapposte
+  VirtualBPMFy27 32 coppie sovrapposte
+  ConvergioEdu2030 12 coppie sovrapposte
+  buddy          8 coppie sovrapposte
+  MirrorHR-Epilepsy-Research-Kit-Official 2 coppie sovrapposte
+  roberdan-os    2 coppie sovrapposte
+  FDE_EMEA_Engagement_Playbook_FY27 2 coppie sovrapposte
+
+  RAPPORTO       132 occasioni di lavoro in parallelo · il canale e' comparso in 1 sessioni
+
+4. Copertura — quanti agenti e skill spiegano come si usa
+  bus            agenti 5/9 · skill 5/16 (di cui quelle che coordinano: 5/5) · canone: si
+  jev            agenti 3/9 · skill 1/16 (di cui quelle che coordinano: 0/5) · canone: si
+  twin           agenti 0/9 · skill 0/16 (di cui quelle che coordinano: 0/5) · canone: si
+
+5. Cosa si puo' dire, e dove ci si ferma
+  Questo referto misura USO e OCCASIONI. Non misura il valore, e non sa perche'
+  qualcosa non viene usato: la copertura qui sopra e' una causa CANDIDATA, la piu'
+  economica da escludere, non una spiegazione. Una funzionalita' ben documentata e
+  mai usata su molte occasioni e' un'altra storia, e va guardata da vicino.
+```
