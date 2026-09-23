@@ -1,5 +1,15 @@
 # Findings — cose vere che nessuno ha chiesto
 
+### 2026-09-23 — audit concorrente: errore intermittente di permessi
+
+La validazione completa ha fallito in
+`test_concurrent_appends_and_duplicate_replays`: un replay concorrente ha
+ricevuto `audit files must be regular, unlinked, owned by you and mode 0600`.
+La suite isolata successiva passa tutti i trenta test, senza modifiche al codice.
+Non e' una prova della causa: riprodurre con scheduling controllato prima di
+attribuirlo al carico o cambiare le protezioni. Aprire un intervento se ricorre;
+la telemetria non modifica il writer dell'audit. — cose vere che nessuno ha chiesto
+
 ### 2026-09-23 — identificativi esterni scambiati per commit
 
 `kb finish --thor` ha rifiutato un identificativo di agente e un numero di
