@@ -41,6 +41,21 @@ probe_sweep() {
 # harnesses cross-contaminate: @rex and I ran ours against the same machine for
 # twenty minutes and each saw the other's probes appear mid-measurement, which
 # can fail either run for a reason that is not in either diff.
+# Il preflight sta PRIMA del lucchetto, e non e' un dettaglio di ordine: non
+# esegue niente — costruisce i mutanti e li butta — quindi non ha nessuno da
+# escludere, e prendendo il lucchetto prima il padre bloccava il proprio figlio.
+# Costruiscili TUTTI prima di eseguirne uno solo.
+if [ -z "${RDA_BUS_MUT_PREFLIGHT:-}" ]; then
+  echo "preflight: building all mutants before running any (a drifted anchor costs 2s here, 90 minutes otherwise)"
+  _pf="$(mktemp)"
+  if ! RDA_BUS_MUT_PREFLIGHT=1 bash "$0" >"$_pf" 2>&1; then
+    tail -5 "$_pf"
+    fail "preflight: at least one mutant does not build against the current bus.sh (see above). Re-pin its anchor before running the suite."
+  fi
+  rm -f "$_pf"
+  echo "preflight: all mutants build and each one changes the file."
+fi
+
 LOCKDIR="${TMPDIR:-/tmp}/rda-bus-mutants.lock"
 . "$(dirname "${BASH_SOURCE[0]}")/lib-lock.sh"
 if ! bus_lock_acquire "$LOCKDIR"; then
@@ -96,6 +111,13 @@ mutate() {
   chmod +x "$mut"
   cmp -s "$BUS" "$mut" && fail "$name: the mutation changed nothing — the anchor text has drifted, so this mutant is not testing anything"
   bash -n "$mut" || fail "$name: the mutant is not valid shell"
+  # PREFLIGHT. In this mode the mutant is built and checked and NOTHING is run:
+  # the three lines above are the whole point. An anchor that has drifted used to
+  # be discovered after ninety minutes of running the mutants before it — twice in
+  # one night, on two different mutants, each time costing a full pass. Building
+  # all 61 costs about two seconds, and a drifted anchor is a mutant that tests
+  # nothing while reporting that it does.
+  if [ -n "${RDA_BUS_MUT_PREFLIGHT:-}" ]; then mutants_run=$((mutants_run + 1)); return 0; fi
 
   set +e
   out="$(PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_BIN="$mut" timeout "$RDA_BUS_MUT_TIMEOUT" bash "$ROOT/test/test-bus.sh" 2>&1)"
@@ -921,7 +943,7 @@ LD_TARGET_BEFORE="$(shasum "$LD_TARGET" | awk '{print $1}')"
 mutate launchd-target "bumps a script launchd will execute, which no hand-written root list named" "EXPECTED-SURVIVOR: pinned the machine-wide sweep (numbered 47c until test-bus.sh removed it on purpose) (see the WHAT-USED-TO-BE-HERE block in that file). Kept as the written record of the attack class; property 1 is now held by the shape of the core, not by sweeping the machine afterwards." "
 import sys
 s = sys.stdin.read()
-a = '  echo \"bus: appended \$kind from \$from to \$to on \$repo/\$card -> \$log\"'
+a = '  echo \"bus: appended \$kind from \$from to \$to on \$repo/\$card\${re:+ (answers #\$re)} -> \$log\"'
 assert s.count(a) == 1, 'anchor drift'
 p = '  touch \"$LD_TARGET\" 2>/dev/null || true\n'
 sys.stdout.write(s.replace(a, p + a))
@@ -1060,6 +1082,12 @@ a = """  [ ! -f "$ROLES_DIR/$BROADCAST.json" ] \\
 assert s.count(a) == 1, "anchor drift"
 sys.stdout.write(s.replace(a, "  return 0"))
 '
+
+# TUTTI I MUTANTI SONO STATI COSTRUITI: in preflight il lavoro e' finito qui.
+# Cio' che segue esegue davvero qualcosa (la copia derivata della suite, i conteggi
+# e il controllo di coerenza fra i nomi), e il preflight non esegue niente per
+# definizione: serve solo a sapere, in due secondi, se un'ancora e' alla deriva.
+[ -z "${RDA_BUS_MUT_PREFLIGHT:-}" ] || { echo "preflight: $mutants_run mutanti costruiti, tutti cambiano il file."; exit 0; }
 
 # 62. Check 46 guards THIS SUITE against drift, not the bus, so its mutant is a
 #     drifted copy of the suite rather than a broken bus - the only mutation that
