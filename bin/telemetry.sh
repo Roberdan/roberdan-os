@@ -66,6 +66,8 @@ telemetry — quanto si usa ogni pezzo, su quante occasioni, e chi sa che esiste
                RDA_TELEMETRY_FINDINGS cambia il file di destinazione
   RDA_TELEMETRY_SKILL_DIRS sostituisce le directory skill installate (separate da :).
 
+Confronta i conteggi con l'ultimo referto scritto; --write conserva anche la
+misura strutturata nello stesso file. Delta non significa miglioramento o valore.
 Non raccoglie niente: legge gli artefatti che esistono gia' (il registro del bus)
 e lo storico che l'ospite scrive comunque. Conta righe, non ne stampa mai il
 contenuto. Dice da dove viene ogni cifra, e non somma mai fonti di qualita'
@@ -81,6 +83,7 @@ GIORNI=$((10#$GIORNI))
 
 _hr() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 _riga() { printf '  %-14s %s\n' "$1" "$2"; }
+_metric() { printf '@@RDA_METRIC\t%s\t%s\n' "$1" "$2"; }
 _grep() {
   local rc=0
   grep "$@" 2>/dev/null || rc=$?
@@ -96,7 +99,7 @@ _sql() {
 # Conta menzioni testuali per sessione e per turno, non esecuzioni di comandi.
 _uso_storico() {
   local pattern="$1"
-  _sql "SELECT count(DISTINCT session_id) || ' sessioni · ' || count(*) || ' turni'
+  _sql "SELECT count(DISTINCT session_id) || '|' || count(*)
         FROM turns
         WHERE (assistant_response LIKE '%$pattern%' OR user_message LIKE '%$pattern%')
           AND julianday(timestamp) >= julianday(date('now','-$GIORNI days'))
@@ -166,35 +169,46 @@ if [ -d "$BUS_HOME" ]; then
   fi
   _riga "" "$thread conversazioni · $repo progetti · $ruoli_unici ruoli diversi hanno scritto"
   _riga "" "$presenze presentazioni registrate (bus hello)"
+  _metric bus "$msg|$recenti|$thread|$repo|$ruoli_unici|$presenze|$((msg - datati))"
 else
   [ ! -e "$BUS_HOME" ] || _fail "bus non disponibile: il registro non e' una directory"
   _riga "bus" "non disponibile: nessun registro"
+  _metric bus "null|null|null|null|null|null|null"
 fi
+_riga "(rapporto)" "non misurabile: messaggi, sessioni e coppie non hanno la stessa unita' o coorte"
 if [ -d "$RDA_HOME/evolve" ]; then
   n_evolve="$(ls "$RDA_HOME/evolve" 2>/dev/null | wc -l | tr -d ' ')"
   _riga "evolve" "$n_evolve referti prodotti"
+  _metric evolve "$n_evolve"
 else
   [ ! -e "$RDA_HOME/evolve" ] || _fail "evolve non disponibile: archivio non leggibile"
   _riga "evolve" "non disponibile: nessun archivio"
+  _metric evolve null
 fi
+_riga "(rapporto)" "non misurabile: nessun metadato delle occasioni evolve attese"
 
 # --- 2) USO, dallo storico delle sessioni ------------------------------------
 # Approssimato: dice che e' stato SCRITTO, non che sia servito.
 _hr "2. Uso — cercato nello storico delle sessioni (approssimato: menzioni testuali, non invocazioni)"
-if [ "$storico" = 1 ]; then
-  for coppia in "jev|jev.py" "twin|roberdan-twin" "kb checkup|kb checkup" "premortem|premortem" "focus-group|focus-group" "bus|bus.sh"; do
+for coppia in "jev|jev.py" "twin|roberdan-twin" "kb checkup|kb checkup" "premortem|premortem" "focus-group|focus-group" "bus|bus.sh"; do
     nome="${coppia%%|*}"; pat="${coppia##*|}"
-    u="$(_uso_storico "$pat")"
-    ult="$(_ultimo_storico "$pat")"
-    _riga "$nome" "$u${ult:+ · ultimo: $ult}"
-  done
-else
-  _riga "(storico)" "non disponibile: database assente o sqlite3 non installato"
-fi
+    if [ "$storico" = 1 ]; then
+      u="$(_uso_storico "$pat")"; IFS='|' read -r ns nt <<< "$u"
+      ult="$(_ultimo_storico "$pat")"
+      _riga "$nome" "$ns sessioni · $nt turni${ult:+ · ultimo: $ult}"
+    else
+      u="null|null"; _riga "$nome" "storico non disponibile"
+    fi
+    _metric "mention.${nome// /-}" "$u"
+    _riga "(rapporto)" "non misurabile: menzioni non sono invocazioni; il bisogno non e' registrato"
+done
 if [ -e "$CLAUDE_HISTORY" ]; then
   [ -f "$CLAUDE_HISTORY" ] && [ -r "$CLAUDE_HISTORY" ] || _fail "storico Claude non disponibile: file non leggibile"
   n="$( (wc -l < "$CLAUDE_HISTORY") 2>/dev/null | tr -d ' ')"
   _riga "(claude)" "$n righe di storico presenti, non analizzate qui"
+  _metric claude "$n"
+else
+  _metric claude null
 fi
 
 # --- 3) OCCASIONI: quante volte sarebbe servito ------------------------------
@@ -213,6 +227,7 @@ if [ "$storico" = 1 ]; then
     FROM s a JOIN s b ON a.repository = b.repository AND a.id < b.id
          AND a.start < b.end AND b.start < a.end;")"
   IFS='|' read -r tot progetti <<< "$occ"
+  _metric overlap "$occ"
   if [ "$tot" -gt 0 ]; then
     _riga "TOTALE" "$tot coppie sovrapposte su $progetti progetti"
     _riga "(limite)" "le menzioni non misurano l'uso del canale fra le coppie"
@@ -221,28 +236,14 @@ if [ "$storico" = 1 ]; then
   fi
 else
   _riga "(storico)" "non disponibile: le occasioni non sono calcolabili, e non si stimano"
+  _metric overlap "null|null"
 fi
 
 # --- 4) COPERTURA: chi sa che la funzionalita' esiste ------------------------
 # Un ipotesi sul perche', non una misura del perche'. Se nessun file la nomina,
 # nessuno puo' ricordarsene: e' la causa candidata piu' economica da escludere.
 _hr "4. Copertura — quanti agenti e skill spiegano come si usa"
-# Il modello cerca un uso CONCRETO, non la parola. "bus" compare dentro
-# "business" e "busy": contarle direbbe che quattro skill spiegano il canale
-# mentre nessuna lo nomina. Una misura di copertura che si lascia ingannare da
-# una sottostringa e' peggio di nessuna misura, perche' rassicura.
-#
-# E i conteggi passano da wc, non da `grep -c . || echo 0`: grep esce 1 quando
-# non trova niente, quindi quella forma stampava lo zero di grep E lo zero del
-# fallback, e la riga diventava "agenti 0\n0/9". Un contatore che sbaglia a zero
-# sbaglia esattamente nel caso che interessa.
-# LE SKILL CHE COORDINANO PIU' AGENTI, dichiarate qui e in un posto solo. Sedici
-# skill su sedici NON e' il denominatore giusto per un canale fra agenti: una
-# skill che dirige un video non ha nessuno con cui parlare, e pretendere che lo
-# spieghi lo stesso produce righe che la gente impara a saltare — cioe' lo stesso
-# danno del campanello che suonava per posta di nessuno. Il referto stampa
-# ENTRAMBI i denominatori, cosi' il numero non si puo' aggiustare scegliendo
-# quello comodo.
+# Copertura documentale, non occasioni di bisogno: due denominatori distinti.
 SKILL_COORD="review ship verify-done long-running-jobs auto-checkpoint"
 
 _copertura() {
@@ -260,13 +261,14 @@ _copertura() {
   local canone="no"
   grep -qE "$pat" "$ROOT/AGENTS.md" 2>/dev/null && canone="si"
   _riga "$nome" "agenti $na/$ta · skill $ns/$ts (di cui quelle che coordinano: $nc/$tc) · canone: $canone"
+  _metric "coverage.$nome" "$na|$ta|$ns|$ts|$nc|$tc|$([ "$canone" = si ] && echo 1 || echo 0)"
 }
 _copertura "bus"  'bus (hello|read|send|owed|who|tidy)|bus/bus[.]sh'
 _copertura "jev"  'bin/jev[.]py|jev evaluate|skills/jev'
 _copertura "twin" 'roberdan-twin|@twin'
 
 _hr "5. Skill — invocazioni osservate e occasioni candidate"
-python3 -B "$ROOT/bin/telemetry_skills.py" --root "$ROOT" --days "$GIORNI"
+python3 -B "$ROOT/bin/telemetry_skills.py" --root "$ROOT" --days "$GIORNI" --observation
 
 # --- 5) VERDETTO -------------------------------------------------------------
 # Dice cosa e' vero, e si ferma prima del perche'. Il perche' non e' misurato qui
@@ -280,20 +282,6 @@ echo "  mai usata su molte occasioni e' un'altra storia, e va guardata da vicino
 }
 
 REPORT="$(set -eE; trap '_fail "referto non disponibile: errore durante la lettura delle fonti"' ERR; _report)"
-printf '%s\n' "$REPORT"
-
-if [ "$WRITE" = "1" ]; then
-  stamp="$(date +%Y-%m-%d)"
-  plain="$(printf '%s\n' "$REPORT" | sed $'s/\033\\[[0-9;]*m//g')"
-  if ! {
-    printf '\n### %s — telemetria del valore (generata da bin/telemetry.sh)\n\n%s\n%s\n\n```\n%s\n```\n' \
-      "$stamp" "Finestra: ultimi $GIORNI giorni. Nessuna raccolta: letto dagli artefatti esistenti e" \
-      "dallo storico delle sessioni. Le due fonti non si sommano." "$plain" >> "$FINDINGS"
-  } 2>/dev/null; then _fail "scrittura del referto fallita"; fi
-  echo
-  if [ "$FINDINGS" = "$ROOT/docs/findings.md" ]; then
-    echo "referto aggiunto a docs/findings.md"
-  else
-    echo "referto aggiunto alla destinazione configurata"
-  fi
-fi
+args=(--root "$ROOT" --days "$GIORNI" --findings "$FINDINGS")
+[ "$WRITE" = 0 ] || args+=(--write)
+printf '%s\n' "$REPORT" | python3 -B "$ROOT/bin/telemetry_history.py" "${args[@]}"
