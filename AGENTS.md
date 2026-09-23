@@ -385,6 +385,41 @@ Logic in plain markdown, tool-agnostic (wrappers are generated):
 [`focus-group`](skills/focus-group/skill.md) — pool of user-personas + moderator + consolidator, multi-mode, anti-sycophancy ·
 [`problem-validation`](skills/problem-validation/skill.md) — orchestrator: focus-group → prioritization → premortem, leverages gstack.
 
+## Telemetria del valore — quanto si usa ogni pezzo, su quante occasioni
+
+→ `bin/telemetry.sh` · in `kb checkup` come sezione 5 · con `--write` il referto
+va in coda a [`docs/findings.md`](docs/findings.md), aggiunto e mai sovrapposto,
+perché la serie nel tempo è l'unica cosa che dica se un numero sta migliorando.
+
+**Non raccoglie niente, ed è la scelta principale.** Nessun file di eventi nuovo,
+nessun contatore da tenere aggiornato, nessun hook che scrive a ogni turno: un
+secondo archivio di misure diverge da ciò che misura, e quello che diverge è
+sempre quello che nessuno legge finché non sbaglia. Si legge ciò che esiste già —
+il registro del bus, che essendo append-only **è** la sua telemetria esatta, e lo
+storico delle sessioni che l'ospite scrive comunque.
+
+**Le due fonti non si sommano mai.** Un conteggio esatto preso dal registro di un
+componente e una ricerca di testo nello storico non sono la stessa qualità di
+prova; ogni riga dice da dove viene. È la stessa disciplina di `bus who`, che
+stampa la presenza dichiarata **accanto** a quella osservata e mai al posto.
+
+**Il denominatore è la parte che mancava.** "Usato 20 volte" non risponde a
+niente: venti su quante occasioni? Per un canale fra agenti l'occasione è
+misurabile — due sessioni sullo stesso progetto nello stesso momento. Prima
+misura, 2026-09-23: **132 occasioni di lavoro in parallelo in trenta giorni, il
+bus comparso in 1 sessione su 94**, e zero delle sedici skill lo nominava.
+
+**Privacy:** si contano righe e si leggono date, **mai il contenuto di una
+conversazione**. Lo storico contiene i dialoghi per intero e questo comando non
+ha modo di mostrarne una riga — fissato da `test/test-telemetry.sh`, insieme al
+fatto che `--write` può solo aggiungere in coda.
+
+**Dove si ferma, detto invece che sottinteso:** misura **uso** e **occasioni**,
+non il valore, e non sa *perché* una cosa non viene usata. La copertura (quanti
+agenti e skill la spiegano) è una **causa candidata**, la più economica da
+escludere, non una spiegazione: una funzionalità ben documentata e mai usata su
+molte occasioni è un'altra storia, e va guardata da vicino.
+
 ## Eval — does the canon actually change output?
 
 [`eval/README.md`](eval/README.md) — with/without-canon A/B on 12 representative tasks + blind
