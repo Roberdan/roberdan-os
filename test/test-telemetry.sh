@@ -19,6 +19,7 @@ T="$TMP/repo/bin/telemetry.sh"
 export RDA_HOME="$TMP/home" RDA_BUS_HOME="$TMP/bus"
 export RDA_SESSION_STORE="$TMP/store.db" RDA_CLAUDE_HISTORY="$TMP/history.jsonl"
 export RDA_TELEMETRY_DAYS=30
+unset RDA_TELEMETRY_FINDINGS
 export TELEMETRY_SQLITE
 TELEMETRY_SQLITE="$(command -v sqlite3)"
 export TELEMETRY_CALLS="$TMP/calls"
@@ -174,6 +175,28 @@ printf '%s\n' "${out%$'\n\nreferto aggiunto a docs/findings.md'}" | sed $'s/\033
 awk '/^```$/ {inside=!inside; next} inside' "$TMP/repo/docs/findings.md" > "$TMP/appended"
 cmp -s "$TMP/displayed" "$TMP/appended" || fail "referto salvato diverso da quello mostrato"
 ok "--write aggiunge senza troncare e salva la stessa misura, senza rieseguirla"
+
+cp "$TMP/repo/docs/findings.md" "$TMP/default-before"
+redirected="$TMP/redirected findings.md"
+printf 'sentinella: destinazione alternativa\n' > "$redirected"
+cp "$redirected" "$TMP/redirected-before"
+out="$(RDA_TELEMETRY_FINDINGS="$redirected" bash "$T" 2>&1)" || fail "override senza --write fallisce"
+cmp -s "$redirected" "$TMP/redirected-before" || fail "override scrive senza --write"
+out="$(RDA_TELEMETRY_FINDINGS="$redirected" bash "$T" --write 2>&1)" || fail "override --write fallisce"
+cmp -s "$TMP/default-before" "$TMP/repo/docs/findings.md" || fail "override modifica findings predefinito"
+head -n 1 "$redirected" > "$TMP/prefix"
+cmp -s "$TMP/redirected-before" "$TMP/prefix" || fail "override tronca la destinazione"
+awk '/^```$/ {inside=!inside; next} inside' "$redirected" > "$TMP/redirected-report"
+cmp -s "$TMP/appended" "$TMP/redirected-report" || fail "override salva un referto diverso"
+grep -Fq "referto aggiunto a $redirected" <<< "$out" || fail "override indica una destinazione errata"
+for invalid_destination in "" "$TMP/missing-parent/findings.md"; do
+  if out="$(RDA_TELEMETRY_FINDINGS="$invalid_destination" bash "$T" --write 2>&1)"; then
+    fail "destinazione override invalida accettata"
+  fi
+  has 'scrittura del referto fallita' "errore di destinazione override non dichiarato"
+  cmp -s "$TMP/default-before" "$TMP/repo/docs/findings.md" || fail "override invalido ricade sul default"
+done
+ok "RDA_TELEMETRY_FINDINGS isola la scrittura, preserva i dati e non ricade sul default"
 
 out="$(bash "$T" --giorni 030 2>&1)" || fail "alias --giorni o numero con zero iniziale rifiutato"
 has 'TOTALE +3 coppie sovrapposte' "alias --giorni cambia le misure"

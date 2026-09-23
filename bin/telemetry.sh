@@ -46,7 +46,7 @@ STORE="${RDA_SESSION_STORE:-$HOME/.copilot/session-store.db}"
 CLAUDE_HISTORY="${RDA_CLAUDE_HISTORY:-$HOME/.claude/history.jsonl}"
 GIORNI="${RDA_TELEMETRY_DAYS-30}"
 WRITE=0
-FINDINGS="$ROOT/docs/findings.md"
+FINDINGS="${RDA_TELEMETRY_FINDINGS-$ROOT/docs/findings.md}"
 _fail() { echo "telemetry: $*" >&2; exit 1; }
 
 while [ $# -gt 0 ]; do
@@ -63,6 +63,7 @@ telemetry — quanto si usa ogni pezzo, su quante occasioni, e chi sa che esiste
 
   --giorni N   finestra di osservazione, 1..999999 giorni (default 30; alias --days)
   --write      aggiunge il referto datato a docs/findings.md
+               RDA_TELEMETRY_FINDINGS cambia il file di destinazione
 
 Non raccoglie niente: legge gli artefatti che esistono gia' (il registro del bus)
 e lo storico che l'ospite scrive comunque. Conta righe, non ne stampa mai il
@@ -286,5 +287,5 @@ if [ "$WRITE" = "1" ]; then
     "dallo storico delle sessioni. Le due fonti non si sommano." "$plain" >> "$FINDINGS" \
     || _fail "scrittura del referto fallita"
   echo
-  echo "referto aggiunto a docs/findings.md"
+  echo "referto aggiunto a ${FINDINGS#"$ROOT/"}"
 fi
