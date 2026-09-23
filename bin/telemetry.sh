@@ -149,16 +149,20 @@ if [ -d "$BUS_HOME" ]; then
   # totale storico non dice niente su oggi: le due cifre insieme distinguono un
   # canale vivo da un archivio, e una sola delle due non lo fa.
   taglio="$(date -u -v-"${GIORNI}"d +%Y-%m-%d 2>/dev/null || date -u -d "-${GIORNI} days" +%Y-%m-%d)"
-  recenti=0
+  recenti=0; datati=0
   for d in "$BUS_HOME"/*/; do
     [ -d "$d" ] || continue
     for f in "$d"*.jsonl; do
       [ -e "$f" ] && [ -s "$f" ] || continue
       n="$(_grep -o '"ts":"[0-9-]\{10\}' "$f" | sed 's/.*"//' | awk -v t="$taglio" '$1 >= t' | wc -l | tr -d ' ')"
       recenti=$((recenti + n))
+      n="$(_grep -c '"ts":"[0-9-]\{10\}' "$f")"; datati=$((datati + n))
     done
   done
   _riga "bus" "$msg messaggi in tutto · $recenti negli ultimi $GIORNI giorni"
+  if [ "$datati" -lt "$msg" ]; then
+    _riga "(limite)" "$((msg - datati)) messaggi senza data riconoscibile: nel totale, non nei recenti"
+  fi
   _riga "" "$thread conversazioni · $repo progetti · $ruoli_unici ruoli diversi hanno scritto"
   _riga "" "$presenze presentazioni registrate (bus hello)"
 else

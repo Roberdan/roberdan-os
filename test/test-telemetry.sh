@@ -127,6 +127,11 @@ has '2 messaggi in tutto · 1 negli ultimi 30 giorni' "finestra del bus errata"
 has '1 conversazioni · 1 progetti · 1 ruoli' "presenze contate come messaggi"
 has '1 presentazioni registrate' "hello non contato esattamente una volta"
 ok "registri vuoti, sole uscite, presentazioni e messaggi hanno conteggi stabili"
+printf '%s\n' '{}' >> "$RDA_BUS_HOME/fixture/card.jsonl"
+out="$(bash "$T" 2>&1)" || fail "messaggio storico senza data rifiutato"
+has '3 messaggi in tutto · 1 negli ultimi 30 giorni' "messaggio senza data escluso dal totale o contato recente"
+has '1 messaggi senza data riconoscibile: nel totale, non nei recenti' "data sconosciuta non spiegata"
+ok "messaggi storici senza data accettati nel totale e dichiarati fuori dal conteggio recente"
 
 "$TELEMETRY_SQLITE" "$RDA_SESSION_STORE" <<'SQL'
 CREATE TABLE sessions(id TEXT PRIMARY KEY, repository TEXT, created_at TEXT, updated_at TEXT);
