@@ -25,12 +25,8 @@
 # unico numero e' la stessa bugia che questo sistema rifiuta altrove quando
 # stampa la presenza dichiarata accanto a quella osservata invece che al posto.
 #
-# IL DENOMINATORE, che e' la parte che di solito manca. "Usato 20 volte" non dice
-# niente: venti volte su quante in cui sarebbe servito? Per un canale fra agenti
-# l'occasione e' misurabile — due sessioni sullo stesso progetto nello stesso
-# momento — e il rapporto fra le due cifre e' l'unica che risponda alla domanda.
-# Misurato la prima volta che questo comando e' esistito: 44 coppie di sessioni
-# sovrapposte in 30 giorni, il canale usato in 1 sessione su 94.
+# Le occasioni sono coppie uniche di sessioni sovrapposte sullo stesso progetto.
+# Le menzioni sono sessioni/turni: unita' diverse, non un rapporto di utilizzo.
 #
 # PRIVACY. Si contano righe, mai se ne stampa il contenuto. Lo storico delle
 # sessioni contiene le conversazioni di Roberto per intero: questo comando puo'
@@ -41,28 +37,31 @@
 # sessione dice che e' stato SCRITTO, non che sia servito a qualcosa. Nessuna
 # delle cifre qui dentro misura il VALORE; misurano l'uso e l'occasione, che sono
 # le due cose senza le quali il valore non si puo' nemmeno discutere.
-set -uo pipefail
+set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RDA_HOME="${RDA_HOME:-$HOME/.roberdan-os}"
 BUS_HOME="${RDA_BUS_HOME:-$RDA_HOME/bus}"
 STORE="${RDA_SESSION_STORE:-$HOME/.copilot/session-store.db}"
 CLAUDE_HISTORY="${RDA_CLAUDE_HISTORY:-$HOME/.claude/history.jsonl}"
-GIORNI="${RDA_TELEMETRY_DAYS:-30}"
+GIORNI="${RDA_TELEMETRY_DAYS-30}"
 WRITE=0
 FINDINGS="$ROOT/docs/findings.md"
+_fail() { echo "telemetry: $*" >&2; exit 1; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --write)  WRITE=1; shift;;
-    --giorni|--days) GIORNI="$2"; shift 2;;
+    --giorni|--days)
+      [ $# -ge 2 ] || _fail "--giorni/--days richiede un numero di giorni"
+      GIORNI="$2"; shift 2;;
     -h|--help)
       cat <<'USAGE'
 telemetry — quanto si usa ogni pezzo, su quante occasioni, e chi sa che esiste.
 
   bin/telemetry.sh [--giorni N] [--write]
 
-  --giorni N   finestra di osservazione (default 30)
+  --giorni N   finestra di osservazione, 1..999999 giorni (default 30; alias --days)
   --write      aggiunge il referto datato a docs/findings.md
 
 Non raccoglie niente: legge gli artefatti che esistono gia' (il registro del bus)
@@ -74,33 +73,53 @@ USAGE
     *) echo "telemetry: argomento sconosciuto '$1'" >&2; exit 1;;
   esac
 done
+[[ "$GIORNI" =~ ^[0-9]{1,6}$ ]] && [ "$((10#$GIORNI))" -gt 0 ] \
+  || _fail "--giorni/--days: giorni non validi (intero da 1 a 999999)"
+GIORNI=$((10#$GIORNI))
 
 _hr() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 _riga() { printf '  %-14s %s\n' "$1" "$2"; }
-
-_sql() {  # una query sullo storico delle sessioni, o niente se non c'e'
-  [ -r "$STORE" ] || return 1
-  command -v sqlite3 >/dev/null 2>&1 || return 1
-  sqlite3 -noheader "$STORE" "$1" 2>/dev/null
+_grep() {
+  local rc=0
+  grep "$@" || rc=$?
+  [ "$rc" -le 1 ] || return "$rc"
 }
 
-# Quante SESSIONI hanno scritto questo testo, e quante volte. Il conteggio e' per
-# sessione e non per riga: dieci comandi nella stessa sessione sono un uso, non
-# dieci — la domanda e' "quante volte qualcuno se n'e' ricordato".
+_sql() {
+  # SQLite puo' includere dati nell'errore: segnala il fallimento, non quel testo.
+  sqlite3 -readonly -batch -noheader "$STORE" "$1" 2>/dev/null \
+    || _fail "storico non disponibile: lettura SQLite fallita (database o schema)"
+}
+
+# Conta menzioni testuali per sessione e per turno, non esecuzioni di comandi.
 _uso_storico() {
   local pattern="$1"
   _sql "SELECT count(DISTINCT session_id) || ' sessioni · ' || count(*) || ' turni'
         FROM turns
         WHERE (assistant_response LIKE '%$pattern%' OR user_message LIKE '%$pattern%')
-          AND substr(timestamp,1,10) >= date('now','-$GIORNI days');"
+          AND julianday(timestamp) >= julianday(date('now','-$GIORNI days'))
+          AND julianday(timestamp) <= julianday('now');"
 }
 
 _ultimo_storico() {
   local pattern="$1"
-  _sql "SELECT substr(max(timestamp),1,10) FROM turns
+  _sql "SELECT date(max(julianday(timestamp))) FROM turns
         WHERE (assistant_response LIKE '%$pattern%' OR user_message LIKE '%$pattern%');"
 }
 
+_report() {
+storico=0
+if [ -e "$STORE" ]; then
+  [ -f "$STORE" ] && [ -r "$STORE" ] || _fail "storico non disponibile: file non leggibile"
+  if command -v sqlite3 >/dev/null 2>&1; then
+    invalidi="$(_sql "SELECT
+      (SELECT count(*) FROM sessions WHERE julianday(created_at) IS NULL
+        OR julianday(updated_at) IS NULL OR julianday(updated_at) < julianday(created_at))
+      + (SELECT count(*) FROM turns WHERE julianday(timestamp) IS NULL);")"
+    [ "$invalidi" = 0 ] || _fail "storico non disponibile: date mancanti, non valide o intervalli invertiti"
+    storico=1
+  fi
+fi
 echo "TELEMETRIA — finestra: ultimi $GIORNI giorni"
 echo "Nessuna raccolta: si legge cio' che esiste gia'. Ogni riga dice da dove viene."
 
@@ -115,52 +134,61 @@ if [ -d "$BUS_HOME" ]; then
     for f in "$d"*.jsonl; do
       [ -e "$f" ] && [ -s "$f" ] || continue
       thread=$((thread + 1))
-      msg=$((msg + $(grep -c . "$f" 2>/dev/null || echo 0)))
-      mittenti="$mittenti $(grep -o '"from":"[^"]*"' "$f" 2>/dev/null | sort -u | tr '\n' ' ')"
+      n="$(_grep -c . "$f")"; msg=$((msg + n))
+      mittenti="$mittenti $(_grep -o '"from":"[^"]*"' "$f" | sort -u | tr '\n' ' ')"
     done
   done
-  ruoli_unici="$(printf '%s' "$mittenti" | tr ' ' '\n' | sort -u | grep -c . | tr -d ' ')"
+  ruoli_unici="$(printf '%s' "$mittenti" | tr ' ' '\n' | sort -u | _grep -c . | tr -d ' ')"
   presenze=0
   for p in "$BUS_HOME"/*/.presence.jsonl; do
     [ -e "$p" ] || continue
-    presenze=$((presenze + $(grep -c '"event":"hello"' "$p" 2>/dev/null || echo 0)))
+    n="$(_grep -c '"event":"hello"' "$p")"; presenze=$((presenze + n))
   done
   # DALL'INIZIO e NELLA FINESTRA, separati. Il registro non dimentica, quindi il
   # totale storico non dice niente su oggi: le due cifre insieme distinguono un
   # canale vivo da un archivio, e una sola delle due non lo fa.
-  taglio="$(date -u -v-"${GIORNI}"d +%Y-%m-%d 2>/dev/null || date -u -d "-${GIORNI} days" +%Y-%m-%d 2>/dev/null || echo 0000-00-00)"
+  taglio="$(date -u -v-"${GIORNI}"d +%Y-%m-%d 2>/dev/null || date -u -d "-${GIORNI} days" +%Y-%m-%d)"
   recenti=0
   for d in "$BUS_HOME"/*/; do
     [ -d "$d" ] || continue
     for f in "$d"*.jsonl; do
       [ -e "$f" ] && [ -s "$f" ] || continue
-      recenti=$((recenti + $(grep -o '"ts":"[0-9-]\{10\}' "$f" 2>/dev/null | sed 's/.*"//' | awk -v t="$taglio" '$1 >= t' | wc -l | tr -d ' ')))
+      n="$(_grep -o '"ts":"[0-9-]\{10\}' "$f" | sed 's/.*"//' | awk -v t="$taglio" '$1 >= t' | wc -l | tr -d ' ')"
+      recenti=$((recenti + n))
     done
   done
   _riga "bus" "$msg messaggi in tutto · $recenti negli ultimi $GIORNI giorni"
   _riga "" "$thread conversazioni · $repo progetti · $ruoli_unici ruoli diversi hanno scritto"
   _riga "" "$presenze presentazioni registrate (bus hello)"
 else
-  _riga "bus" "nessun registro: mai usato su questa macchina"
+  [ ! -e "$BUS_HOME" ] || _fail "bus non disponibile: il registro non e' una directory"
+  _riga "bus" "non disponibile: nessun registro"
 fi
-n_evolve="$(ls "$RDA_HOME/evolve" 2>/dev/null | wc -l | tr -d ' ')"
-_riga "evolve" "$n_evolve referti prodotti"
+if [ -d "$RDA_HOME/evolve" ]; then
+  n_evolve="$(ls "$RDA_HOME/evolve" | wc -l | tr -d ' ')"
+  _riga "evolve" "$n_evolve referti prodotti"
+else
+  [ ! -e "$RDA_HOME/evolve" ] || _fail "evolve non disponibile: archivio non leggibile"
+  _riga "evolve" "non disponibile: nessun archivio"
+fi
 
 # --- 2) USO, dallo storico delle sessioni ------------------------------------
 # Approssimato: dice che e' stato SCRITTO, non che sia servito.
-_hr "2. Uso — cercato nello storico delle sessioni (approssimato: dice che e' stato scritto)"
-if [ -r "$STORE" ] && command -v sqlite3 >/dev/null 2>&1; then
+_hr "2. Uso — cercato nello storico delle sessioni (approssimato: menzioni testuali, non invocazioni)"
+if [ "$storico" = 1 ]; then
   for coppia in "jev|jev.py" "twin|roberdan-twin" "kb checkup|kb checkup" "premortem|premortem" "focus-group|focus-group" "bus|bus.sh"; do
     nome="${coppia%%|*}"; pat="${coppia##*|}"
     u="$(_uso_storico "$pat")"
     ult="$(_ultimo_storico "$pat")"
-    _riga "$nome" "${u:-0 sessioni · 0 turni}${ult:+ · ultimo: $ult}"
+    _riga "$nome" "$u${ult:+ · ultimo: $ult}"
   done
 else
-  _riga "(storico)" "non leggibile in $STORE — questa sezione non ha dati, e non li inventa"
+  _riga "(storico)" "non disponibile: database assente o sqlite3 non installato"
 fi
-if [ -r "$CLAUDE_HISTORY" ]; then
-  _riga "(claude)" "$(wc -l < "$CLAUDE_HISTORY" 2>/dev/null | tr -d ' ') righe di storico presenti, non analizzate qui"
+if [ -e "$CLAUDE_HISTORY" ]; then
+  [ -f "$CLAUDE_HISTORY" ] && [ -r "$CLAUDE_HISTORY" ] || _fail "storico Claude non disponibile: file non leggibile"
+  n="$(wc -l < "$CLAUDE_HISTORY" | tr -d ' ')"
+  _riga "(claude)" "$n righe di storico presenti, non analizzate qui"
 fi
 
 # --- 3) OCCASIONI: quante volte sarebbe servito ------------------------------
@@ -168,14 +196,17 @@ fi
 # non si sa su quante occasioni. Per un canale fra agenti l'occasione e'
 # misurabile: due sessioni sullo stesso progetto nello stesso momento.
 _hr "3. Occasioni — quante volte due sessioni hanno lavorato insieme allo stesso progetto"
-if [ -r "$STORE" ] && command -v sqlite3 >/dev/null 2>&1; then
+if [ "$storico" = 1 ]; then
   occ="$(_sql "
-    WITH s AS (SELECT id, repository, created_at, updated_at FROM sessions
-               WHERE repository IS NOT NULL AND substr(created_at,1,10) >= date('now','-$GIORNI days'))
+    WITH s AS (SELECT id, repository, julianday(created_at) AS start, julianday(updated_at) AS end
+               FROM sessions WHERE repository IS NOT NULL
+                 AND julianday(updated_at) > julianday(date('now','-$GIORNI days'))
+                 AND julianday(created_at) < julianday('now')
+                 AND julianday(updated_at) > julianday(created_at))
     SELECT a.repository || '|' || count(*)
-    FROM s a JOIN s b ON a.repository = b.repository AND a.id <> b.id
-         AND a.created_at < b.updated_at AND b.created_at < a.updated_at
-    GROUP BY a.repository ORDER BY count(*) DESC;")"
+    FROM s a JOIN s b ON a.repository = b.repository AND a.id < b.id
+         AND a.start < b.end AND b.start < a.end
+    GROUP BY a.repository ORDER BY count(*) DESC, a.repository;")"
   if [ -n "$occ" ]; then
     tot=0
     while IFS='|' read -r r n; do
@@ -183,16 +214,12 @@ if [ -r "$STORE" ] && command -v sqlite3 >/dev/null 2>&1; then
       tot=$((tot + n))
       _riga "${r##*/}" "$n coppie sovrapposte"
     done <<< "$occ"
-    usate="$(_sql "SELECT count(DISTINCT session_id) FROM turns
-                   WHERE assistant_response LIKE '%bus.sh%'
-                     AND substr(timestamp,1,10) >= date('now','-$GIORNI days');")"
-    echo
-    _riga "RAPPORTO" "$tot occasioni di lavoro in parallelo · il canale e' comparso in ${usate:-0} sessioni"
+    _riga "TOTALE" "$tot coppie sovrapposte; le menzioni non misurano l'uso del canale fra le coppie"
   else
-    _riga "(nessuna)" "nessuna sovrapposizione nella finestra: il canale non aveva occasioni"
+    _riga "(nessuna)" "nessuna sovrapposizione osservata nello storico nella finestra"
   fi
 else
-  _riga "(storico)" "non leggibile: il denominatore non e' calcolabile, e non si stima"
+  _riga "(storico)" "non disponibile: le occasioni non sono calcolabili, e non si stimano"
 fi
 
 # --- 4) COPERTURA: chi sa che la funzionalita' esiste ------------------------
@@ -221,8 +248,8 @@ _copertura() {
   local nome="$1" pat="$2" na ns ta ts nc tc k
   ta="$(ls "$ROOT"/agents/*.md 2>/dev/null | wc -l | tr -d " ")"
   ts="$(ls -d "$ROOT"/skills/*/ 2>/dev/null | wc -l | tr -d " ")"
-  na="$(grep -rlE "$pat" "$ROOT"/agents/*.md 2>/dev/null | wc -l | tr -d " ")"
-  ns="$(grep -rlE "$pat" "$ROOT"/skills/*/skill.md 2>/dev/null | wc -l | tr -d " ")"
+  na="$(_grep -rlE "$pat" "$ROOT"/agents/*.md | wc -l | tr -d " ")"
+  ns="$(_grep -rlE "$pat" "$ROOT"/skills/*/skill.md | wc -l | tr -d " ")"
   nc=0; tc=0
   for k in $SKILL_COORD; do
     [ -f "$ROOT/skills/$k/skill.md" ] || continue
@@ -246,15 +273,18 @@ echo "  Questo referto misura USO e OCCASIONI. Non misura il valore, e non sa pe
 echo "  qualcosa non viene usato: la copertura qui sopra e' una causa CANDIDATA, la piu'"
 echo "  economica da escludere, non una spiegazione. Una funzionalita' ben documentata e"
 echo "  mai usata su molte occasioni e' un'altra storia, e va guardata da vicino."
+}
+
+REPORT="$(set -eE; trap '_fail "referto non disponibile: errore durante la lettura delle fonti"' ERR; _report)"
+printf '%s\n' "$REPORT"
 
 if [ "$WRITE" = "1" ]; then
-  {
-    printf '\n### %s — telemetria del valore (generata da bin/telemetry.sh)\n\n' "$(date +%Y-%m-%d)"
-    printf 'Finestra: ultimi %s giorni. Nessuna raccolta: letto dagli artefatti esistenti e\n' "$GIORNI"
-    printf 'dallo storico delle sessioni. Le due fonti non si sommano.\n\n```\n'
-    RDA_TELEMETRY_DAYS="$GIORNI" bash "$0" --giorni "$GIORNI" 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g'
-    printf '```\n'
-  } >> "$FINDINGS"
+  stamp="$(date +%Y-%m-%d)"
+  plain="$(printf '%s\n' "$REPORT" | sed $'s/\033\\[[0-9;]*m//g')"
+  printf '\n### %s — telemetria del valore (generata da bin/telemetry.sh)\n\n%s\n%s\n\n```\n%s\n```\n' \
+    "$stamp" "Finestra: ultimi $GIORNI giorni. Nessuna raccolta: letto dagli artefatti esistenti e" \
+    "dallo storico delle sessioni. Le due fonti non si sommano." "$plain" >> "$FINDINGS" \
+    || _fail "scrittura del referto fallita"
   echo
   echo "referto aggiunto a docs/findings.md"
 fi
