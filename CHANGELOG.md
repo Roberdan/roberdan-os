@@ -3,6 +3,24 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.56.0 — 2026-09-23
+
+### Added
+
+- `bin/telemetry.sh` reports bus activity, session-history mentions, concurrent
+  work opportunities and documentation coverage. It reads existing artifacts,
+  keeps exact event counts separate from text matches, and explicitly does not
+  claim to measure value or explain why a tool was missed.
+- `kb checkup` includes the report; `--write` appends a dated observation to
+  `docs/findings.md`. Coordination workflows now explain when and how to use
+  the agent bus.
+
+### Fixed
+
+- Telemetry counts each overlapping session pair once, normalizes timestamps,
+  and distinguishes unavailable evidence from measured zero. Invalid observation
+  windows are rejected rather than interpolated into queries.
+
 ## 2.55.0 — 2026-09-22
 
 ### Changed

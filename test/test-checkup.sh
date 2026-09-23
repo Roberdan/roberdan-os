@@ -17,6 +17,11 @@ export RDA_HOME="$TMP/rda"; mkdir -p "$RDA_HOME"
 export RDA_WORKTREES="$HOME/GitHub/worktrees"; mkdir -p "$RDA_WORKTREES"
 export RDA_BUS_HOME="$RDA_HOME/bus"
 export RDA_KANBAN_REGISTRY="$RDA_HOME/kanban-registry"
+export RDA_TELEMETRY_FINDINGS="$TMP/findings.md"
+export RDA_SESSION_STORE="$TMP/session-store.db"
+export RDA_CLAUDE_HISTORY="$TMP/history.jsonl"
+printf 'Existing findings\n' > "$RDA_TELEMETRY_FINDINGS"
+findings_before="$(git hash-object "$ROOT/docs/findings.md")"
 export GIT_CONFIG_GLOBAL="$TMP/gitconfig"
 git config -f "$GIT_CONFIG_GLOBAL" user.email t@t; git config -f "$GIT_CONFIG_GLOBAL" user.name t
 
@@ -59,6 +64,31 @@ grep -q '"kind":"closed"' "$RDA_BUS_HOME/demo/VIVA.jsonl" 2>/dev/null \
   && fail "ha chiuso la conversazione di una card VIVA" || ok "non chiude mai la conversazione di una card viva"
 [ -f "$R/kanban/doing/VIVA.md" ] && ok "nemmeno con --yes tocca una card" || fail "con --yes ha toccato una card"
 case "$out2" in *"le card sono decisioni tue"*) ok "dichiara che le card restano decisione di Roberto" ;; *) fail "non dichiara il limite sulle card" ;; esac
+if [ -r "$ROOT/bin/telemetry.sh" ]; then
+  if grep -q 'telemetria del valore' "$RDA_TELEMETRY_FINDINGS"; then
+    ok "--yes scrive il referto nella destinazione isolata"
+  else
+    fail "referto isolato assente"
+  fi
+  if [ "$(git hash-object "$ROOT/docs/findings.md")" = "$findings_before" ]; then
+    ok "il test non modifica i findings reali"
+  else
+    fail "il test modifica i findings reali"
+  fi
+  mkdir "$TMP/invalid-findings"
+  if failed_report="$(cd "$R" && RDA_TELEMETRY_FINDINGS="$TMP/invalid-findings" bash "$CHK" --yes 2>&1)"; then
+    fail "un referto non scrivibile viene presentato come riuscito"
+  else
+    case "$failed_report" in
+      *"telemetria non disponibile"*) ok "un errore di telemetria resta visibile" ;;
+      *) fail "errore di telemetria nascosto" ;;
+    esac
+    case "$failed_report" in
+      *"referto completo aggiunto"*) fail "annuncia un referto mai scritto" ;;
+      *) ok "non annuncia una scrittura fallita" ;;
+    esac
+  fi
+fi
 
 # Le sezioni devono PRODURRE qualcosa, non solo avere un titolo. Il 2026-09-13 le prime due
 # stampavano "FLAGS[@]: unbound variable" sul Mac di Roberto (bash 3.2: espandere un array

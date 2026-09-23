@@ -405,9 +405,10 @@ stampa la presenza dichiarata **accanto** a quella osservata e mai al posto.
 
 **Il denominatore è la parte che mancava.** "Usato 20 volte" non risponde a
 niente: venti su quante occasioni? Per un canale fra agenti l'occasione è
-misurabile — due sessioni sullo stesso progetto nello stesso momento. Prima
-misura, 2026-09-23: **132 occasioni di lavoro in parallelo in trenta giorni, il
-bus comparso in 1 sessione su 94**, e zero delle sedici skill lo nominava.
+misurabile — due sessioni sullo stesso progetto nello stesso momento. Ogni coppia
+si conta una volta; il rapporto confronta sessioni con sessioni, non coppie con
+menzioni. La prima misura del 2026-09-23 duplicava le coppie: non usarla come
+baseline del confronto. Una menzione nello storico non prova un'invocazione.
 
 **Privacy:** si contano righe e si leggono date, **mai il contenuto di una
 conversazione**. Lo storico contiene i dialoghi per intero e questo comando non

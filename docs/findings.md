@@ -450,6 +450,17 @@ dichiarazione che si limita a spegnere un allarme nasconde il giorno in cui
 l'allarme aveva ragione. Questa invece fallisce quando la realta' e' migliore di
 come e' stata descritta.
 
+### 2026-09-23 — rettifica delle prime misure di telemetria
+
+I referti preliminari qui sotto NON sono una baseline affidabile. La query
+contava entrambe le direzioni di ogni coppia; confrontava poi coppie e sessioni,
+due unita' diverse. Le menzioni testuali non dimostrano invocazioni ne' valore.
+I referti con quattro messaggi sono dati sintetici: il test di `kb checkup --yes`
+scriveva erroneamente nei findings reali. Restano identificati per non cancellare
+la traccia dell'errore; i test ora scrivono in una destinazione isolata.
+Le conclusioni sull'uso del twin piu' sotto sono ipotesi, non prove di efficacia.
+I nomi dei progetti e i percorsi temporanei non servono alla misura e sono omessi.
+
 ### 2026-09-23 — telemetria del valore (generata da bin/telemetry.sh)
 
 Finestra: ultimi 30 giorni. Nessuna raccolta: letto dagli artefatti esistenti e
@@ -475,14 +486,7 @@ Nessuna raccolta: si legge cio' che esiste gia'. Ogni riga dice da dove viene.
   (claude)       8677 righe di storico presenti, non analizzate qui
 
 3. Occasioni — quante volte due sessioni hanno lavorato insieme allo stesso progetto
-  MirrorScopio   40 coppie sovrapposte
-  MirrorBuddy    34 coppie sovrapposte
-  VirtualBPMFy27 32 coppie sovrapposte
-  ConvergioEdu2030 12 coppie sovrapposte
-  buddy          8 coppie sovrapposte
-  MirrorHR-Epilepsy-Research-Kit-Official 2 coppie sovrapposte
-  roberdan-os    2 coppie sovrapposte
-  FDE_EMEA_Engagement_Playbook_FY27 2 coppie sovrapposte
+  (nomi omessi: conteggi preliminari non validi per il confronto)
 
   RAPPORTO       132 occasioni di lavoro in parallelo · il canale e' comparso in 1 sessioni
 
@@ -514,7 +518,7 @@ Nessuna raccolta: si legge cio' che esiste gia'. Ogni riga dice da dove viene.
   evolve         0 referti prodotti
 
 2. Uso — cercato nello storico delle sessioni (approssimato: dice che e' stato scritto)
-  (storico)      non leggibile in /var/folders/t4/gv3g58bj75g3_zd9tvxvcjd40000gp/T/tmp.32Uv2AphaU/home/.copilot/session-store.db — questa sezione non ha dati, e non li inventa
+  (storico)      fixture sintetica: database assente
 
 3. Occasioni — quante volte due sessioni hanno lavorato insieme allo stesso progetto
   (storico)      non leggibile: il denominatore non e' calcolabile, e non si stima
@@ -567,7 +571,40 @@ Nessuna raccolta: si legge cio' che esiste gia'. Ogni riga dice da dove viene.
   evolve         0 referti prodotti
 
 2. Uso — cercato nello storico delle sessioni (approssimato: dice che e' stato scritto)
-  (storico)      non leggibile in /var/folders/t4/gv3g58bj75g3_zd9tvxvcjd40000gp/T/tmp.iheW2SvtqF/home/.copilot/session-store.db — questa sezione non ha dati, e non li inventa
+  (storico)      fixture sintetica: database assente
+
+3. Occasioni — quante volte due sessioni hanno lavorato insieme allo stesso progetto
+  (storico)      non leggibile: il denominatore non e' calcolabile, e non si stima
+
+4. Copertura — quanti agenti e skill spiegano come si usa
+  bus            agenti 5/9 · skill 5/16 (di cui quelle che coordinano: 5/5) · canone: si
+  jev            agenti 3/9 · skill 1/16 (di cui quelle che coordinano: 0/5) · canone: si
+  twin           agenti 0/9 · skill 0/16 (di cui quelle che coordinano: 0/5) · canone: si
+
+5. Cosa si puo' dire, e dove ci si ferma
+  Questo referto misura USO e OCCASIONI. Non misura il valore, e non sa perche'
+  qualcosa non viene usato: la copertura qui sopra e' una causa CANDIDATA, la piu'
+  economica da escludere, non una spiegazione. Una funzionalita' ben documentata e
+  mai usata su molte occasioni e' un'altra storia, e va guardata da vicino.
+```
+
+### 2026-09-23 — telemetria del valore (generata da bin/telemetry.sh)
+
+Finestra: ultimi 30 giorni. Nessuna raccolta: letto dagli artefatti esistenti e
+dallo storico delle sessioni. Le due fonti non si sommano.
+
+```
+TELEMETRIA — finestra: ultimi 30 giorni
+Nessuna raccolta: si legge cio' che esiste gia'. Ogni riga dice da dove viene.
+
+1. Uso — misurato sull'artefatto della funzionalita' (esatto)
+  bus            4 messaggi in tutto · 1 negli ultimi 30 giorni
+                 2 conversazioni · 1 progetti · 2 ruoli diversi hanno scritto
+                 0 presentazioni registrate (bus hello)
+  evolve         0 referti prodotti
+
+2. Uso — cercato nello storico delle sessioni (approssimato: dice che e' stato scritto)
+  (storico)      fixture sintetica: database assente
 
 3. Occasioni — quante volte due sessioni hanno lavorato insieme allo stesso progetto
   (storico)      non leggibile: il denominatore non e' calcolabile, e non si stima

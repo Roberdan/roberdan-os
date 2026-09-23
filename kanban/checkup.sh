@@ -195,12 +195,18 @@ printf '\n  %s card in lavorazione · %s in attesa. Nessuna viene toccata da qui
 # sta migliorando.
 _hr "5. Quanto si usano gli strumenti"
 if [ -r "$ROOT/bin/telemetry.sh" ]; then
-  if [ "$APPLY" = "1" ]; then
-    bash "$ROOT/bin/telemetry.sh" --write 2>/dev/null | grep -E "RAPPORTO|^  bus |^  jev |^  twin " | head -6
-    printf '  referto completo aggiunto a docs/findings.md\n'
+  telemetry_args=()
+  [ "$APPLY" = "1" ] && telemetry_args=(--write)
+  if telemetry_report="$(bash "$ROOT/bin/telemetry.sh" ${telemetry_args[@]+"${telemetry_args[@]}"})"; then
+    printf '%s\n' "$telemetry_report" | awk '/RAPPORTO|^  bus |^  jev |^  twin / {if (++n <= 6) print}'
+    if [ "$APPLY" = "1" ]; then
+      printf '  referto completo aggiunto ai findings\n'
+    else
+      printf '  referto completo: bin/telemetry.sh · per scriverlo in findings: kb checkup --yes\n'
+    fi
   else
-    bash "$ROOT/bin/telemetry.sh" 2>/dev/null | grep -E "RAPPORTO|^  bus |^  jev |^  twin " | head -6
-    printf '  referto completo: bin/telemetry.sh · per scriverlo in findings: kb checkup --yes\n'
+    printf '  telemetria non disponibile: raccolta del referto fallita\n' >&2
+    exit 1
   fi
 else
   printf '  (bin/telemetry.sh non raggiungibile da qui)\n'
