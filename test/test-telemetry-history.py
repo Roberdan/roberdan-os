@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "bin"))
-from telemetry_history import END, LIMIT, MARKER, comparison, execute, latest, valid, write_report
+from telemetry_history import END, LIMIT, MARKER, comparison, execute, latest, render, valid, write_report
 from telemetry_snapshot import GROUPS, build_snapshot, observation
 from telemetry_inventory import TelemetryError
 
@@ -76,7 +76,7 @@ class History(unittest.TestCase):
         self.findings.write_text("# PRIVATE_note\nlegacy report\n")
         self.assertIn("legacy", self.run_report())
         self.run_report(True)
-        self.assertIn("bus.messages_total: delta +0", self.run_report())
+        self.assertIn("bus: messaggi totali +0", self.run_report())
         with self.findings.open("a") as file:
             file.write("### 2026-09-23 — telemetria del valore (generata da bin/telemetry.sh)\nlegacy\n")
         self.assertIn("ultimo referto legacy", self.run_report())
@@ -87,9 +87,9 @@ class History(unittest.TestCase):
         self.groups["bus"]["messages_total"] += 3
         self.groups["mention.jev"]["sessions"] -= 1
         output = self.run_report()
-        self.assertIn("bus.messages_total: delta +3", output)
-        self.assertIn("mention.jev.sessions: delta -1", output)
-        self.assertIn("mention.twin.sessions: delta +0", output)
+        self.assertIn("bus: messaggi totali +3", output)
+        self.assertIn("mention.jev: sessioni -1", output)
+        self.assertIn("mention.twin: sessioni +0", output)
         self.assertIn("non valore, bisogno o miglioramento causale", output)
         self.assertIn("nessun metadato affidabile del bisogno", output)
 
@@ -150,7 +150,7 @@ class History(unittest.TestCase):
         hostile = b"PRIVATE_SECRET <script>alert(1)</script> \x1b[2J $(touch nope)\n"
         self.findings.write_bytes(hostile + self.block(current) + b"# ordinary later note\n" + hostile)
         output = self.run_report()
-        self.assertIn("bus.messages_total: delta +0", output)
+        self.assertIn("bus: messaggi totali +0", output)
         for sentinel in ("PRIVATE_", "<script>", "\x1b[2J", "$(touch", str(self.root)):
             self.assertNotIn(sentinel, output)
         broken = deepcopy(current)
@@ -239,9 +239,9 @@ class History(unittest.TestCase):
         db.close()
         second = subprocess.run(command, capture_output=True, text=True, timeout=15)
         self.assertEqual(second.returncode, 0, second.stderr)
-        self.assertIn("bus.messages_total: delta +2", second.stdout)
-        self.assertIn("mention.jev.sessions: delta -1", second.stdout)
-        self.assertIn("mention.twin.sessions: delta +0", second.stdout)
+        self.assertIn("bus: messaggi totali +2", second.stdout)
+        self.assertIn("mention.jev: sessioni -1", second.stdout)
+        self.assertIn("mention.twin: sessioni +0", second.stdout)
         appended = self.findings.read_bytes()[len(prefix):].decode()
         rendered = second.stdout.removesuffix("\nreferto aggiunto alla destinazione configurata\n").rstrip()
         rendered = re.sub(r"\x1b\[[0-9;]*m", "", rendered)
@@ -251,8 +251,47 @@ class History(unittest.TestCase):
         with patch.dict(os.environ, {"RDA_BUS_HOME": str(self.root / "OTHER_BUS")}):
             third = subprocess.run(command[:-1], capture_output=True, text=True, timeout=15)
         self.assertEqual(third.returncode, 0, third.stderr)
-        self.assertIn("bus.messages_total: delta non confrontabile: fonte/perimetro diverso", third.stdout)
+        self.assertIn("bus: delta non confrontabile", third.stdout)
+        self.assertIn("fonte/perimetro diverso", third.stdout)
         self.assertEqual(self.findings.read_bytes()[:len(prefix)], prefix)
+
+    def test_compact_skill_rows_keep_all_deltas_and_group_unknowns(self):
+        current = self.snapshot()
+        old = deepcopy(current)
+        expected = {"observed": 2, "candidate_sessions": -1, "cohort_sessions": 0,
+                    "invoked_in_cohort": 1, "uses_outside_cohort": -1}
+        for field, delta in expected.items():
+            old["metrics"]["skill:film-director:" + field]["value"] -= delta
+        output = render(current, comparison(current, old, None))
+        rows = [line for line in output.splitlines() if line.startswith("  skill:")]
+        self.assertEqual(len(rows), 1)
+        for expected_text in ("osservate +2", "candidate -1", "coorte +0",
+                              "usi in coorte +1", "fuori coorte -1", "rapporto 2/3",
+                              "delta +33.3 punti percentuali"):
+            self.assertIn(expected_text, rows[0])
+        for field in expected:
+            if field != "observed":
+                current["metrics"]["skill:film-director:" + field]["value"] = None
+                current["metrics"]["skill:film-director:" + field]["denominator"] = {
+                    "value": None, "status": "non misurabile", "reason": "unmapped"}
+        unchanged = deepcopy(current)
+        output = render(current, comparison(current, unchanged, None))
+        rows = [line for line in output.splitlines() if line.startswith("  skill:")]
+        self.assertEqual(len(rows), 1)
+        self.assertIn("osservate +0", rows[0])
+        self.assertIn("occasioni non confrontabile", rows[0])
+        self.assertIn("occasioni/rapporto non misurabile", rows[0])
+        self.assertEqual(output.count("nessun criterio di occasione per questa skill"), 1)
+        legacy = render(current, comparison(current, None, "prima osservazione legacy"))
+        self.assertEqual(legacy.count("prima osservazione legacy"), 1)
+        self.assertIn("skill:film-director: delta non confrontabile", legacy)
+        self.assertEqual(current, unchanged)
+        current["metrics"]["skill:film-director:observed"]["value"] = None
+        current["metrics"]["skill:film-director:candidate_sessions"]["value"] = 4
+        unchanged["metrics"]["skill:film-director:candidate_sessions"]["value"] = 3
+        output = render(current, comparison(current, unchanged, None))
+        self.assertIn("candidate +1", output)
+        self.assertIn("osservate e occasioni non confrontabile", output)
 
 
 if __name__ == "__main__":

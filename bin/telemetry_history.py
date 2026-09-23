@@ -133,15 +133,68 @@ def comparison(current, previous, reason):
 def render(current, changes):
     lines = ["", "7. Confronto con l'ultima osservazione scritta e stato dei denominatori",
              "  Delta di CONTEGGI osservati, totali o su finestre mobili: non valore, bisogno o miglioramento causale.",
-             "  Fonti identificate senza percorsi; conteggi non osservati restano null, mai zero inventato."]
+             "  Una riga per voce; +0 = invariato, non confrontabile = delta sconosciuto. Tutte le misure restano nello snapshot."]
+    labels = {"observed": "osservate", "candidate_sessions": "candidate", "cohort_sessions": "coorte",
+              "invoked_in_cohort": "usi in coorte", "uses_outside_cohort": "fuori coorte",
+              "messages_total": "messaggi totali", "messages_recent": "messaggi recenti",
+              "sessions": "sessioni", "turns": "turni", "pairs": "coppie", "projects": "progetti"}
+    reasons = list(dict.fromkeys(change["reason"] for change in changes.values() if change["reason"]))
+    for index, reason in enumerate(reasons, 1):
+        lines.append(f"  Non confrontabile [C{index}]: {reason}.")
+    denominator_reasons = list(dict.fromkeys(metric["denominator"]["reason"]
+                               for metric in current["metrics"].values()
+                               if metric["denominator"]["status"] != "misurabile"))
+    for index, reason in enumerate(denominator_reasons, 1):
+        lines.append(f"  Denominatore non misurabile [D{index}]: {REASONS[reason]}.")
+    groups = {}
     for key, metric in current["metrics"].items():
-        change = changes[key]
-        delta = f"{change['delta']:+d}" if change["delta"] is not None else "non confrontabile: " + change["reason"]
-        denominator = metric["denominator"]
-        status = denominator["status"]
-        if status == "misurabile":
-            status += f" ({denominator['value']})"
-        lines.append(f"  {key}: delta {delta}; denominatore {status}: {REASONS[denominator['reason']]}")
+        group, field = key.rsplit(":" if key.startswith("skill:") else ".", 1)
+        groups.setdefault(group, {})[field] = (metric, changes[key])
+    for group, fields in groups.items():
+        parts, unavailable, missing, denominators = [], {}, set(), {}
+        for field, (metric, change) in fields.items():
+            label = labels.get(field, field)
+            if change["delta"] is not None:
+                parts.append(f"{label} {change['delta']:+d}")
+            else:
+                unavailable.setdefault(change["reason"], []).append(label)
+            denominator = metric["denominator"]
+            if denominator["status"] == "misurabile":
+                denominators[label] = denominator["value"]
+            else:
+                missing.add(denominator_reasons.index(denominator["reason"]) + 1)
+        if not parts:
+            refs = ",".join(f"C{reasons.index(reason) + 1}" for reason in unavailable)
+            parts.append(f"delta non confrontabile [{refs}]")
+        else:
+            for reason, fields_unknown in unavailable.items():
+                fields_text = ", ".join(fields_unknown)
+                if group.startswith("skill:") and len(fields_unknown) > 1:
+                    fields_text = "osservate e occasioni" if "osservate" in fields_unknown else "occasioni"
+                parts.append(f"{fields_text} non confrontabile [C{reasons.index(reason) + 1}]")
+        if group.startswith("skill:") and "invoked_in_cohort" in fields:
+            numerator, numerator_change = fields["invoked_in_cohort"]
+            cohort, cohort_change = fields["cohort_sessions"]
+            if numerator["denominator"]["status"] == "misurabile":
+                n, d = numerator["value"], cohort["value"]
+                ratio = f"rapporto {n}/{d}"
+                if numerator_change["delta"] is not None and cohort_change["delta"] is not None:
+                    old_n, old_d = n - numerator_change["delta"], d - cohort_change["delta"]
+                    if old_d > 0:
+                        ratio += f" (delta {(n / d - old_n / old_d) * 100:+.1f} punti percentuali)"
+                    else:
+                        ratio += " (delta non confrontabile: precedente coorte vuota)"
+                else:
+                    ratio += " (delta non confrontabile)"
+                parts.append(ratio)
+                denominators.clear()
+            else:
+                parts.append("occasioni/rapporto non misurabile")
+        if denominators:
+            parts.append("denominatori misurabili: " + ", ".join(f"{key}={value}" for key, value in denominators.items()))
+        if missing:
+            parts.append("denominatori non misurabili [" + ",".join(f"D{index}" for index in sorted(missing)) + "]")
+        lines.append(f"  {group}: " + "; ".join(parts))
     return "\n".join(lines)
 
 
