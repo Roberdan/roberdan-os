@@ -449,3 +449,75 @@ Il meccanismo che ha prodotto questa scoperta e' l'inversione della sorpresa: un
 dichiarazione che si limita a spegnere un allarme nasconde il giorno in cui
 l'allarme aveva ragione. Questa invece fallisce quando la realta' e' migliore di
 come e' stata descritta.
+
+### 2026-09-23 — rettifica delle prime misure di telemetria
+
+I referti preliminari conservati nella storia Git NON sono una baseline affidabile. La query
+contava entrambe le direzioni di ogni coppia; confrontava poi coppie e sessioni,
+due unita' diverse. Le menzioni testuali non dimostrano invocazioni ne' valore.
+I referti con quattro messaggi sono dati sintetici: il test di `kb checkup --yes`
+scriveva erroneamente nei findings reali. Le copie sintetiche sono state rimosse
+dal documento; la storia conserva la traccia. I test ora scrivono in una
+destinazione isolata, verificando che questo file non cambi.
+Le conclusioni sull'uso del twin piu' sotto sono ipotesi, non prove di efficacia.
+I nomi dei progetti e i percorsi temporanei non servono alla misura e sono omessi.
+
+### 2026-09-23 — il twin risulta a zero, e la cifra va letta bene
+
+La telemetria dice `twin: agenti 0/9 · skill 0/16 · canone: si`, e la cifra e'
+vera ma si presta a una lettura sbagliata. Il twin **e'** un obbligo scritto:
+`AGENTS.md` § "Decision before handoff" impone di consultarlo prima di restituire
+alternative senza una raccomandazione operativa. Quello che nessun file dice e'
+**dove un agente lo incontra mentre lavora** — nessun `agents/*.md` e nessuna
+skill lo nomina, quindi lo si ricorda solo se si e' letto il canone da capo.
+
+E' esattamente la forma del difetto misurato sul bus lo stesso giorno: documentato
+nel posto giusto, invisibile nel momento giusto. La differenza e' che per il bus
+la cifra di uso era 1 sessione su 94, mentre il twin risulta usato in 25 sessioni
+in trenta giorni — quindi qui la copertura mancante **non** sta producendo il
+danno che produceva sul bus, e aggiungere righe ovunque sarebbe rumore senza
+prova.
+
+Diventa una card se l'uso del twin scende mentre le occasioni restano: allora la
+causa candidata e' questa, ed e' gia' isolata. Fino ad allora la cifra resta
+registrata perche' la serie nel tempo e' cio' che la rendera' leggibile.
+
+### 2026-09-23 — telemetria del valore (generata da bin/telemetry.sh)
+
+Finestra: ultimi 30 giorni. Nessuna raccolta: letto dagli artefatti esistenti e
+dallo storico delle sessioni. Le due fonti non si sommano.
+
+```
+TELEMETRIA — finestra: ultimi 30 giorni
+Nessuna raccolta: si legge cio' che esiste gia'. Ogni riga dice da dove viene.
+
+1. Uso — misurato sull'artefatto della funzionalita' (esatto)
+  bus            253 messaggi in tutto · 188 negli ultimi 30 giorni
+                 34 conversazioni · 7 progetti · 6 ruoli diversi hanno scritto
+                 12 presentazioni registrate (bus hello)
+  evolve         87 referti prodotti
+
+2. Uso — cercato nello storico delle sessioni (approssimato: menzioni testuali, non invocazioni)
+  jev            1 sessioni · 1 turni · ultimo: 2026-09-20
+  twin           25 sessioni · 38 turni · ultimo: 2026-09-23
+  kb checkup     2 sessioni · 4 turni · ultimo: 2026-09-23
+  premortem      7 sessioni · 7 turni · ultimo: 2026-09-13
+  focus-group    4 sessioni · 4 turni · ultimo: 2026-09-13
+  bus            1 sessioni · 2 turni · ultimo: 2026-08-30
+  (claude)       8677 righe di storico presenti, non analizzate qui
+
+3. Occasioni — quante volte due sessioni hanno lavorato insieme allo stesso progetto
+  TOTALE         46 coppie sovrapposte su 6 progetti
+  (limite)       le menzioni non misurano l'uso del canale fra le coppie
+
+4. Copertura — quanti agenti e skill spiegano come si usa
+  bus            agenti 5/9 · skill 5/16 (di cui quelle che coordinano: 5/5) · canone: si
+  jev            agenti 3/9 · skill 1/16 (di cui quelle che coordinano: 0/5) · canone: si
+  twin           agenti 0/9 · skill 0/16 (di cui quelle che coordinano: 0/5) · canone: si
+
+5. Cosa si puo' dire, e dove ci si ferma
+  Questo referto misura USO e OCCASIONI. Non misura il valore, e non sa perche'
+  qualcosa non viene usato: la copertura qui sopra e' una causa CANDIDATA, la piu'
+  economica da escludere, non una spiegazione. Una funzionalita' ben documentata e
+  mai usata su molte occasioni e' un'altra storia, e va guardata da vicino.
+```

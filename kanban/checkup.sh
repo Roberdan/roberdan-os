@@ -184,6 +184,34 @@ $(_boards | sort -u)
 EOF
 printf '\n  %s card in lavorazione · %s in attesa. Nessuna viene toccata da qui: le card sono decisioni tue.\n' "$tot_doing" "$tot_todo"
 
+# --- 5) quanto si usano davvero gli strumenti ---------------------------------
+# Il referto sul valore vive in bin/telemetry.sh e non raccoglie niente: legge gli
+# artefatti che esistono gia'. Qui compaiono le sole righe che dicono se qualcosa
+# e' vivo o e' solo installato — perche' una capacita' che c'e' e non parte da
+# sola vale, in pratica, quanto una che non esiste, e questo comando e' il posto
+# dove il sistema si guarda addosso.
+# Con --yes il referto per intero viene aggiunto a docs/findings.md: aggiunto, mai
+# sovrapposto, perche' la serie nel tempo e' l'unica cosa che dica se un numero
+# sta migliorando.
+_hr "5. Quanto si usano gli strumenti"
+if [ -r "$ROOT/bin/telemetry.sh" ]; then
+  telemetry_args=()
+  [ "$APPLY" = "1" ] && telemetry_args=(--write)
+  if telemetry_report="$(bash "$ROOT/bin/telemetry.sh" ${telemetry_args[@]+"${telemetry_args[@]}"})"; then
+    printf '%s\n' "$telemetry_report" | awk '/RAPPORTO|^  bus |^  jev |^  twin / {if (++n <= 6) print}'
+    if [ "$APPLY" = "1" ]; then
+      printf '  referto completo aggiunto ai findings\n'
+    else
+      printf '  referto completo: bin/telemetry.sh · per scriverlo in findings: kb checkup --yes\n'
+    fi
+  else
+    printf '  telemetria non disponibile: raccolta del referto fallita\n' >&2
+    exit 1
+  fi
+else
+  printf '  (bin/telemetry.sh non raggiungibile da qui)\n'
+fi
+
 if [ "$APPLY" != "1" ]; then
   printf '\n\033[1mNiente e\x27 stato toccato.\033[0m Per applicare le pulizie proposte: kb checkup --yes\n'
 fi
