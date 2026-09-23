@@ -391,6 +391,11 @@ Logic in plain markdown, tool-agnostic (wrappers are generated):
 va in coda a [`docs/findings.md`](docs/findings.md), aggiunto e mai sovrapposto,
 perché la serie nel tempo è l'unica cosa che dica se un numero sta migliorando.
 
+Il confronto usa l'ultimo referto strutturato scritto nei findings, non una
+misura precedente scelta perché conveniente. Finestra, fonti e significato delle
+misure devono essere compatibili; altrimenti il referto spiega perché non può
+confrontarle. Un cambiamento nei conteggi non dimostra un aumento del valore.
+
 **Non raccoglie niente, ed è la scelta principale.** Nessun file di eventi nuovo,
 nessun contatore da tenere aggiornato, nessun hook che scrive a ogni turno: un
 secondo archivio di misure diverge da ciò che misura, e quello che diverge è

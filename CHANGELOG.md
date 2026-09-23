@@ -3,6 +3,17 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.58.0 — 2026-09-23
+
+### Added
+
+- Telemetry compares observations with the latest structured report in findings.
+  Changes are shown only for compatible measurements; missing evidence,
+  changed measurement scope and legacy reports remain explicitly incomparable.
+- Every usage category declares whether its opportunity denominator can be
+  measured. Optional Jev calls and Twin consultations are not assigned invented
+  need counts from availability or textual mentions.
+
 ## 2.57.0 — 2026-09-23
 
 ### Added
