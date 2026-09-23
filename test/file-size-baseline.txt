@@ -194,9 +194,22 @@
 # Non qui: test-bus.sh misura l'allowlist su una traccia di esecuzione di QUEL file e
 # test-bus-mutants.sh deriva i suoi controlli da test-bus.sh, quindi lo split cambia la
 # superficie tracciata e vuole quella batteria in mano. E' una card sua.
+# 2026-09-23, ventesima: +38 test/test-bus-mutants.sh (1178 -> 1216) e +3
+# test/validate.sh (312 -> 315).
+# Le 38 righe sono il PREFLIGHT che costruisce tutti i mutanti prima di eseguirne
+# uno, e la dichiarazione che distingue un mutante sopravvissuto per costruzione
+# da una regressione. Perche valgono: due volte in una notte un ancoraggio alla
+# deriva si e fatto scoprire dopo NOVANTA MINUTI di esecuzione, e sette mutanti
+# puntavano a un controllo che test-bus.sh ha rimosso apposta, quindi venivano
+# riportati come regressioni da inseguire. Costruirli tutti costa due secondi.
+# Le 3 righe di validate.sh agganciano test/test-telemetry.sh, che fissa le
+# proprieta del referto sul valore: le due fonti restano separate, il
+# denominatore c e, il referto dichiara cosa non sa, si contano righe senza
+# leggerne il contenuto, e --write puo solo aggiungere in coda a findings.
+# E resta in piedi, per la sesta volta: validate.sh si spezza, non si allarga.
 1777 kanban/kb.sh
 1415 test/test-bus.sh
-1178 test/test-bus-mutants.sh
+1216 test/test-bus-mutants.sh
 1601 bus/bus.sh
 654 bin/sync.sh
 601 test/test-federated-kb.sh
@@ -205,5 +218,5 @@
 446 test/test-kb-views.sh
 344 eval/report.sh
 377 test/test-copilot-adapter.sh
-312 test/validate.sh
+315 test/validate.sh
 712 hooks/copilot/extension.template.mjs
