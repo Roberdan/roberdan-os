@@ -193,12 +193,15 @@ def main():
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--days", type=int, default=30)
     parser.add_argument("--json", action="store_true", help="Count-only structured metrics")
+    parser.add_argument("--observation", action="store_true", help=argparse.SUPPRESS)
     try:
         args = parser.parse_args()
         if not 1 <= args.days <= 999999:
             raise TelemetryError("giorni non validi")
         report = build_report(args.root, args.days)
         print(json.dumps(report, ensure_ascii=True)) if args.json else render(report)
+        if args.observation:
+            print("@@RDA_SKILLS\t" + json.dumps(report, ensure_ascii=True))
         return 0
     except (TelemetryError, OSError, UnicodeError, sqlite3.Error) as exc:
         reason = str(exc) if isinstance(exc, TelemetryError) else "sorgente non disponibile o danneggiata"
