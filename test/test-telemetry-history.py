@@ -18,7 +18,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "bin"))
 from telemetry_history import END, LIMIT, MARKER, comparison, execute, latest, render, valid, write_report
-from telemetry_snapshot import GROUPS, build_snapshot, observation
+from telemetry_snapshot import GROUPS, SEMANTICS, build_snapshot, digest, observation
 from telemetry_inventory import TelemetryError
 
 
@@ -39,6 +39,7 @@ class History(unittest.TestCase):
         self.addCleanup(self.env.stop)
         self.groups = {key: {field: 2 for field in spec[0].split()} for key, spec in GROUPS.items()}
         self.skills = {
+            "cohort_definition": "public-name-policy starts or named skill invocations",
             "inventory": {"unnamed_definitions": 0, "scopes": [
                 {"scope": "installate-test", "status": "presente", "definitions": 1}]},
             "sources": {"audit": {"status": "presente", "observed_sessions": 4, "gap_sessions": 1,
@@ -121,6 +122,22 @@ class History(unittest.TestCase):
         for key in ("bus.messages_total", "skill:film-director:observed"):
             self.assertEqual(comparison(current, previous, None)[key]["reason"],
                              "dati mancanti in una delle osservazioni")
+
+    def test_public_name_coverage_does_not_compare_with_legacy_masked_coverage(self):
+        current = self.snapshot()
+        old = deepcopy(current)
+        for key, metric in old["metrics"].items():
+            if key.startswith("skill:"):
+                policy = ("v1" if key.endswith(":observed") else
+                          ["first-seen-file/audit-start-intersection-v1", [".mp4", ".mov", "remotion"]])
+                metric["policy"] = digest([SEMANTICS, policy])
+        changes = comparison(current, old, None)
+        for field in ("observed", "cohort_sessions", "invoked_in_cohort"):
+            self.assertIn("politica", changes[f"skill:film-director:{field}"]["reason"])
+        self.assertEqual(changes["bus.messages_total"]["delta"], 0)
+        self.skills["cohort_definition"] = "different observation policy"
+        changed = comparison(self.snapshot(), current, None)
+        self.assertIn("politica", changed["skill:film-director:invoked_in_cohort"]["reason"])
 
     def test_every_metric_has_denominator_status_and_ratios_keep_cohort(self):
         metrics = self.snapshot()["metrics"]

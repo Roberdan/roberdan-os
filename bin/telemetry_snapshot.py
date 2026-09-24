@@ -134,7 +134,8 @@ def build_snapshot(root, days, groups, skills):
         if not NAME.fullmatch(name):
             raise TelemetryError("nome skill non valido")
         opportunity = skill["opportunity"]
-        add("skill:" + name + ":observed", skill["observed_sessions"], "skill-audit", "host_session", "need")
+        add("skill:" + name + ":observed", skill["observed_sessions"], "skill-audit", "host_session", "need",
+            policy=["public-name-starts-v2", skills["cohort_definition"]])
         for field in ("candidate_sessions", "cohort_sessions", "invoked_in_cohort", "uses_outside_cohort"):
             value = opportunity[field]
             denominator = opportunity["cohort_sessions"] if field == "invoked_in_cohort" else None
@@ -142,7 +143,8 @@ def build_snapshot(root, days, groups, skills):
                       "empty" if field == "invoked_in_cohort" and not denominator else
                       "cohort" if field == "invoked_in_cohort" else "descriptive")
             add("skill:" + name + ":" + field, value, "cohort", "host_session", reason, denominator,
-                policy=["first-seen-file/audit-start-intersection-v1", opportunity["criteria"]])
+                policy=["first-seen-file/public-name-start-intersection-v2",
+                        skills["cohort_definition"], opportunity["criteria"]])
     return {"schema_version": SCHEMA, "days": days, "semantics": SEMANTICS,
             "observed_at": datetime.now(timezone.utc).isoformat(), "inventory_policy": inventory_policy,
             "metrics": metrics}
