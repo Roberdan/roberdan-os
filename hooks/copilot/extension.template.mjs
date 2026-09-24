@@ -593,14 +593,13 @@ const hooks = withSkillObligations({
 
     onPostToolUse: async (input) => {
         const cwd = input && input.workingDirectory;
-        // Doorbell first, and for EVERY tool — Claude wires bus-doorbell.sh on PostToolUse with
-        // matcher "*", so restricting it to write tools here would be a silent parity loss (a
-        // read-only review session would never hear the bell). The hook's own fast path exits 0
-        // with no output when the current repo has no bus traffic, so the per-tool cost is one
-        // directory stat.
-        await ringDoorbell(cwd);
-
         const name = String((input && input.toolName) || "").toLowerCase();
+        // Doorbell first, but only for tools that can change bus/repo state — Claude wires
+        // bus-doorbell.sh on PostToolUse with matcher "Bash|Edit|Write", not "*": a read-only
+        // turn (view/search/…) cannot make the bus state stale, so it doesn't pay the ~0.55s
+        // doorbell cost either. Parity with Claude means matching that filter, not ignoring it.
+        if (WRITE_TOOLS.has(name) || SHELL_TOOLS.has(name)) await ringDoorbell(cwd);
+
         if (!WRITE_TOOLS.has(name)) return undefined;
         const args = toolArgsOf(input);
         const fp = writePathOf(args);

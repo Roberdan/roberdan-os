@@ -22,10 +22,10 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test
           test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery test-verify-done test-audit test-audit-hooks \
           test-kb-root-resolution test-kb-start-worktree-cause test-worktree-sweep test-junk-clean test-checkup test-twin-export-drift test-kb-top test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
-          test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-telemetry test-telemetry-skills test-telemetry-history test-skill-routing test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
-          test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-model-economy \
+          test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-bus-mutant-probes test-telemetry test-telemetry-skills test-telemetry-history test-skill-routing test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
+          test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-bus-doorbell-matcher test-model-economy \
           test-model-registry test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
-          test-drift test-links test-privacy test-plan-coverage test-optional-skills test-jev test-jev-routing test-publication-check test-film-preflight test-gbrain-recovery; do
+          test-drift test-copilot-instructions-drift test-links test-privacy test-plan-coverage test-optional-skills test-jev test-jev-routing test-publication-check test-film-preflight test-gbrain-recovery; do
   _spawn "$_s"
 done
 unset _s
@@ -43,6 +43,8 @@ section "canon guardrails"; if _suite test-canon-guardrails; then ok "cross-tool
 if _suite test-links; then _suite_out test-links | grep -vE '^test-links:'; else _suite_out test-links; err "test-links — see bash test/test-links.sh"; fi
 # --- la generazione di bin/sync.sh e deterministica -> test/test-drift.sh
 if _suite test-drift; then _suite_out test-drift | grep -vE '^test-drift:'; else _suite_out test-drift; err "test-drift — see bash test/test-drift.sh"; fi
+# --- .github/copilot-instructions.md must be bin/sync.sh's generated output, not a hand copy -> test/test-copilot-instructions-drift.sh
+if _suite test-copilot-instructions-drift; then _suite_out test-copilot-instructions-drift | grep -vE '^test-copilot-instructions-drift:'; else _suite_out test-copilot-instructions-drift; err "test-copilot-instructions-drift — see bash test/test-copilot-instructions-drift.sh"; fi
 # --- 4) Shellcheck -----------------------------------------------------------
 section "shellcheck (hooks + bin + test + eval + factory + dispatcher shims + lint-cards + bus)"
 # factory/*.sh, the runner-shims and kanban/lint-cards.sh are security-sensitive (dispatcher
@@ -253,10 +255,10 @@ section "review budget — a review loop that cannot run forever (test/test-revi
 if _suite test-review-budget; then ok "a spent review budget exits 3 and demands a human decision instead of another round"; else err "test-review-budget — see bash test/test-review-budget.sh"; fi
 
 section "agent bus — messages, never execution (test/test-bus.sh)"
-if _suite test-bus; then ok "bus delivers durably, attributes, resolves citations to no more than they prove, and executes nothing"; else _suite_out test-bus; err "test-bus — see bash test/test-bus.sh"; fi
+if _suite test-bus && _suite test-bus-mutant-probes; then ok "(and no mutation probe left on the real machine) bus delivers durably, attributes, resolves citations to no more than they prove, and executes nothing"; else _suite_out test-bus; _suite_out test-bus-mutant-probes; err "test-bus — see bash test/test-bus.sh"; fi
 
 section "agent bus — the doorbell rings, it never delivers (test/test-bus-doorbell.sh)"
-if _suite test-bus-doorbell; then ok "the PostToolUse doorbell announces a COUNT in the one dialect the model hears, leaks no body, consumes no mail, is silent at zero, and is wired nowhere that can continue a turn"; else _suite_out test-bus-doorbell; err "test-bus-doorbell — see bash test/test-bus-doorbell.sh"; fi
+if _suite test-bus-doorbell && _suite test-bus-doorbell-matcher; then ok "the PostToolUse doorbell announces a COUNT in the one dialect the model hears, leaks no body, consumes no mail, is silent at zero, and is wired nowhere that can continue a turn, and rings only after Bash|Edit|Write"; else _suite_out test-bus-doorbell; _suite_out test-bus-doorbell-matcher; err "test-bus-doorbell(-matcher) — see bash test/test-bus-doorbell.sh and test-bus-doorbell-matcher.sh"; fi
 
 section "agent bus — the typed MCP surface (test/test-bus-mcp.sh)"
 if _suite test-bus-mcp; then ok "the MCP surface dispatches send/read/log only, refuses unknown tools, and stores shell metacharacters as inert data"; else _suite_out test-bus-mcp; err "test-bus-mcp — see bash test/test-bus-mcp.sh"; fi

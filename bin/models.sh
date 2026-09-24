@@ -49,7 +49,17 @@ case "$cmd" in
     done
     printf '%-20s %-16s %-8s %-9s %-30s %-22s %s\n' ID FAMILY ALIAS CLASS EFFORTS CONTEXTS STATUS
     models_rows | while IFS=$'\t' read -r id fam ali cls eff ctx hosts st _src; do
-      [ -n "$host" ] && ! _models_in_list "$host" "$hosts" && continue
+      if [ -n "$host" ]; then
+        if [ "$host" = "claude" ]; then
+          # Claude Code never takes a `hosts` id — it takes the tier alias, and only a
+          # `current` row backs one (models_resolve's own rule; see lib-models.sh). `hosts`
+          # never contains the literal string "claude", so filtering on it here would always
+          # print an empty table.
+          { [ "$ali" != "-" ] && [ "$st" = "current" ]; } || continue
+        else
+          _models_in_list "$host" "$hosts" || continue
+        fi
+      fi
       [ -n "$status" ] && [ "$status" != "$st" ] && continue
       [ -n "$klass" ] && [ "$klass" != "$cls" ] && continue
       printf '%-20s %-16s %-8s %-9s %-30s %-22s %s\n' "$id" "$fam" "$ali" "$cls" "$eff" "$ctx" "$st"

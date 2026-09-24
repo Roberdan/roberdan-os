@@ -72,12 +72,14 @@ done <<< "$rows"
 
 # --- B) resolution ------------------------------------------------------------------------
 section "resolution — aliases expand, brand words do not, hosts keep separate vocabularies"
-[ "$($M resolve opus)" = "claude-opus-5" ]    && ok "opus -> claude-opus-5 (copilot)"    || err "opus resolved wrong"
+[ "$($M resolve opus)" = "claude-opus-5.5" ]  && ok "opus -> claude-opus-5.5 (copilot)"  || err "opus resolved wrong"
 [ "$($M resolve sonnet)" = "claude-sonnet-5" ] && ok "sonnet -> claude-sonnet-5 (copilot)" || err "sonnet resolved wrong"
 [ "$($M resolve haiku)" = "claude-haiku-4.5" ] && ok "haiku -> claude-haiku-4.5 (copilot)" || err "haiku resolved wrong"
 [ "$($M resolve gpt-6-astra)" = "gpt-6-astra" ] && ok "a reviewed concrete id resolves to itself" || err "gpt-6-astra did not resolve"
 # Claude Code takes the TIER alias, not a Copilot id — the two hosts do not share a namespace.
 [ "$($M resolve opus --host claude)" = "opus" ] && ok "opus --host claude stays the tier alias (Claude Code back-compat)" || err "claude host resolution changed"
+# `hosts` never says "claude": `list --host claude` once filtered on it and printed nothing.
+_cl="$($M list --host claude)"; grep -q '^claude-opus-5.5 ' <<<"$_cl" && ok "list --host claude shows the current opus row" || err "list --host claude regressed to an empty table"
 refuses "a Copilot id on the claude host"   $M resolve gpt-6-astra --host claude
 refuses "a Copilot id on the claude host"   $M resolve claude-opus-5 --host claude
 refuses "the codex host (no model pin)"     $M resolve opus --host codex
@@ -88,7 +90,7 @@ refuses "'gpt-6-astra' capitalised"         $M resolve GPT-6-ASTRA
 refuses "an invented id"                    $M resolve gpt-7-nova
 refuses "an empty token"                    $M resolve ""
 refuses "an unknown host"                   $M resolve opus --host gemini-cli
-for legacy in claude-opus-4.8 claude-opus-4.7 claude-opus-4.6 claude-sonnet-4.6 \
+for legacy in claude-opus-5 claude-opus-4.8 claude-opus-4.7 claude-opus-4.6 claude-sonnet-4.6 \
               gemini-3.7-flash gemini-3.6-flash gemini-3.5-flash mai-code-1-flash-picker grok-4.5; do
   [ "$(models_status "$legacy")" = legacy ] || err "$legacy lost its legacy designation"
   refuses "reviewed older generation $legacy" $M resolve "$legacy" --host copilot-task
@@ -103,8 +105,9 @@ done
 section "knobs — an effort/context the model does not have is refused, never forwarded"
 $M validate --model gpt-6-astra --effort xhigh --context long_context >/dev/null \
   && ok "astra accepts xhigh + long_context" || err "astra validation failed unexpectedly"
-$M validate --model claude-opus-5 --effort max --context long_context >/dev/null \
-  && ok "opus-5 accepts max + long_context" || err "opus-5 validation failed unexpectedly"
+$M validate --model claude-opus-5.5 --effort max --context default >/dev/null \
+  && ok "opus-5.5 accepts max + default context" || err "opus-5.5 validation failed unexpectedly"
+refuses "long_context not claimed for opus-5.5 (unreviewed)" $M validate --model claude-opus-5.5 --context long_context
 refuses "effort on a model with no reasoning knob (haiku)" $M validate --model claude-haiku-4.5 --effort high
 refuses "long_context on a default-only model"            $M validate --model gpt-5.4-mini --context long_context
 refuses "an effort above what the model offers"           $M validate --model gemini-3.8-flash --effort max
@@ -155,8 +158,9 @@ E1="$TMP/e1"; E2="$TMP/e2"
 RDA_SYNC_OUT="$E1" bash bin/sync.sh --emit-only >/dev/null 2>&1
 RDA_SYNC_OUT="$E2" bash bin/sync.sh --emit-only >/dev/null 2>&1
 BA="$E1/copilot/agents/baccio.md"
-grep -qE '^model: gpt-6-astra$' "$BA" && ok "the Copilot-only override reaches the generated wrapper" || err "copilot_model override missing from $BA"
-grep -qE '^model:[[:space:]]*"opus"' agents/baccio.md && ok "the canon tier for Claude Code is untouched by that override" || err "the override leaked into the canon model: field"
+grep -qE '^model: claude-opus-5\.5$' "$BA" && ok "the canon opus alias reaches the generated wrapper (no Copilot-only override)" || err "baccio's generated model wrong in $BA"
+grep -qE '^model:[[:space:]]*"opus"' agents/baccio.md && ok "the canon tier for Claude Code is opus" || err "baccio's canon model: field changed unexpectedly"
+grep -q '^copilot_model:' agents/baccio.md && err "baccio still carries a copilot_model override" || ok "baccio's Copilot-only override was removed, not just changed"
 # Copilot's agent schema has NO effort/context field and ignores unknown keys in silence (the
 # `metadata:` scar). A key that looks like configuration and behaves like a comment is worse
 # than no key: it stops anyone from looking for the setting that actually works.
@@ -174,7 +178,7 @@ diff "$E1/copilot/subagents.json" "$E2/copilot/subagents.json" >/dev/null 2>&1 \
   && ok "subagents.json is deterministic across two runs" || err "subagents.json is non-deterministic"
 if command -v python3 >/dev/null 2>&1; then
   python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); a=d["subagents"]["agents"];
-assert a["baccio"]=={"model":"gpt-6-astra","modelPolicy":"required","effortLevel":"high","contextTier":"default"}, a["baccio"]
+assert a["baccio"]=={"model":"claude-opus-5.5","modelPolicy":"required","effortLevel":"high","contextTier":"default"}, a["baccio"]
 assert a["wanda"]["effortLevel"]=="medium", a["wanda"]
 assert a["explore"]["model"]=="claude-sonnet-5", a["explore"]
 assert all(a[n]["modelPolicy"]=="required" for n in ("explore","task","general-purpose","research","code-review","security-review"))' "$E1/copilot/subagents.json" 2>/dev/null \
@@ -189,8 +193,8 @@ badp="$(grep -L "$ROOT/skills/" "$E1"/copilot/prompts/*.prompt.md 2>/dev/null)"
 # --- F) launcher --------------------------------------------------------------------------
 section "launcher — the flags are really built, and a duplicated flag stops the run"
 args="$(RDA_DRY_RUN=1 bash bin/copilot-agent.sh baccio -p hello 2>&1)"
-printf '%s\n' "$args" | tr '\n' ' ' | grep -q -- "copilot --agent baccio --model gpt-6-astra --effort high --context default -p hello" \
-  && ok "baccio launches as: copilot --agent baccio --model gpt-6-astra --effort high --context default -p hello" \
+printf '%s\n' "$args" | tr '\n' ' ' | grep -q -- "copilot --agent baccio --model claude-opus-5.5 --effort high -p hello" \
+  && ok "baccio launches as: copilot --agent baccio --model claude-opus-5.5 --effort high -p hello" \
   || err "unexpected argv: $(printf '%s' "$args" | tr '\n' ' ')"
 # The prompt survives as ONE argv token: the flags are built as an array, and a flat string
 # would have re-split it on the space.
@@ -232,7 +236,7 @@ if command -v python3 >/dev/null 2>&1; then
 assert d["theme"]=="high-contrast", "theme lost"
 assert d["model"]=="claude-opus-5", "session model lost"
 assert d["subagents"]["agents"]["mine"]["model"]=="gpt-5.5", "foreign subagent lost"
-assert d["subagents"]["agents"]["baccio"]["model"]=="gpt-6-astra", "our subagent missing"' "$CFG" 2>/dev/null \
+assert d["subagents"]["agents"]["baccio"]["model"]=="claude-opus-5.5", "our subagent missing"' "$CFG" 2>/dev/null \
     && ok "unrelated keys and a foreign subagent survive the merge" || err "the merge dropped unrelated settings"
   [ -n "$(find "$TMP" -name 'settings.json.bak-rdos-*' 2>/dev/null)" ] && ok "a timestamped backup is kept (never deleted)" || err "no backup written"
   # Idempotent: applying twice must not multiply anything.

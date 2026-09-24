@@ -19,7 +19,7 @@ Three knobs, decided separately, and **one place that knows the answers**:
 
 ```
 bin/models.sh list                       # the reviewed table
-bin/models.sh resolve opus               # -> claude-opus-5   (host copilot)
+bin/models.sh resolve opus               # -> claude-opus-5.5 (host copilot)
 bin/models.sh resolve opus --host claude # -> opus            (Claude Code takes the tier alias)
 bin/models.sh class gpt-6-astra          # -> frontier
 bin/models.sh validate --model gpt-6-astra --effort xhigh --context long_context
@@ -174,6 +174,11 @@ generations with exposed capability metadata are recorded as `legacy`, not promo
 registry header names every deferred id and why it remains refused (missing capability
 metadata or unreviewed task fit). Astra / Opus 5 / Sonnet 5 profiles are unchanged. Listing a
 new model is not evidence of better quality, latency, or price.
+
+**2026-09-24 review (Roberto, explicit):** `claude-opus-5.5` promoted to `current`/`opus`,
+`claude-opus-5` demoted to `legacy` — verified listed in `copilot help config` 1.0.89-1 and in
+564 real calls in `~/.copilot/session-store.db`, with `hosts` limited to `copilot` (no
+task-tool evidence for this id in that db). See the registry header for the full review note.
 
 **Long sessions:** context pressure is not a reason to downgrade the model or reasoning effort,
 switch to `auto`, or buy a larger window. First checkpoint and reduce the working set using

@@ -38,8 +38,25 @@
 #     Reason: distinct variants with no reviewed task-fit evidence; no profile change justified.
 # Existing current rows/aliases and required subagent profiles are intentionally unchanged.
 #
+# Reviewed 2026-09-24 (Roberto, explicit promotion): claude-opus-5.5 confirmed listed in
+# `copilot help config` 1.0.89-1's `model:` id list, and in ~/.copilot/session-store.db with
+# 564 real calls recorded. Roberto states it exposes the same effort levels as claude-opus-5
+# (low,medium,high,xhigh,max); this session's own query of that db shows only reasoning_effort
+# "high" actually used across all 564 calls (no independent confirmation of the other levels).
+# `hosts` set to `copilot` only, NOT `copilot-task`: every one of those 564 rows has
+# parent_tool_call_id/agent_id NULL (never routed through the task/subagent tool), while other
+# ids in the same table do carry a parent_tool_call_id — so the column is meaningful and this
+# id specifically has no task-surface evidence. `contexts` left at `default` only: the input
+# `costPerBatch` in token_details_json is the SAME single value across all 564 rows — checked
+# with a full-table DISTINCT, not a sample — including the 3 largest (~1.3M, ~1.31M, ~1.3M total
+# input+cache tokens, well past a typical 200k tier boundary); no sign of a long_context pricing
+# tier. claude-opus-5 demoted to legacy (alias -> `-`, matching every other legacy row);
+# claude-opus-5.5 takes the `opus` alias. claude-fable-5.1 stays deferred — 0 rows for it in the
+# session-store db, no effort/context evidence found.
+#
 #id	family	alias	class	efforts	contexts	hosts	status	source
-claude-opus-5	claude-opus	opus	frontier	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
+claude-opus-5.5	claude-opus	opus	frontier	low,medium,high,xhigh,max	default	copilot	current	cli-help+session-store/2026-09-24
+claude-opus-5	claude-opus	-	frontier	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	legacy	cli-help+task-schema/2026-09-05
 claude-sonnet-5	claude-sonnet	sonnet	mid	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
 claude-haiku-4.5	claude-haiku	haiku	cheap	none	default	copilot,copilot-task	current	cli-help+task-schema/2026-09-05
 gpt-6-astra	gpt-astra	-	frontier	low,medium,high,xhigh,max	default,long_context	copilot,copilot-task	current	cli-help+task-schema/2026-09-05

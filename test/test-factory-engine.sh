@@ -53,7 +53,7 @@ case "$a" in *"--model claude-sonnet-5"*) ok "alias sonnet -> claude-sonnet-5 (m
 case "$a" in *"--add-dir $TMP/dir"*) ok "the task dir is passed with --add-dir" ;;
   *) err "no --add-dir: the agent would be scoped to the wrong tree" ;; esac
 launch "" opus
-case "$(argv_of copilot)" in *"--model claude-opus-5"*) ok "alias opus -> claude-opus-5" ;;
+case "$(argv_of copilot)" in *"--model claude-opus-5.5"*) ok "alias opus -> claude-opus-5.5" ;;
   *) err "opus did not resolve to a Copilot frontier id" ;; esac
 
 [ "$(cat "$TMP/headless-copilot" 2>/dev/null)" = "1" ] && ok "the headless agent runs with RDA_HEADLESS=1 (never re-photographs or chases the queue)" \
