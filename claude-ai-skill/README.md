@@ -12,15 +12,18 @@ write in Roberto's voice, how to reason through decisions, and the ethical root.
 gbrain/vault recall, no git/factory automation, no launchd scheduling. None of that
 exists on claude.ai's sandboxed VM. Only the judgment/voice layer travels.
 
-Not wired into `bin/sync.sh` — this is a manually maintained export, not an
-auto-generated `platforms/` artifact. If the source canon changes meaningfully,
-re-derive this by hand (or ask an agent to re-derive it) rather than assuming it's
-still in sync.
+**Generated, not hand-maintained** (since 2026-09-24): `python3 bin/gen-portable-skills.py`
+builds `roberto-mode/` and `roberto-mode.zip` from the one source,
+`.github/skills/roberdan-twin/`, plus the claude.ai-specific overlay
+`bin/portable-skills/claude-ai.md`. Edit those, never the output:
+`test/test-portable-skills-drift.sh` fails when the two diverge.
 
 ## How to upload
 
-1. Zip the `roberto-mode/` folder (the folder itself must be at the root of the zip,
-   not just its contents): `cd claude-ai-skill && zip -r roberto-mode.zip roberto-mode`
+Uploading is Roberto's manual step; nothing here reaches claude.ai on its own.
+
+1. Run `python3 bin/gen-portable-skills.py`: it writes `claude-ai-skill/roberto-mode.zip`
+   with the folder at the root of the zip (gitignored build product).
 2. On claude.ai: **Settings → Customize → Skills → "+" → Create skill → Upload a skill**
 3. Upload `roberto-mode.zip`. Requires a Pro/Max/Team/Enterprise plan with code
    execution enabled. Custom Skills on claude.ai are private to your account — not
