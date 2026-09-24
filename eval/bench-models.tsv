@@ -14,7 +14,9 @@
 # fit it, so both are recorded here as comments instead of a silent 4th column.
 # The `claude-opus`/`claude-sonnet`/`claude-haiku` rows below are the ORIGINAL generic-family
 # rows: eval/test-model-bench.sh asserts on them by name in its committed-fixture check — do not
-# rename or remove them. The rows added 2026-09-24 use the current concrete registry ids instead.
+# rename or remove them. The rows added 2026-09-24 use concrete Copilot CLI host ids instead
+# (one of them, claude-fable-5.1, is a listed host id but stays DEFERRED in models.tsv itself —
+# see that file's header — so "registry id" would overclaim it).
 claude-opus	15.00	75.00
 claude-sonnet	3.00	15.00
 claude-haiku	0.80	4.00
