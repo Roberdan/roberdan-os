@@ -16,6 +16,16 @@ export RDA_KANBAN_REGISTRY="$TMP/registry"   # empty → only the local board
 mkdir -p "$RDA_KANBAN"/{todo,doing,done} "$RDA_QUARANTINE" "$RDA_HOME"
 : > "$RDA_KANBAN_REGISTRY"
 
+# Pre-seed a FRESH system-health report so the digest's staleness check (see
+# bin/pending-digest.sh) finds today's report and skips the real bin/system-health.sh — this
+# suite is about the pending inbox, not a live gbrain probe + telemetry.sh run inside the gate.
+# test-system-health.sh is where the trigger-when-stale behavior itself is pinned.
+mkdir -p "$RDA_HOME/reports"
+{ echo "# roberdan-os — salute del sistema ($(date +%Y-%m-%d))"; echo;
+  echo "Finestra: ultimi 7 giorni. spesa Copilot: sentinel-summary-line-xyz."; echo;
+  echo "## Proposte (da approvare)"; echo "Nessuna proposta: nessuna soglia documentata e' stata superata."; } \
+  > "$RDA_HOME/reports/system-health-$(date +%Y-%m-%d).md"
+
 # DELTA-based: _pending correctly aggregates the REAL roberdan-os board too (via _board_roots,
 # which always includes $ROOT — that's the right behavior for a user). So the test can't assume
 # an absolute total; it measures the CHANGE when it adds isolated test cards. Baseline first,
@@ -58,6 +68,23 @@ rm -f "$RDA_KANBAN/todo/"*.md "$RDA_QUARANTINE/"*.md
 bash "$DIGEST" --always >/dev/null 2>&1 || fail "digest must exit 0"
 [ -s "$RDA_HOME/pending-digest.txt" ] || fail "digest did not write its file"
 grep -qE '^PENDING: [0-9]+$' "$RDA_HOME/pending-digest.txt" || fail "digest file missing PENDING total"
+
+# 4b) the weekly system-health section rides along in the SAME digest file, and with a fresh
+# report already on disk (seeded above) it must NOT have re-run the real bin/system-health.sh —
+# it reads the seeded report verbatim.
+grep -q "## Salute del sistema" "$RDA_HOME/pending-digest.txt" || fail "digest missing the system-health section"
+grep -q "system-health-$(date +%Y-%m-%d).md" "$RDA_HOME/pending-digest.txt" \
+  || fail "digest's health section does not point at the seeded (fresh) report"
+# Exact match on "0 proposte in attesa" (the count line, not a bare "0" anywhere): pins the
+# count parsing itself, not just that a "0" happens to appear somewhere on the page.
+grep -q "^0 proposte in attesa" "$RDA_HOME/pending-digest.txt" \
+  || fail "digest's health section did not read the seeded report's proposal count"
+# The digest carries the REPORT, not just a path to it: the summary block between the report's
+# H1 and its first "## " section must show up verbatim in the digest.
+grep -q "sentinel-summary-line-xyz" "$RDA_HOME/pending-digest.txt" \
+  || fail "digest's health section is missing the seeded report's summary block (path-only regression)"
+grep -q "Nessuna proposta: nessuna soglia documentata" "$RDA_HOME/pending-digest.txt" \
+  || fail "digest's health section is missing the seeded report's proposal text"
 
 # 5) PR bot-filter: the exact regex _pending uses must drop bot authors, keep humans.
 #    (Full gh integration is best-effort/network — this locks the filter logic that decides
