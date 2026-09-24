@@ -54,7 +54,7 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 
 ---
 
-## Aperti — 9 su 10
+## Aperti — 10 su 10
 
 | # | Cosa | Prova |
 |---|---|---|
@@ -67,6 +67,7 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 | 33 | **La richiesta di un concept video solo testuale non attiva `film-director` nei campioni osservati** (2026-09-24) | Quattro sessioni completate su Copilot e Claude producono il concept senza invocare la skill, pur esposta. Canone e descrittore emesso dichiarano il trigger; la presenza e' verificabile ma non prova il comportamento. Altre due prove candidate Copilot non arrivano all'inferenza. **Condizione per la card:** Roberto autorizza una garanzia diversa per le skill obbligatorie; niente altri ritocchi di prosa presentati come soluzione |
 | 34 | **Gli eventi di discovery non dichiarano la versione del filtro dei nomi** (2026-09-24) | Il ramo `session.skills_loaded` dell'adattatore Copilot conserva solo nomi pubblici ma non `skillNamePolicy`. I conteggi attuali usano esclusivamente gli avvii, quindi non ne dipendono. **Condizione per la card:** si decide di misurare la copertura della discovery; non interpretare quei record come un catalogo completo |
 | 35 | **Le prove fresche mostrano notifiche del bus anche su lavoro non corrente** (2026-09-24) | Nelle esportazioni locali delle prove Apple e rilascio compaiono conteggi non letti su cinque card; soltanto una e' quella corrente. Non dimostra che le altre siano obsolete. **Condizione per la card:** verificare che i destinatari o le card non siano piu' attivi prima di modificare i filtri; `bus tidy` resta il controllo esistente |
+| 36 | **Il controllo completo fallisce sui tempi dell'osservatore; la stessa suite isolata passa** (2026-09-24) | `test-audit-hooks.sh`: logger bloccato terminato in 3,138 secondi contro il limite di 2, piu' timeout a 5 secondi. La successiva suite isolata passa senza cambiare codice o soglie. Causa non dimostrata; non e' lo stesso errore di permessi riportato il 23 settembre. **Condizione per la card:** riproduzione con carico controllato prima di attribuirlo alla concorrenza o cambiare limiti; non dichiarare verde la validazione completa sulla sola prova isolata |
 
 Il 2 agosto 2026 la lista e' passata da 19 rilievi aperti a zero: 13 chiusi da una
 decisione, 6 riparati con la loro card e la loro prova di mutazione. Il 26 e' nato dopo.
