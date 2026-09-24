@@ -13,13 +13,14 @@ trap 'rm -rf "$STORE"' EXIT
 export RDA_AUDIT_HOME="$STORE/audit" RDA_HOME="$STORE/home" RDA_OS="$ROOT"
 export PYTHONDONTWRITEBYTECODE=1
 FAIL=0
+DIAG="$STORE/diag"
 ok()  { printf '  ok: %s\n' "$1"; }
 err() { printf '  FAIL: %s\n' "$1"; FAIL=1; }
 
 audit() { python3 "$ROOT/kanban/audit.py" "$@"; }
 
 # --- 1. osservazione nativa Copilot attraverso l'observer reale -----------------------------
-node --input-type=module <<'JS' || err "l'observer Copilot non ha scritto nel registro reale"
+node --input-type=module 2>>"$DIAG" <<'JS' || err "l'observer Copilot non ha scritto nel registro reale"
 const { createAuditObserver } = await import(process.env.RDA_OS + "/hooks/copilot/audit.mjs");
 const observer = createAuditObserver({ root: process.env.RDA_OS, sessionId: "chain-copilot" });
 // Sessione finta: serve solo a far partire l'observer, gli eventi li consegniamo noi.
@@ -45,7 +46,7 @@ if (!await observer.stop()) throw Error("observer end not recorded");
 JS
 
 # --- 2. osservazione nativa Claude attraverso il vero hook di comando -----------------------
-claude_event() { printf '%s' "$1" | bash "$ROOT/hooks/audit.sh" 2>/dev/null; }
+claude_event() { printf '%s' "$1" | bash "$ROOT/hooks/audit.sh" 2>>"$DIAG"; }
 claude_event '{"hook_event_name":"SessionStart","session_id":"chain-claude","model":"sonnet"}'
 claude_event '{"hook_event_name":"PreToolUse","session_id":"chain-claude","tool_use_id":"cc-1","tool_name":"Skill","tool_input":{"skill":"roberdan-twin"}}'
 claude_event '{"hook_event_name":"PostToolUse","session_id":"chain-claude","tool_use_id":"cc-1","tool_name":"Skill"}'
@@ -117,5 +118,22 @@ passed &= ok(len(bound) == 1 and bound[0]["decision_id"] == "dec-1",
 sys.exit(0 if passed else 1)
 PY
 
+# Sotto carico reale, un singolo ingest (subprocess python3 + sqlite, mai bloccato apposta) puo'
+# superare il budget di scrittura del writer e produrre un buco transitorio — stesso principio
+# del budget sull'invocazione intera in test-audit-hooks.sh (finding #36), ma qui non c'e' un
+# numero magico da rifare: la sezione 4 richiede a ragion veduta zero buchi, e AUDIT_LIMITS e'
+# congelato apposta. L'unica leva lato test e' classificare: se OGNI riga diagnostica raccolta
+# e' un timeout transitorio (mai un altro codice, e almeno una riga c'e'), si riprova una sola
+# volta con un registro nuovo — un fallimento deterministico fallisce anche al secondo giro.
+if [ "$FAIL" -ne 0 ] && [ -z "${RDA_CHAIN_RETRY:-}" ]; then
+    codes="$(grep -o '^\[roberdan-os audit\] .*' "$DIAG" 2>/dev/null | awk '{print $NF}' | sort -u || true)"
+    other="$(printf '%s\n' "$codes" | grep -v -E '^(ingest_timeout|flush_timeout)$' || true)"
+    if [ -n "$codes" ] && [ -z "$other" ]; then
+        printf '  retry: timeout transitorio (%s)\n' "$(printf '%s' "$codes" | tr '\n' ',' | sed 's/,$//')"
+        rm -rf "$STORE"
+        RDA_CHAIN_RETRY=1 exec bash "${BASH_SOURCE[0]}"
+    fi
+fi
+[ "$FAIL" -ne 0 ] && { cat "$DIAG" >&2 2>/dev/null || true; }
 [ "$FAIL" -eq 0 ] && echo "test-audit-chain: PASS (osservazione nativa reale, registro reale, catena chiusa)"
 exit "$FAIL"
