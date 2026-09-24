@@ -28,7 +28,7 @@ done
 ROOT="$(cd -P "$(dirname "$_kb_src")/.." && pwd)"
 unset _kb_src _kb_dir
 # shellcheck source=kanban/kb-finish-bus.sh
-. "$ROOT/kanban/kb-finish-bus.sh"
+[ -f "$ROOT/kanban/kb-finish-bus.sh" ] && . "$ROOT/kanban/kb-finish-bus.sh" || _kb_close_bus_thread() { :; }
 
 if [ "${1:-}" = "audit" ]; then
   shift
