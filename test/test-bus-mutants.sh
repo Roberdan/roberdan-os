@@ -15,24 +15,53 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUS="$ROOT/bus/bus.sh"
-WORK="$(mktemp -d)"
-# Four of these mutants write to the REAL machine on purpose - that IS the
-# finding: `~/.claude/skills`, `~/.claude/scripts` and `<repo>/hooks` are all read
-# by something that starts an agent. Being CAUGHT does not unwrite the file, so
-# every probe carries one distinctive name and is swept afterwards, always.
 PROBE="RDA-MUTANT-PROBE"
-# The sweep roots are the SAME roots the suite watches, read out of test-bus.sh
-# rather than remembered here: a probe this harness plants somewhere the sweep
-# does not reach is litter on the real machine, and the two lists drifting apart
-# is exactly how that happens. No -maxdepth: a probe at
+# The sweep roots are also a STANDING GUARD's source of truth
+# (test/test-bus-mutant-probes.sh reads them via `--list-probe-roots` below),
+# never duplicated: a probe planted somewhere the sweep does not reach is
+# litter on the real machine, and two lists of the same roots drifting apart is
+# exactly how that happens. No -maxdepth on ~/.claude et al.: a probe at
 # ~/.claude/skills/x/y/SKILL.md is already at the old limit of 4, and one level
 # deeper it would have been left behind. (-maxdepth also has to precede -name on
-# BSD find, which the old call got wrong and hid with 2>/dev/null.)
+# BSD find, which the old call got wrong and hid with 2>/dev/null.) ~/.copilot is
+# Copilot's analogue of ~/.claude, but its session-state/ alone holds 12000+
+# live files and a full recursive walk of it timed out empirically (>100s,
+# measured 2026-09-24) - the same reason the old ~/.claude mtime sweep was
+# removed as a CHECK in the first place - so it is watched by its
+# dispatch-relevant subdirectories only, not the whole tree.
+PROBE_ROOTS=(
+  "$HOME/.claude" "$HOME/.orca" "$HOME/Library/LaunchAgents" \
+  "$HOME/.roberdan-os/factory" "$HOME/.gbrain" "$HOME/.local/bin" \
+  "$HOME/.copilot/skills" "$HOME/.copilot/skills-disabled" "$HOME/.copilot/skills-off" \
+  "$HOME/.copilot/hooks" "$HOME/.copilot/agents" "$HOME/.copilot/m-skills" \
+  "$HOME/.copilot/extensions" "$HOME/.copilot/installed-plugins" "$HOME/.copilot/plugins-vbpm" \
+  "$ROOT"
+)
+# A read-only, lock-free mode for the standing guard: print the roots and exit,
+# before anything here touches the lock, creates a scratch dir or builds a
+# single mutant.
+if [ "${1:-}" = "--list-probe-roots" ]; then
+  printf '%s\n' "${PROBE_ROOTS[@]}"
+  exit 0
+fi
+WORK="$(mktemp -d)"
+# The probes below used to land in the REAL $HOME on purpose - that WAS the
+# finding: `~/.claude/skills`, `~/.claude/scripts` and their Copilot analogues
+# are all read by something that starts an agent, so proving the suite is BLIND
+# to a write there was the whole point. But nothing in this suite or
+# test-bus.sh has ever inspected the real machine afterward to decide that
+# (the EXPECTED-SURVIVOR verdict a few screens down comes entirely from
+# test-bus.sh's exit code and output) - so actually touching the real machine
+# bought nothing but litter. Canon: mutation testing only in a throwaway
+# sandbox. Every mutant now runs against a sandboxed HOME ($MUTHOME, mktemp'd
+# alongside $WORK, destroyed with it); `<repo>/hooks` was already sandboxed the
+# same way $ROOT always is (bus.sh derives ROOT from its own script location,
+# and the mutant lives under $MUTREPO, below).
+MUTHOME="$WORK/home"
+mkdir -p "$MUTHOME/.claude"   # mutant 52 (claude-root) has no mkdir of its own
 probe_sweep() {
   local root
-  for root in "$HOME/.claude" "$HOME/.orca" "$HOME/Library/LaunchAgents" \
-              "$HOME/.roberdan-os/factory" "$HOME/.gbrain" "$HOME/.local/bin" \
-              "$ROOT" ; do
+  for root in "${PROBE_ROOTS[@]}"; do
     [ -d "$root" ] || continue
     find "$root" -name "$PROBE*" -exec rm -rf {} + 2>/dev/null || true
   done
@@ -60,14 +89,35 @@ LOCKDIR="${TMPDIR:-/tmp}/rda-bus-mutants.lock"
 . "$(dirname "${BASH_SOURCE[0]}")/lib-lock.sh"
 if ! bus_lock_acquire "$LOCKDIR"; then
   echo "REFUSED: another mutant run holds $LOCKDIR (pid $(bus_lock_owner "$LOCKDIR"), vivo)." >&2
-  echo "  This harness writes probes into the real \$HOME and the suite now watches it," >&2
-  echo "  so two runs at once corrupt each other's evidence. Un lucchetto ORFANO viene" >&2
-  echo "  riusato da solo: se sei qui, il proprietario e' vivo. Aspetta, non cancellare." >&2
+  echo "  This harness shares its lock with test-bus.sh, which the mutants also invoke" >&2
+  echo "  once per run - two runs at once corrupt each other's evidence. Un lucchetto" >&2
+  echo "  ORFANO viene riusato da solo: se sei qui, il proprietario e' vivo. Aspetta," >&2
+  echo "  non cancellare." >&2
   exit 2
 fi
-trap 'rm -rf "$WORK" "$LOCKDIR"; probe_sweep' EXIT
-# test-bus.sh takes the same dir now (it watches the real $HOME too), and this
-# harness runs it once per mutant. Tell it the lock is already held by its caller.
+# The exit trap is now an ASSERTION, not just a cleanup: it scans the real
+# sweep roots BEFORE sweeping them, so a probe that reaches the real machine
+# despite the HOME sandbox above fails the run loudly instead of being quietly
+# unwritten. It always sweeps regardless (defense in depth - being caught here
+# does not unwrite a file already on the real machine).
+_final_probe_check() {
+  local rc=$? root hits=""
+  for root in "${PROBE_ROOTS[@]}"; do
+    [ -d "$root" ] || continue
+    while IFS= read -r hit; do hits="$hits
+  $hit"; done < <(find "$root" -name "$PROBE*" 2>/dev/null)
+  done
+  probe_sweep
+  rm -rf "$WORK" "$LOCKDIR"
+  if [ -n "$hits" ]; then
+    echo "FAIL: probe artifact(s) reached the real machine despite the HOME sandbox (now swept):$hits" >&2
+    [ "$rc" -eq 0 ] && rc=1
+  fi
+  exit "$rc"
+}
+trap _final_probe_check EXIT
+# test-bus.sh shares this lock too, and this harness runs it once per mutant.
+# Tell it the lock is already held by its caller.
 export RDA_BUS_LOCK_HELD=1
 probe_sweep
 
@@ -120,7 +170,7 @@ mutate() {
   if [ -n "${RDA_BUS_MUT_PREFLIGHT:-}" ]; then mutants_run=$((mutants_run + 1)); return 0; fi
 
   set +e
-  out="$(PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_BIN="$mut" timeout "$RDA_BUS_MUT_TIMEOUT" bash "$ROOT/test/test-bus.sh" 2>&1)"
+  out="$(PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_BIN="$mut" HOME="$MUTHOME" timeout "$RDA_BUS_MUT_TIMEOUT" bash "$ROOT/test/test-bus.sh" 2>&1)"
   local rc=$?
   set -e
   # A MUTANT WHOSE CHECK NO LONGER EXISTS. Seven of these pin the sweep numbered
@@ -1113,7 +1163,7 @@ sed 's@^busrun() {@busrun() { bash "$BUS" --drifted-call-site >/dev/null 2>\&1 |
 cmp -s "$ROOT/test/test-bus.sh" "$drifted" \
   && fail "suite-drift: the drift injection changed nothing — the busrun() anchor moved, so this mutant is not testing anything"
 set +e
-out="$(PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_SELFSCAN="$drifted" \
+out="$(PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_SELFSCAN="$drifted" HOME="$MUTHOME" \
   timeout "$RDA_BUS_MUT_TIMEOUT" bash "$ROOT/test/test-bus.sh" 2>&1)"
 rc=$?
 set -e
@@ -1145,7 +1195,7 @@ survives() {
   cmp -s "$BUS" "$mut" && fail "$name: the mutation changed nothing — the anchor text has drifted"
   bash -n "$mut" || fail "$name: the mutant is not valid shell"
   set +e
-  PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_BIN="$mut" timeout "$RDA_BUS_MUT_TIMEOUT" bash "$ROOT/test/test-bus.sh" >/dev/null 2>&1
+  PATH="$STUBS:$PATH" RDA_BUS_STUBDIR="$STUBS" RDA_BUS_BIN="$mut" HOME="$MUTHOME" timeout "$RDA_BUS_MUT_TIMEOUT" bash "$ROOT/test/test-bus.sh" >/dev/null 2>&1
   local rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "$name is now CAUGHT (exit $rc). That is good news and a broken claim: promote it to mutate() with the check that caught it, and delete the paragraph in bus-protocol.md that says it cannot be caught."
