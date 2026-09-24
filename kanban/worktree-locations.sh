@@ -4,10 +4,12 @@
 # contenitore, i registri git ormai prunable e le cartelle che git non conosce piu'.
 #
 # Misurato il 2026-09-24: `kb wt` guardava SOLO ~/GitHub/worktrees/<repo>/*. Il resto del parco
-# vive altrove e nessun comando lo nominava mai: MirrorBuddy tiene 7 copie (3.4 GB) sotto
-# <repo>/worktrees/ (layout bare), Claude Code apre sotto <repo>/.claude/worktrees/, altri
-# strumenti sotto <repo>/.worktrees/, e ~/GitHub/worktrees/MirrorHR/completion-20260906-f144e5a4
-# e' una cartella che git non conosce affatto (il repo si chiama MirrorHR_Set ora).
+# vive altrove e nessun comando lo nominava mai: MirrorBuddy tiene copie (la card dice 7, 3.4 GB;
+# rimisurate qui lo stesso giorno, poche ore dopo: 2, 2.0 GB — il numero cambia da sessione a
+# sessione, non e' un errore di misura) sotto <repo>/worktrees/ (layout bare), Claude Code apre
+# sotto <repo>/.claude/worktrees/, altri strumenti sotto <repo>/.worktrees/, e
+# ~/GitHub/worktrees/MirrorHR/completion-20260906-f144e5a4 e' una cartella che git non conosce
+# affatto (il repo si chiama MirrorHR_Set ora).
 #
 # File separato perche' worktree-sweep.sh, con dentro anche questo, supererebbe le 300 righe che
 # rules/best-practices.md impone ai file scritti a mano. Sourced da worktree-sweep.sh, che a sua
@@ -24,7 +26,7 @@ GH_HOME="$(dirname "$WT_HOME")"
 # nemmeno se una copia li' dentro sarebbe altrimenti rimovibile (pulita e integrata) — la
 # regola e' scritta sulla card, non e' un giudizio di questo script sul contenuto.
 # Due controlli, non uno solo: il PATH prende <repo>/worktrees/* (la convenzione (2), dove
-# vivono le 7 copie vere di MirrorBuddy); il git-common-dir prende anche una copia registrata
+# vivono le copie vere di MirrorBuddy); il git-common-dir prende anche una copia registrata
 # altrove per NOME (es. $WT_HOME/MirrorBuddy/<card>, la convenzione (1)) — senza il secondo
 # controllo una copia cosi' sfuggirebbe all'esclusione e finirebbe rimossa.
 _wt_hard_exclude() {

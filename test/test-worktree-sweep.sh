@@ -254,6 +254,22 @@ git -C "$MB" worktree add -q -b card/mb-by-id "$RDA_WORKTREES/MirrorBuddy/mb-by-
 out8="$(cd "$TMP" && bash "$WT" sweep --yes --all 2>&1)"
 [ -d "$RDA_WORKTREES/MirrorBuddy/mb-by-id" ] && ok "MirrorBuddy escluso anche registrato altrove, per identita' di repo (git-common-dir)" || fail "RIMOSSA una copia di MirrorBuddy registrata sotto \$WT_HOME — la regola di sicurezza va per PATH soltanto"
 
+# --- HEAD staccata (`git worktree add --detach`): `rev-parse --abbrev-ref HEAD` restituisce la
+# stringa letterale "HEAD", e un ancestor-check fatto con "-C $repo" su quella stringa legge
+# l'HEAD del checkout PRINCIPALE (di solito main), non quello del worktree — un worktree
+# staccato con un commit proprio, mai integrato, risulterebbe sempre "integrato" per errore.
+# Una copia in ciascun posto che ha il proprio confronto di ramo: location (1) via _verdict,
+# location (4) via _verdict_at.
+DETACHED1="$(git -C "$REPO" worktree add --detach "$RDA_WORKTREES/demo/detached" main 2>&1 && printf '%s' "$RDA_WORKTREES/demo/detached")"
+echo d1 > "$RDA_WORKTREES/demo/detached/f"; git -C "$RDA_WORKTREES/demo/detached" commit -qam "mai integrato, HEAD staccata"
+git -C "$REPO3" worktree add --detach -q "$REPO3/.claude/worktrees/detached2" main
+echo d2 > "$REPO3/.claude/worktrees/detached2/f"; git -C "$REPO3/.claude/worktrees/detached2" commit -qam "mai integrato, HEAD staccata"
+
+out9="$(cd "$TMP" && bash "$WT" sweep --yes --all 2>&1)"
+[ -d "$RDA_WORKTREES/demo/detached" ] && ok "HEAD staccata con commit proprio tenuta in location (1)" || fail "RIMOSSA una HEAD staccata con lavoro non integrato — location (1)"
+[ -d "$REPO3/.claude/worktrees/detached2" ] && ok "HEAD staccata con commit proprio tenuta in location (4)" || fail "RIMOSSA una HEAD staccata con lavoro non integrato — location (4)"
+case "$out9" in *"HEAD ha lavoro non ancora integrato"*) ok "dice PERCHE' tiene una HEAD staccata" ;; *) fail "non spiega perche' tiene una HEAD staccata" ;; esac
+
 REAL_WT_AFTER="$(ls -1d "$REAL_HOME/GitHub/worktrees"/*/ 2>/dev/null | sort)"
 [ "$REAL_WT_BEFORE" = "$REAL_WT_AFTER" ] && ok "la suite non ha toccato il parco vero delle copie di lavoro" \
   || fail "la suite ha creato o tolto qualcosa in $REAL_HOME/GitHub/worktrees"

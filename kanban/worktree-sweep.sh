@@ -58,7 +58,13 @@ _owned_by_doing_card() {
 _branch_integrated() {
   local repo="$1" branch="$2" wt="$3" base merged_oid local_oid
   base="$(_base_ref "$repo")"
-  git -C "$repo" merge-base --is-ancestor "$branch" "$base" 2>/dev/null && return 0
+  # Il commit LOCALE, non il nome del ramo: in HEAD staccata (`git worktree add --detach`)
+  # `rev-parse --abbrev-ref HEAD` restituisce la stringa letterale "HEAD", e un ancestor-check
+  # su "HEAD" eseguito con `-C "$repo"` legge l'HEAD del checkout PRINCIPALE (di solito main),
+  # non quello del worktree — un worktree staccato con commit propri risulterebbe sempre
+  # "integrato" per errore. Un SHA vale per `merge-base --is-ancestor` quanto un nome di ramo.
+  local_oid="$(git -C "${wt:-$repo}" rev-parse HEAD 2>/dev/null)"
+  git -C "$repo" merge-base --is-ancestor "${local_oid:-$branch}" "$base" 2>/dev/null && return 0
   # RDA_WT_FAST: risposta solo-git, nessuna rete. Il campanello di inizio sessione deve costare
   # millisecondi, non un minuto di chiamate a GitHub — e sbagliare per DIFETTO (conta meno copie
   # rimovibili del vero) e' l'unico verso in cui un contatore puo' sbagliare senza fare danno.
@@ -67,8 +73,7 @@ _branch_integrated() {
   merged_oid="$(gh pr list --repo "$(git -C "$repo" remote get-url origin 2>/dev/null)" \
         --head "$branch" --state merged --json headRefOid -q '.[0].headRefOid' 2>/dev/null)"
   [ -n "$merged_oid" ] || return 1
-  local_oid="$(git -C "${wt:-$repo}" rev-parse HEAD 2>/dev/null)"
-  [ "$merged_oid" = "$local_oid" ]
+  [ "$merged_oid" = "$local_oid" ]   # gia' calcolato sopra, per l'ancestor-check
 }
 
 # _verdict <path> <repo-name> -> "REMOVE" | "KEEP: <perche'>"
