@@ -18,6 +18,10 @@ DIR="$(cd -P "$(dirname "$_src")" && pwd)"
 unset _src _d
 # shellcheck source=kanban/worktree.sh
 RDA_WT_NO_DISPATCH=1 . "$DIR/worktree.sh"
+# Le altre tre convenzioni (<repo>/worktrees, <repo>/.worktrees, <repo>/.claude/worktrees),
+# la scoperta dei repo annidati in una cartella contenitore, e i registri prunable di git.
+# shellcheck source=kanban/worktree-locations.sh
+. "$DIR/worktree-locations.sh"
 # Numero di copie rimovibili gia' calcolato: scritto dal job notturno e da ogni `kb wt`, letto
 # (mai calcolato) dal campanello di inizio sessione.
 CACHE="${RDA_WT_COUNT_CACHE:-$RDA_HOME/worktrees-count}"
@@ -47,8 +51,12 @@ _owned_by_doing_card() {
 #  - PR in stato MERGED: e' l'unico modo di vedere uno squash-merge, che RISCRIVE i commit e
 #    quindi rende la discendenza falsa. Senza questo controllo lo spazzino non rimuoverebbe
 #    mai niente in un repo che fa squash — cioe' in quasi tutti.
+# Il confronto con headRefOid (non solo "esiste una PR merged") e' il pezzo che manca a "not
+# ancestor -> chiedi a gh se e' merged": una PR merged NON dice che il worktree e' allineato a
+# quel merge — puo' avere commit locali aggiunti DOPO, mai pushati. Quei commit spariscono con
+# il worktree se non si controlla che HEAD sia ESATTAMENTE il commit che gh dice merged.
 _branch_integrated() {
-  local repo="$1" branch="$2" base
+  local repo="$1" branch="$2" wt="$3" base merged_oid local_oid
   base="$(_base_ref "$repo")"
   git -C "$repo" merge-base --is-ancestor "$branch" "$base" 2>/dev/null && return 0
   # RDA_WT_FAST: risposta solo-git, nessuna rete. Il campanello di inizio sessione deve costare
@@ -56,23 +64,42 @@ _branch_integrated() {
   # rimovibili del vero) e' l'unico verso in cui un contatore puo' sbagliare senza fare danno.
   [ "${RDA_WT_FAST:-0}" = "1" ] && return 1
   command -v gh >/dev/null 2>&1 || return 1
-  [ -n "$(gh pr list --repo "$(git -C "$repo" remote get-url origin 2>/dev/null)" \
-        --head "$branch" --state merged --json number -q '.[0].number' 2>/dev/null)" ]
+  merged_oid="$(gh pr list --repo "$(git -C "$repo" remote get-url origin 2>/dev/null)" \
+        --head "$branch" --state merged --json headRefOid -q '.[0].headRefOid' 2>/dev/null)"
+  [ -n "$merged_oid" ] || return 1
+  local_oid="$(git -C "${wt:-$repo}" rev-parse HEAD 2>/dev/null)"
+  [ "$merged_oid" = "$local_oid" ]
 }
 
 # _verdict <path> <repo-name> -> "REMOVE" | "KEEP: <perche'>"
 _verdict() {
   local wt="$1" name="$2" repo branch dirty
+  _wt_hard_exclude "$wt" && { echo "KEEP: MirrorBuddy — Roberto ci lavora ora con un altro agente, mai toccare"; return 0; }
   case "$PWD/" in "$wt"/*) echo "KEEP: e' la cartella in cui stai lavorando adesso"; return 0 ;; esac
   [ -d "$wt" ] || { echo "REMOVE"; return 0; }
-  git -C "$wt" rev-parse --git-dir >/dev/null 2>&1 || { echo "KEEP: non e' un worktree git"; return 0; }
+  # Cartella orfana: git non la conosce affatto (es. ~/GitHub/worktrees/MirrorHR/completion-...,
+  # il repo si chiama MirrorHR_Set ora). Vuota non ha niente da perdere e si toglie; con dentro
+  # qualcosa si tiene e si dice quanto c'e'. _is_worktree_root, non un `git -C "$wt" rev-parse
+  # --git-dir` diretto: quest'ultimo risale ai genitori quando $wt e' DENTRO l'albero di un
+  # altro repo (non il caso di $WT_HOME, ma lo e' per le convenzioni (2)/(3)/(4) che
+  # worktree-locations.sh scandisce con la stessa funzione — qui per coerenza, non per bug).
+  if ! _is_worktree_root "$wt"; then
+    if [ -z "$(ls -A "$wt" 2>/dev/null)" ]; then echo "REMOVE"; else
+      echo "KEEP: cartella orfana (git non la conosce), non vuota — $(ls -A "$wt" 2>/dev/null | wc -l | tr -d ' ') elementi"
+    fi
+    return 0
+  fi
+  # "0 file modificati" non e' prova che l'agente ha finito — vedi rules/best-practices.md §
+  # No False Done. Il lock che Claude Code tiene mentre una sessione ci gira dentro e' il
+  # segnale giusto, e si controlla PRIMA di ogni altro verdetto.
+  _wt_locked "$wt" && { echo "KEEP: lockato (un agente potrebbe averci ancora sessione aperta)"; return 0; }
   _owned_by_doing_card "$wt" && { echo "KEEP: appartiene a una card in corso"; return 0; }
   dirty="$(git -C "$wt" status --porcelain 2>/dev/null | grep -c . || true)"
   [ "${dirty:-0}" -gt 0 ] && { echo "KEEP: $dirty file non salvati"; return 0; }
   repo="$(_repo_path "$name" || true)"
   [ -n "$repo" ] || { echo "KEEP: non trovo il checkout principale di $name"; return 0; }
   branch="$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
-  _branch_integrated "$repo" "$branch" || { echo "KEEP: $branch ha lavoro non ancora integrato"; return 0; }
+  _branch_integrated "$repo" "$branch" "$wt" || { echo "KEEP: $branch ha lavoro non ancora integrato"; return 0; }
   echo "REMOVE"
 }
 
@@ -98,7 +125,7 @@ _scope() {
 }
 
 _sweep() {
-  local apply=0 junk=0 n=0 rm=0 kept=0 name wt v only
+  local apply=0 junk=0 n=0 rm=0 kept=0 name wt v only repo branch
   while [ $# -gt 0 ]; do
     case "$1" in
       --yes) apply=1 ;;
@@ -118,8 +145,26 @@ _sweep() {
       v="$(_verdict "$wt" "$name")"
       if [ "$v" = "REMOVE" ]; then
         if [ "$apply" = "1" ]; then
-          _remove "$wt" "$name" >/dev/null 2>&1 && { rm=$((rm+1)); printf '  rimossa   %s\n' "$wt"; } \
-            || printf '  NON rimossa (git ha rifiutato) %s\n' "$wt"
+          # Rimozione diretta, non via `_remove`: quella ridefinisce "pulito" contando i commit
+          # non ancora in base, il che rifiuta SEMPRE un ramo che gh conferma merged per SQUASH
+          # (la SHA cambia, quindi appare sempre "avanti" a git). Il verdetto appena calcolato
+          # da `_verdict` e' gia' la fonte di verita' piu' forte (ancestry O headRefOid
+          # confermato) — una volta REMOVE, si rimuove per davvero, non si ridiscute con un
+          # controllo piu' debole. Una cartella orfana (git non la conosce) e' vuota per
+          # costruzione (solo cosi' _verdict ha detto REMOVE): `rmdir`, mai una `rm -rf`.
+          if _is_worktree_root "$wt"; then
+            repo="$(_repo_path "$name" || true)"
+            branch="$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+            if git -C "${repo:-$wt}" worktree remove "$wt" 2>/dev/null; then
+              rm=$((rm+1)); printf '  rimossa   %s\n' "$wt"
+              [ -n "$repo" ] && [ -n "$branch" ] && [ "$branch" != "?" ] && git -C "$repo" branch -d "$branch" >/dev/null 2>&1
+            else
+              printf '  NON rimossa (git ha rifiutato) %s\n' "$wt"
+            fi
+          else
+            rmdir "$wt" 2>/dev/null && { rm=$((rm+1)); printf '  rimossa (orfana)  %s\n' "$wt"; } \
+              || printf '  NON rimossa (cartella orfana non vuota) %s\n' "$wt"
+          fi
         else
           rm=$((rm+1)); printf '  da rimuovere %s\n' "$wt"
         fi
@@ -128,6 +173,10 @@ _sweep() {
       fi
     done
   done
+  # Le altre tre convenzioni (<repo>/worktrees, <repo>/.worktrees, <repo>/.claude/worktrees) e i
+  # registri prunable di git: n/rm/kept sono `local` qui sopra, quindi restano visibili (scope
+  # dinamico di bash) e la funzione li aggiorna direttamente, niente valore di ritorno da unire.
+  _scan_extra_locations "$apply" "$only"
   mkdir -p "$RDA_HOME" 2>/dev/null || true
   [ "$apply" = "1" ] && [ -z "$only" ] && { printf '%s' "0" > "$CACHE" 2>/dev/null || true; }
   if [ "$apply" = "1" ]; then
