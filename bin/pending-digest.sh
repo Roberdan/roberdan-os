@@ -25,6 +25,51 @@ report="$(RDA_KANBAN="$ROOT/kanban" bash "$KB" pending 2>/dev/null || true)"
 count="$(printf '%s\n' "$report" | sed -n 's/^PENDING:[[:space:]]*//p' | tail -1)"
 [ -n "$count" ] || count=0
 
+# --- weekly system health, folded into the same digest ----------------------
+# bin/system-health.sh is a CONSUMER here, never edited to know about the digest — this is the
+# one place that decides WHEN it runs. Only when the latest report is stale (>7 days, or absent)
+# — twice-daily launchd runs must not pay its cost (gbrain probe, telemetry.sh) every time.
+# Bounded and best-effort: a slow/failing health run degrades the digest's health section, never
+# the digest itself (see bin/system-health.sh for each section's own degrade-to-"non disponibile").
+HEALTH_CMD="${RDA_HEALTH_CMD:-$ROOT/bin/system-health.sh}"
+health_reports_dir="${RDA_HEALTH_REPORTS_DIR:-$RDA_HOME/reports}"
+health_total_timeout="${RDA_HEALTH_TOTAL_TIMEOUT:-1200}"
+health_section=""
+latest_health="$(ls -1 "$health_reports_dir"/system-health-*.md 2>/dev/null | sort | tail -1)"
+stale=1
+[ -n "$latest_health" ] && [ -n "$(find "$latest_health" -mtime -7 2>/dev/null)" ] && stale=0
+if [ "$stale" -eq 1 ]; then
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$health_total_timeout" env RDA_HOME="$RDA_HOME" bash "$HEALTH_CMD" >/dev/null 2>&1 || true
+  else
+    RDA_HOME="$RDA_HOME" bash "$HEALTH_CMD" >/dev/null 2>&1 || true
+  fi
+  latest_health="$(ls -1 "$health_reports_dir"/system-health-*.md 2>/dev/null | sort | tail -1)"
+fi
+if [ -n "$latest_health" ] && [ -r "$latest_health" ]; then
+  # The digest must carry the REPORT, not just a path to it — a pointer nobody follows is the
+  # same as no digest. The summary block is the handful of lines system-health.sh already
+  # wrote between its H1 and its first "## " section; the proposal lines are the exact `kb add`
+  # commands, scoped to "## Proposte" (the rest of the report never starts a line with "- ").
+  summary="$(awk 'NR>1 && /^## /{exit} NR>1' "$latest_health")"
+  proposals="$(sed -n '/^## Proposte/,$p' "$latest_health" | grep '^- ')"
+  # `grep -c`/`grep` ALREADY print their match text (or nothing) and exit 1 on zero matches —
+  # `|| echo 0` INSIDE a substitution would print a SECOND value on its own line. `|| true`
+  # here is outside the substitution: it only swallows that exit status, never adds output
+  # (scar: this exact bug shipped once for the count, caught only because the test grepped for
+  # a bare "0" anywhere on the page, which a doubled "0\n0" still contains).
+  n_prop="$(printf '%s\n' "$proposals" | grep -c '^- ')" || true
+  [ -n "$proposals" ] || proposals="Nessuna proposta: nessuna soglia documentata e' stata superata."
+  health_section="## Salute del sistema
+referto: $latest_health
+$summary
+$n_prop proposte in attesa di approvazione:
+$proposals"
+else
+  health_section="## Salute del sistema
+non disponibile: nessun referto ancora prodotto (bin/system-health.sh non e' andato a buon fine)"
+fi
+
 # Twin shadow (docs/adr/0005-twin-decision-ledger.md): record what the kb hook missed, run the
 # hidden predictions ONLY if Roberto opted in (they spend: touch <ledger dir>/auto-predict), then
 # the weekly agreement — aggregates only, never a card title or a prediction. Never blocks.
@@ -40,6 +85,8 @@ twin="$(bash "$TWIN" agreement --days 7 2>/dev/null || echo "Twin — accordo co
   printf '%s\n' "$report"
   echo
   printf '%s\n' "$twin"
+  echo
+  printf '%s\n' "$health_section"
 } > "$digest" 2>/dev/null || true
 
 if [ "$count" -gt 0 ] || [ "$always" -eq 1 ]; then

@@ -91,7 +91,7 @@ import json, sys
 def r(i, cat, pred, choice, att=True, dec="2026-09-20T10:00:00Z", shown=None, jev=None):
     return {"id": f"F{i}", "category": cat, "twin_prediction": {"choice": pred, "confidence": .8} if pred else None,
             "roberto_choice": choice, "attributed": att, "decided_at": dec, "shown_at": shown,
-            "jev_prediction": {"choice": jev} if jev else None}
+            "jev_observation": {"status": "dry-run", "choice": jev} if jev else None}
 rows = [r(i, "tecnico", "approve", "approve") for i in range(5)] + [r(5, "tecnico", "approve", "reject", jev="reject")]
 rows += [r(6, "persone", "defer", "defer"), r(7, "persone", "approve", "reject")]
 rows += [r(8, "tecnico", "approve", "approve", att=False), r(9, "tecnico", None, "approve"),
@@ -104,7 +104,7 @@ grep -q "tecnico        N=6   accordo 83% (5 su 6)" <<<"$week" && ok "accordo pe
 grep -q "persone        N=2   dati insufficienti" <<<"$week" && ok "N<5 -> dati insufficienti" || err "persone: $week"
 grep -q "totale         N=8   accordo 75% (6 su 8)" <<<"$week" && ok "totale 6 su 8 = 75%, escluse le 4 da non contare" || err "totale: $week"
 grep -q "1 senza previsione del twin, 1 non attribuibili a Roberto (coda, agente, o card sparita), 1 decise dopo" <<<"$week" && ok "le escluse sono dichiarate, non nascoste" || err "escluse: $week"
-grep -A1 "^Jev" <<<"$week" | grep -q "N=1   dati insufficienti" && ok "Jev misurato a parte" || err "Jev: $week"
+grep -q "^Jev" <<<"$week" && err "Jev contato come previsione di Roberto (ADR-0003 lo vieta): $week" || ok "Jev non entra nell'accordo: da' segnali, non una previsione"
 all="$(RDA_TWIN_LEDGER_DIR="$FIX" RDA_TWIN_NOW=2026-09-24T12:00:00Z bash "$ROOT/bin/twin-agreement.sh" --all)"
 grep -q "totale         N=9   accordo 78% (7 su 9)" <<<"$all" && ok "--all include la decisione fuori settimana" || err "--all: $all"
 empty="$(RDA_TWIN_LEDGER_DIR="$TMP/nessuno" bash "$ROOT/bin/twin-agreement.sh")"
