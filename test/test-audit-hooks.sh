@@ -16,6 +16,16 @@ import unittest
 HOOK = Path(sys.argv.pop()) / "hooks" / "audit.sh"
 
 
+def pid_alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # exists, owned by someone else — treat as alive
+    return True
+
+
 class ClaudeAuditHooks(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="rda-audit-claude-")
@@ -131,10 +141,48 @@ class ClaudeAuditHooks(unittest.TestCase):
         self.assertEqual([e["type"] for e in self.events()], ["observer.gap", "SessionEnd"])
 
     def test_stuck_logger_is_killed_within_bound(self):
-        self.core.write_text("import time\ntime.sleep(30)\n")
+        # hooks/audit.sh:110 kills the logger after HOOK_TIMEOUT. A fixed wall-clock
+        # budget for the whole hook also pays interpreter/process startup, which
+        # varies with machine load, so this compares the stuck run against a
+        # MEASURED baseline (same event, logger that returns immediately) instead
+        # of a magic number. A single baseline sample is not reliable evidence of a
+        # timing property under load — 2026-09-24, run 14/20 under 6x `yes`:
+        # stuck=1.945s against a budget of 1.919s computed from one sample — so the
+        # baseline is now the max of 3 samples, and the margin scales with it. The
+        # real proof the kill happened is the PROPERTY below (the logger's own PID
+        # is dead), not a wall-clock ceiling: with the harness's own 5s subprocess
+        # timeout (see invoke()), a fixed absolute ceiling below 5s can never fire
+        # on its own — invoke() itself raises first — so it proved nothing.
+        HOOK_TIMEOUT = 1.5  # hooks/audit.sh:110
+        MARGIN_FLOOR = 0.5  # minimum scheduling slack, not a second timeout
+        MARGIN_FRACTION = 0.5  # extra slack scaled to this run's own baseline noise
+
+        def baseline_sample():
+            start = time.monotonic()
+            self.invoke(dict(hook_event_name="SessionEnd"))
+            return time.monotonic() - start
+
+        baseline = max(baseline_sample() for _ in range(3))
+
+        pid_file = self.root / "stuck.pid"
+        self.core.write_text(
+            "import os, time\n"
+            f"open({str(pid_file)!r}, 'w').write(str(os.getpid()))\n"
+            "time.sleep(30)\n")
         before = time.monotonic()
         self.assertIn(b"ingest_timeout", self.invoke(dict(hook_event_name="SessionEnd")).stderr)
-        self.assertLess(time.monotonic() - before, 2)
+        stuck_cost = time.monotonic() - before
+
+        # Property: the logger process is actually gone, not just "the hook returned".
+        pid = int(pid_file.read_text())
+        self.assertFalse(pid_alive(pid), f"logger pid {pid} is still alive after the hook returned")
+
+        margin = max(MARGIN_FLOOR, MARGIN_FRACTION * baseline)
+        budget = baseline + HOOK_TIMEOUT + margin
+        self.assertLess(
+            stuck_cost, budget,
+            f"stuck={stuck_cost:.3f}s baseline={baseline:.3f}s (max of 3) "
+            f"budget=baseline+{HOOK_TIMEOUT}s+{margin:.3f}s margin")
 
 
 result = unittest.main(verbosity=2, exit=False)

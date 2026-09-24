@@ -70,10 +70,21 @@ else
 non disponibile: nessun referto ancora prodotto (bin/system-health.sh non e' andato a buon fine)"
 fi
 
+# Twin shadow (docs/adr/0005-twin-decision-ledger.md): record what the kb hook missed, run the
+# hidden predictions ONLY if Roberto opted in (they spend: touch <ledger dir>/auto-predict), then
+# the weekly agreement — aggregates only, never a card title or a prediction. Never blocks.
+TWIN="${RDA_TWIN_SHADOW:-$ROOT/bin/twin-shadow.sh}"
+export RDA_HOME
+bash "$TWIN" reconcile >/dev/null 2>&1 || true
+bash "$TWIN" predict --if-enabled >/dev/null 2>&1 || true
+twin="$(bash "$TWIN" agreement --days 7 2>/dev/null || echo "Twin — accordo con Roberto: non disponibile")"
+
 {
   echo "# roberdan-os — pending digest ($(date '+%Y-%m-%d %H:%M'))"
   echo
   printf '%s\n' "$report"
+  echo
+  printf '%s\n' "$twin"
   echo
   printf '%s\n' "$health_section"
 } > "$digest" 2>/dev/null || true

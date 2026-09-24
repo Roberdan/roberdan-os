@@ -454,7 +454,8 @@ renderebbe card e' scritta accanto.
 ### 2026-09-22 — tre limiti che scattavano sul caso sano, in tre file diversi
 
 Trovati tutti in una notte, e sono la stessa cosa scritta tre volte: **un tempo
-massimo tarato su un'ipotesi invece che su una misura**. Due corretti, uno no.
+massimo tarato su un'ipotesi invece che su una misura**. Tre limiti, tre
+correzioni (l'ultima il 2026-09-24, vedi sotto).
 
 - **Corretto** — `test/test-bus-mutants.sh`: 300 s per una passata che ne dura
   322. Un mutante catturato fallisce subito, uno NON catturato arriva in fondo:
@@ -465,13 +466,70 @@ massimo tarato su un'ipotesi invece che su una misura**. Due corretti, uno no.
   quindi l'ultima pagava anche l'attesa delle altre quattro. `test-twin-install`
   passa da solo in 2m48s ed e' stata dichiarata bloccata in tre validazioni di
   fila. Ora il conto parte quando la suite parte davvero.
-- **NON corretto, e dichiarato** — `test/test-audit-hooks.sh` e' sensibile al
-  carico: da sola passa sempre, dentro una validazione completa ha fallito 2
-  volte su 8, una su un'asserzione di tempo (2,139 s contro un limite di 2) e una
-  su "l'observer Copilot non ha scritto nel registro reale". Non e' toccata da
-  questo lavoro e non ho misurato dove sia la soglia giusta. Diventa una card se
-  fallisce di nuovo: la correzione e' della stessa famiglia delle due qui sopra —
-  misurare quanto dura davvero e tarare su quello, invece di indovinare.
+- **Corretto il 2026-09-24, poi indurito lo stesso giorno (finding #36)** —
+  `test/test-audit-hooks.sh`, `test_stuck_logger_is_killed_within_bound`:
+  asseriva che l'intera invocazione dell'hook con un logger bloccato
+  (`time.sleep(30)`) finisse sotto i 2 s, budget che paga anche l'avvio di
+  interprete/processo — fallita in CI a 2.017 s e 2.126 s. **Causa**: stesso
+  bug delle due correzioni sopra, budget fisso tarato su un'ipotesi. **Primo
+  fix**: confronto con UNA baseline misurata (stesso evento, logger che
+  risponde subito) — `stuck_cost < baseline + 1.5s + 0.25s` di margine — piu'
+  un tetto di sanita' a 5 s. Non bastava: @thor l'ha preso in fallo sotto
+  carico reale (6x `yes`, 20 run), run 14: `stuck=1.945s` contro un budget di
+  `1.919s` calcolato da UN SOLO campione — un campione non e' prova affidabile
+  di una proprieta' temporale sotto carico. In piu' `SANITY_CEILING=5` era
+  codice morto: il timeout di 5 s del solo harness (`invoke()`) scatta prima e
+  impedisce a quell'assert di essere mai raggiunto con un valore che la
+  farebbe fallire. **Fix indurito**: la baseline e' ora il massimo di 3
+  campioni, il margine scala con essa (`max(0.5s, 50% della baseline)`), e la
+  vera prova che il logger e' morto e' una **proprieta'**, non un tempo: il
+  logger bloccato scrive il proprio PID in un file, e dopo che l'hook e'
+  tornato si verifica che quel PID non sia piu' vivo (`os.kill(pid, 0)` ->
+  `ProcessLookupError`). Il tetto morto e' rimosso, sostituito dalla
+  proprieta'. `hooks/audit.sh:110` (kill a 1.5 s, non piu' alla riga 89 di
+  prima — il file e' cresciuto per la funzione di policy dei nomi skill
+  arrivata nel frattempo) resta non toccato. Prova rossa in copie scratch
+  fuori dal repo, mai committate: kill rimosso del tutto -> scade il timeout
+  di 5 s dell'harness (rosso, come prima); **kill "finto"** — il tempo resta
+  nel budget ma il processo non viene davvero ucciso (`Popen` senza
+  `kill()`) -> la vecchia versione sarebbe passata, la nuova fallisce
+  correttamente sulla proprieta' ("logger pid ... is still alive"), a riprova
+  che la proprieta' aggiunge una garanzia che il solo tempo non dava. 20/20
+  del test bersaglio a livello python3 (isolato) sotto lo stesso carico.
+- **Corretto il 2026-09-24** — la stessa validazione a 20 run sotto carico
+  aveva riprodotto 1/20 un flake diverso: `test-audit-chain.sh`, "l'observer
+  Copilot non ha scritto nel registro reale". Causa verificata nel codice:
+  quel test usa l'observer Copilot reale senza `runScript`/`report` iniettati
+  (`test/test-audit-chain.sh:21-25`), quindi il suo `write()` gira con
+  `AUDIT_LIMITS.writeMs = 1000` ms (`hooks/copilot/audit.mjs:5,131`) — non gli
+  1.5 s di `hooks/audit.sh` — e in quel run l'ingest reale della chiusura di
+  sessione (`observer.end`) l'ha superato. **Non e' lo stesso bug di #36**:
+  qui non c'e' un budget wall-clock sull'intera invocazione da ricalibrare —
+  la sezione 4 chiede, a ragion veduta, zero buchi di osservazione, e
+  `AUDIT_LIMITS` e' volutamente congelato, quindi il test non puo' allargare
+  il budget del writer. **Misura prima di decidere**: un singolo write reale
+  isolato sotto 6x `yes` non ha mai superato ~0.3 s (30 campioni); la replay
+  realistica dell'intera catena (~9 write, store nuovo, stesso carico) ha dato
+  10/10 sessioni sane nei primi run, poi 3/40 fallite — ma il carico ambiente
+  e' salito da solo durante la misura (load average arrivato a ~9, `epsext` di
+  Microsoft Defender all'88.9% CPU, non causato da questo lavoro) e i numeri
+  piu' alti misurati (fino a 2.6 s) erano somme di piu' write per singolo
+  evento di copertura, non una latenza per write. Nessuna prova pulita che il
+  limite di produzione sia sbagliato a carico normale: `writeMs` **non
+  toccato**. **Fix** (lato test soltanto): se tutte le righe diagnostiche
+  raccolte da entrambi i lati (osservatore Copilot reale e hook Claude reale,
+  stderr catturato in un file invece che scartato) sono
+  `ingest_timeout`/`flush_timeout` — mai un altro codice — si riprova la
+  catena una sola volta con un registro nuovo; un fallimento persistente
+  fallisce identico al secondo giro e resta rosso. Prova rossa in copie
+  scratch, mai committate: un `kanban/audit.py` che rallenta solo la chiusura
+  di sessione fa scattare esattamente un `retry:` e poi il rosso al secondo
+  giro; un `kanban/audit.py` che fallisce sempre (non per timeout) resta rosso
+  al primo giro, senza retry. **Punto cieco non risolto**: se la chiusura di
+  sessione (`observer.end`) va persa davvero (non per un timeout transitorio),
+  in quel registro non resta alcun marcatore di buco — il design lo prevede
+  cosi' per non dichiarare una chiusura pulita quando non lo e', ma significa
+  che quella singola sessione non ha traccia recuperabile del buco.
 
 La regola che ne esce, e vale piu' delle tre correzioni: **un limite che puo'
 scattare sul caso sano non e' un margine di sicurezza, e' un rosso a caso.** E un

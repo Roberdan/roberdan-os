@@ -40,6 +40,10 @@ say released.
 
 ## Blanket-add
 
+### Blanket-add — two sessions on one checkout (2026-07-07)
+
+Two sessions committed to the same working checkout and re-edited each other's files: duplicate frontmatter keys, interleaved commits, a near-collision on the release. Origin of the worktree + PR rule for parallel work.
+
 ### Blanket-add — a mutation test swept into a docs commit and pushed (2026-07-14)
 
 Real scar, 2026-07-14, and the worst of the campaign: `@thor` was running a mutation test — deliberately reintroducing a clock bug to prove the test caught it — in the same checkout where the orchestrator ran `git add -A && git commit` to update a plan. The mutation was swept into a commit titled `docs(p3): ...` and **pushed to `Development`**. A clinical-safety regression shipped inside a documentation commit, and every gate stayed green because no test covered that line. Thor spotted it and restored it. Two rules, both cheap: **stage docs by path**, and **mutation testing only ever in a throwaway worktree**.
