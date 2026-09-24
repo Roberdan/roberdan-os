@@ -206,6 +206,11 @@ const pre = cfg.hooks.onPreToolUse;
 // deny: force push
 let r = await pre({ toolName: "bash", toolArgs: { command: "git push --force origin main" } });
 A(r && r.permissionDecision === "deny", "bash force-push -> deny");
+// deny: whole-disk search (same bash-guard.sh as Claude; incident 2026-09-24)
+r = await pre({ toolName: "bash", toolArgs: { command: "find / -name '*.log'" } });
+A(r && r.permissionDecision === "deny", "bash find / -> deny");
+r = await pre({ toolName: "bash", toolArgs: { command: "find ~/GitHub -name '*.log'" } });
+A(!(r && r.permissionDecision === "deny"), "bash find in a folder -> allow");
 // ask: reset --hard
 r = await pre({ toolName: "bash", toolArgs: { command: "git reset --hard HEAD~1" } });
 A(r && r.permissionDecision === "ask", "bash reset --hard -> ask");
