@@ -30,7 +30,7 @@ overrides `--allow-all-tools` (verified live), which is the third guard layer be
 
 - `factory/enqueue.sh "<task text or file>" [name]` — add a task to the queue.
 - `factory/run.sh` — process the queue: for each task, dispatch a headless agent
-  (`copilot -p "<task>" --model <claude-sonnet-5|claude-opus-5> --allow-all-tools --deny-tool ... --add-dir <dir>`;
+  (`copilot -p "<task>" --model <claude-sonnet-5|claude-opus-5.5> --allow-all-tools --deny-tool ... --add-dir <dir>`;
   with `FACTORY_ENGINE=claude`: `claude -p "<task>" --model <sonnet|opus> --permission-mode auto --permission-prompts none --add-dir <dir>`),
   capture the log. See "Model policy" below for how `<sonnet|opus>` is chosen.
   **A task only reaches `done/` on exit 0.** On failure it is requeued once (attempt 2/2); if
@@ -81,7 +81,7 @@ inherits it when `--model` is omitted; an unattended factory must not ride that 
   `sonnet` and logged as `[factory] WARN model '<x>' not allowed (sonnet|opus only) — clamped to
   sonnet` — it is never passed through raw and never causes the task itself to fail. The aliases
   are mapped to the engine's real ids by `engine_model()` (copilot: `sonnet`=claude-sonnet-5,
-  `opus`=claude-opus-5), so the allowlist keeps working unchanged across engines.
+  `opus`=claude-opus-5.5), so the allowlist keeps working unchanged across engines.
 - **The headless @thor verification pass always uses `sonnet`**, unconditionally — it is QA
   (compare evidence against `dod:`/`acceptance:`), not authorship, so it never scales to opus and
   is unaffected by `model:` or `RDA_FACTORY_MODEL`.

@@ -88,7 +88,7 @@ factory_engine_bin() {
 engine_model() {
   local alias="$1"
   case "$FACTORY_ENGINE" in
-    copilot) case "$alias" in opus) printf 'claude-opus-5' ;; *) printf 'claude-sonnet-5' ;; esac ;;
+    copilot) case "$alias" in opus) printf 'claude-opus-5.5' ;; *) printf 'claude-sonnet-5' ;; esac ;;
     *)       printf '%s' "$alias" ;;
   esac
 }

@@ -325,7 +325,14 @@ repeat. What ships in this repo is the *deriver and the runner*, never the deriv
 
 Formula: `tasks × Σ_models (tokens_per_task × price_per_token)`. With the committed `bench-models.tsv`
 list prices and the default **30 000 tokens/task/model** assumption (split half input / half output),
-one task across all three models costs **≈ $1.69** (opus $1.35 + sonnet $0.27 + haiku $0.07). So:
+one task across the original three generic-family rows costs **≈ $1.69** (opus $1.35 + sonnet
+$0.27 + haiku $0.07). So, **scoped to those three with `--models claude-opus,claude-sonnet,claude-haiku`**:
+
+**`bench-models.tsv` now carries 8 rows** (the 3 original generic-family rows plus 5 concrete
+host ids added 2026-09-24: opus-5.5, sonnet-5, haiku-4.5, fable-5.1, gpt-6-astra — fable-5.1
+stays deferred in `models.tsv` itself, so it is a listed host id here, not a reviewed one). A `--real`
+run with **no `--models` filter runs every row in the file**, not just these three — the printed
+"$N task(s) x M model(s)" estimate before the human gate reflects that; read it, don't assume 3.
 
 | sample size | 3 models, ~30k tok/task | note |
 |---|---|---|
