@@ -37,7 +37,7 @@ unset _dash_src _dash_dir
 WT="$ROOT/kanban/worktree.sh"
 DONE_N="${RDA_DASH_DONE:-5}"   # how many closed cards to detail
 
-_field() { grep -m1 "^$2:" "$1" 2>/dev/null | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"\$//"; }
+_field() { grep -m1 "^$2:" "$1" 2>/dev/null | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"\$//; s/\\\\\"/\"/g; s/\\\\\\\\/\\\\/g"; }
 
 # --- time ------------------------------------------------------------------
 # GNU (-d) first, BSD (-r/-jf) second: on macOS the GNU form fails cleanly, while on Linux
