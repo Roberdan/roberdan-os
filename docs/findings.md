@@ -466,18 +466,36 @@ correzioni (l'ultima il 2026-09-24, vedi sotto).
   quindi l'ultima pagava anche l'attesa delle altre quattro. `test-twin-install`
   passa da solo in 2m48s ed e' stata dichiarata bloccata in tre validazioni di
   fila. Ora il conto parte quando la suite parte davvero.
-- **Corretto il 2026-09-24 (finding #36)** — `test/test-audit-hooks.sh`,
-  `test_stuck_logger_is_killed_within_bound`: asseriva che l'intera invocazione
-  dell'hook con un logger bloccato (`time.sleep(30)`) finisse sotto i 2 s,
-  budget che paga anche l'avvio di interprete/processo — fallita in CI a
-  2.017 s e 2.126 s. **Causa**: stesso bug delle due correzioni sopra, budget
-  fisso tarato su un'ipotesi. **Fix**: confronto con una baseline misurata (stesso
-  evento, logger che risponde subito) — `stuck_cost < baseline + 1.5s + 0.25s`
-  di margine — piu' un tetto di sanita' a 5 s. `hooks/audit.sh:89` (kill a
-  1.5 s) non toccato. Prova rossa in copie scratch fuori dal repo, mai
-  committate: timeout a 3.0 s fa fallire la nuova asserzione; kill rimosso fa
-  scadere il timeout di 5 s dell'harness. 20/20 sotto carico (6x `yes` su 18
-  core).
+- **Corretto il 2026-09-24, poi indurito lo stesso giorno (finding #36)** —
+  `test/test-audit-hooks.sh`, `test_stuck_logger_is_killed_within_bound`:
+  asseriva che l'intera invocazione dell'hook con un logger bloccato
+  (`time.sleep(30)`) finisse sotto i 2 s, budget che paga anche l'avvio di
+  interprete/processo — fallita in CI a 2.017 s e 2.126 s. **Causa**: stesso
+  bug delle due correzioni sopra, budget fisso tarato su un'ipotesi. **Primo
+  fix**: confronto con UNA baseline misurata (stesso evento, logger che
+  risponde subito) — `stuck_cost < baseline + 1.5s + 0.25s` di margine — piu'
+  un tetto di sanita' a 5 s. Non bastava: @thor l'ha preso in fallo sotto
+  carico reale (6x `yes`, 20 run), run 14: `stuck=1.945s` contro un budget di
+  `1.919s` calcolato da UN SOLO campione — un campione non e' prova affidabile
+  di una proprieta' temporale sotto carico. In piu' `SANITY_CEILING=5` era
+  codice morto: il timeout di 5 s del solo harness (`invoke()`) scatta prima e
+  impedisce a quell'assert di essere mai raggiunto con un valore che la
+  farebbe fallire. **Fix indurito**: la baseline e' ora il massimo di 3
+  campioni, il margine scala con essa (`max(0.5s, 50% della baseline)`), e la
+  vera prova che il logger e' morto e' una **proprieta'**, non un tempo: il
+  logger bloccato scrive il proprio PID in un file, e dopo che l'hook e'
+  tornato si verifica che quel PID non sia piu' vivo (`os.kill(pid, 0)` ->
+  `ProcessLookupError`). Il tetto morto e' rimosso, sostituito dalla
+  proprieta'. `hooks/audit.sh:110` (kill a 1.5 s, non piu' alla riga 89 di
+  prima — il file e' cresciuto per la funzione di policy dei nomi skill
+  arrivata nel frattempo) resta non toccato. Prova rossa in copie scratch
+  fuori dal repo, mai committate: kill rimosso del tutto -> scade il timeout
+  di 5 s dell'harness (rosso, come prima); **kill "finto"** — il tempo resta
+  nel budget ma il processo non viene davvero ucciso (`Popen` senza
+  `kill()`) -> la vecchia versione sarebbe passata, la nuova fallisce
+  correttamente sulla proprieta' ("logger pid ... is still alive"), a riprova
+  che la proprieta' aggiunge una garanzia che il solo tempo non dava. 20/20
+  del test bersaglio a livello python3 (isolato) sotto lo stesso carico.
 - **Corretto il 2026-09-24** — la stessa validazione a 20 run sotto carico
   aveva riprodotto 1/20 un flake diverso: `test-audit-chain.sh`, "l'observer
   Copilot non ha scritto nel registro reale". Causa verificata nel codice:
