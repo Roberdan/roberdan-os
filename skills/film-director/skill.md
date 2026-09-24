@@ -1,6 +1,6 @@
 ---
 name: film-director
-description: "Required for any moving-image work: product films, demo videos, brand films, launch films, hackathon/competition submissions, trailers, explainers, case-study films, video ads, AI-generated video. Use when the request involves making, directing, re-cutting, scoring or reviewing a video, or when a deliverable is an .mp4/.mov. Directs a real film — coverage, shot grammar, cut motivation, sound design, delivery gate — instead of an animated slide deck. Covers Azure Sora 2 generation, screen-recording compositing, Remotion typography, Blender shots, ffmpeg assembly and loudness compliance."
+description: "Required for any moving-image work, including text-only concepts, treatments, scripts and storyboards before any media is produced: product films, demo videos, brand films, launch films, hackathon/competition submissions, trailers, explainers, case-study films, video ads, AI-generated video. Use before planning, making, directing, re-cutting, scoring or reviewing a video, or when a deliverable is an .mp4/.mov. Directs a real film — coverage, shot grammar, cut motivation, sound design, delivery gate — instead of an animated slide deck. Covers Azure Sora 2 generation, screen-recording compositing, Remotion typography, Blender shots, ffmpeg assembly and loudness compliance."
 providers: [claude, copilot, codex]
 ---
 
@@ -22,6 +22,10 @@ continuity of space and a sound bed that runs underneath the cuts.
 moving-image deliverable. It supplies craft and an executable gate — not permission to
 spend, publish, or declare done. The owner approves subjective direction. Nothing is
 uploaded, published or submitted without an explicit human instruction.
+
+A text-only concept, treatment, script or storyboard for a future film is
+already video work. Load this guidance even if no media file is requested;
+do not expand a short concept request into production or generation.
 
 ## Routing
 

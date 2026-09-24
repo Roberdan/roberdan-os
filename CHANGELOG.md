@@ -3,6 +3,34 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.59.0 — 2026-09-24
+
+### Fixed
+
+- Native audit adapters preserve reviewed public skill selectors beyond Twin,
+  without collecting prompts, results or arbitrary private skill names. General
+  skill starts remain distinct from Twin invocations and consultations; old
+  filtered records cannot establish zero general-skill usage.
+- Canonical review/release routing uses declared namespaced skills where present
+  and explicit canonical-file fallbacks, not an unrelated same-named workflow.
+- Native Copilot and Claude callbacks enforce recognized explicit video and
+  Apple-interface requests, including text-only concepts. Successful native
+  skill loading or a full canonical read satisfies the obligation, with distinct
+  provenance. Missing guidance produces an explicit incomplete warning and at
+  most two automatic continuations; ordinary requests and pause/cancel remain free.
+  This replaces the failed wording-only approach, not every possible routing case.
+
+### Changed
+
+- Integration evidence distinguishes native callback-to-telemetry fixtures,
+  fresh-host routing observations, real agent coordination and no-spend Jev
+  preparation. None establishes universal routing reliability or live Jev value.
+- Zero-usage evidence now requires observed coverage on the installation host;
+  coverage on a different host or an unscoped custom directory is insufficient.
+- Validation runs at most four suites concurrently by default, including the
+  serialized installation group. `RDA_VALIDATE_JOBS=1..32` changes that ceiling;
+  assertions, failure codes and test timeouts are not relaxed.
+
 ## 2.58.0 — 2026-09-23
 
 ### Added

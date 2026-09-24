@@ -4,6 +4,7 @@
 ROOT="${RDA_OS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 python3 - "$ROOT" 3<&0 <<'PY'
 import fcntl
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -17,6 +18,7 @@ IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}\Z")
 EVENTS = {"SessionStart", "SessionEnd", "PreToolUse", "PostToolUse",
           "PostToolUseFailure", "SubagentStart", "SubagentStop"}
 root = Path(sys.argv[1])
+sys.path.insert(0, str(root / "kanban"))
 state = Path(os.environ.get("RDA_HOME", str(Path.home() / ".roberdan-os"))) / "audit-observer"
 pending = state / "claude.pending"
 recovering = state / "claude.recovering"
@@ -47,6 +49,11 @@ def normalize(raw):
     if kind not in EVENTS:
         raise ValueError("unsupported_event")
     data = {}
+    try:
+        from audit_skills import POLICY, public_skill_names
+        names = public_skill_names()
+    except (ImportError, OSError, ValueError) as exc:
+        raise ValueError("skill_policy_unavailable") from exc
 
     def put(key, value):
         if value is not None:
@@ -59,6 +66,8 @@ def normalize(raw):
     if kind == "SessionStart":
         put("model", raw.get("model"))
     if kind in {"PreToolUse", "PostToolUse", "PostToolUseFailure"}:
+        if kind == "PreToolUse":
+            data["skillNamePolicy"] = POLICY
         if not identifier(raw.get("tool_use_id")):
             raise ValueError("missing_tool_call_id")
         if not identifier(raw.get("tool_name")):
@@ -67,18 +76,30 @@ def normalize(raw):
         put("toolName", raw["tool_name"])
         args = raw.get("tool_input")
         if isinstance(args, dict):
-            if raw["tool_name"] == "Skill" and args.get("skill") in ("roberdan-twin", "roberto-twin"):
+            if raw["tool_name"] == "Skill" and isinstance(args.get("skill"), str) and args["skill"] in names:
                 data["arguments"] = {"skill": args["skill"]}
             if raw["tool_name"] in {"Agent", "Task"} and args.get("subagent_type") is not None:
                 if not identifier(args["subagent_type"]):
                     raise ValueError("invalid_metadata")
                 data["arguments"] = {"agent_type": args["subagent_type"]}
+        if raw["tool_name"] == "Skill" and "arguments" not in data:
+            data["skillNameStatus"] = "omitted"
         if kind != "PreToolUse":
             data["success"] = kind == "PostToolUse"
         # Claude's error field is free text, not a machine-readable error code.
     if kind in {"SubagentStart", "SubagentStop"} and not identifier(raw.get("agent_id")):
         raise ValueError("missing_agent_id")
-    return {"type": kind, "session_id": raw["session_id"], "data": data}
+    envelope = {"type": kind, "session_id": raw["session_id"], "data": data}
+    if "timestamp" in raw:
+        value = raw["timestamp"]
+        try:
+            if (not isinstance(value, str) or len(value) > 40
+                    or datetime.fromisoformat(value.replace("Z", "+00:00")).tzinfo is None):
+                raise ValueError()
+        except ValueError as exc:
+            raise ValueError("invalid_timestamp") from exc
+        envelope["timestamp"] = value
+    return envelope
 
 
 def send(envelope):
@@ -129,7 +150,8 @@ def main():
         envelope = normalize(raw)
     except (ValueError, TypeError) as error:
         codes = {"invalid_session_id", "unsupported_event", "invalid_metadata",
-                 "missing_tool_call_id", "invalid_tool_name", "missing_agent_id"}
+                 "missing_tool_call_id", "invalid_tool_name", "missing_agent_id",
+                 "skill_policy_unavailable", "invalid_timestamp"}
         diagnostic(str(error) if isinstance(error, ValueError) and str(error) in codes else "invalid_input")
         mark_gap()
         return
@@ -159,6 +181,9 @@ def main():
             if envelope["type"] == "SessionStart":
                 unsupported = {"type": "observer.unsupported", "session_id": envelope["session_id"],
                                "data": {"error": {"code": "claude_hooks_no_permission_or_semantic_consent"}}}
+                if not send(unsupported):
+                    mark_gap()
+                unsupported["data"]["error"]["code"] = "public_skill_names_only"
                 if not send(unsupported):
                     mark_gap()
     except OSError:

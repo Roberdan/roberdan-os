@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // SDK 1.0.86-2 session-events.d.ts. Hook invocation context has no toolCallId.
 export const AUDIT_LIMITS = Object.freeze({ pending: 64, metadataBytes: 16384, writeMs: 1000, flushMs: 1500 });
@@ -9,12 +11,30 @@ export const AUDIT_EVENTS = Object.freeze([
     "session.skills_loaded", "session.shutdown",
 ]);
 const identifiers = /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/;
-const twins = new Set(["roberdan-twin", "roberto-twin"]);
+const policy = "public_allowlist_v1";
+const catalogs = new Map();
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const identifier = (value) => typeof value === "string" && identifiers.test(value);
 
+function publicSkillNames(root) {
+    if (catalogs.has(root)) return catalogs.get(root);
+    const payload = readFileSync(join(root, "kanban", "audit_skill_names.json"));
+    if (payload.length > AUDIT_LIMITS.metadataBytes) throw Error("skill_policy_unavailable");
+    const data = JSON.parse(payload);
+    if (!object(data) || Object.keys(data).sort().join() !== "canonical,compatibility,providers" ||
+        Object.values(data).some((names) => !Array.isArray(names) || names.length > 64 ||
+            names.some((name) => typeof name !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(name)))) {
+        throw Error("skill_policy_unavailable");
+    }
+    const names = new Set([...data.canonical, ...data.canonical.map((name) => `rdos-${name}`),
+        ...data.compatibility, ...data.providers]);
+    catalogs.set(root, names);
+    return names;
+}
+
 // Project before serializing: no traversal of prompts, results, errors, or shell arguments.
-export function normalizeAuditEvent(event, sessionId) {
+export function normalizeAuditEvent(event, sessionId,
+    names = publicSkillNames(fileURLToPath(new URL("../../", import.meta.url)))) {
     if (!identifier(sessionId)) throw Error("invalid_session_id");
     if (!object(event) || !AUDIT_EVENTS.includes(event.type) || !object(event.data)) throw Error("unsupported_event");
     const data = {};
@@ -32,6 +52,7 @@ export function normalizeAuditEvent(event, sessionId) {
     }
     if (event.type.startsWith("tool.")) put("parentToolCallId", source.parentToolCallId);
     if (event.type === "tool.execution_start") {
+        if (names) data.skillNamePolicy = policy;
         if (!identifier(source.toolName)) throw Error("invalid_tool_name");
         put("toolName", source.toolName);
         let args = source.arguments;
@@ -40,7 +61,7 @@ export function normalizeAuditEvent(event, sessionId) {
             try { args = JSON.parse(args); } catch (e) { throw Error("invalid_arguments"); }
         }
         if (object(args)) {
-            if (source.toolName === "skill" && twins.has(args.skill)) data.arguments = { skill: args.skill };
+            if (source.toolName === "skill" && names?.has(args.skill)) data.arguments = { skill: args.skill };
             if (source.toolName === "task") {
                 for (const key of ["agent_type", "name"]) {
                     if (args[key] !== undefined) {
@@ -50,6 +71,7 @@ export function normalizeAuditEvent(event, sessionId) {
                 }
             }
         }
+        if (source.toolName === "skill" && !data.arguments) data.skillNameStatus = "omitted";
     }
     if (event.type === "tool.execution_complete") {
         if (typeof source.success !== "boolean") throw Error("missing_terminal_status");
@@ -71,7 +93,9 @@ export function normalizeAuditEvent(event, sessionId) {
     }
     if (event.type === "session.skills_loaded") {
         if (!Array.isArray(source.skills) || source.skills.length > 256) throw Error("oversized_discovery");
-        data.skills = source.skills.filter((skill) => object(skill) && twins.has(skill.name)).map((skill) => skill.name);
+        data.skills = [...new Set(source.skills.filter((skill) => object(skill) && names?.has(skill.name))
+            .map((skill) => skill.name))].sort();
+        if (source.skills.some((skill) => !object(skill) || !names?.has(skill.name))) data.skillNameStatus = "omitted";
     }
     const envelope = { type: event.type, session_id: sessionId, data };
     if (event.id !== undefined) {
@@ -118,6 +142,8 @@ export function createAuditObserver({ root, sessionId, runScript = ingest, repor
             process.stderr.write("[roberdan-os audit] diagnostic_failed\n");
         }
     };
+    let names = null;
+    try { names = publicSkillNames(root); } catch (e) { diagnostic("skill_policy_unavailable"); }
     const coverage = (type, code) => ({
         type, session_id: sessionId, data: code ? { error: { code } } : {},
     });
@@ -167,7 +193,7 @@ export function createAuditObserver({ root, sessionId, runScript = ingest, repor
     }
     function observe(event) {
         if (closing || closed) return;
-        try { enqueue(normalizeAuditEvent(event, sessionId)); } catch (e) {
+        try { enqueue(normalizeAuditEvent(event, sessionId, names)); } catch (e) {
             // Only codes created by this normalizer are diagnostic; never echo host exceptions.
             const codes = new Set(["unsupported_event", "missing_tool_call_id", "oversized_arguments",
                 "invalid_arguments", "invalid_metadata", "invalid_tool_name", "missing_terminal_status",
@@ -187,6 +213,7 @@ export function createAuditObserver({ root, sessionId, runScript = ingest, repor
         enqueue(coverage("observer.unsupported", "semantic_decisions_require_explicit_records"));
         enqueue(coverage("observer.unsupported", "permission_consent_not_observed"));
         enqueue(coverage("observer.unsupported", "skill_invoked_has_no_tool_call_id"));
+        enqueue(coverage("observer.unsupported", names ? "public_skill_names_only" : "skill_policy_unavailable"));
     }
     async function flush() {
         pump();

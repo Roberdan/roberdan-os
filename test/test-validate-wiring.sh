@@ -91,5 +91,10 @@ else
 fi
 
 echo
+if python3 -B "$ROOT/test/test-validation-scheduling.py"; then
+  ok "limite concorrente, gruppo seriale e codici reali provati sul motore"
+else
+  err "scheduler: concorrenza o propagazione degli errori non rispettata"
+fi
 if [ "$fails" -eq 0 ]; then echo "test-validate-wiring: PASS"; exit 0; fi
 echo "test-validate-wiring: FAIL ($fails)"; exit 1

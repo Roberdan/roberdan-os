@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, copyFileSy
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { AUDIT_EVENTS, AUDIT_LIMITS, createAuditObserver, normalizeAuditEvent } from "../hooks/copilot/audit.mjs";
 
@@ -16,7 +17,7 @@ const start = (id, skill = "roberdan-twin") => native("tool.execution_start", {
 function fixture(runScript) {
     const writes = [], warnings = [], handlers = new Map();
     const observer = createAuditObserver({
-        root: "/fixture", sessionId: "session-1", report: (code) => warnings.push(code),
+        root: fileURLToPath(new URL("../", import.meta.url)), sessionId: "session-1", report: (code) => warnings.push(code),
         runScript: runScript || (async (path, input) => { writes.push(JSON.parse(input)); return { code: 0 }; }),
     });
     observer.register({ on: (name, handler) => {
@@ -35,7 +36,7 @@ test("projects native identifiers, not prompts, results, hidden reasoning or raw
     const safe = normalizeAuditEvent(event, "session-1");
     assert.deepEqual(safe.data, { agentId: "child-1", model: "test-model",
         toolCallId: "call-1", parentToolCallId: "parent-1", toolName: "skill",
-        arguments: { skill: "roberdan-twin" } });
+        arguments: { skill: "roberdan-twin" }, skillNamePolicy: "public_allowlist_v1" });
     const shell = normalizeAuditEvent(native("tool.execution_start", {
         toolCallId: "shell-1", toolName: "bash",
         arguments: { command: "PRIVATE_SHELL_CANARY", name: "PRIVATE_NAME_CANARY" },
@@ -75,8 +76,8 @@ test("discovery snapshots never turn a failed skill attempt into success", async
     assert.equal(handlers.size, 0);
 });
 
-test("only twin skill aliases and explicit task selectors are projected; child correlation is native", () => {
-    for (const name of ["roberdan-twin", "roberto-twin"]) {
+test("reviewed public names and explicit task selectors are projected; child correlation is native", () => {
+    for (const name of ["roberdan-twin", "roberto-twin", "rdos-roberdan-twin", "film-director", "pdf"]) {
         assert.deepEqual(normalizeAuditEvent(start("call", name), "session").data.arguments, { skill: name });
     }
     assert.equal(normalizeAuditEvent(start("call", "other-skill"), "session").data.arguments, undefined);
@@ -207,7 +208,9 @@ test("extension observes native events independently of unchanged guard permissi
         mkdirSync(join(root, "kanban"));
         mkdirSync(join(root, "node_modules", "@github", "copilot-sdk"), { recursive: true });
         const source = new URL("../hooks/copilot/", import.meta.url);
-        for (const file of ["audit.mjs", "context-recovery.mjs"]) copyFileSync(new URL(file, source), join(root, file));
+        for (const file of ["audit.mjs", "context-recovery.mjs", "skill-obligations.mjs", "skill-obligations-core.mjs"]) {
+            copyFileSync(new URL(file, source), join(root, file));
+        }
         copyFileSync(new URL("extension.template.mjs", source), join(root, "extension.mjs"));
         writeFileSync(join(root, "node_modules", "@github", "copilot-sdk", "package.json"),
             JSON.stringify({ type: "module", exports: { "./extension": "./extension.mjs" } }));

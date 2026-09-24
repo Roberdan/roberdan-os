@@ -93,7 +93,7 @@ stats, cover = run("stats", "--json"), run("coverage", "--json")
 kinds = stats["by_kind"]
 passed &= ok(cover["unsupported_events"] == [], "nessun evento nativo resta non classificato")
 passed &= ok(cover["observer_gaps"] == [], "nessun buco di osservazione dichiarato")
-passed &= ok(len(cover["observer_limitations"]) == 4,
+passed &= ok(len(cover["observer_limitations"]) == 6,
              "i limiti dichiarati dagli observer sono registrati, non dedotti")
 passed &= ok(cover["unlinked_native_events"] == [], "ogni evento nativo di chiamata e' correlato")
 passed &= ok(kinds.get("skill_invocation_succeeded") == 2,
