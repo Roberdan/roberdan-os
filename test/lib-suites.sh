@@ -14,9 +14,8 @@
 # this machine, the same 17 suites take 289s one after another and 47s started
 # together — the wall clock was the ORDERING, not the tests.
 #
-# So they are all started here, at once, and each section below then blocks on
-# its own result and prints exactly the line it printed before. The report a
-# human reads is unchanged and still deterministic; only the waiting is gone.
+# A bounded pool avoids starving the tests' own timing assertions as the suite
+# inventory grows. The report stays ordered; no test timeout is increased.
 # A suite that needs its output (not just its exit code) reads _suite_out.
 # Dentro @thor, con la CI gia' verde sullo stesso commit, la suite non riparte: 15 minuti per
 # ridire cio' che GitHub ha gia' detto (2026-09-14, due verifiche, una in timeout).
@@ -27,17 +26,48 @@ if [ "${RDA_IN_THOR_VERIFY:-0}" = "1" ] && [ -n "${RDA_THOR_CI_GREEN:-}" ] \
 fi
 _PARDIR="$(mktemp -d "${TMPDIR:-/tmp}/rda-validate.XXXXXX")"
 trap 'rm -rf "$_PARDIR"' EXIT INT TERM
+_MAX_JOBS="${RDA_VALIDATE_JOBS-4}"
+case "$_MAX_JOBS" in [1-9]|[12][0-9]|3[0-2]) ;;
+  *) printf 'validate: RDA_VALIDATE_JOBS must be an integer from 1 to 32\n' >&2; exit 2 ;;
+esac
 
 # Launched names land here; _suite refuses any name missing from it. On 2026-07-31 a _suite
 # without its _spawn stalled the gate 15 minutes — twice, since a stall reads as a slow suite.
 _SPAWNED=""
+_wait_slot() {
+  local running _pid progress="" observed="" since=$SECONDS
+  while :; do
+    running=0
+    for _pid in $(jobs -pr); do running=$((running+1)); done
+    [ "$running" -lt "$_MAX_JOBS" ] && return 0
+    if [ -f "$_PARDIR/progress" ]; then
+      IFS= read -r progress < "$_PARDIR/progress"
+    fi
+    if [ "$progress" != "$observed" ]; then
+      observed="$progress"; since=$SECONDS
+    fi
+    if [ "$((SECONDS-since))" -ge 900 ]; then
+      printf '  FAIL: validation workers made no scheduling progress within 15 minutes (hung)\n' >&2
+      exit 1
+    fi
+    sleep 0.1
+  done
+}
+_run_suite() {
+  local name="$1" rc=0
+  printf '%s' "$(date +%s)" > "$_PARDIR/$name.start"
+  printf '%s\n' "$name" > "$_PARDIR/$name.progress"
+  mv "$_PARDIR/$name.progress" "$_PARDIR/progress"
+  bash "test/$name.sh" > "$_PARDIR/$name.out" 2>&1 || rc=$?
+  printf '%s' "$rc" > "$_PARDIR/$name.rc.part" && mv "$_PARDIR/$name.rc.part" "$_PARDIR/$name.rc"
+}
 _spawn() {
+  _wait_slot
   _SPAWNED="$_SPAWNED $1"
   # Write the exit code LAST and atomically: _suite treats the .rc file as the
   # signal that the .out file is complete, so a half-written .out must never be
   # reachable through a present .rc.
-  ( bash "test/$1.sh" > "$_PARDIR/$1.out" 2>&1
-    printf '%s' "$?" > "$_PARDIR/$1.rc.part" && mv "$_PARDIR/$1.rc.part" "$_PARDIR/$1.rc" ) &
+  ( _run_suite "$1" ) &
 }
 
 # Some suites are NOT independent of each other, and pretending otherwise is how
@@ -53,6 +83,7 @@ _spawn() {
 # is a change to what the tests exercise, and it does not belong in a commit
 # about wall clock.
 _spawn_serial_group() {
+  _wait_slot
   _SPAWNED="$_SPAWNED $*"
   ( for _g in "$@"; do
       # QUANDO QUESTA SUITE E' PARTITA DAVVERO. Le cinque del gruppo girano in
@@ -63,9 +94,7 @@ _spawn_serial_group() {
       # tre validazioni di fila. Un limite che scatta sul caso sano non e' un
       # margine, e' un rosso a caso — e un rosso a caso su un innocente insegna a
       # non leggere piu' il referto.
-      printf '%s' "$(date +%s)" > "$_PARDIR/$_g.start"
-      bash "test/$_g.sh" > "$_PARDIR/$_g.out" 2>&1
-      printf '%s' "$?" > "$_PARDIR/$_g.rc.part" && mv "$_PARDIR/$_g.rc.part" "$_PARDIR/$_g.rc"
+      _run_suite "$_g"
     done ) &
 }
 
@@ -82,8 +111,7 @@ _suite() {
     # 15 minutes OF ITS OWN RUN. A suite queued behind others in a serial group
     # has not started yet, and counting that queue against it turns a slow
     # neighbour into its failure. The countdown restarts the moment this suite
-    # actually begins; suites launched by `_spawn` have no start marker and are
-    # timed as before, because they begin immediately.
+    # actually begins; both launch paths publish the same start marker.
     if [ "$started" = "0" ] && [ -f "$_PARDIR/$1.start" ]; then
       started=1; waited=0
     fi
