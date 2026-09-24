@@ -221,9 +221,25 @@
 # il test che pin-na l'intero file (non le cinque frasi-ancora di test-canon-structure.sh)
 # contro l'output del generatore.
 # E resta in piedi, per la settima volta: validate.sh si spezza, non si allarga.
+# 2026-09-24, ventiduesima: +50 test/test-bus-mutants.sh (1216 -> 1266); validate.sh
+# invariato (il guard e' agganciato alla riga di test-bus). test-bus-mutants.sh scriveva quattro dei suoi
+# probe (dispatch-elsewhere, skills-drop, marker-bump, claude-root) dentro il
+# vero $HOME "di proposito" — la scoperta era reale, ma niente in questo file o
+# in test-bus.sh ha mai ispezionato il $HOME vero dopo per decidere qualcosa
+# (il verdetto EXPECTED-SURVIVOR viene solo dall'exit code e dall'output di
+# test-bus.sh), quindi toccare la macchina vera non provava niente in piu' e
+# lasciava litter — due skill e uno script probe sono rimasti su questa
+# macchina. Canone: mutation testing solo in una sandbox usa-e-getta. Ogni
+# mutante ora gira con un $HOME sandboxato ($MUTHOME, sotto lo stesso mktemp di
+# $WORK); il trap di uscita e' diventato un'ASSERZIONE (fallisce se un probe
+# raggiunge comunque la macchina vera, non solo lo spazza in silenzio). Le 4
+# righe di validate.sh (piegate nella riga test-bus) agganciano test/test-bus-mutant-probes.sh, il nuovo
+# guard economico (non rilancia l'ora di mutation testing) che legge la stessa
+# lista di radici via `test-bus-mutants.sh --list-probe-roots` — una sola fonte
+# di verita', non due liste che possono divergere.
 1777 kanban/kb.sh
 1415 test/test-bus.sh
-1216 test/test-bus-mutants.sh
+1266 test/test-bus-mutants.sh
 1601 bus/bus.sh
 689 bin/sync.sh
 601 test/test-federated-kb.sh
