@@ -76,6 +76,15 @@ expect allow "git add docs/findings.md && git commit -m 'docs(evolve): note'" \
 expect allow "git add -A && git commit -m 'feat(evolve): code change'" \
   "blanket add on a non-docs commit -> allowed (rule is scoped to docs)"
 
+echo "=== rule 5: no whole-disk searches (the 2026-09-24 incident: find/bfs on / alive for hours) ==="
+expect deny  "find / -iname 'IE-Tenant-Research*'"                        "find on / -> deny"
+expect deny  "bfs -S dfs -regextype findutils-default / -iname extension.mjs" "bfs with options then / -> deny"
+expect deny  "cd /tmp && sudo find / -name x"                              "find / after && -> deny"
+expect allow "find . -path '*/node_modules/*' -prune"                      "find in cwd with a path pattern -> allowed"
+expect allow "find ~/Library/LaunchAgents -name 'com.roberdan.*'"          "find in a specific folder -> allowed"
+expect allow "ls / | head"                                                 "listing / (not a search) -> allowed"
+expect allow "echo 'never run find / on this Mac'"                         "find / inside a quoted message -> allowed"
+
 echo
 if [ "$fails" -eq 0 ]; then echo "test-bash-guard: PASS"; exit 0; fi
 echo "test-bash-guard: FAIL ($fails)"; exit 1

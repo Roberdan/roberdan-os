@@ -62,4 +62,12 @@ if printf '%s' "$cmd_nostr" | grep -qE 'git[[:space:]]+add[[:space:]]+(-A|--all|
   deny "A docs commit must not be staged with 'git add -A': a blanket add stages whatever is in the tree right now — including another agent's in-flight edits (e.g. a mutation test). Stage by explicit path: git add path/to/doc.md"
 fi
 
+# 5) Whole-disk searches. Real incident (2026-09-24): three agent `find /` / `bfs /` runs stayed
+#    alive up to 4 h and kept the Mac loaded for every other agent. Checked per command segment,
+#    on the quote-stripped command, so `find . -path '*/x'` or a message mentioning `find /` pass.
+if printf '%s' "$cmd_nostr" | tr ';&|' '\n\n\n' \
+   | grep -qE '^[[:space:](]*(sudo[[:space:]]+)?(find|bfs|fd)([[:space:]].*)?[[:space:]](/|/System/Volumes/Data/?)([[:space:]]|$)'; then
+  deny "Searching the whole disk (find/bfs/fd on /) is forbidden: it runs for hours and slows every agent. Search a specific folder (e.g. ~/GitHub/<repo>, ~/Library/LaunchAgents), or use mdfind -name / gbrain."
+fi
+
 exit 0
