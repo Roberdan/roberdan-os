@@ -455,17 +455,40 @@ correzioni (l'ultima il 2026-09-24, vedi sotto).
   committate: timeout a 3.0 s fa fallire la nuova asserzione; kill rimosso fa
   scadere il timeout di 5 s dell'harness. 20/20 sotto carico (6x `yes` su 18
   core).
-- **NON corretto, e dichiarato** — la stessa validazione a 20 run sotto carico
-  ha riprodotto 1/20 un flake diverso e gia' noto: `test-audit-chain.sh`,
-  "l'observer Copilot non ha scritto nel registro reale". Causa verificata nel
-  codice (non solo per adiacenza nel log): quel test usa l'observer Copilot
-  reale senza `runScript`/`report` iniettati (`test/test-audit-chain.sh:21-25`),
-  quindi il suo `write()` gira con `AUDIT_LIMITS.writeMs = 1000` ms
-  (`hooks/copilot/audit.mjs:5,131`) — un secondo, non gli 1.5 s di
-  `hooks/audit.sh` — e sotto carico l'ingest reale verso `kanban/audit.py` lo
-  ha superato. Stessa famiglia di bug di #36, ma sul writer Copilot, non su
-  quello Claude corretto qui: fuori scope per questa card, non toccato.
-  Diventa una card se ricorre.
+- **Corretto il 2026-09-24** — la stessa validazione a 20 run sotto carico
+  aveva riprodotto 1/20 un flake diverso: `test-audit-chain.sh`, "l'observer
+  Copilot non ha scritto nel registro reale". Causa verificata nel codice:
+  quel test usa l'observer Copilot reale senza `runScript`/`report` iniettati
+  (`test/test-audit-chain.sh:21-25`), quindi il suo `write()` gira con
+  `AUDIT_LIMITS.writeMs = 1000` ms (`hooks/copilot/audit.mjs:5,131`) — non gli
+  1.5 s di `hooks/audit.sh` — e in quel run l'ingest reale della chiusura di
+  sessione (`observer.end`) l'ha superato. **Non e' lo stesso bug di #36**:
+  qui non c'e' un budget wall-clock sull'intera invocazione da ricalibrare —
+  la sezione 4 chiede, a ragion veduta, zero buchi di osservazione, e
+  `AUDIT_LIMITS` e' volutamente congelato, quindi il test non puo' allargare
+  il budget del writer. **Misura prima di decidere**: un singolo write reale
+  isolato sotto 6x `yes` non ha mai superato ~0.3 s (30 campioni); la replay
+  realistica dell'intera catena (~9 write, store nuovo, stesso carico) ha dato
+  10/10 sessioni sane nei primi run, poi 3/40 fallite — ma il carico ambiente
+  e' salito da solo durante la misura (load average arrivato a ~9, `epsext` di
+  Microsoft Defender all'88.9% CPU, non causato da questo lavoro) e i numeri
+  piu' alti misurati (fino a 2.6 s) erano somme di piu' write per singolo
+  evento di copertura, non una latenza per write. Nessuna prova pulita che il
+  limite di produzione sia sbagliato a carico normale: `writeMs` **non
+  toccato**. **Fix** (lato test soltanto): se tutte le righe diagnostiche
+  raccolte da entrambi i lati (osservatore Copilot reale e hook Claude reale,
+  stderr catturato in un file invece che scartato) sono
+  `ingest_timeout`/`flush_timeout` — mai un altro codice — si riprova la
+  catena una sola volta con un registro nuovo; un fallimento persistente
+  fallisce identico al secondo giro e resta rosso. Prova rossa in copie
+  scratch, mai committate: un `kanban/audit.py` che rallenta solo la chiusura
+  di sessione fa scattare esattamente un `retry:` e poi il rosso al secondo
+  giro; un `kanban/audit.py` che fallisce sempre (non per timeout) resta rosso
+  al primo giro, senza retry. **Punto cieco non risolto**: se la chiusura di
+  sessione (`observer.end`) va persa davvero (non per un timeout transitorio),
+  in quel registro non resta alcun marcatore di buco — il design lo prevede
+  cosi' per non dichiarare una chiusura pulita quando non lo e', ma significa
+  che quella singola sessione non ha traccia recuperabile del buco.
 
 La regola che ne esce, e vale piu' delle tre correzioni: **un limite che puo'
 scattare sul caso sano non e' un margine di sicurezza, e' un rosso a caso.** E un
