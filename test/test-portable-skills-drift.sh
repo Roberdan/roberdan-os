@@ -33,9 +33,20 @@ grep -q "AI-era lens" "$ROOT/claude-ai-skill/roberto-mode/THINKING.md" && ok "cl
 # The zip is gitignored (a build product): check the generated one, and the local one if present.
 z="$(unzip -l "$TMP/a/claude-ai-skill/roberto-mode.zip" 2>/dev/null)"
 grep -q " roberto-mode/SKILL.md" <<<"$z" && grep -q " roberto-mode/ENGINEERING.md" <<<"$z" && ok "lo zip ha la cartella alla radice, pronto da caricare" || err "zip senza roberto-mode/SKILL.md: $z"
-if [ -f "$ROOT/claude-ai-skill/roberto-mode.zip" ]; then
-  cmp -s "$ROOT/claude-ai-skill/roberto-mode.zip" "$TMP/a/claude-ai-skill/roberto-mode.zip" && ok "lo zip locale coincide con la fonte" || err "lo zip locale e' vecchio: rigenera"
-fi
+# The local zip is an untracked artifact the generator owns: missing or stale is a note with
+# the command to rebuild it, never a failure (2026-09-24: a stale local zip, deleted by @thor).
+REGEN="python3 bin/gen-portable-skills.py"
+local_zip() { # local_zip <path> -> prints one line, always rc 0
+  if [ ! -f "$1" ]; then echo "  skip: zip locale assente (artefatto ignorato da git) — per caricarlo: $REGEN"
+  elif cmp -s "$1" "$TMP/a/claude-ai-skill/roberto-mode.zip"; then echo "  ok: lo zip locale coincide con la fonte"
+  else echo "  skip: zip locale vecchio (artefatto ignorato da git) — rigenera prima di caricarlo: $REGEN"; fi
+}
+local_zip "$ROOT/claude-ai-skill/roberto-mode.zip"
+printf 'vecchio' > "$TMP/stale.zip"
+case "$(local_zip "$TMP/stale.zip")$(local_zip "$TMP/assente.zip")" in
+  *"vecchio"*"$REGEN"*"assente"*"$REGEN"*) ok "zip locale vecchio o assente: nota con il comando, nessun fallimento" ;;
+  *) err "zip locale vecchio/assente non gestito" ;;
+esac
 
 echo "== una modifica alla fonte cambia le uscite (il test vede la deriva) =="
 cp -R "$ROOT/.github/skills/roberdan-twin" "$TMP/src"
