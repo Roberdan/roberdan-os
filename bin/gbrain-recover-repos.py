@@ -89,6 +89,15 @@ def active_manifest(root, inspect_repo):
     return {"local": [item for item in local if item], "remote": []}
 
 
+
+def sha256_stream(stream):
+    # hashlib.file_digest is Python 3.11+; the shebang is `env python3`, and a shell whose PATH
+    # puts /usr/bin first gets macOS's 3.9, so hash in chunks instead.
+    digest = hashlib.sha256()
+    for chunk in iter(lambda: stream.read(1 << 20), b""):
+        digest.update(chunk)
+    return digest.hexdigest()
+
 class Recovery:
     def __init__(self, manifest, root, backup, blocked_sources=(), active_root=None, rename_proof=None,
                  full_sync_proofs=None):
@@ -179,7 +188,7 @@ class Recovery:
                     or content.replace("\r\n", "\n").rstrip("\n") != note.read_text().replace("\r\n", "\n").rstrip("\n")):
                 raise RuntimeError("Managed snapshot contains an untracked file that is not the current canonical memory.")
             with note.open("rb") as stream:
-                notes[note] = hashlib.file_digest(stream, "sha256").hexdigest()
+                notes[note] = sha256_stream(stream)
         return notes
 
     @staticmethod
@@ -188,7 +197,7 @@ class Recovery:
             if not note.is_file() or note.is_symlink():
                 raise RuntimeError("Canonical memory file changed during snapshot update.")
             with note.open("rb") as stream:
-                if hashlib.file_digest(stream, "sha256").hexdigest() != expected:
+                if sha256_stream(stream) != expected:
                     raise RuntimeError("Canonical memory file changed during snapshot update.")
 
     def validate_backup(self):
@@ -197,7 +206,7 @@ class Recovery:
             raise RuntimeError("A restore-tested backup is mandatory.")
         for name, expected in data["sha256"].items():
             with (self.backup.parent / name).open("rb") as stream:
-                if hashlib.file_digest(stream, "sha256").hexdigest() != expected:
+                if sha256_stream(stream) != expected:
                     raise RuntimeError(f"Backup checksum mismatch: {name}")
         config = json.loads((HOME / ".gbrain/config.json").read_text())
         if config.get("embedding_model") != "ollama:bge-m3" or config.get("embedding_dimensions") != 1024:
