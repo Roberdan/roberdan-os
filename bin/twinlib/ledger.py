@@ -57,7 +57,11 @@ def ledger_path(create=False):
             "Il registro delle decisioni vive solo in locale (RDA_HOME/private/decisions)."
         )
     if create:
-        os.makedirs(d, mode=0o700, exist_ok=True)
+        old = os.umask(0o077)  # every dir makedirs creates (private/ too) is born 0700
+        try:
+            os.makedirs(d, mode=0o700, exist_ok=True)
+        finally:
+            os.umask(old)
         os.chmod(d, 0o700)
     return os.path.join(d, "ledger.jsonl")
 
@@ -88,8 +92,10 @@ def load():
 def locked():
     """Exclusive lock + read; yields the list, writes it back atomically if changed."""
     path = ledger_path(create=True)
-    with open(path + ".lock", "a", encoding="utf-8") as lk:
-        os.chmod(path + ".lock", 0o600)
+    # Created 0600 in one step (os.open), never widened by the umask and then narrowed.
+    fd = os.open(path + ".lock", os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as lk:
         fcntl.flock(lk, fcntl.LOCK_EX)
         records = load()
         before = json.dumps(records, sort_keys=True)

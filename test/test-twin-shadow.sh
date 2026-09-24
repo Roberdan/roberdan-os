@@ -27,7 +27,10 @@ card C1 "primo"; card C2 "secondo"
 out="$(RDA_TWIN_HOST_CMD="$STUB" bash "$TS" predict)"
 [ "$(jq_py 'print(sum(1 for r in recs if r["twin_prediction"]))')" = 2 ] && ok "predict: previsione registrata per ogni card in attesa" || err "predict non ha registrato 2 previsioni: $out"
 case "$out" in *approve*|*tecnico*) err "predict mostra la previsione: $out" ;; *) ok "predict stampa solo i conteggi, non la previsione" ;; esac
-[ "$(stat -f %Lp "$LEDGER" 2>/dev/null || stat -c %a "$LEDGER")" = 600 ] && ok "registro leggibile solo dal proprietario (600)" || err "permessi del registro non 600"
+# Not `stat -f %Lp || stat -c %a`: on GNU `stat -f` is filesystem status and succeeds, so the
+# fallback never runs on Linux. Python reads the mode the same way on both.
+perm="$(python3 -c 'import os,stat,sys; print(" ".join(oct(stat.S_IMODE(os.stat(p).st_mode))[2:] for p in sys.argv[1:]))' "$(dirname "$LEDGER")" "$LEDGER" "$LEDGER.lock")"
+[ "$perm" = "700 600 600" ] && ok "registro solo del proprietario (cartella 700, file 600)" || err "permessi del registro: $perm (attesi 700 600 600)"
 
 # 2) no host / broken host -> "no prediction", rc 0, never an invented one
 card C3 "terzo"
