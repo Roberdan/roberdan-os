@@ -606,12 +606,37 @@ before UI work rather than claiming the skill was engaged.
 
 ## Skill routing
 
+**Video planning is video work.** Invoke `film-director` before writing a
+concept, treatment, script, storyboard or shot list for a film or trailer,
+including a text-only request with no media files to produce. Loading craft
+guidance does not authorize rendering, spending or publishing; keep the result
+inside the requested scope. If unavailable, read `skills/film-director/skill.md`.
+
+**Native enforcement is bounded, not universal.** When installed and active, the
+Copilot/Claude callbacks enforce recognized explicit Italian/English video and Apple UI
+requests: successful skill loading or a full canonical read, otherwise an explicit incomplete
+result with at most two continuations. Pause/cancel and ordinary requests remain free.
+They do not prove that guidance was followed or classify every paraphrase. Activation
+prerequisites and measured positive/negative cases: [`eval/README.md`](eval/README.md#native-activation-boundaries).
+
 **Route to a name the host actually declares.** Ask the host for its skill list and match the
 **declared skill name**; never infer availability from a directory prefix, a `gstack:` namespace
 or the fact that a name appears below. Most of these routes come from **gstack, which is
 optional** — on a machine without it they do not exist, and an agent that "invokes" one of them
 burns a turn on a failure. If the name is not declared: **fall back to the canonical equivalent
 and say which one you used.** Never tell Roberto to install something to answer his question.
+
+**A collision changes the invocation name, not the workflow.** The installer may
+publish this repo's skills as `rdos-review` and `rdos-ship` when another provider
+owns `review` or `ship`. For this repo's review/release workflow, prefer the
+declared `rdos-*` name when available; otherwise read the canonical file linked
+below. Do not treat a same-named third-party skill as the canonical fallback.
+Other third-party workflows remain available when explicitly intended.
+
+**A running session may retain old instructions.** After installation, validate
+new routing in a fresh session; a successful sync does not refresh the current
+host's already-loaded instructions. Check the host's declared names, not folder
+names or the inventory of what merely exists on disk.
 
 | Request | Preferred (if the host declares it) | Fallback — always available here |
 |---|---|---|
@@ -621,13 +646,13 @@ and say which one you used.** Never tell Roberto to install something to answer 
 | Strategy / scope | `plan-ceo-review` | [`board`](agents/board.md) (red-team) + [`problem-validation`](skills/problem-validation/skill.md) |
 | Architecture | `plan-eng-review` | [`baccio`](agents/baccio.md) |
 | Design system / plan review | `design-consultation`, `plan-design-review` | [`board`](agents/board.md) |
-| Full review pipeline | `autoplan` | [`review`](skills/review/skill.md) → [`rex`](agents/rex.md) → [`thor`](agents/thor.md) |
+| Full review pipeline | `autoplan` | declared `rdos-review`, otherwise [canonical review](skills/review/skill.md) → [`rex`](agents/rex.md) → [`thor`](agents/thor.md) |
 | Bugs / errors | `investigate` | [`socrates`](agents/socrates.md) (root cause) + [`baccio`](agents/baccio.md) |
 | QA / testing behaviour | `qa`, `qa-only` | [`thor`](agents/thor.md) + [`verify-done`](skills/verify-done/skill.md) |
-| Code review / diff check | `review` | [`review`](skills/review/skill.md) + [`rex`](agents/rex.md) |
+| Code review / diff check (this repo's workflow) | `rdos-review` | [canonical review](skills/review/skill.md) + [`rex`](agents/rex.md) |
 | Visual polish | `design-review` | no canonical equivalent — say so, don't fake one |
 | Linear-inspired workspace UI | `linear-ui` | [`linear-ui`](skills/linear-ui/skill.md); complements, never replaces, required platform guidance |
-| Ship / deploy / PR | `ship`, `land-and-deploy` | [`ship`](skills/ship/skill.md) |
+| Ship / deploy / PR (this repo's workflow) | `rdos-ship` | [canonical ship](skills/ship/skill.md); third-party `ship` / `land-and-deploy` only when intended |
 | Author a backlog-ready spec/issue | `spec` | `kb add` with `dod:` + `acceptance:` |
 
 **Save/resume progress — the canonical path wins, and this is not a preference.** `kb pause` /

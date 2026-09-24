@@ -64,7 +64,8 @@ mistakes the aspiration for a delivered capability):
 - Use **repeated trials** and ideally a **cross-family judge** to separate signal from variance and
   from same-family self-preference.
 
-Building that is future work; it is **not** built here. Tasks `13-release-confirm-ci` and
+Building that comparative harness is future work; it is **not** built here. The bounded
+activated-host probes below are not an A/B value study. Tasks `13-release-confirm-ci` and
 `14-resume-whole-plan` (added below) are execution-flavored precisely to make this visible: run
 under the current prepend harness they *may* show the same confound as the skill tasks (a
 procedural, agentic behavior flattened into one passive answer). If they lose, that is *consistent
@@ -75,6 +76,61 @@ skill has a formal invocation protocol the prepend flattens) than for `behavior/
 which genuinely are meant to reach a session as read context — so "prepend under-represents
 everything equally" is itself only partly true. Fixing the tasks (below) makes them more realistic;
 it does **not** fix the mechanism, and this PR does not claim to.
+
+## Bounded activated-host checks — 2026-09-24
+
+These checks exercise mechanisms, not the value of the whole system:
+
+| Surface | Evidence and boundary |
+|---|---|
+| Native skill recording | `test/test-audit-hooks.sh` includes both adapters through real SQLite into telemetry. Reviewed public names survive; unknown/private selectors and content do not. Discovery, starts, failures and Twin consultations remain different events. Restoring either old adapter independently makes the new regression fail. |
+| Coverage and history | `test/test-telemetry-skills.sh` excludes legacy/mixed masked-name sessions from general-skill zero counts and denominators. `test/test-telemetry-history.sh` refuses old/new policy comparisons rather than reporting a false improvement. |
+| Fresh Copilot routing | Real new Sonnet sessions selected `apple-designer` for an iPhone proposal and the canonical ship file for this project's release procedure. A negative case answered arithmetic and declined private-dossier forwarding without a tool call. Read-only tools were exposed; these are bounded selection observations, not unrestricted execution trials. |
+| Video routing baseline — **failed** | Four completed samples across Copilot and Claude answered a text-only trailer concept without invoking `film-director`. These failures are retained: descriptions alone did not enforce the route. Startup timeouts before inference remain unmeasured. |
+| Native obligations — **12/12 measured cases passed** | Copilot 1.0.89-1 and Claude 2.1.281 each passed video and Apple native loading, ordinary no-tool input, full canonical fallback without Skill, unavailable guidance with exactly two stop continuations and an explicit incomplete warning, and removed-guard control with zero continuations. Native invocation requires paired start/success events, not injected context or a receipt alone. |
+| Agent coordination | The actual implementation used an architect and an implementer with reciprocal, cited bus replies, including a newly found snapshot-policy integration dependency. A bus fixture alone would not establish this. |
+| Optional Jev | All four CLI preparation examples, guarded tests and an actual dry-run passed without increasing the existing request count. Live judgment, remote availability and usefulness were **not evaluated**; a dry-run is not a remote inference. |
+
+The audit uses a committed public-name policy, not arbitrary installed names.
+The local report explicitly separates new policy-marked coverage from legacy
+records; a selector omitted by an old adapter cannot be recovered retroactively.
+Names outside the public policy remain unobserved, not proof of non-use.
+
+Fresh-host startup also exposed external-service initialization failures before
+inference. Restricting a probe to local tools isolates routing, not those failures:
+the finding remains in `docs/findings.md`. No external-service policy was weakened.
+The original failed samples were not relabeled. The new callbacks change the
+guarantee for explicit Italian/English video and Apple-interface triggers:
+successful guidance loading, or a bounded visible incomplete result. They cannot
+prove that a model follows the guidance or recognize every paraphrase. The twelve
+fresh-host transcripts and callback logs were independently rechecked against
+their hashes; the local manifest digest is
+`70ca1a0f669fb904d8e6cc948e52721e8303f65d5d856d35ea42ced03ad617ca`.
+These are installed-equivalent isolated probes, not proof that the personal
+installation is active or that the final full validation has passed.
+These few samples do not estimate routing reliability, establish that every
+skill is useful, or prove that the canon outperforms an unconfigured host.
+
+### Native activation boundaries
+
+`bin/sync.sh --install` registers Claude command callbacks (Node is required)
+and generates the Copilot extension composition. The Copilot extension must
+actually be enabled, approved and running; a discovered or failed extension is
+not enforcement. Headless project probes additionally needed
+`GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS=true` in the measured runtime. This is an
+observed runtime prerequisite, not a stable public SDK promise.
+
+The probes isolated settings and state, disabled external services, restricted
+available tools, and approved extension registration only in that synthetic
+scope; they did not change personal permissions. Never transfer their broad
+registration approval to ordinary sessions. `test/test-copilot-adapter.sh`
+also exercises the shared engine, registration and integration regressions.
+State contains public route IDs and fixed metadata, never prompt or tool content.
+Copilot emitted session-end callbacks between continuations in these probes;
+unmet obligations therefore survive that event rather than becoming false success.
+During a skill continuation, inherited Copilot audit and bus cleanup is deferred;
+it still runs after fulfillment, exhausted retries or a user pause. The real callback
+sequence reproduced premature cleanup before this integration fix.
 
 ## Fixture inventory vs. what's been run
 

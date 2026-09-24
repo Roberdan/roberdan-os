@@ -8,7 +8,7 @@
 // Usage/compaction events save and recover context; session end makes a final checkpoint.
 //
 // Native stop support was checked against CLI 1.0.84-5 AgentStopHookOutput.
-// Registration is not execution evidence. Only the authorized queue is mechanically tracked.
+// Registration is not execution evidence. Queue continuation and skill obligations are separate.
 // See docs/USAGE.md for installation, explicit pause commands and runtime limitations.
 
 import { joinSession } from "@github/copilot-sdk/extension";
@@ -18,6 +18,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createContextRecovery } from "./context-recovery.mjs";
 import { createAuditObserver } from "./audit.mjs";
+import { withSkillObligations } from "./skill-obligations.mjs";
 
 // Repo root: a runtime RDA_OS env wins (portable across forks / relocations); otherwise the
 // path baked at emit time. Never throws if it's wrong — every hook degrades to a no-op.
@@ -536,7 +537,7 @@ let execFormatInSystemMessage = false; // false ⇒ the long form, on every unex
 
 // --- hooks -------------------------------------------------------------------
 
-const hooks = {
+const hooks = withSkillObligations({
     onSessionStart: async (input) => {
         contextRecovery.rememberDirectory(input);
         const ci = join(HOOKS, "context-inject.sh");
@@ -686,8 +687,7 @@ const hooks = {
         else if (reason) await warn("continuation", `Continuation stopped (queue brake): ${reason}`);
         return undefined;
     },
-};
-
+}, { root: RDA_OS, sessionId, notify: (message) => warn("skills", message) });
 // --- join --------------------------------------------------------------------
 
 try {

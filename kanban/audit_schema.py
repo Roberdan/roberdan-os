@@ -12,6 +12,7 @@ import stat
 import sys
 from datetime import datetime, timezone
 from uuid import uuid4
+from audit_skills import POLICY, public_skill_names
 
 MAX_INPUT = 16384
 MAX_SUMMARY = 512
@@ -66,6 +67,8 @@ NATIVE_IDS = ("toolCallId", "toolName", "model", "agentId", "agentName",
 LIMITS = [
     "Adapter replay is not authenticated; this audit never grants permission.",
     "Discovery is not invocation, consultation, recommendation or human approval.",
+    "Only reviewed public skill selectors are named; private/unknown names are omitted.",
+    "Legacy observers masked general skill names; missing names never establish zero use.",
     "Unobserved sessions and events before observer attachment are unknown.",
     "An observed gap marks lost events; their number and content stay unrecoverable.",
     "Missing terminal events are unresolved, not successful or necessarily failed.",
@@ -220,12 +223,30 @@ def native(host, raw):
     if "arguments" in data:
         require(isinstance(data["arguments"], dict), "sanitized arguments must be an object")
         clean["arguments"] = {key: identifier(data["arguments"][key])
-                              for key in ("skill", "agent_type", "name") if key in data["arguments"]}
+                              for key in ("agent_type", "name") if key in data["arguments"]}
+    try:
+        names = public_skill_names()
+    except (OSError, ValueError) as exc:
+        raise AuditError("skill policy unavailable") from exc
+    if "skillNamePolicy" in data:
+        require(data["skillNamePolicy"] == POLICY, "unknown skill name policy")
+        clean["skillNamePolicy"] = POLICY
+    if "skillNameStatus" in data:
+        require(data["skillNameStatus"] == "omitted", "unknown skill name status")
+        clean["skillNameStatus"] = "omitted"
+    if "skill" in data.get("arguments", {}):
+        name = data["arguments"]["skill"]
+        if isinstance(name, str) and name in names:
+            clean["arguments"]["skill"] = name
+        else:
+            clean["skillNameStatus"] = "omitted"
     if "skills" in data:
-        require(isinstance(data["skills"], list) and len(data["skills"]) <= 64,
+        require(isinstance(data["skills"], list) and len(data["skills"]) <= 256,
                 "skills must be a bounded list of names")
-        names = [identifier(name) for name in data["skills"]]
-        clean["skills"] = sorted(set(names) & set(TWIN_SELECTORS))
+        clean["skills"] = sorted({name for name in data["skills"]
+                                  if isinstance(name, str) and name in names})
+        if any(not isinstance(name, str) or name not in names for name in data["skills"]):
+            clean["skillNameStatus"] = "omitted"
     kind = NATIVE_KINDS.get(event_type, "unsupported_observation")
     if event_type in TOOL_START_TYPES:
         kind = started_kind(clean)
@@ -245,5 +266,4 @@ def started_kind(clean):
     if (clean.get("toolName") or "").lower() == "skill":
         return "skill_invocation_started" if args.get("skill") in TWIN_SELECTORS else "execution_started"
     return "consultation_started" if args.get("agent_type") == "twin" else "execution_started"
-
 

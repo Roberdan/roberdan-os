@@ -149,8 +149,7 @@ printf '%s\n' "$pout2" | grep -q "^SKIP copilot extension: .* già presente" && 
 section "extension load — registers namespaced tools + hooks; guard mapping deny/ask/allow/fail-safe"
 STAGE="$TMP/stage"; mkdir -p "$STAGE/node_modules/@github/copilot-sdk"
 cp "$EXT" "$STAGE/extension.mjs"
-cp "$(dirname "$EXT")/context-recovery.mjs" "$STAGE/context-recovery.mjs"
-cp "$(dirname "$EXT")/audit.mjs" "$STAGE/audit.mjs"
+cp "$(dirname "$EXT")/"{context-recovery,audit,skill-obligations,skill-obligations-core}.mjs "$STAGE/"
 cat > "$STAGE/node_modules/@github/copilot-sdk/package.json" <<'JSON'
 { "name": "@github/copilot-sdk", "version": "0.0.0-stub", "exports": { "./extension": "./extension.mjs" } }
 JSON
@@ -373,5 +372,6 @@ done
 # shellcheck source=test/lib-copilot-continuity.sh
 . "$ROOT/test/lib-copilot-continuity.sh"
 bash "$ROOT/test/test-copilot-startup.sh" || err "startup diagnostics regression"
+node --test "$ROOT/test/test-skill-obligations.mjs" || err "mandatory skill obligations regression"
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "test-copilot-adapter: PASS"; exit 0; else echo "test-copilot-adapter: FAIL"; exit 1; fi

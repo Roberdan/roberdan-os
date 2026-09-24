@@ -29,16 +29,16 @@ class SkillTelemetry(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name)
-        self.root, self.installed = self.base / "repo", self.base / "installed"
+        self.root, self.installed = self.base / "repo", self.base / "home/.copilot/skills"
         self.db = self.base / "session.db"
         self.environment = patch.dict(os.environ, {
             "HOME": str(self.base / "home"), "RDA_HOME": str(self.base / "rda"),
             "RDA_AUDIT_HOME": str(self.base / "audit"), "RDA_SESSION_STORE": str(self.db),
-            "RDA_TELEMETRY_SKILL_DIRS": str(self.installed),
             "RDA_TELEMETRY_FINDINGS": str(self.base / "findings.md"),
         })
         self.environment.start()
         self.addCleanup(self.environment.stop)
+        os.environ.pop("RDA_TELEMETRY_SKILL_DIRS", None)
         self.sequence = 0
         self.manifest(self.root / "skills/film-director", "film-director", ["director"])
         self.manifest(self.root / "skills/not-installed", "not-installed")
@@ -58,6 +58,8 @@ class SkillTelemetry(unittest.TestCase):
     def event(self, session, skill=None, host="copilot", when=RECENT, event_type="tool.execution_start"):
         self.sequence += 1
         data = {"toolCallId": f"call-{self.sequence}", "toolName": "skill" if skill else "bash"}
+        if event_type in ("tool.execution_start", "PreToolUse"):
+            data["skillNamePolicy"] = "public_allowlist_v1"
         if skill:
             data["arguments"] = {"skill": skill}
         append(native(host, {"session_id": session, "id": f"event-{self.sequence}",
@@ -103,7 +105,7 @@ class SkillTelemetry(unittest.TestCase):
         self.assertIn("roberdan-twin", names)
         self.assertEqual(catalog["aliases"]["rdos-nested"], "nested")
         film = next(row for row in catalog["skills"] if row["name"] == "film-director")
-        self.assertEqual(film["scopes"], ["canoniche", "installate-1"])
+        self.assertEqual(film["scopes"], ["canoniche", "installate-copilot"])
         self.assert_private(json.dumps(catalog))
 
     def test_named_starts_and_ratio_share_host_time_and_opportunity_cohort(self):
@@ -188,12 +190,46 @@ class SkillTelemetry(unittest.TestCase):
         self.assertEqual(row["status"], "non misurabile")
         self.assertNotIn("1/0", self.output(self.report()))
 
+    def test_legacy_masked_names_never_produce_general_zero_or_an_opportunity_denominator(self):
+        append(native("copilot", {"session_id": "PRIVATE_legacy", "timestamp": RECENT,
+                                 "type": "tool.execution_start",
+                                 "data": {"toolCallId": "legacy", "toolName": "skill"}}))
+        self.file("PRIVATE_legacy", "/PRIVATE_file.mp4")
+        report = self.report()
+        film = self.row("film-director", report)
+        self.assertIsNone(film["observed_sessions"])
+        self.assertIsNone(film["opportunity"]["cohort_sessions"])
+        self.assertEqual(report["sources"]["audit"]["legacy_or_unmarked_sessions"], 1)
+        self.assertEqual(report["sources"]["audit"]["public_name_sessions"], 0)
+        self.event("PRIVATE_legacy")
+        mixed = self.report()
+        self.assertIsNone(self.row("film-director", mixed)["observed_sessions"])
+        self.assertEqual(mixed["sources"]["audit"]["legacy_or_unmarked_sessions"], 1)
+        self.assertEqual(mixed["sources"]["audit"]["public_name_sessions"], 1)
+
     def test_twin_declared_aliases_only_affect_identity_not_decision_rates(self):
         self.event("PRIVATE_twin", "roberto-twin")
         row = self.row("roberdan-twin")
         self.assertEqual(row["observed_sessions"], 1)
         self.assertEqual(row["opportunity"]["status"], "non misurabile")
         self.assertIn("rdos-roberdan-twin", row["aliases"])
+
+    def test_other_host_and_unscoped_install_cannot_establish_zero_or_ratio(self):
+        self.manifest(self.base / "home/.claude/skills/make-pdf", "make-pdf")
+        self.event("PRIVATE_copilot")
+        self.file("PRIVATE_copilot", "/PRIVATE_file.pdf")
+        row = self.row("make-pdf")
+        self.assertIsNone(row["observed_sessions"])
+        self.assertIsNone(row["opportunity"]["cohort_sessions"])
+        self.event("PRIVATE_claude", host="claude", event_type="PreToolUse")
+        row = self.row("make-pdf")
+        self.assertEqual(row["observed_sessions"], 0)
+        self.assertEqual(row["opportunity"]["cohort_sessions"], 0)
+        self.assertEqual(row["opportunity"]["status"], "non misurabile")
+        with patch.dict(os.environ, {"RDA_TELEMETRY_SKILL_DIRS": str(self.installed)}):
+            self.assertIsNone(self.row("film-director")["observed_sessions"])
+        self.event("PRIVATE_copilot", "make-pdf")
+        self.assertEqual(self.row("make-pdf")["opportunity"]["invoked_in_cohort"], 1)
 
     def test_corrupt_present_sources_fail_explicitly_without_content_or_paths(self):
         self.db.write_bytes(b"PRIVATE_not_sqlite")
@@ -223,12 +259,13 @@ class SkillTelemetry(unittest.TestCase):
         self.assert_private(result.stderr)
 
     def test_default_host_scope_missing_is_not_reported_as_zero_definitions(self):
-        os.environ.pop("RDA_TELEMETRY_SKILL_DIRS")
-        catalog = inventory(self.root)
+        absent_home = self.base / "absent-home"
+        with patch.dict(os.environ, {"HOME": str(absent_home)}):
+            catalog = inventory(self.root)
         missing = [scope for scope in catalog["scopes"] if scope["scope"].startswith("installate-")]
         self.assertEqual(len(missing), 4)
         self.assertTrue(all(scope["status"] == "assente" and scope["definitions"] is None for scope in missing))
-        self.assertFalse((self.base / "home").exists())
+        self.assertFalse(absent_home.exists())
 
     def test_cli_is_count_only_and_read_only(self):
         self.event("PRIVATE_A", "film-director")
