@@ -25,7 +25,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-telemetry test-telemetry-skills test-telemetry-history test-skill-routing test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-model-economy \
           test-model-registry test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure \
-          test-drift test-links test-privacy test-plan-coverage test-optional-skills test-jev test-jev-routing test-publication-check test-film-preflight test-gbrain-recovery; do
+          test-drift test-copilot-instructions-drift test-links test-privacy test-plan-coverage test-optional-skills test-jev test-jev-routing test-publication-check test-film-preflight test-gbrain-recovery; do
   _spawn "$_s"
 done
 unset _s
@@ -43,6 +43,8 @@ section "canon guardrails"; if _suite test-canon-guardrails; then ok "cross-tool
 if _suite test-links; then _suite_out test-links | grep -vE '^test-links:'; else _suite_out test-links; err "test-links — see bash test/test-links.sh"; fi
 # --- la generazione di bin/sync.sh e deterministica -> test/test-drift.sh
 if _suite test-drift; then _suite_out test-drift | grep -vE '^test-drift:'; else _suite_out test-drift; err "test-drift — see bash test/test-drift.sh"; fi
+# --- .github/copilot-instructions.md must be bin/sync.sh's generated output, not a hand copy -> test/test-copilot-instructions-drift.sh
+if _suite test-copilot-instructions-drift; then _suite_out test-copilot-instructions-drift | grep -vE '^test-copilot-instructions-drift:'; else _suite_out test-copilot-instructions-drift; err "test-copilot-instructions-drift — see bash test/test-copilot-instructions-drift.sh"; fi
 # --- 4) Shellcheck -----------------------------------------------------------
 section "shellcheck (hooks + bin + test + eval + factory + dispatcher shims + lint-cards + bus)"
 # factory/*.sh, the runner-shims and kanban/lint-cards.sh are security-sensitive (dispatcher

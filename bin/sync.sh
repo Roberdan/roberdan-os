@@ -32,6 +32,11 @@
 # check verifies generation is deterministic instead of diffing against committed output.
 #
 # Output dir override (for the determinism check in test/validate.sh): RDA_SYNC_OUT.
+# Repo-tracked copy of the Copilot instructions (see emit_copilot): unset by default (no
+# write — sync.sh runs unattended from hooks/post-task-sync.sh and inside parallel test
+# suites that share this checkout, so nothing writes a tracked file unasked). To actually
+# regenerate .github/copilot-instructions.md:
+#   RDA_SYNC_REPO_COPILOT=.github/copilot-instructions.md bash bin/sync.sh --emit-only
 # Skills install dir override (for the isolated install test): RDA_CLAUDE_SKILLS_DIR
 # (default $HOME/.claude/skills).
 # Copilot skills install (--install only, GATED on ~/.copilot existing — i.e. Copilot
@@ -100,6 +105,19 @@ FULL_NAME="${FULL_NAME:-the operator}"
 # Claude's roberto-plain output style) get this compact form, not a second full copy; the
 # authoritative text stays in behavior/roberto-mode.md between the exec-format markers.
 EXEC_FORMAT_BLURB='**Talk to '"$FULL_NAME"' like an executive — fixed four-part format, every reply** (accessibility commitment, not a style preference; inlined so it binds without following a pointer): (1) **Stato** — where the work stands, first sentence is the point, and every finished item marked inline *fatto e provato* or *fatto, non ancora provato*, never a bare "done"; (2) **Sto facendo** — the one thing in hand right now; (3) **Manca** — what is left, numbered, in order; (4) **Mi serve da te** — options with their consequences + your recommendation first, or "Nulla". Detail (commands, paths, numbers) in a short tail at the bottom. Delete empty sections. No unexplained jargon. Max ~6 lines before the detail.'
+
+# The "decision before handoff" rule (AGENTS.md § Decision before handoff, Roberto-approved
+# 2026-09-17), written ONCE so the digital twin and the adversarial-check habit (consult
+# `twin`, bring the strongest counterargument, draft-not-send externally) never drift between
+# wrappers. Restored into the Copilot wrapper 2026-09-24 — it used to live only as hand-written
+# text in .github/copilot-instructions.md and was silently dropped when this generator was last
+# reworked; it is canon (agents/twin.md, agents/board.md), so it belongs here, not lost.
+TWIN_BLURB='**Decision before handoff** — when the next step depends on '"$FULL_NAME"''"'"'s
+priorities, consult the `twin` agent (voice + cognitive engine; convenes the `board` agent —
+sounding board plus adversarial check — for high-stakes calls) before returning alternatives
+without a recommendation. Bring one recommended next step, grounded in his explicit
+preferences, with the strongest counterargument. Draft, not send, for anything external. Full
+contract: `AGENTS.md` § Decision before handoff.'
 # Extracts a simple YAML frontmatter field (name:/description:) from a file.
 fm() { grep -m1 -E "^$2:" "$1" 2>/dev/null | sed -E "s/^$2:[[:space:]]*//; s/^[\"']//; s/[\"']$//"; }
 
@@ -298,7 +316,15 @@ emit_copilot() {
   local d="$P/copilot"
   mkdir -p "$d/prompts"
 
-  # copilot-instructions.md → AGENTS.md pointer + executive-format/delegate rules inline (must not wait behind a pointer); --install symlinks it to ~/.copilot/.
+  # copilot-instructions.md → AGENTS.md pointer + executive-format/twin/delegate rules inline
+  # (must not wait behind a pointer); --install symlinks it to ~/.copilot/. This is ALSO, byte
+  # for byte, the repo-tracked .github/copilot-instructions.md that GitHub Copilot auto-loads
+  # in this repo (bin/bootstrap.sh has long documented copying this exact block into any repo's
+  # .github/copilot-instructions.md) — one heredoc, so the two can never diverge. The repo copy
+  # is written only when RDA_SYNC_REPO_COPILOT names a target path (see header): --emit-only's
+  # plain default touches nothing outside $P, since sync.sh runs unattended and concurrently
+  # (hooks/post-task-sync.sh, parallel test suites sharing this checkout) and must never race a
+  # write to a tracked file no caller asked for.
   cat > "$d/copilot-instructions.md" <<EOF
 # Copilot instructions → roberdan-os
 
@@ -309,6 +335,10 @@ Loop Protocol, Human gates).
 $EXEC_FORMAT_BLURB
 Full contract: \`behavior/roberto-mode.md\` § Communicating with Roberto.
 
+$TWIN_BLURB
+
+**Human gates:** never automated — full list in \`AGENTS.md\` § Human gates.
+
 ## Behavior
 - Engineering: \`behavior/roberto-mode.md\` — autonomy, evidence-first, done-criteria, quality gate.
 - Voice: \`identity/voice.md\` — drafting/triage in ${FULL_NAME}'s voice.
@@ -318,6 +348,11 @@ $(cat "$ROOT/behavior/delegate-by-default.md")
 ## Rules
 - \`rules/constitution.md\` · \`rules/best-practices.md\`
 EOF
+  # RDA_SYNC_REPO_COPILOT: opt-in target for the repo-tracked copy (default: unset, no write).
+  # To regenerate .github/copilot-instructions.md for real: RDA_SYNC_REPO_COPILOT=.github/copilot-instructions.md bash bin/sync.sh --emit-only
+  if [ -n "${RDA_SYNC_REPO_COPILOT:-}" ]; then
+    cp "$d/copilot-instructions.md" "$RDA_SYNC_REPO_COPILOT"
+  fi
 
   # Skills as thin .prompt.md files, canon path ABSOLUTE (a prompt runs from the session cwd).
   local s name desc
