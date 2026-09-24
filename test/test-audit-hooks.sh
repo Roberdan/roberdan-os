@@ -142,3 +142,4 @@ raise SystemExit(0 if result.result.wasSuccessful() and subprocess.call(
     ["node", "--test", str(HOOK.parents[1] / "test" / "test-copilot-audit.mjs")]) == 0 and subprocess.call(
     ["bash", str(HOOK.parents[1] / "test" / "test-audit-chain.sh")]) == 0 else 1)
 PY
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/test/test-audit-skills.py"
