@@ -372,6 +372,6 @@ done
 # shellcheck source=test/lib-copilot-continuity.sh
 . "$ROOT/test/lib-copilot-continuity.sh"
 bash "$ROOT/test/test-copilot-startup.sh" || err "startup diagnostics regression"
-node --test "$ROOT/test/test-skill-obligations.mjs" || err "mandatory skill obligations regression"
+RDA_TEST_SKILL_EMISSION="$E1" node --test "$ROOT/test/test-skill-obligations.mjs" || err "mandatory skill obligations regression"
 printf "\n"
 if [ "$FAIL" -eq 0 ]; then echo "test-copilot-adapter: PASS"; exit 0; else echo "test-copilot-adapter: FAIL"; exit 1; fi

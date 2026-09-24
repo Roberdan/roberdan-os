@@ -106,8 +106,11 @@ prove that a model follows the guidance or recognize every paraphrase. The twelv
 fresh-host transcripts and callback logs were independently rechecked against
 their hashes; the local manifest digest is
 `70ca1a0f669fb904d8e6cc948e52721e8303f65d5d856d35ea42ced03ad617ca`.
-These are installed-equivalent isolated probes, not proof that the personal
-installation is active or that the final full validation has passed.
+These were isolated probes with full canonical fixture skills, not the emitted
+pointer wrappers. They did not prove that the personal installation delivered
+the full guidance. Subsequent installed-profile acceptance exposed that gap;
+mandatory-route emission now includes the complete canonical body, with an
+exact-content regression rather than a heading or invocation-count proxy.
 These few samples do not estimate routing reliability, establish that every
 skill is useful, or prove that the canon outperforms an unconfigured host.
 
@@ -129,6 +132,10 @@ scope; they did not change personal permissions. Never transfer their broad
 registration approval to ordinary sessions. `test/test-copilot-adapter.sh`
 also exercises the shared engine, registration and integration regressions.
 State contains public route IDs and fixed metadata, never prompt or tool content.
+Supported requests must begin with a recognized action; known native notification
+envelopes are ignored without clearing a user's existing obligation. Technical
+skill identifiers alone are not creative requests. This is bounded recognition,
+not an authenticated origin check or a semantic guarantee for arbitrary prose.
 Copilot emitted session-end callbacks between continuations in these probes;
 unmet obligations therefore survive that event rather than becoming false success.
 During a skill continuation, inherited Copilot audit and bus cleanup is deferred;

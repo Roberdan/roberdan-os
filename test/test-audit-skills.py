@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,31 @@ for (const event of JSON.parse(readFileSync(0, "utf8"))) {
 }
 if (!await observer.stop()) throw Error("shutdown failed");
 """
+# hooks/copilot/audit.mjs's AUDIT_LIMITS.writeMs=1000 (and hooks/audit.sh's own 1.5s) are
+# production budgets on a python3 subprocess spawn; under real CPU contention (@thor: 6x `yes`)
+# that spawn can legitimately miss them, so the node/bash harness above reports ingest_timeout/
+# flush_timeout and this file's own AssertionError/TimeoutExpired follows. That is not a bug in
+# either timeout (frozen by design, not touched here) or in the 15s/5s outer subprocess.run caps
+# below (a real hang must still fail). Same diagnosis and fix as test-audit-chain.sh (commit
+# 8bb7176): collect every diagnostic line from every subprocess call in this run; if the whole
+# run failed and EVERY line collected is one of these transient codes (never zero, never any
+# other code), retry the whole file, up to RETRIES times, against fresh state. A persistent
+# failure fails identically on every retry and stays red.
+TRANSIENT = {"ingest_timeout", "flush_timeout", "test_subprocess_timeout"}
+RETRIES = 1  # matches test-audit-chain.sh's precedent (commit 8bb7176); bounded, not "keep trying".
+DIAGNOSTICS = []
+
+
+def _run(cmd, **kwargs):
+    # Every call's stderr is collected into DIAGNOSTICS unconditionally (success or failure —
+    # hooks/audit.sh exits 0 even on its own timeout), and classified only at the end: the one
+    # deliberately-triggered diagnostic this file expects on a still-exit-0 call
+    # (invalid_timestamp) is excluded there, not by guessing per call which outcome was "expected".
+    try:
+        return subprocess.run(cmd, **kwargs)
+    except subprocess.TimeoutExpired as timeout:
+        DIAGNOSTICS.append((timeout.stderr or "") + "\n[roberdan-os audit] test_subprocess_timeout")
+        raise
 
 
 class NativeSkillAudit(unittest.TestCase):
@@ -65,16 +91,21 @@ class NativeSkillAudit(unittest.TestCase):
         self.addCleanup(self.env.stop)
 
     def copilot(self, events, ok=True):
-        result = subprocess.run(["node", "--input-type=module", "-e", NODE],
-                                input=json.dumps(events), text=True, capture_output=True, timeout=15)
+        result = _run(["node", "--input-type=module", "-e", NODE],
+                      input=json.dumps(events), text=True, capture_output=True, timeout=15)
+        DIAGNOSTICS.append(result.stderr or "")
         self.assertEqual(result.returncode == 0, ok, result.stderr)
         self.assertNotIn(CANARY, result.stdout + result.stderr)
         return result
 
     def claude(self, event):
-        result = subprocess.run(["bash", str(ROOT / "hooks/audit.sh")], text=True,
-                                input=json.dumps({"session_id": "claude-general", **event}),
-                                capture_output=True, timeout=5)
+        result = _run(["bash", str(ROOT / "hooks/audit.sh")], text=True,
+                      input=json.dumps({"session_id": "claude-general", **event}),
+                      capture_output=True, timeout=5)
+        # hooks/audit.sh exits 0 even on its own internal ingest_timeout (it reports and moves
+        # on, same as invalid_timestamp), so this diagnostic is collected unconditionally too —
+        # a dropped event can still fail a LATER count assertion with nothing else to explain it.
+        DIAGNOSTICS.append(result.stderr or "")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "")
         self.assertNotIn(CANARY, result.stderr)
@@ -201,4 +232,14 @@ class NativeSkillAudit(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    _result = unittest.main(verbosity=2, exit=False).result
+    _attempt = int(os.environ.get("RDA_AUDIT_SKILLS_RETRY", "0"))
+    if not _result.wasSuccessful() and _attempt < RETRIES:
+        codes = set(re.findall(r"\[roberdan-os audit\] (\w+)", "\n".join(DIAGNOSTICS)))
+        codes -= {"invalid_timestamp"}  # this file's own deliberately-triggered, still-exit-0 case
+        if codes and codes <= TRANSIENT:
+            print(f"  retry {_attempt + 1}/{RETRIES}: transient timeout under load "
+                  f"({','.join(sorted(codes))})", file=sys.stderr)
+            os.environ["RDA_AUDIT_SKILLS_RETRY"] = str(_attempt + 1)
+            os.execv(sys.executable, [sys.executable, __file__])
+    sys.exit(0 if _result.wasSuccessful() else 1)
