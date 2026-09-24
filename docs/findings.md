@@ -431,7 +431,8 @@ renderebbe card e' scritta accanto.
 ### 2026-09-22 — tre limiti che scattavano sul caso sano, in tre file diversi
 
 Trovati tutti in una notte, e sono la stessa cosa scritta tre volte: **un tempo
-massimo tarato su un'ipotesi invece che su una misura**. Due corretti, uno no.
+massimo tarato su un'ipotesi invece che su una misura**. Tre limiti, tre
+correzioni (l'ultima il 2026-09-24, vedi sotto).
 
 - **Corretto** — `test/test-bus-mutants.sh`: 300 s per una passata che ne dura
   322. Un mutante catturato fallisce subito, uno NON catturato arriva in fondo:
@@ -442,13 +443,32 @@ massimo tarato su un'ipotesi invece che su una misura**. Due corretti, uno no.
   quindi l'ultima pagava anche l'attesa delle altre quattro. `test-twin-install`
   passa da solo in 2m48s ed e' stata dichiarata bloccata in tre validazioni di
   fila. Ora il conto parte quando la suite parte davvero.
-- **NON corretto, e dichiarato** — `test/test-audit-hooks.sh` e' sensibile al
-  carico: da sola passa sempre, dentro una validazione completa ha fallito 2
-  volte su 8, una su un'asserzione di tempo (2,139 s contro un limite di 2) e una
-  su "l'observer Copilot non ha scritto nel registro reale". Non e' toccata da
-  questo lavoro e non ho misurato dove sia la soglia giusta. Diventa una card se
-  fallisce di nuovo: la correzione e' della stessa famiglia delle due qui sopra —
-  misurare quanto dura davvero e tarare su quello, invece di indovinare.
+- **Corretto il 2026-09-24 (finding #36)** — `test/test-audit-hooks.sh`,
+  `test_stuck_logger_is_killed_within_bound`: asseriva che l'intera invocazione
+  dell'hook con un logger bloccato (`time.sleep(30)`) finisse sotto i 2 s,
+  mentre `hooks/audit.sh:89` uccide il logger dopo 1.5 s — i 2 s includevano
+  anche l'avvio dell'interprete/processo (0.3-0.6 s sotto carico), fallita in CI
+  a 2.017 s e 2.126 s. **Causa**: un budget fisso tarato su un'ipotesi, non su
+  una misura — la stessa famiglia delle due correzioni sopra. **Fix**: il test
+  misura ora un'invocazione equivalente con logger che risponde subito (stesso
+  evento, logger sano di `setUp`) e confronta con quella —
+  `stuck_cost < baseline + 1.5s + 0.25s` di margine di scheduling — piu' un
+  tetto di sanita' assoluto a 5 s (il timeout dell'hook registrato in
+  `bin/sync.sh`). Il timeout dell'hook resta 1.5 s, non toccato. Prova rossa
+  fatta due volte in copie scratch fuori dal repo: timeout portato a 3.0 s (resta
+  sotto i 5 s dell'harness) fa fallire la nuova asserzione relativa; kill rimosso
+  del tutto fa scadere il timeout di 5 s dell'harness stesso (`TimeoutExpired`).
+  20/20 esecuzioni dell'asserzione passano con la macchina sotto carico (6x
+  `yes` su 18 core).
+- **NON corretto, e dichiarato** — la stessa validazione a 20 run sotto carico
+  ha riprodotto 1/20 il flake gia' noto di `test-audit-chain.sh`: "l'observer
+  Copilot non ha scritto nel registro reale". Il log mostra `[roberdan-os
+  audit] ingest_timeout` subito prima — cioe' l'ingest **reale** verso
+  `kanban/audit.py` (non un logger di test bloccato apposta) ha superato il
+  kill di 1.5 s sotto carico. E' la stessa famiglia di bug di #36 ma sul lato
+  Copilot/ingest reale, non sul test Claude qui sopra: fuori dallo scope di
+  questa card, non toccato. Diventa una card se ricorre: misurare la soglia
+  reale invece di allargare il timeout a occhio.
 
 La regola che ne esce, e vale piu' delle tre correzioni: **un limite che puo'
 scattare sul caso sano non e' un margine di sicurezza, e' un rosso a caso.** E un

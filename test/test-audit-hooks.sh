@@ -128,10 +128,32 @@ class ClaudeAuditHooks(unittest.TestCase):
         self.assertEqual([e["type"] for e in self.events()], ["observer.gap", "SessionEnd"])
 
     def test_stuck_logger_is_killed_within_bound(self):
+        # hooks/audit.sh:89 kills the logger after HOOK_TIMEOUT. A fixed wall-clock
+        # budget for the whole hook also pays interpreter/process startup, which
+        # varies with machine load, so compare the stuck run against a baseline
+        # run of the same event whose logger returns immediately (setUp's
+        # healthy() core), not against a magic number.
+        HOOK_TIMEOUT = 1.5  # hooks/audit.sh:89
+        MARGIN = 0.25  # scheduling slack under load, not a second timeout
+        SANITY_CEILING = 5  # bin/sync.sh's registered hook timeout for audit.sh
+
+        baseline_before = time.monotonic()
+        self.invoke(dict(hook_event_name="SessionEnd"))
+        baseline = time.monotonic() - baseline_before
+
         self.core.write_text("import time\ntime.sleep(30)\n")
         before = time.monotonic()
         self.assertIn(b"ingest_timeout", self.invoke(dict(hook_event_name="SessionEnd")).stderr)
-        self.assertLess(time.monotonic() - before, 2)
+        stuck_cost = time.monotonic() - before
+
+        self.assertLess(
+            stuck_cost, baseline + HOOK_TIMEOUT + MARGIN,
+            f"stuck={stuck_cost:.3f}s baseline={baseline:.3f}s "
+            f"budget=baseline+{HOOK_TIMEOUT}s+{MARGIN}s margin")
+        self.assertLess(
+            stuck_cost, SANITY_CEILING,
+            f"stuck={stuck_cost:.3f}s must stay far below the {SANITY_CEILING}s "
+            "hook timeout to prove the logger was actually killed")
 
 
 result = unittest.main(verbosity=2, exit=False)
