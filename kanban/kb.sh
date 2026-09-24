@@ -104,10 +104,8 @@ _resolve_kb
 mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
 cmd="${1:-view}"; [ $# -gt 0 ] && shift || true
 
-# portable mtime (macOS BSD stat first, GNU stat fallback, else 0)
-# GNU (-c) FIRST: on macOS `stat -c` fails cleanly (unknown flag → exit 1, empty stdout) so the
-# BSD `-f` fallback runs; the reverse order breaks on Linux, where `stat -f` means --file-system
-# and prints multi-line garbage for `%m`+file instead of failing (CI-only bug, seen 2026-07-06).
+# portable mtime: GNU (-c) FIRST — on macOS it fails cleanly and falls through to BSD (-f); the
+# reverse order breaks on Linux, where `stat -f` (file-system, not mtime) prints garbage instead of failing (seen 2026-07-06).
 _mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; }
 # unique repo roots for aggregation: roberdan-os home first, then registry entries.
 _board_roots() {
@@ -117,7 +115,9 @@ _board_roots() {
   done
 }
 
-_field() { grep -m1 "^$2:" "$1" 2>/dev/null | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"\$//"; }
+_field() { grep -m1 "^$2:" "$1" 2>/dev/null | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"\$//; s/\\\\\"/\"/g; s/\\\\\\\\/\\\\/g"; }
+# YAML double-quote a scalar (': ' in a title, '"' in a dod, breaks an unquoted mapping); _field reverses these two escapes.
+_yaml_dq() { local s="${1//\\/\\\\}"; s="${s//\"/\\\"}"; printf '"%s"' "$s"; }
 
 # _repo_qui — COME SI CHIAMA il progetto in cui sto, anche da dentro un worktree.
 #
@@ -1501,7 +1501,7 @@ case "$cmd" in
     fi
     base_id="${RDA_KB_ID_BASE:-$(date +%y%m%d-%H%M%S)}"
     id="$(_new_card_id "$base_id")"
-    { echo '---'; echo "title: $title"; echo "repo: $repo"; echo "dod: \"$dod\""; echo "acceptance: \"$acc\"";
+    { echo '---'; echo "title: $(_yaml_dq "$title")"; echo "repo: $repo"; echo "dod: $(_yaml_dq "$dod")"; echo "acceptance: $(_yaml_dq "$acc")";
       [ -n "$satisfies" ] && echo "satisfies: $satisfies"
       echo 'status: todo'; echo "created: $(date +%Y-%m-%d)"; echo '---'; } > "$KB/todo/$id.md"
     if [ "$id" = "$base_id" ]; then
