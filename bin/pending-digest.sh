@@ -25,10 +25,21 @@ report="$(RDA_KANBAN="$ROOT/kanban" bash "$KB" pending 2>/dev/null || true)"
 count="$(printf '%s\n' "$report" | sed -n 's/^PENDING:[[:space:]]*//p' | tail -1)"
 [ -n "$count" ] || count=0
 
+# Twin shadow (docs/adr/0005-twin-decision-ledger.md): record what the kb hook missed, run the
+# hidden predictions ONLY if Roberto opted in (they spend: touch <ledger dir>/auto-predict), then
+# the weekly agreement — aggregates only, never a card title or a prediction. Never blocks.
+TWIN="${RDA_TWIN_SHADOW:-$ROOT/bin/twin-shadow.sh}"
+export RDA_HOME
+bash "$TWIN" reconcile >/dev/null 2>&1 || true
+bash "$TWIN" predict --if-enabled >/dev/null 2>&1 || true
+twin="$(bash "$TWIN" agreement --days 7 2>/dev/null || echo "Twin — accordo con Roberto: non disponibile")"
+
 {
   echo "# roberdan-os — pending digest ($(date '+%Y-%m-%d %H:%M'))"
   echo
   printf '%s\n' "$report"
+  echo
+  printf '%s\n' "$twin"
 } > "$digest" 2>/dev/null || true
 
 if [ "$count" -gt 0 ] || [ "$always" -eq 1 ]; then

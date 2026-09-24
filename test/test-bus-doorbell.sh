@@ -22,6 +22,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOOK="$ROOT/hooks/bus-doorbell.sh"
 BUS="$ROOT/bus/bus.sh"
 fail() { echo "FAIL: $*" >&2; exit 1; }
+ok()   { echo "  ok: $*"; }
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -170,5 +171,61 @@ if where != ["PostToolUse"]:
     print(f"FAIL: the doorbell is wired on {where}; it must be on PostToolUse and nowhere else "
           "(a Stop hook that surfaces mail can continue a turn)", file=sys.stderr); sys.exit(1)
 PY
+
+# --- 7. A KNOWN ROLE rings only for itself, splits notes from questions, and
+#        never for mail it sent itself (card 260924-120127, defect 3). --------
+REPO_C=doorbell-role-repo
+WORK_C="$TMP/$REPO_C"; mkdir -p "$WORK_C"
+payload_c() { printf '{"session_id":"%s","cwd":"%s","hook_event_name":"PostToolUse"}' "$1" "$WORK_C"; }
+
+NOTE_BODY="DOORBELL-NOTE-MUST-NOT-LEAK-b3f1"
+QR_BODY="DOORBELL-QUESTION-MUST-NOT-LEAK-c9e2"
+echo "$NOTE_BODY" | bash "$BUS" send --repo "$REPO_C" --card rc1 --from sol-gate --to implementer --kind note >/dev/null \
+  || fail "could not seed the note fixture"
+echo "$QR_BODY" | bash "$BUS" send --repo "$REPO_C" --card rc1 --from sol-gate --to implementer --kind question >/dev/null \
+  || fail "could not seed the question fixture"
+# Mail the reader sent to itself — a direct self-address and a broadcast it also
+# receives — must never ring, even for a known role.
+echo "own note to self" | bash "$BUS" send --repo "$REPO_C" --card rc1 \
+  --from implementer --to implementer --kind note >/dev/null
+echo "own broadcast" | bash "$BUS" send --repo "$REPO_C" --card rc1 \
+  --from implementer --to all --kind note >/dev/null
+# Mail addressed to a DIFFERENT role, also declared present, must not ring for
+# this session either — the old defect was ringing for every role at once.
+( cd "$WORK_C" && bash "$BUS" hello --repo "$REPO_C" --as qa-gate --session qa-in-repo-c >/dev/null 2>&1 )
+echo "for qa-gate only" | bash "$BUS" send --repo "$REPO_C" --card rc1 --from sol-gate --to qa-gate >/dev/null
+
+ring7="$(payload_c s7 | env -u RDA_BUS_SESSION RDA_BUS_ROLE=implementer RDA_BUS_HOME="$RDA_BUS_HOME" bash "$HOOK" 2>/dev/null)"
+ctx7="$(jq -r '.hookSpecificOutput.additionalContext' <<<"$ring7" 2>/dev/null)"
+[ -n "$ctx7" ] && [ "$ctx7" != "null" ] || fail "a known role (RDA_BUS_ROLE) got no ring at all with real mail waiting"
+grep -q "NOTES" <<<"$ctx7" || fail "the ring does not distinguish notes (to read) at all"
+grep -q "QUESTIONS/REQUESTS" <<<"$ctx7" || fail "the ring does not distinguish questions/requests (to answer) at all"
+grep -q "$NOTE_BODY" <<<"$ring7" && fail "a body leaked into the ring"
+grep -q "$QR_BODY" <<<"$ring7" && fail "a body leaked into the ring"
+grep -q "for qa-gate only" <<<"$ctx7" && fail "the ring for @implementer included mail addressed to @qa-gate — a known role must ring only for itself"
+grep -qi "own note to self\|own broadcast" <<<"$ctx7" && fail "mail the role sent to itself rang the doorbell"
+ok "a known role (RDA_BUS_ROLE) rings only for itself, splits NOTES from QUESTIONS/REQUESTS, and skips own-sent mail"
+
+# --- 8. THE SAME, but the role comes from `bus hello`'s presence log for THIS
+#        session_id — no RDA_BUS_ROLE in the environment at all. --------------
+REPO_D=doorbell-session-role-repo
+WORK_D="$TMP/$REPO_D"; mkdir -p "$WORK_D"
+echo "a note found by session lookup" | bash "$BUS" send --repo "$REPO_D" --card rd1 --from sol-gate --to implementer --kind note >/dev/null
+( cd "$WORK_D" && bash "$BUS" hello --repo "$REPO_D" --as implementer --session cc-session-xyz >/dev/null 2>&1 ) \
+  || fail "could not declare presence for the session-lookup fixture"
+ring8="$(printf '{"session_id":"cc-session-xyz","cwd":"%s","hook_event_name":"PostToolUse"}' "$WORK_D" \
+  | env -u RDA_BUS_ROLE -u RDA_BUS_SESSION RDA_BUS_HOME="$RDA_BUS_HOME" bash "$HOOK" 2>/dev/null)"
+ctx8="$(jq -r '.hookSpecificOutput.additionalContext' <<<"$ring8" 2>/dev/null)"
+grep -q "NOTES for @implementer" <<<"$ctx8" \
+  || fail "with no RDA_BUS_ROLE set, the doorbell did not resolve the role from bus hello's own session record: $ctx8"
+ok "with no RDA_BUS_ROLE set, the role is resolved from the presence log for this exact session_id"
+
+# --- 9. UNKNOWN ROLE still falls back to today's behaviour — a session_id that
+#        matches no hello, and no RDA_BUS_ROLE, must not silently ring for nobody.
+ring9="$(payload_c s9-unknown | env -u RDA_BUS_ROLE -u RDA_BUS_SESSION RDA_BUS_HOME="$RDA_BUS_HOME" bash "$HOOK" 2>/dev/null)"
+ctx9="$(jq -r '.hookSpecificOutput.additionalContext' <<<"$ring9" 2>/dev/null)"
+[ -n "$ctx9" ] && [ "$ctx9" != "null" ] || fail "an unrecognised session got no ring at all — the fallback must still ring, not go silent"
+grep -q "unread for @" <<<"$ctx9" || fail "the fallback path lost its old present-based wording: $ctx9"
+ok "an unresolvable session still falls back to the old present-based ring, unchanged"
 
 echo "PASS: test-bus-doorbell.sh"

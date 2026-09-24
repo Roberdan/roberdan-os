@@ -40,6 +40,8 @@ LEAKCHECK="${RDA_LEAKCHECK:-$ROOT/test/leak-check.sh}"
 KANBAN="${RDA_KANBAN:-$ROOT/kanban}"
 REGISTRY="${RDA_KANBAN_REGISTRY:-$RDA_HOME/kanban-registry}"
 
+# shellcheck source=bus/bus-unread.sh
+. "$DIR/bus-unread.sh"
 die() { echo "bus: $*" >&2; exit 1; }
 now() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
 
@@ -743,7 +745,7 @@ _count_unread() {
   local log="$1" role="$2" seen="$3"
   tail -n +$((seen + 1)) "$log" \
     | jq -r --arg me "$role" --arg all "$BROADCAST" \
-        'select(.to == $me or (.to == $all and .from != $me)) | 1' 2>/dev/null \
+        'select((.to == $me or .to == $all) and .from != $me) | 1' 2>/dev/null \
     | wc -l | tr -d ' '
 }
 
@@ -1221,25 +1223,26 @@ _cmd_owed() {
     else
       echo "bus: @$as owes no answer on $repo${card:+/$card}."
     fi
-    return 0
-  fi
-  echo "bus: $(grep -c . < "$out") message(s) are waiting for an answer from @$as on $repo."
-  echo "Each one was addressed to you and no message of yours cites it back to whoever asked."
-  echo
-  if [ "$brief" = "1" ]; then
-    awk -F'\t' '{ printf "  %s #%s  from @%s (%s, %s)\n", $1, $2, $3, $4, $5 }' "$out"
-    echo
-    echo "What they actually say is NOT shown here. Read it, and it will arrive stamped"
-    echo "UNVERIFIED like every claim on this channel:  bus read --repo $repo --card <CARD>"
   else
-    awk -F'\t' -v repo="$repo" -v me="$as" '{
-      printf "  %s #%s  from @%s (%s, %s)\n", $1, $2, $3, $4, $5
-      printf "      %s\n", $6
-      printf "      answer:  bus send --repo %s --card %s --from %s --to %s --re %s --kind verdict\n\n", repo, $1, me, $3, $2
-    }' "$out"
-    echo "Read the full text of any of them with: bus log --repo $repo --card <CARD>"
+    echo "bus: $(grep -c . < "$out") message(s) are waiting for an answer from @$as on $repo."
+    echo "Each one was addressed to you and no message of yours cites it back to whoever asked."
+    echo
+    if [ "$brief" = "1" ]; then
+      awk -F'\t' '{ printf "  %s #%s  from @%s (%s, %s)\n", $1, $2, $3, $4, $5 }' "$out"
+      echo
+      echo "What they actually say is NOT shown here. Read it, and it will arrive stamped"
+      echo "UNVERIFIED like every claim on this channel:  bus read --repo $repo --card <CARD>"
+    else
+      awk -F'\t' -v repo="$repo" -v me="$as" '{
+        printf "  %s #%s  from @%s (%s, %s)\n", $1, $2, $3, $4, $5
+        printf "      %s\n", $6
+        printf "      answer:  bus send --repo %s --card %s --from %s --to %s --re %s --kind verdict\n\n", repo, $1, me, $3, $2
+      }' "$out"
+      echo "Read the full text of any of them with: bus log --repo $repo --card <CARD>"
+    fi
+    rm -f "$out"
   fi
-  rm -f "$out"
+  _print_unread_section "$repo" "$card" "$as"   # "da leggere" — bus/bus-unread.sh
 }
 
 # --- tidy: i thread di un lavoro finito smettono di chiamare -----------------
