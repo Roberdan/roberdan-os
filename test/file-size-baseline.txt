@@ -237,10 +237,25 @@
 # guard economico (non rilancia l'ora di mutation testing) che legge la stessa
 # lista di radici via `test-bus-mutants.sh --list-probe-roots` — una sola fonte
 # di verita', non due liste che possono divergere.
-1777 kanban/kb.sh
+# 2026-09-24, card 260924-120127: +3 bus.sh (1601 -> 1604), +3 kb.sh (1777 -> 1780).
+# Two of three defects needed new logic in bus.sh/kb.sh, and the ratchet says
+# where it goes: a new small sourced file each (bus/bus-unread.sh — "da leggere",
+# messages of any kind unread by cursor; kanban/kb-finish-bus.sh — closes a
+# card's bus thread on `kb finish`), not these two. What grew here is only the
+# wiring: one `source` line each, plus replacing an early `return 0` in
+# `_cmd_owed` with an if/else so the new section still prints when nothing is
+# owed (kb.sh's own call folds onto the existing `mv …; echo …` line at zero
+# extra lines). This is the split THIS FILE'S OWN comments kept deferring as
+# "its own card, its own review, with that test battery in hand" (2026-09-22,
+# twice) — done here, verified against test/test-bus.sh's run-wide allowlist
+# (check 45), which traces every external command bus.sh executes: `.
+# "$DIR/bus-unread.sh"` is a shell builtin, forks nothing, and adds no new
+# traced command. The third defect (bus-doorbell.sh, role-scoped ring) needed
+# no split: the hook grew from 210 to 223 lines, still under the 300 floor.
+1780 kanban/kb.sh
 1415 test/test-bus.sh
 1266 test/test-bus-mutants.sh
-1601 bus/bus.sh
+1604 bus/bus.sh
 689 bin/sync.sh
 601 test/test-federated-kb.sh
 578 test/test-factory-kb.sh

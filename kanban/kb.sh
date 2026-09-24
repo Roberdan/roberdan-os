@@ -27,6 +27,8 @@ while [ -L "$_kb_src" ]; do
 done
 ROOT="$(cd -P "$(dirname "$_kb_src")/.." && pwd)"
 unset _kb_src _kb_dir
+# shellcheck source=kanban/kb-finish-bus.sh
+[ -f "$ROOT/kanban/kb-finish-bus.sh" ] && . "$ROOT/kanban/kb-finish-bus.sh" || _kb_close_bus_thread() { :; }
 
 if [ "${1:-}" = "audit" ]; then
   shift
@@ -1750,6 +1752,7 @@ case "$cmd" in
     [ -n "$sp" ] && echo "spend: $sp" >> "$f"
     [ "$wt_removed" = "1" ] && echo "worktree_removed_at: $(date '+%Y-%m-%d %H:%M %Z')" >> "$f"
     [ -n "$keep_wt" ] && [ -n "$wt" ] && echo "worktree_kept_why: \"$keep_wt\"" >> "$f"
+    _kb_close_bus_thread "$ROOT" "$(_field "$f" repo || true)" "$id" "${RDA_BUS_ROLE:-orchestrator}"
     mv "$f" "$KB/done/"; echo "done/$id verified by @$verifier ($ev)"
     ;;
 
