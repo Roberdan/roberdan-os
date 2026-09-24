@@ -217,8 +217,23 @@ _scan_repo() {
 # hanno gia' la loro riga, il contenitore e' solo un percorso, non un candidato.
 # shellcheck disable=SC2154
 _orphan_check() {
-  local wt="$1" apply="$2" wt_real sub
+  local wt="$1" apply="$2" wt_real sub pwd_real
+  # _wt_verdict fa questi due controlli per ogni worktree VERO che passa da _scan_repo; una
+  # cartella orfana (fase B, mai passata da li') li salta del tutto se non li si ripete qui — e
+  # MirrorBuddy tiene proprio cartelle VUOTE sotto .claude/worktrees/ mentre un agente ci scrive
+  # dentro: senza questo controllo una `--yes` le rmdir'erebbe, contro la regola della card.
+  case "$wt" in "$GH_HOME/MirrorBuddy/"*|"$WT_HOME/MirrorBuddy/"*)
+    n=$((n+1)); kept=$((kept+1))
+    printf '  tenuta    %-58s KEEP: MirrorBuddy — Roberto ci lavora ora con un altro agente, mai toccare\n' "$wt"
+    return 0 ;;
+  esac
   wt_real="$(_realpath "$wt")" || return 0
+  pwd_real="$(_realpath "$PWD")" || pwd_real="$PWD"
+  case "$pwd_real/" in "$wt_real"/*)
+    n=$((n+1)); kept=$((kept+1))
+    printf '  tenuta    %-58s KEEP: e'"'"' la cartella in cui stai lavorando adesso\n' "$wt"
+    return 0 ;;
+  esac
   grep -qxF "$wt_real" "$known" 2>/dev/null && return 0        # e' un worktree vero: gia' segnalato
   grep -qF "$wt_real/" "$known" 2>/dev/null && return 0        # CONTIENE worktree veri: non e' orfana
   # Guardia di sicurezza: _discover_repos puo' comunque non trovare un repo (fuori da ~/GitHub,

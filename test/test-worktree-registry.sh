@@ -67,6 +67,12 @@ ln -s "$NESTED2" "$HOME/GitHub/linkrepo"
 git -C "$NESTED2" worktree add -q -b link/unmerged "$RDA_WORKTREES/nested2repo/y" main
 echo z > "$RDA_WORKTREES/nested2repo/y/f"; git -C "$RDA_WORKTREES/nested2repo/y" commit -qam z
 
+# (g) MirrorBuddy: la fase B (caccia agli orfani) deve escludere MirrorBuddy quanto _wt_verdict
+# gia' fa per la fase A — Claude Code tiene cartelle VUOTE sotto .claude/worktrees/ mentre un
+# agente ci scrive dentro, e una `--yes` non deve mai poterle `rmdir`.
+MB="$HOME/GitHub/MirrorBuddy"; mkrepo "$MB"
+mkdir -p "$MB/.claude/worktrees/vuota" "$RDA_WORKTREES/MirrorBuddy/vuota"
+
 out="$(cd "$TMP" && bash "$WT" sweep --yes --all 2>&1)"
 
 [ -d "$RDA_WORKTREES/nestrepo/contenitore/merged" ] && fail "worktree nidificato 2 livelli sotto WT_HOME non rimosso" || ok "worktree nidificato 2 livelli sotto WT_HOME (pulito e integrato) rimosso dal registro di git"
@@ -88,14 +94,21 @@ n_sib="$(grep -oF "$HOME/GitHub/sibrepo-extra-scope" <<<"$out" | wc -l | tr -d '
   || ok "repo del kanban-registry scoperto e la sua copia pulita/integrata rimossa"
 
 CONT2="$RDA_WORKTREES/ghost/cont"
-case "$out" in
-  *"$CONT2 "*"orfan"*|*"$CONT2"$'\n'*) fail "la cartella che contiene un worktree di un repo introvabile e' stata chiamata orfana" ;;
+# riga per riga (grep, non un case-glob su tutto $out): "orfana" compare in output per altre
+# ragioni (es. il full-orphan piu' sotto), e un case-glob *A*B* combacia anche se B sta su una
+# riga diversa e successiva — falso "fallito" a distanza, misurato in questa stessa card.
+cont2_line="$(grep -F "$CONT2 " <<<"$out" | head -1)"
+case "$cont2_line" in
+  *orfan*) fail "la cartella che contiene un worktree di un repo introvabile e' stata chiamata orfana" ;;
   *) ok "la cartella che contiene un worktree di un repo introvabile NON e' orfana (git lo conosce comunque)" ;;
 esac
 [ -d "$RDA_WORKTREES/ghost/cont/y" ] && ok "il worktree di un repo introvabile non e' stato toccato" || fail "RIMOSSO un worktree il cui repo non era scopribile — mai dovrebbe succedere senza verdetto esplicito"
 
 n_link="$(grep -oF "$RDA_WORKTREES/nested2repo/y" <<<"$out" | wc -l | tr -d ' ')"
 [ "$n_link" -eq 1 ] && ok "repo raggiunto anche via symlink: il suo worktree compare UNA sola volta" || fail "il worktree del repo simlinkato compare $n_link volte — simlink non deduplicato"
+
+[ -d "$MB/.claude/worktrees/vuota" ] && ok "cartella vuota dentro MirrorBuddy/.claude/worktrees NON rmdir'ata" || fail "RIMOSSA una cartella vuota dentro MirrorBuddy — regola di sicurezza violata dalla fase B"
+[ -d "$RDA_WORKTREES/MirrorBuddy/vuota" ] && ok "cartella vuota dentro \$WT_HOME/MirrorBuddy NON rmdir'ata" || fail "RIMOSSA una cartella vuota sotto \$WT_HOME/MirrorBuddy — regola di sicurezza violata dalla fase B"
 
 REAL_WT_AFTER="$(ls -1d "$REAL_HOME/GitHub/worktrees"/*/ 2>/dev/null | sort)"
 [ "$REAL_WT_BEFORE" = "$REAL_WT_AFTER" ] && ok "la suite non ha toccato il parco vero delle copie di lavoro" \
