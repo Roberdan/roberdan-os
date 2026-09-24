@@ -54,7 +54,7 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 
 ---
 
-## Aperti — 9 su 10
+## Aperti — 8 su 10
 
 | # | Cosa | Prova |
 |---|---|---|
@@ -66,7 +66,6 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 | 32 | **L'avvio di servizi esterni puo' bloccare una nuova sessione prima della prima risposta** (2026-09-24) | Due prove Copilot terminano con `Managed MCP policy settlement failed`; una registra anche Tavily non avviato per il blocco npm `EALLOWREMOTE`. Le prove locali di instradamento ripartono disabilitando quei servizi solo nel processo di prova, senza cambiare configurazione o protezioni. **Condizione per la card:** il problema ricorre in una sessione ordinaria; le prove isolate non certificano l'avvio di tutti i servizi esterni |
 | 34 | **Gli eventi di discovery non dichiarano la versione del filtro dei nomi** (2026-09-24) | Il ramo `session.skills_loaded` dell'adattatore Copilot conserva solo nomi pubblici ma non `skillNamePolicy`. I conteggi attuali usano esclusivamente gli avvii, quindi non ne dipendono. **Condizione per la card:** si decide di misurare la copertura della discovery; non interpretare quei record come un catalogo completo |
 | 35 | **Le prove fresche mostrano notifiche del bus anche su lavoro non corrente** (2026-09-24) | Nelle esportazioni locali delle prove Apple e rilascio compaiono conteggi non letti su cinque card; soltanto una e' quella corrente. Non dimostra che le altre siano obsolete. **Condizione per la card:** verificare che i destinatari o le card non siano piu' attivi prima di modificare i filtri; `bus tidy` resta il controllo esistente |
-| 36 | **Il controllo completo fallisce sui tempi dell'osservatore; la stessa suite isolata passa** (2026-09-24) | `test-audit-hooks.sh`: logger bloccato terminato in 3,138 secondi contro il limite di 2, piu' timeout a 5 secondi. La successiva suite isolata passa senza cambiare codice o soglie. Causa non dimostrata; non e' lo stesso errore di permessi riportato il 23 settembre. **Condizione per la card:** riproduzione con carico controllato prima di attribuirlo alla concorrenza o cambiare limiti; non dichiarare verde la validazione completa sulla sola prova isolata |
 
 Il 2 agosto 2026 la lista e' passata da 19 rilievi aperti a zero: 13 chiusi da una
 decisione, 6 riparati con la loro card e la loro prova di mutazione. Il 26 e' nato dopo.
@@ -78,6 +77,19 @@ Dodici casi reali su Copilot e Claude includono caricamento riuscito, lettura ca
 guida indisponibile e controllo rimosso; dettagli e limiti in `eval/README.md`.
 I quattro campioni precedenti restano falliti, non reinterpretati. La garanzia vale
 per richieste esplicite riconosciute e richiede adattatori effettivamente attivi.
+
+**#36 mitigato e verificato il 24 settembre, non spiegato retroattivamente:** il
+controllo completo aveva superato i limiti di 2 e 5 secondi dell'osservatore,
+mentre la stessa suite isolata passava. Il lanciatore non limitava la concorrenza:
+una riproduzione controllata sul motore reale ha misurato otto suite simultanee
+contro le due richieste. Ora il limite predefinito e' quattro, condiviso anche
+dal gruppo di installazione; cinque regressioni provano limite, errori e attesa
+finita. Nessuna soglia dei test e' stata alzata. Su `6b13745` la validazione
+completa, non solo i test isolati, termina `ALL GREEN`.
+Questo chiude il blocco operativo con una mitigazione provata, non attribuisce
+con certezza ogni ritardo storico al carico e non garantisce i tempi su qualsiasi
+macchina condivisa. Riaprire se ricorre con il lanciatore limitato; l'errore di
+permessi del 23 settembre resta un rilievo distinto.
 
 **Pagato il 3 agosto, non rinviato:** il gate @thor sulla card `260802-212646` aveva trovato che
 l'asse "riga di commento" di `test-kb-repo-path-agree` era un paper-pass (interrogava `"#"`, che
