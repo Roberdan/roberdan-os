@@ -5,6 +5,8 @@
 #   bin/twin-shadow.sh reconcile           record approvals/vanished cards the kb hook missed
 #   bin/twin-shadow.sh decide --card C --choice approve|reject|defer [--reason R]
 #   bin/twin-shadow.sh batch               pending sorted by the twin's advice — approves NOTHING
+#   bin/twin-shadow.sh approve [--except a,b]  YOU, at a terminal: one confirmation, then kb start
+#                                          --by roberto per card of the twin's approve block
 #   bin/twin-shadow.sh agreement [--days N | --all]
 #   (outcome: called by `kb start`, update-only, never blocks kb)
 #

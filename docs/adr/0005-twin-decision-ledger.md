@@ -45,6 +45,12 @@ twin's advice with the category's historical agreement. It approves nothing. Eac
 gets `shown_at`, and a decision taken after seeing the advice is excluded from agreement,
 because an anchored choice is not an independent one.
 
+**Bulk approval (4.6).** `twin-shadow.sh approve [--except a,b]` is Roberto's own command:
+it refuses without a terminal (stdin and stdout, the same test kb uses for its audit line) and
+inside an agent session, shows the twin's "approve" block, asks one confirmation, then runs the
+normal `kb start <id> --by roberto` per card, so every kb gate still decides card by card. Those
+decisions are marked `batch` and, having been shown the advice, stay out of the agreement.
+
 **Precedents (4.5).** Before asking the host, `predict` retrieves up to 3 past decisions
 attributed to Roberto that share meaningful words with the card (same category ranks higher)
 and puts them, with his real choice and reason, in the prompt. Local lexical match only: no
