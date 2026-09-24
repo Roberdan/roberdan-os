@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resumable conservative recovery: snapshot first, scoped imports, local vectors."""
+"""Conservative recovery; receipts include live indexed revisions before and after sync."""
 import argparse
 import fcntl
 import hashlib
@@ -10,6 +10,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 
@@ -40,6 +41,14 @@ def active_pages(source):
                    quote(source) + " AND deleted_at IS NULL"))
 
 
+def page_metadata(source):
+    return sql("SELECT json_build_object('last_commit',"
+               "(SELECT last_commit FROM sources WHERE id=" + quote(source) + "),"
+               "'pages',(SELECT coalesce(json_agg(p),'[]') FROM "
+               "(SELECT id,slug,source_path,updated_at,deleted_at FROM pages "
+               "WHERE source_id=" + quote(source) + " ORDER BY id) p))")
+
+
 def make_id(identity):
     stem = re.sub("[^a-z0-9-]", "-", identity.split("/")[-1].lower()).strip("-")[:19]
     return "repo-" + stem + "-" + hashlib.sha256(identity.lower().encode()).hexdigest()[:6]
@@ -59,8 +68,30 @@ def plan(manifest):
     return sorted(records.values(), key=lambda row: (not bool(row.get("local_path")), row["key"]))
 
 
+def eligible(record, root):
+    if root is None:
+        return True
+    if not record.get("local_path"):
+        return False
+    path = Path(record["local_path"])
+    return (path.name.casefold() not in {"warehouse", "parkinglot", "worktrees"}
+            and not path.is_symlink() and path.is_dir()
+            and path.resolve().parent == Path(root).resolve()
+            and (path / ".git").exists())
+
+
+def active_manifest(root, inspect_repo):
+    root = Path(root)
+    if not root.is_dir():
+        raise RuntimeError("Active repository folder is unavailable.")
+    local = [inspect_repo(path) for path in sorted(root.iterdir())
+             if eligible({"local_path": str(path)}, root)]
+    return {"local": [item for item in local if item], "remote": []}
+
+
 class Recovery:
-    def __init__(self, manifest, root, backup, blocked_sources=()):
+    def __init__(self, manifest, root, backup, blocked_sources=(), active_root=None, rename_proof=None,
+                 full_sync_proofs=None):
         self.manifest = manifest
         self.root = root
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -68,6 +99,10 @@ class Recovery:
         self.state = json.loads(self.path.read_text()) if self.path.exists() else {"repos": {}, "commands": []}
         self.backup = backup
         self.blocked_sources = set(blocked_sources)
+        self.active_root = active_root
+        self.current_record = None
+        self.rename_proof = rename_proof
+        self.full_sync_proofs = full_sync_proofs
         self.env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GH_PROMPT_DISABLED="1",
                         COPILOT_AUTO_UPDATE="false")
         for key in ("DATABASE_URL", "GBRAIN_DATABASE_URL", "GBRAIN_SOURCE"):
@@ -78,14 +113,22 @@ class Recovery:
         temp.write_text(json.dumps(self.state, indent=2) + "\n")
         temp.replace(self.path)
 
-    def command(self, argv, timeout=600):
+    def check_scope(self):
+        if self.current_record is not None and not eligible(self.current_record, self.active_root):
+            raise RuntimeError("BLOCKED: repository was removed, archived or moved outside the active folder.")
+
+    def command(self, argv, timeout=600, *, sensitive=False):
+        self.check_scope()
         argv = list(map(str, argv))
         index = len(self.state["commands"]) + 1
         log = self.root / f"command-{index:05d}.log"
         entry = {"argv": argv, "log": str(log), "started": time.time(), "exit": None}
+        if sensitive:
+            entry["sensitive_output"] = True
+            log.write_text("Contenuto privato confrontato localmente; output non conservato.\n")
         self.state["commands"].append(entry)
         self.save()
-        with log.open("wb") as output:
+        with (tempfile.TemporaryFile() if sensitive else log.open("w+b")) as output:
             with subprocess.Popen(argv, cwd=HOME / ".gbrain", env=self.env,
                                   stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT,
                                   start_new_session=True) as proc:
@@ -101,12 +144,52 @@ class Recovery:
                     entry["exit"] = 124
                     self.save()
                     raise
+            output.flush()
+            output.seek(0)
+            text = output.read().decode(errors="replace")
         entry["exit"] = code
         self.save()
-        text = log.read_text(errors="replace")
         if code:
-            raise RuntimeError(f"Command exit {code}: {log}\n" + "\n".join(text.splitlines()[-8:]))
+            raise RuntimeError(f"Command exit {code}: {log}\n" +
+                               ("Output privato non riportato." if sensitive else "\n".join(text.splitlines()[-8:])))
         return text.strip()
+
+    def canonical_notes(self, path, status):
+        entries = [item for item in status.split("\0") if item]
+        if any(not item.startswith("?? ") for item in entries):
+            raise RuntimeError(f"Managed snapshot was modified; refusing to overwrite: {path}")
+        matches = [source for source in sources() if source.get("local_path") == str(path)]
+        if len(matches) != 1 or matches[0]["id"] in self.blocked_sources:
+            raise RuntimeError(f"Managed snapshot was modified; refusing to overwrite: {path}")
+        source = matches[0]["id"]
+        notes = {}
+        for entry in entries:
+            relative = Path(entry[3:])
+            note = path / relative
+            if (relative.is_absolute() or ".." in relative.parts or note.is_symlink()
+                    or note.suffix != ".md" or not note.is_file()
+                    or not note.resolve().is_relative_to(path.resolve())):
+                raise RuntimeError(f"Managed snapshot was modified; refusing to overwrite: {path}")
+            slug = relative.as_posix()[:-3]
+            output = self.command([GB, "get", slug, "--source", source, "--include-content", "--json"],
+                                  timeout=60, sensitive=True)
+            data = json.loads(output[output.index("{"):])
+            content = data.get("content") if isinstance(data, dict) else None
+            if (not isinstance(content, str) or data.get("slug") != slug or data.get("source_id") != source
+                    or content.replace("\r\n", "\n").rstrip("\n") != note.read_text().replace("\r\n", "\n").rstrip("\n")):
+                raise RuntimeError("Managed snapshot contains an untracked file that is not the current canonical memory.")
+            with note.open("rb") as stream:
+                notes[note] = hashlib.file_digest(stream, "sha256").hexdigest()
+        return notes
+
+    @staticmethod
+    def preserve_notes(notes):
+        for note, expected in notes.items():
+            if not note.is_file() or note.is_symlink():
+                raise RuntimeError("Canonical memory file changed during snapshot update.")
+            with note.open("rb") as stream:
+                if hashlib.file_digest(stream, "sha256").hexdigest() != expected:
+                    raise RuntimeError("Canonical memory file changed during snapshot update.")
 
     def validate_backup(self):
         data = json.loads(self.backup.read_text())
@@ -130,10 +213,28 @@ class Recovery:
         path = HOME / ".gbrain/checkouts" / (identity or "local/" + make_id(record["key"]))
         marker = path / ".git/roberdan-recovery.json"
         if path.exists():
+            if (path / ".gbrain-owner.json").exists():
+                raise RuntimeError("BLOCKED: claimed source root; gbrain refuses periodic sync here. "
+                                   "Keep this ownership protection; do not remove its marker.")
             if not marker.exists() or json.loads(marker.read_text()).get("key") != record["key"]:
                 raise RuntimeError(f"Existing checkout is not owned by this recovery: {path}")
-            if self.command(["git", "-C", path, "status", "--porcelain"]):
-                raise RuntimeError(f"Managed snapshot was modified; refusing to overwrite: {path}")
+            status = self.command(["git", "-C", path, "status", "--porcelain", "--untracked-files=all", "--ignored", "-z"])
+            notes = self.canonical_notes(path, status) if status else {}
+            if local:
+                revision = self.head(Path(local))
+                if self.head(path) != revision:
+                    git_dir = self.command(["git", "-C", local, "rev-parse", "--absolute-git-dir"])
+                    self.command(["git", "-c", "core.hooksPath=/dev/null", "-C", path, "fetch",
+                                  "--no-tags", "--no-recurse-submodules", git_dir, revision])
+                    if self.head(Path(local)) != revision:
+                        raise RuntimeError("Local HEAD changed while refreshing the managed snapshot.")
+                    self.preserve_notes(notes)
+                    self.command(["git", "-c", "core.hooksPath=/dev/null", "-C", path,
+                                  "merge", "--ff-only", "--no-edit", "--no-overwrite-ignore", revision])
+                    self.preserve_notes(notes)
+                    if self.head(path) != revision:
+                        raise RuntimeError("Managed snapshot does not match current local HEAD.")
+                    marker.write_text(json.dumps({"key": record["key"], "snapshot": revision}) + "\n")
             return path
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         if local:
@@ -180,17 +281,56 @@ class Recovery:
         self.command([GB, "sources", "add", source_id, "--path", path, "--no-federated"])
         return source_id, True
 
+    def validate_renames(self, source, path, preview):
+        if self.rename_proof is None:
+            raise RuntimeError("BLOCKED: preview contains deletions/renames; originals preserved.")
+        proof = json.loads(Path(self.rename_proof).read_text())
+        lines = [line.strip() for line in preview.splitlines() if line.strip().startswith("Renamed:")]
+        self.validate_import_proof(source, path, proof, "rename_lines", lines)
+
+    def validate_import_proof(self, source, path, proof, line_key, lines):
+        if not isinstance(proof, dict):
+            raise RuntimeError("BLOCKED: isolated import proof is not an object.")
+        metadata = page_metadata(source)
+        digest = hashlib.sha256(json.dumps(metadata, sort_keys=True).encode()).hexdigest()
+        if (proof.get("status") != "verified" or proof.get("source") != source
+                or proof.get("production_unchanged") is not True
+                or proof.get("lost_page_ids") != []
+                or not lines or proof.get(line_key) != lines
+                or proof.get("metadata_sha256") != digest
+                or proof.get("snapshot") != self.head(path)
+                or proof.get("indexed_revision") != proof.get("snapshot")):
+            raise RuntimeError("BLOCKED: isolated rename proof does not match the current source and changes.")
+        installed = self.command(["git", "-C", HOME / "gbrain", "rev-parse", "HEAD"])
+        dirty = self.command(["git", "-C", HOME / "gbrain", "status", "--porcelain"])
+        if dirty or installed != proof.get("gbrain_revision"):
+            raise RuntimeError("BLOCKED: gbrain changed since the isolated rename validation.")
+
+    def validate_full_sync(self, source, path, preview):
+        if self.full_sync_proofs is None or "chunker_version gate" not in preview:
+            raise RuntimeError("BLOCKED: existing source requires reconciliation; original pages preserved.")
+        proofs = json.loads(Path(self.full_sync_proofs).read_text())
+        if not isinstance(proofs, dict):
+            raise RuntimeError("BLOCKED: isolated full-sync proofs are not an object.")
+        proof = proofs.get(source)
+        lines = [line.strip() for line in preview.splitlines() if line.strip().startswith("Full-sync dry run")]
+        self.validate_import_proof(source, path, proof, "full_sync_lines", lines)
+
     def refresh(self, source, path, new):
         before = active_pages(source)
+        indexed_before = next((row["last_commit"] for row in sources() if row["id"] == source), None)
         revision = self.head(path)
         base = [GB, "sync", "--source", source, "--repo", path, "--no-pull",
                 "--strategy", "auto", "--no-embed", "--no-auto-embed"]
         preview = self.command([*base, "--dry-run"], timeout=300)
-        if re.search(r"^\s*(Deleted|Removed|Renamed):|would delete", preview, re.MULTILINE | re.IGNORECASE):
+        if re.search(r"^\s*(Deleted|Removed):|would delete", preview, re.MULTILINE | re.IGNORECASE):
             raise RuntimeError("BLOCKED: preview contains deletions/renames; originals preserved.")
-        if before and re.search(r"full (sync|import)|reconcil", preview, re.IGNORECASE):
-            raise RuntimeError("BLOCKED: existing source requires reconciliation; original pages preserved.")
-        if before and not (re.search(r"Sync dry run: [0-9a-f]+\.\.[0-9a-f]+", preview)
+        if re.search(r"^\s*Renamed:", preview, re.MULTILINE | re.IGNORECASE):
+            self.validate_renames(source, path, preview)
+        full = bool(re.search(r"full[- ](sync|import)|reconcil", preview, re.IGNORECASE))
+        if before and full:
+            self.validate_full_sync(source, path, preview)
+        if before and not full and not (re.search(r"Sync dry run: [0-9a-f]+\.\.[0-9a-f]+", preview)
                            or "Already up to date" in preview):
             raise RuntimeError("BLOCKED: existing source needs a full/reconcile sync; not authorized.")
         if new and before:
@@ -207,7 +347,9 @@ class Recovery:
         indexed = next((row for row in sources() if row["id"] == source), None)
         if not indexed or indexed["last_commit"] != revision:
             raise RuntimeError("BLOCKED: stored index revision does not match the managed checkout.")
-        return {"pages_before": len(before), "pages_after": len(after), "snapshot": revision}
+        return {"pages_before": len(before), "pages_after": len(after), "snapshot": revision,
+                "indexed_before": indexed_before, "indexed_after": indexed["last_commit"],
+                "sync_changed": indexed_before != revision or before != after or full}
 
     def local_vectors(self, source):
         with urllib.request.urlopen("http://localhost:11434/api/version", timeout=5) as response:
@@ -233,24 +375,30 @@ class Recovery:
     def run(self):
         with (self.root / "run.lock").open("w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if self.path.exists():
+                self.state = json.loads(self.path.read_text())
+            self.state.update(started=time.time(), finished=None, current=None)
+            self.save()
             self.validate_backup()
-            records = plan(self.manifest)
+            all_records = plan(self.manifest)
+            records = [r for r in all_records if eligible(r, self.active_root)]
             registered = sources()
             self.state["total"] = len(records)
+            self.state["excluded_from_scope"] = len(all_records) - len(records)
+            self.state["active_root"] = str(self.active_root) if self.active_root else None
             for index, record in enumerate(records, 1):
                 key = record["key"]
-                previous = self.state["repos"].get(key, {})
-                if previous.get("status") == "verified":
-                    continue
                 row = {**record, "status": "running", "started": time.time()}
+                self.current_record = record
                 self.state["repos"][key] = row
                 self.state["current"] = key
                 self.save()
                 print(f"[{index}/{len(records)}] {key}", flush=True)
                 try:
+                    self.check_scope()
                     matches = [s["id"] for s in registered if s["local_path"] == record.get("local_path")
                                and s["local_path"]]
-                    if self.blocked_sources.intersection(matches):
+                    if record.get("pin") in self.blocked_sources or self.blocked_sources.intersection(matches):
                         raise RuntimeError("BLOCKED: source access not granted; no content read.")
                     path = self.checkout(record)
                     row["checkout"] = str(path)
@@ -259,7 +407,9 @@ class Recovery:
                     row.update(self.refresh(source, path, new))
                     row["index_status"] = "verified"
                     self.save()
-                    self.local_vectors(source)
+                    row["embedded_chunks"] = self.local_vectors(source)
+                    if record.get("local_path") and self.head(Path(record["local_path"])) != row["snapshot"]:
+                        raise RuntimeError("Local HEAD changed during recovery; a fresh pass is required.")
                     row["status"] = "verified"
                 except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
                     row["status"] = "blocked"
@@ -273,7 +423,7 @@ class Recovery:
             self.state["current"] = None
             self.state["finished"] = time.time()
             self.save()
-            return int(any(r["status"] != "verified" for r in self.state["repos"].values()))
+            return int(any(self.state["repos"][r["key"]]["status"] != "verified" for r in records))
 
 
 def main():
@@ -282,15 +432,27 @@ def main():
     parser.add_argument("--backup", type=Path, required=True)
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--active-root", type=Path, default=Path.home() / "GitHub",
+                        help="Only existing direct-child repositories here; no archived or remote-only collections.")
+    parser.add_argument("--rename-proof", type=Path,
+                        help="Exact isolated-sync evidence; never permits deletions or other rename batches.")
+    parser.add_argument("--full-sync-proofs", type=Path,
+                        help="Exact source-specific retention proofs for a tested chunker migration.")
     parser.add_argument("--blocked-source", action="append", default=[],
                         help="Do not access or modify an explicitly ungranted source.")
     args = parser.parse_args()
     os.umask(0o077)
-    manifest = json.loads(args.manifest.read_text())
+    # The saved manifest is evidence, not authority to resurrect moved/deleted projects.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("repo_audit", Path(__file__).with_name("gbrain-repo-audit.py"))
+    audit = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(audit)
+    manifest = active_manifest(args.active_root, audit.inspect)
     if not args.apply:
-        print(json.dumps(plan(manifest), indent=2))
+        print(json.dumps([r for r in plan(manifest) if eligible(r, args.active_root)], indent=2))
         return 0
-    return Recovery(manifest, args.state_dir, args.backup, args.blocked_source).run()
+    return Recovery(manifest, args.state_dir, args.backup, args.blocked_source,
+                    args.active_root, args.rename_proof, args.full_sync_proofs).run()
 
 
 if __name__ == "__main__":
