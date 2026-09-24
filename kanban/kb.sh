@@ -1559,7 +1559,6 @@ case "$cmd" in
       echo "REFUSED: fill repo first (kb edit $id) — e.g. repo: roberdan-os, repo: convergio, repo: personal" >&2; exit 1
     fi
     # REGOLA 1 — una card in corso per progetto.
-    #
     # Misurato il 2026-07-30: sette card in `doing`, di cui quattro sullo stesso lavoro
     # ("Casa Martucci"), aperte da sette giorni, mentre il progetto principale
     # (VirtualBPMFy27) aveva ZERO card in corso e diciannove in attesa. `doing` non
@@ -1596,6 +1595,7 @@ case "$cmd" in
       echo "started_at: $(date '+%Y-%m-%d %H:%M:%S %Z')"; echo "started_epoch: $(date +%s)"; } >> "$f"
     mv "$f" "$KB/doing/"
     d="$KB/doing/$id.md"
+    bash "${RDA_TWIN_SHADOW:-$ROOT/bin/twin-shadow.sh}" outcome --board "$KB" --card "$id" --choice approve --by "$by" --interactive "$interactive" </dev/null >/dev/null 2>&1 || true  # ADR-0005 shadow ledger: update-only, never blocks
     # One worktree per card (rules/best-practices.md § Parallel work): the card is exactly the
     # unit that can run in parallel with another card, so it is the unit of isolation — and a
     # dedicated cwd is what makes this card's token spend attributable instead of guessed.
