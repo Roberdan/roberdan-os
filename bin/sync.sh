@@ -290,6 +290,7 @@ EOF
   # H1 (rex, HIGH 2026-07-07): $RDA_OS is defined NOWHERE — a verbatim merge of the
   # snippet on a fresh install/fork expands it empty ("/hooks/main-guard.sh") and the
   # guards die silently. Expand the repo root at generation time, like bootstrap.sh.
+  node "$ROOT/hooks/skill-obligations-config.mjs" "$d/settings-hooks.json"
   sed "s|[\$]RDA_OS|$ROOT|g" "$d/settings-hooks.json" > "$d/settings-hooks.json.tmp" \
     && mv "$d/settings-hooks.json.tmp" "$d/settings-hooks.json"
 }
@@ -385,8 +386,7 @@ EOF
   if [ -f "$ROOT/hooks/copilot/extension.template.mjs" ]; then
     sed "s|__RDA_OS_DEFAULT__|$ROOT|g" "$ROOT/hooks/copilot/extension.template.mjs" \
       > "$d/extension/roberdan-os/extension.mjs"
-    cp "$ROOT/hooks/copilot/context-recovery.mjs" "$d/extension/roberdan-os/context-recovery.mjs"
-    cp "$ROOT/hooks/copilot/audit.mjs" "$d/extension/roberdan-os/audit.mjs"
+    cp "$ROOT/hooks/copilot/"{context-recovery,audit,skill-obligations,skill-obligations-core}.mjs "$d/extension/roberdan-os/"
   fi
 }
 

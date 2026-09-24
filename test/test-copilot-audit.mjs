@@ -208,7 +208,9 @@ test("extension observes native events independently of unchanged guard permissi
         mkdirSync(join(root, "kanban"));
         mkdirSync(join(root, "node_modules", "@github", "copilot-sdk"), { recursive: true });
         const source = new URL("../hooks/copilot/", import.meta.url);
-        for (const file of ["audit.mjs", "context-recovery.mjs"]) copyFileSync(new URL(file, source), join(root, file));
+        for (const file of ["audit.mjs", "context-recovery.mjs", "skill-obligations.mjs", "skill-obligations-core.mjs"]) {
+            copyFileSync(new URL(file, source), join(root, file));
+        }
         copyFileSync(new URL("extension.template.mjs", source), join(root, "extension.mjs"));
         writeFileSync(join(root, "node_modules", "@github", "copilot-sdk", "package.json"),
             JSON.stringify({ type: "module", exports: { "./extension": "./extension.mjs" } }));

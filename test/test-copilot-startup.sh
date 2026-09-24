@@ -9,6 +9,7 @@ mkdir -p "$STAGE/node_modules/@github/copilot-sdk"
 cp "$ROOT/hooks/copilot/extension.template.mjs" "$STAGE/extension.mjs"
 cp "$ROOT/hooks/copilot/context-recovery.mjs" "$STAGE/context-recovery.mjs"
 cp "$ROOT/hooks/copilot/audit.mjs" "$STAGE/audit.mjs"
+cp "$ROOT/hooks/copilot/skill-obligations.mjs" "$ROOT/hooks/copilot/skill-obligations-core.mjs" "$STAGE/"
 cat > "$STAGE/node_modules/@github/copilot-sdk/package.json" <<'JSON'
 {"type":"module","exports":{"./extension":"./extension.mjs"}}
 JSON
