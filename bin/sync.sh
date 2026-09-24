@@ -275,14 +275,19 @@ EOF
       { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/audit.sh", "timeout": 5 }] },
       { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/bus-bye.sh 2>/dev/null || true", "timeout": 10 }] }
     ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/bus-wake-clear.sh 2>/dev/null || true", "timeout": 5 }] }
+    ],
     "PreToolUse": [
       { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/main-guard.sh", "timeout": 10 }] },
       { "matcher": "Bash",        "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/bash-guard.sh", "timeout": 10 }] },
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/bus-guard.sh", "timeout": 10 }] },
       { "matcher": "*", "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/audit.sh", "timeout": 5 }] }
     ],
     "PostToolUse": [
       { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/autofmt.sh", "timeout": 30 }] },
       { "matcher": "Bash|Edit|Write", "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/bus-doorbell.sh 2>/dev/null || true", "timeout": 5 }] },
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/bus-taint.sh 2>/dev/null || true", "timeout": 5 }] },
       { "matcher": "*", "hooks": [
           { "type": "command", "command": "bash $RDA_OS/hooks/audit.sh", "timeout": 5 }
       ] }

@@ -252,11 +252,32 @@
 # "$DIR/bus-unread.sh"` is a shell builtin, forks nothing, and adds no new
 # traced command. The third defect (bus-doorbell.sh, role-scoped ring) needed
 # no split: the hook grew from 210 to 223 lines, still under the 300 floor.
+# 2026-09-24, card 260924-142220 ("bus come chat di squadra"), Roberto: "autorizzo
+# la costruzione del bus chat autonomo come da piano di luca". +61 bus.sh (1604 ->
+# 1665): a `source` line each for bus-trust.sh/bus-brakes.sh/bus-chat.sh (new,
+# small, under 300 — the split THIS card actually does), plus the wiring each of
+# A (signing) and B (taint) and D (brakes) needed directly in _cmd_hello/_cmd_send/
+# _append_record/_emit because those are the ONE place identity, taint and the
+# body digest are already open — moving them out would mean re-deriving all four
+# in a second file, which is a bigger file, not a smaller one. +5 test-bus.sh
+# (1415 -> 1420): the ALLOWLIST comment at check 45 documenting why `openssl`
+# joins it (EC-P256 sign/verify), deliberately, per that check's own rule
+# ("extend deliberately, never idly"). +139 extension.template.mjs (712 -> 851):
+# the wake plumbing (item F — session.idle -> budget/pause/stall checks ->
+# session.send wrapped in setTimeout, tagged wake-origin) has no shell-script
+# home the way Claude's side does (bus-guard.sh, bus-wake-clear.sh, both new
+# and under 300): it needs `session.send` and module state (wake budget,
+# git-HEAD stall count) that exist only inside this file. Plus the
+# bus-guard.sh/bus-taint.sh applyGuard wiring (item C/B), same shape as the
+# existing main-guard/bash-guard/bus-doorbell calls already here. +5 bin/sync.sh
+# (689 -> 694): the three new hook entries in settings-hooks.json (bus-guard.sh
+# on PreToolUse, bus-taint.sh on PostToolUse, bus-wake-clear.sh on the new
+# UserPromptSubmit block) — without this, all three would be dead code nothing ever ran.
 1780 kanban/kb.sh
-1415 test/test-bus.sh
+1420 test/test-bus.sh
 1266 test/test-bus-mutants.sh
-1604 bus/bus.sh
-689 bin/sync.sh
+1665 bus/bus.sh
+694 bin/sync.sh
 601 test/test-federated-kb.sh
 578 test/test-factory-kb.sh
 438 eval/test-eval-pipeline.sh
@@ -264,4 +285,4 @@
 344 eval/report.sh
 377 test/test-copilot-adapter.sh
 317 test/validate.sh
-712 hooks/copilot/extension.template.mjs
+851 hooks/copilot/extension.template.mjs

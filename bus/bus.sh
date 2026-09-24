@@ -42,6 +42,12 @@ REGISTRY="${RDA_KANBAN_REGISTRY:-$RDA_HOME/kanban-registry}"
 
 # shellcheck source=bus/bus-unread.sh
 . "$DIR/bus-unread.sh"
+# shellcheck source=bus/bus-trust.sh
+. "$DIR/bus-trust.sh"
+# shellcheck source=bus/bus-brakes.sh
+. "$DIR/bus-brakes.sh"
+# shellcheck source=bus/bus-chat.sh
+. "$DIR/bus-chat.sh"
 die() { echo "bus: $*" >&2; exit 1; }
 now() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
 
@@ -373,6 +379,10 @@ _cmd_send() {
   else
     _assert_role "$to"
   fi
+  _brakes_assert_not_paused
+  local session; session="$(_ident_session "")"
+  local taint; taint="$(_taint_of_session "$session")"
+  _trust_assert_egress "$taint" "$to" "$ROLES_DIR"
 
   # The body NEVER enters a shell variable. A 3MB verdict took it through command
   # substitution, two greps and a printf as one string, and the send hung for
@@ -438,9 +448,24 @@ _cmd_send() {
     local depth; depth="$(wc -l < "$log" | tr -d ' ')"
     [ "$re" -le "$depth" ] \
       || die "send: --re $re, but $repo/$card holds only $depth record(s). Check the number with: bus log --repo $repo --card $card"
+    _brakes_check_hops "$log" "$re"
+  fi
+  _brakes_check_hourly "$log" "$from"
+
+  # Signing (card 260924-142220): best-effort, never fatal. No key for this
+  # session (headless, no openssl, never said `hello`) simply means sig/seq/
+  # session all land null and the record reads UNVERIFIED, exactly as before
+  # this card existed.
+  local seq="" sig=""
+  if [ -n "$session" ]; then
+    seq=$(( $(_trust_last_seq "$log" "$session") + 1 ))
+    local digest; digest="$(_trust_body_digest "$body")"
+    sig="$(_trust_sign "$repo" "$card" "$to" "$kind" "${re:-0}" "$seq" "$digest" "$session" || true)"
+    [ -n "$sig" ] || seq=""   # no signature -> no seq either, so nothing HALF-signs
   fi
 
-  _with_lock "$log" _append_record "$log" "$repo" "$card" "$from" "$to" "$kind" "$ref" "$body" "$re"
+  _with_lock "$log" _append_record "$log" "$repo" "$card" "$from" "$to" "$kind" "$ref" "$body" "$re" \
+    "$session" "$sig" "$seq" "$taint"
   echo "bus: appended $kind from $from to $to on $repo/$card${re:+ (answers #$re)} -> $log"
   # Say what is still owed AFTER a send, not only after a read. An agent that has
   # just written is the one agent guaranteed to be awake and looking at this
@@ -463,6 +488,7 @@ _cmd_send() {
 
 _append_record() {
   local log="$1" repo="$2" card="$3" from="$4" to="$5" kind="$6" ref="$7" body="$8" re="${9:-}"
+  local session="${10:-}" sig="${11:-}" seq="${12:-}" tainted="${13:-}"
   # $body is a PATH here, and --rawfile reads it directly: as `--arg` this hit
   # ARG_MAX at roughly a megabyte and died as a raw `jq: Argument list too long`
   # with no `bus:` message at all - an undocumented ceiling reported in a way
@@ -471,9 +497,20 @@ _append_record() {
   # `re` is an ADDITIVE field and is written as null when absent, so every record
   # ever written before it existed reads back exactly as it did: no selector in
   # this file asserts the key set, and `.re // null` is how every reader asks.
+  # `session`/`sig`/`seq`/`tainted` are additive the same way (card 260924-142220):
+  # a record from before signing existed carries all four as null, and _trust_mark
+  # treats a null session/sig exactly like a today's-UNVERIFIED record.
   jq -cn --arg ts "$(now)" --arg repo "$repo" --arg card "$card" --arg from "$from" \
         --arg to "$to" --arg kind "$kind" --arg ref "$ref" --arg re "$re" --rawfile body "$body" \
-    '{ts:$ts,repo:$repo,card:$card,from:$from,to:$to,kind:$kind,ref:(if $ref=="" then null else $ref end),re:(if $re=="" then null else ($re|tonumber) end),body:$body}' \
+        --arg session "$session" --arg sig "$sig" --arg seq "$seq" --arg tainted "$tainted" \
+    '{ts:$ts,repo:$repo,card:$card,from:$from,to:$to,kind:$kind,
+      ref:(if $ref=="" then null else $ref end),
+      re:(if $re=="" then null else ($re|tonumber) end),
+      body:$body,
+      session:(if $session=="" then null else $session end),
+      sig:(if $sig=="" then null else $sig end),
+      seq:(if $seq=="" then null else ($seq|tonumber) end),
+      tainted:(if $tainted=="" then null else $tainted end)}' \
     >> "$log" || die "send: could not encode the record — nothing was appended"
 }
 
@@ -544,18 +581,19 @@ _resolve_ref() {
 # nothing, so the stamp is the only thing standing between a thread and a review
 # that never happened.
 _emit() {
-  local card="$1" me="${2:-}" line n=0
+  local repo="$1" card="$2" me="${3:-}" line n=0
   while IFS= read -r line; do
     n=$((n+1))
-    local ts from kind ref body seq re to
+    local ts from kind ref body seq re to mark
     ts="$(jq -r '.ts' <<<"$line")"; from="$(jq -r '.from' <<<"$line")"
     kind="$(jq -r '.kind' <<<"$line")"; ref="$(jq -r '.ref // ""' <<<"$line")"
     body="$(jq -r '.body' <<<"$line")"
     seq="$(jq -r '._seq // ""' <<<"$line")"
     re="$(jq -r '.re // ""' <<<"$line")"
     to="$(jq -r '.to' <<<"$line")"
+    mark="$(_trust_mark "$repo" "$line")"
     echo "--------------------------------------------------------------------"
-    echo "CLAIM BY @$from ($kind, $ts) — UNVERIFIED, and @$from is self-declared."
+    echo "CLAIM BY @$from ($kind, $ts) — $mark, and @$from is self-declared."
     # The record number is what makes an answer addressable. Without it `--re`
     # would need a number the reader has no way to know, and a linkage nobody can
     # spell is a linkage nobody uses.
@@ -683,7 +721,7 @@ _cmd_read() {
   want="$(jq -s --arg me "$as" --arg all "$BROADCAST" --argjson skip "$seen" \
       '.[$skip:] | map(select(.to == $me or (.to == $all and .from != $me))) | length' "$snap")" \
     || { rm -f "$snap" "$deliverable" "$emitted_f"; die "the snapshot of $log could not be counted — nothing was delivered, so nothing is half-read"; }
-  RDA_BUS_EMITTED="$emitted_f" _emit "$card" "$as" < "$deliverable"
+  RDA_BUS_EMITTED="$emitted_f" _emit "$repo" "$card" "$as" < "$deliverable"
   emitted="$(cat "$emitted_f" 2>/dev/null || echo 0)"; rm -f "$emitted_f"
   # THE DELIVERY AUDIT. The cursor advances past everything in the snapshot, and
   # the log is append-only, so a record that was deliverable but not rendered is
@@ -933,12 +971,19 @@ _scan_note() {
 }
 
 _presence_append() {
-  local pfile="$1" event="$2" repo="$3" session="$4" role="$5" card="$6" note="$7"
+  local pfile="$1" event="$2" repo="$3" session="$4" role="$5" card="$6" note="$7" pubkey="${8:-}"
+  # `pubkey` is ADDITIVE, exactly like `re` on a message record (card
+  # 260924-142220): written as null when absent, so every presence record before
+  # signing existed reads back exactly as it did. It carries the session's
+  # ephemeral signing key — see bus-trust.sh — so a peer looking up "is this
+  # signature real" never needs a second registry, only this append-only log it
+  # already trusts for "who is here".
   jq -cn --arg ts "$(now)" --arg event "$event" --arg repo "$repo" --arg session "$session" \
-        --arg role "$role" --arg card "$card" --arg note "$note" \
+        --arg role "$role" --arg card "$card" --arg note "$note" --arg pubkey "$pubkey" \
     '{ts:$ts,event:$event,repo:$repo,session:$session,role:$role,
       card:(if $card=="" then null else $card end),
-      note:(if $note=="" then null else $note end)}' \
+      note:(if $note=="" then null else $note end),
+      pubkey:(if $pubkey=="" then null else $pubkey end)}' \
     >> "$pfile" || die "presence: could not encode the record — nothing was appended"
 }
 
@@ -990,7 +1035,15 @@ _cmd_hello() {
   _scan_note "hello --doing" "$doing"
   local pfile; pfile="$(_presence_path "$repo")"
   mkdir -p "$(dirname "$pfile")"
-  _with_lock "$pfile" _presence_append "$pfile" hello "$repo" "$session" "$as" "$card" "$doing"
+  # Interactive sessions ONLY mint a signing key here (card 260924-142220, risk #4
+  # of @luca's review: a headless `claude -p` / factory run must never hold one).
+  # Best-effort: no openssl, or a headless run, and this is simply empty — every
+  # message from this session stays UNVERIFIED, exactly as before this card.
+  local pubkey=""
+  if _trust_ensure_key "$repo" "$session"; then
+    pubkey="$(_trust_pubkey_b64 "$repo" "$session" || true)"
+  fi
+  _with_lock "$pfile" _presence_append "$pfile" hello "$repo" "$session" "$as" "$card" "$doing" "$pubkey"
   # Identity that survives the next command, and the one after that. See
   # _role_from_file: on a host where every command is a fresh process, the
   # environment alone gives an identity that lasts exactly one call.
@@ -1505,7 +1558,7 @@ _cmd_log() {
   # Numbered, because a thread you cannot cite is a thread you can only talk
   # past: `--re N` needs the same N the reader is looking at.
   jq -c -s 'to_entries | map(.value + {_seq: (.key + 1)}) | .[]' "$log" \
-    | _emit "$card" "${RDA_BUS_ROLE:-}"
+    | _emit "$repo" "$card" "${RDA_BUS_ROLE:-}"
 }
 
 _usage() {
@@ -1599,6 +1652,14 @@ case "${1:-}" in
   open)  shift; _cmd_close "reopen" "$@";;
   roles) shift; _cmd_roles "$@";;
   log)   shift; _cmd_log "$@";;
+  pausa)    shift; _cmd_pausa "$@";;
+  riprendi) shift; _cmd_riprendi "$@";;
+  paused)   shift; _cmd_paused "$@";;
+  taking)   shift; _cmd_taking "$@";;
+  wait)     shift; _cmd_wait "$@";;
+  chat)     shift; _cmd_chat "$@";;
+  mark-wake) shift; _cmd_mark_wake "$@";;
+  unread-direct) shift; _cmd_unread_direct "$@";;
   ""|-h|--help|help) _usage;;
   *) die "unknown command '${1}' (try: bus --help)";;
 esac

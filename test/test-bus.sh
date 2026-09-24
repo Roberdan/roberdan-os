@@ -1168,7 +1168,12 @@ grep -q 'café ✓ utf8' <<<"$u8" || fail "non-ASCII UTF-8 did not survive verba
 #     refusal branch passed the entire green suite and started a live agent.
 #     Every bus invocation in this file now goes through busrun, so this runs
 #     over the trace of the WHOLE suite. Extend deliberately, never idly.
-ALLOWED=" jq git date grep mkdir rmdir cp cat wc tail sort awk printf mktemp rm tr basename dirname sleep shasum iconv leak-check.sh "
+# `openssl` added 2026-09-24, card 260924-142220 (Roberto: "autorizzo la costruzione
+# del bus chat autonomo come da piano di luca"): EC-P256 sign/verify for per-session
+# message signing (bus/bus-trust.sh). Deliberate, not silently permissive — bus-trust.sh
+# only ever calls its `ecparam`/`ec`/`dgst`/`base64` verbs with argv-only input, no
+# `-engine`, no shell handed to it.
+ALLOWED=" jq git date grep mkdir rmdir cp cat wc tail sort awk printf mktemp rm tr basename dirname sleep shasum iconv leak-check.sh openssl "
 # NORMALISE BEFORE MATCHING. Two evasions were invisible to the old filter:
 #   /tmp/stubs/claude   - dropped entirely, because the word starts with '/'
 #   BUS_WAKE=1 claude   - the first word is the assignment, not the command

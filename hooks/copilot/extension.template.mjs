@@ -25,6 +25,7 @@ import { withSkillObligations } from "./skill-obligations.mjs";
 const RDA_OS = process.env.RDA_OS || "__RDA_OS_DEFAULT__";
 const HOOKS = join(RDA_OS, "hooks");
 const KB = join(RDA_OS, "kanban", "kb.sh");
+const BUS_SH = join(RDA_OS, "bus", "bus.sh");
 const KB_CMD = process.env.RDA_KB_CMD || "kb";
 const HOME =
     process.env.HOME ||
@@ -98,6 +99,104 @@ let auditObserver;
 let agentStopObserved = false;
 let userPauseRequested = false;
 const contextRecovery = createContextRecovery({ hooksDirectory: HOOKS, runScript, runKb, hookPayload, diag });
+
+// --- bus wake plumbing (card 260924-142220, item C/F) -------------------------
+// The wake-origin marker is a FILE (bus/bus-brakes.sh: bus mark-wake / hooks/
+// bus-wake-clear.sh) shared with the Claude side, so hooks/bus-guard.sh's
+// gate-class denial reads identically on both hosts. What differs is WHO sets
+// it: here the extension controls `session.send` directly, so the marker is
+// set by code, never by the model — the stronger half of item C's design.
+// `lastInjectedWakePrompt` distinguishes "this onUserPromptSubmitted event is
+// OUR OWN injected prompt" (keep the marker, a wake-origin turn is starting)
+// from a genuine one (clear it — Roberto is here).
+let lastInjectedWakePrompt = null;
+const WAKE_BUDGET_PER_HOUR = Number(process.env.RDA_BUS_WAKE_BUDGET || 6);
+const WAKE_STALL_ROUNDS = 2;
+const wakeTimestamps = [];
+let lastWakeHead = null;
+let wakeStallCount = 0;
+
+function runBus(argv, stdinStr, cwd) {
+    return new Promise((resolve) => {
+        let child;
+        try {
+            child = spawn("bash", [BUS_SH, ...argv], { cwd: cwd || process.cwd(), env: process.env });
+        } catch (e) {
+            resolve({ code: 127, stdout: "", stderr: String(e && e.message ? e.message : e) });
+            return;
+        }
+        let stdout = "";
+        let stderr = "";
+        child.stdout.on("data", (b) => (stdout += b.toString()));
+        child.stderr.on("data", (b) => (stderr += b.toString()));
+        child.on("error", (e) => resolve({ code: 127, stdout, stderr: stderr + String(e.message) }));
+        child.on("close", (code) => resolve({ code: code == null ? 1 : code, stdout, stderr }));
+        if (stdinStr != null) child.stdin.write(stdinStr);
+        child.stdin.end();
+    });
+}
+
+function gitHead(cwd) {
+    return new Promise((resolve) => {
+        let out = "";
+        try {
+            const child = spawn("git", ["-C", cwd || process.cwd(), "rev-parse", "HEAD"], { env: process.env });
+            child.stdout.on("data", (b) => (out += b.toString()));
+            child.on("close", () => resolve(out.trim()));
+            child.on("error", () => resolve(""));
+        } catch (e) {
+            diag("gitHead", e);
+            resolve("");
+        }
+    });
+}
+
+// session.idle -> is a wake warranted, and is it SAFE to send one. Never spawns
+// an agent: `bus.sh` stays data-only (bus-protocol.md non-goal 1), and what
+// runs here is the extension's OWN process calling its OWN host's `session.send`
+// — the same shape as a person typing, not a second agent.
+async function maybeWake(cwd) {
+    try {
+        if (!existsSync(BUS_SH)) return;
+        const paused = (await runBus(["paused"], null, cwd)).stdout.trim() === "1";
+        if (paused) return; // item E: bus pausa means no wakes, full stop
+        const role = process.env.RDA_BUS_ROLE || "implementer";
+        const n = Number((await runBus(["unread-direct", "--as", role], null, cwd)).stdout.trim() || "0");
+        if (!(n > 0)) return; // item F: only a DIRECT request/question wakes — never --to all
+        const now = Date.now();
+        while (wakeTimestamps.length && now - wakeTimestamps[0] > 3600_000) wakeTimestamps.shift();
+        if (wakeTimestamps.length >= WAKE_BUDGET_PER_HOUR) {
+            await warn("bus-wake", `hourly wake budget (${WAKE_BUDGET_PER_HOUR}) spent — ${n} direct message(s) waiting, not waking.`);
+            return;
+        }
+        const head = await gitHead(cwd);
+        if (head && head === lastWakeHead) wakeStallCount += 1;
+        else wakeStallCount = 0;
+        lastWakeHead = head || lastWakeHead;
+        if (wakeStallCount >= WAKE_STALL_ROUNDS) {
+            const avvisa = join(RDA_OS, "tools", "avvisa", "avvisa");
+            if (existsSync(avvisa)) {
+                try { spawn(avvisa, ["--titolo", "roberdan-os: bus stallo", "--testo", `${n} messaggio(i) in attesa ma nessun commit da ${WAKE_STALL_ROUNDS} risvegli — controllo.`], { detached: true, stdio: "ignore" }).unref(); } catch (e) { diag("bus-wake:avvisa", e); }
+            }
+            await warn("bus-wake", `${WAKE_STALL_ROUNDS} wakes with no new commit — stopping, Roberto notified.`);
+            return;
+        }
+        wakeTimestamps.push(now);
+        const sid = sessionId();
+        if (sid) await runBus(["mark-wake", "--session", sid], null, cwd);
+        const prompt = `leggi il bus: bus read --repo $(basename "${cwd || process.cwd()}") --as ${role}, e rispondi solo a cio' che e' diretto a te.`;
+        lastInjectedWakePrompt = prompt;
+        setTimeout(() => {
+            try {
+                session && typeof session.send === "function" && session.send({ prompt });
+            } catch (e) {
+                diag("bus-wake:send", e);
+            }
+        }, 0);
+    } catch (e) {
+        diag("maybeWake", e);
+    }
+}
 
 // Queue counters and doorbell stamps require the joined session's readonly sessionId;
 // omitting it collapses every session onto the hooks' shared "nosession" fallback.
@@ -555,7 +654,22 @@ const hooks = withSkillObligations({
         if ((!input.sessionId || input.sessionId === sessionId()) && typeof input.prompt === "string") {
             userPauseRequested = /^(?:stop|pause|pausa|fermati|metti in pausa|devo andare|vado)[.!?\s]*$/iu.test(input.prompt.trim());
         }
-        const recovery = await contextRecovery.takeRecovery(contextRecovery.rememberDirectory(input));
+        // item C: this event fires for BOTH a genuine keystroke and our own
+        // injected wake prompt (maybeWake's session.send). Only the genuine one
+        // clears the wake-origin marker — an exact match against the prompt we
+        // just sent is OUR OWN injection, consumed once and never re-matched.
+        const cwdForWake = contextRecovery.rememberDirectory(input);
+        if (typeof input.prompt === "string" && input.prompt === lastInjectedWakePrompt) {
+            lastInjectedWakePrompt = null;
+        } else {
+            lastInjectedWakePrompt = null;
+            const sid = sessionId();
+            if (sid) {
+                const p = join(HOOKS, "bus-wake-clear.sh");
+                if (existsSync(p)) runScript(p, JSON.stringify({ session_id: sid }), cwdForWake).catch((e) => diag("wake-clear", e));
+            }
+        }
+        const recovery = await contextRecovery.takeRecovery(cwdForWake);
         const format = execFormatInSystemMessage ? EXEC_FORMAT_TURN_REMINDER_SHORT : EXEC_FORMAT_TURN_REMINDER_FULL;
         return { additionalContext: recovery ? `${format}\n${recovery}` : format };
     },
@@ -580,13 +694,22 @@ const hooks = withSkillObligations({
                     `write a note under ~/Obsidian/Roberdan's Vault/agent-learnings/ instead (type: agent-learning).`,
             });
         }
+        // item C/E: bus-guard.sh covers BOTH `bus pausa` (deny everything) and a
+        // wake-origin turn (deny gate-class actions only) — checked ahead of the
+        // per-tool guards below since a pause must block a Bash/Edit call alike.
+        const fpAny = writePathOf(args);
+        const cmdAny = args.command || args.cmd || "";
+        const busGuard = await applyGuard(
+            "bus-guard.sh",
+            { session_id: sessionId(), tool_input: { file_path: String(fpAny), command: String(cmdAny) } },
+            cwd,
+        );
+        if (busGuard) return finish(busGuard);
         if (WRITE_TOOLS.has(name)) {
-            const fp = writePathOf(args);
-            return finish(await applyGuard("main-guard.sh", { tool_input: { file_path: String(fp) } }, cwd));
+            return finish(await applyGuard("main-guard.sh", { tool_input: { file_path: String(fpAny) } }, cwd));
         }
         if (SHELL_TOOLS.has(name)) {
-            const cmd = args.command || args.cmd || "";
-            return finish(await applyGuard("bash-guard.sh", { tool_input: { command: String(cmd) } }, cwd));
+            return finish(await applyGuard("bash-guard.sh", { tool_input: { command: String(cmdAny) } }, cwd));
         }
         return finish(undefined);
     },
@@ -599,6 +722,18 @@ const hooks = withSkillObligations({
         // turn (view/search/…) cannot make the bus state stale, so it doesn't pay the ~0.55s
         // doorbell cost either. Parity with Claude means matching that filter, not ignoring it.
         if (WRITE_TOOLS.has(name) || SHELL_TOOLS.has(name)) await ringDoorbell(cwd);
+
+        // item B: taint marking, best-effort and never blocking — see hooks/bus-taint.sh.
+        try {
+            const p = join(HOOKS, "bus-taint.sh");
+            if (existsSync(p)) {
+                const a = toolArgsOf(input);
+                const payload = { session_id: sessionId(), tool_name: name, tool_input: a };
+                await runScript(p, JSON.stringify(payload), cwd);
+            }
+        } catch (e) {
+            diag("onPostToolUse:taint", e);
+        }
 
         if (!WRITE_TOOLS.has(name)) return undefined;
         const args = toolArgsOf(input);
@@ -700,7 +835,12 @@ try {
     // Idle remains advisory. Only the typed onAgentStop return asks the runtime to continue.
     session.on("session.idle", (event) => {
         if (event && event.agentId) return;
-        return runStopChain(contextRecovery.directory).catch((e) => diag("session.idle:runStopChain", e));
+        // item F: check the bus AFTER the stop chain, never instead of it — a wake
+        // must not skip checkpointing. Never awaited into the idle handler's own
+        // return: maybeWake's own session.send is wrapped in setTimeout (Luca's
+        // threat model item 10 — never a synchronous re-entrant call here).
+        runStopChain(contextRecovery.directory).catch((e) => diag("session.idle:runStopChain", e));
+        return maybeWake(contextRecovery.directory).catch((e) => diag("session.idle:maybeWake", e));
     });
     contextRecovery.register(session);
     // Host plugin reconciliation can restart us repeatedly; readiness belongs in the extension log.
