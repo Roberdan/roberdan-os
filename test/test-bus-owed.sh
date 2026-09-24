@@ -216,4 +216,63 @@ grep -qi "number" <<<"$out" || fail "--re accepted something that is not a recor
 ok "--re is checked against the thread: it cannot cite a record that does not exist"
 
 # ---------------------------------------------------------------------------
+# 4. "DA LEGGERE": A NOTE (or a verdict, or anything else) IS NOT A QUESTION, so
+#    it never appeared in the section above — and an agent that checks only
+#    `bus owed` reads it late. Card 260924-120127, real: an agent checked only
+#    `bus owed` and read an important note late; three threads of already-closed
+#    cards were still open because nothing ever closed them (that half is
+#    test-kb-done-gate.sh — "kb finish closes the card's bus thread").
+NOTE_TXT="zzda-leggerezz-a-note-nobody-asked-for"
+printf '%s\n' "$NOTE_TXT" \
+  | as architect sess-A send --card note-thread --to implementer --kind note >/dev/null 2>&1 \
+  || fail "could not send the note fixture"
+
+owed_before_read="$(as implementer sess-B owed --card note-thread 2>/dev/null)"
+grep -q "owes no answer" <<<"$owed_before_read" \
+  || fail "a NOTE is being treated as something owed an answer — it is not a question"
+grep -q "DA LEGGERE" <<<"$owed_before_read" \
+  || fail "THE CORE REGRESSION (card 260924-120127): an unread note never appears in bus owed"
+grep -q '#1' <<<"$owed_before_read" \
+  || fail "the da-leggere entry carries no record number"
+ok "an unread note appears in bus owed, under 'da leggere', even though it owes no answer"
+
+# The row names card/seq/sender/kind — never the body, in EITHER form. A note can
+# say anything; `bus owed`'s own discipline (see 3d above) is that a body only
+# ever arrives through an explicit `bus read`, stamped UNVERIFIED.
+grep -q "$NOTE_TXT" <<<"$owed_before_read" \
+  && fail "the da-leggere section rendered the note's BODY — this is what the doorbell reuses verbatim"
+ok "da leggere never shows a body, even in the non-brief form"
+
+# A READ clears it — same cursor `bus read` already advances, nothing new to keep
+# in sync. Answering does NOT clear it (a note has nothing to answer); only
+# reading does.
+as implementer sess-B read --card note-thread >/dev/null 2>&1 \
+  || fail "could not read the note fixture"
+owed_after_read="$(as implementer sess-B owed --card note-thread 2>/dev/null)"
+grep -q "has nothing unread" <<<"$owed_after_read" \
+  || fail "reading the note did not clear it from da leggere: $owed_after_read"
+ok "a bus read clears the note from da leggere"
+
+# MAIL YOU SENT YOURSELF MUST NOT APPEAR — neither a direct self-address nor a
+# broadcast the sender itself receives back.
+echo "note to myself" \
+  | as architect sess-A send --card self-thread --to architect --kind note >/dev/null 2>&1
+echo "broadcast from myself" \
+  | as architect sess-A send --card self-thread --to all --kind note >/dev/null 2>&1
+selfowed="$(as architect sess-A owed --card self-thread 2>/dev/null)"
+grep -q "has nothing unread" <<<"$selfowed" \
+  || fail "mail the reader sent to itself (direct or broadcast) counted as something to read: $selfowed"
+ok "mail sent to yourself, direct or broadcast, never appears in da leggere"
+
+# A QUESTION lives in BOTH sections until it is both read and answered — "da
+# rispondere" and "da leggere" are independent, and one never substitutes the
+# other. This is the same third-party-question fixture as 3c, re-read here.
+both="$(as implementer sess-B owed --card "$C" 2>/dev/null)"
+grep -q "waiting for an answer" <<<"$both" \
+  || fail "the still-unanswered questions on $C vanished from da rispondere"
+grep -q "DA LEGGERE" <<<"$both" \
+  || fail "an UNREAD (never-\`bus read\`) question does not also show as unread — da leggere must cover any kind"
+ok "an unread question appears in both sections until it is read and answered"
+
+# ---------------------------------------------------------------------------
 echo "PASS: test-bus-owed.sh"
