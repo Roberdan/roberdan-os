@@ -1,20 +1,26 @@
 #!/usr/bin/env bash
-# kanban/worktree-locations.sh — le ALTRE tre convenzioni di worktree oltre a $WT_HOME/<repo>/<card>
-# (quella che worktree-sweep.sh gia' scandisce), piu' i repo "annidati" in una cartella
-# contenitore, i registri git ormai prunable e le cartelle che git non conosce piu'.
+# kanban/worktree-locations.sh — primitive: repo discovery e il REGISTRO DI GIT come fonte di
+# verita' su dove vivono i worktree, non le quattro cartelle convenzionali per nome.
 #
-# Misurato il 2026-09-24: `kb wt` guardava SOLO ~/GitHub/worktrees/<repo>/*. Il resto del parco
-# vive altrove e nessun comando lo nominava mai: MirrorBuddy tiene copie (la card dice 7, 3.4 GB;
-# rimisurate qui lo stesso giorno, poche ore dopo: 2, 2.0 GB — il numero cambia da sessione a
-# sessione, non e' un errore di misura) sotto <repo>/worktrees/ (layout bare), Claude Code apre
-# sotto <repo>/.claude/worktrees/, altri strumenti sotto <repo>/.worktrees/, e
-# ~/GitHub/worktrees/MirrorHR/completion-20260906-f144e5a4 e' una cartella che git non conosce
-# affatto (il repo si chiama MirrorHR_Set ora).
+# @thor F2 (card 260924-085105-3, seguito -3b): la prima versione scandiva SOLO quattro
+# cartelle per convenzione ($WT_HOME/<repo>/*, <repo>/worktrees, <repo>/.worktrees,
+# <repo>/.claude/worktrees). Misurato che questo perde worktree REALI e REGISTRATI da git in
+# posti arbitrari: ~/GitHub/VirtualBPMFy27-hls2-scope (un fratello di primo livello, mai dentro
+# nessuna delle quattro convenzioni) e ~/GitHub/copilot-worktrees/MirrorScopio/roberdan-...
+# (nidificato due livelli sotto una cartella che non e' nemmeno un repo). Entrambi appartengono
+# a un repo scoperto altrove (VirtualBPMFy27, ParkingLot/MirrorScopio) e compaiono per intero in
+# `git -C <quel repo> worktree list --porcelain`, eseguito da OVUNQUE nella stessa famiglia.
+# La correzione di fondo: per ogni repo scoperto, si CHIEDE A GIT dove sono i suoi worktree
+# (_wt_registry) invece di indovinarlo dal filesystem — cosi' un worktree si trova ovunque git
+# lo sappia, non solo nelle quattro cartelle per nome. Le quattro cartelle restano scandite (in
+# worktree-sweep.sh, fase B) ma SOLO per trovare cartelle che git non conosce affatto: un
+# worktree che il registro gia' conosce non e' mai "orfano", nemmeno se una fase successiva lo
+# incontra di nuovo per nome.
 #
 # File separato perche' worktree-sweep.sh, con dentro anche questo, supererebbe le 300 righe che
 # rules/best-practices.md impone ai file scritti a mano. Sourced da worktree-sweep.sh, che a sua
-# volta e' sourced/exec-ato da worktree.sh: quando questo file gira, WT_HOME, _repo_path,
-# _base_ref, _owned_by_doing_card e _branch_integrated esistono gia' nel processo.
+# volta e' sourced/exec-ato da worktree.sh: quando questo file gira, WT_HOME esiste gia' nel
+# processo.
 set -uo pipefail
 
 # GH_HOME — la cartella che contiene i repo. Derivata da WT_HOME (che e' sempre <GH_HOME>/
@@ -22,73 +28,59 @@ set -uo pipefail
 # seconda variabile da tenere allineata a mano.
 GH_HOME="$(dirname "$WT_HOME")"
 
+# _realpath <path> — il percorso FISICO, symlink risolti. macOS: /var e' un symlink verso
+# /private/var, quindi $HOME (che passa per /var/folders nei test via mktemp) e un
+# `git rev-parse`/`cd -P` sullo stesso posto NON combaciano come stringhe se uno dei due non e'
+# risolto. Ogni confronto fra "questo path" e "quel path" in questo file passa da qui — mai un
+# confronto testuale diretto fra un path costruito a mano e uno che e' passato per git o per cd.
+_realpath() { (cd -P "$1" 2>/dev/null && pwd) || return 1; }
+
 # Roberto ci sta lavorando ORA con un altro agente: si vede nel referto, non si tocca MAI,
 # nemmeno se una copia li' dentro sarebbe altrimenti rimovibile (pulita e integrata) — la
-# regola e' scritta sulla card, non e' un giudizio di questo script sul contenuto.
-# Due controlli, non uno solo: il PATH prende <repo>/worktrees/* (la convenzione (2), dove
-# vivono le copie vere di MirrorBuddy); il git-common-dir prende anche una copia registrata
-# altrove per NOME (es. $WT_HOME/MirrorBuddy/<card>, la convenzione (1)) — senza il secondo
-# controllo una copia cosi' sfuggirebbe all'esclusione e finirebbe rimossa.
+# regola e' scritta sulla card, non e' un giudizio di questo script sul contenuto. Confronto per
+# IDENTITA' DI REPO (il repo che possiede questo worktree e' fisicamente MirrorBuddy), non per
+# path del worktree: una copia vive per convenzione sotto MirrorBuddy/worktrees/*, ma potrebbe
+# in teoria vivere altrove pur appartenendo allo stesso repo.
 _wt_hard_exclude() {
-  local wt="$1" gcd mb_real
+  local repo="$1" wt="$2" mb_real repo_real
   case "$wt" in "$GH_HOME/MirrorBuddy"|"$GH_HOME/MirrorBuddy/"*) return 0 ;; esac
-  [ -d "$wt" ] || return 1
-  gcd="$(git -C "$wt" rev-parse --git-common-dir 2>/dev/null)" || return 1
-  case "$gcd" in /*) : ;; *) gcd="$(cd "$wt" && cd "$gcd" 2>/dev/null && pwd)" ;; esac
-  # git risolve i symlink (macOS: /var -> /private/var, e studio3_emea sulla macchina reale
-  # e' esso stesso un symlink), quindi il confronto va fatto sul percorso FISICO di entrambi i
-  # lati — altrimenti un git-common-dir corretto non combacia mai con $GH_HOME non risolto.
-  mb_real="$(cd -P "$GH_HOME/MirrorBuddy" 2>/dev/null && pwd)"
-  [ -n "$mb_real" ] || return 1
-  case "$gcd" in "$mb_real/"*) return 0 ;; esac
-  return 1
+  mb_real="$(_realpath "$GH_HOME/MirrorBuddy")" || return 1
+  repo_real="$(_realpath "$repo")" || return 1
+  [ "$repo_real" = "$mb_real" ]
 }
 
-# Un worktree lockato (`git worktree lock`) e' quello che Claude Code tiene mentre un agente
-# ci gira dentro (vedi docs/en/worktrees § Clean up subagent and background-session worktrees).
-# "0 file modificati" non e' prova che l'agente ha finito — il lock e' il segnale che conta, e
-# va controllato PRIMA di qualunque altro verdetto: uno spazzino che rimuove un worktree lockato
-# toglie il tappeto da sotto un agente ancora in corsa.
-_wt_locked() {
-  local gd
-  gd="$(git -C "$1" rev-parse --git-dir 2>/dev/null)" || return 1
-  case "$gd" in /*) : ;; *) gd="$1/$gd" ;; esac
-  [ -f "$gd/locked" ]
-}
-
-# _is_worktree_root <path> — vero SOLO se questa cartella e' la RADICE di un worktree (ha un
-# proprio .git). Distinzione che conta esattamente in queste tre convenzioni: <repo>/worktrees,
-# <repo>/.worktrees e <repo>/.claude/worktrees vivono DENTRO l'albero di lavoro del repo
-# principale, quindi una cartella semplice li' dentro (senza .git suo) supera comunque
-# `git -C <cartella> rev-parse --git-dir`: git risale ai genitori e trova il .git del repo
-# principale. Senza questo controllo una cartella cosi' viene letta come "pulita e integrata"
-# (lo stato del REPO, non suo) invece che come orfana — e finisce REMOVE per errore. Un worktree
-# collegato ha SEMPRE un .git proprio (un FILE "gitdir: ..."), quindi -e "$1/.git" e' la guardia.
-_is_worktree_root() {
-  [ -e "$1/.git" ] && git -C "$1" rev-parse --git-dir >/dev/null 2>&1
-}
-
-# Una cartella e' un repo se ha .git (anche come FILE, per i worktree annidati) o se e' in
-# layout bare (HEAD+refs+objects senza .git — il layout di MirrorBuddy).
+# Un repo VERO (radice principale), non un worktree collegato che si spaccia per repo: ha .git
+# come CARTELLA (mai come file — quello e' il puntatore di un worktree collegato, la cui
+# famiglia si scopre gia' interrogando il repo principale) o e' in layout bare (HEAD+refs+
+# objects senza .git — il layout di MirrorBuddy). Senza il `-d` (invece di `-e`) un fratello
+# come VirtualBPMFy27-hls2-scope verrebbe letto come un secondo repo e la sua intera famiglia di
+# worktree, gia' vista interrogando VirtualBPMFy27, ricomparirebbe duplicata nel referto.
 _is_repo_dir() {
-  [ -e "$1/.git" ] && return 0
+  [ -d "$1/.git" ] && return 0
   [ -f "$1/HEAD" ] && [ -d "$1/refs" ] && [ -d "$1/objects" ] && return 0
   return 1
 }
 
-# _discover_repos — un repo per riga: "<nome>\t<path>". Le cartelle che non sono repo ma li
+# _discover_repos — un repo VERO per riga: "<nome>\t<path>". Le cartelle che non sono repo ma li
 # CONTENGONO (WareHouse, ParkingLot, MirrorHR_Set, copilot-worktrees sulla macchina reale) si
-# aprono di un livello: senza questo passo i repo parcheggiati li' dentro restano invisibili.
+# aprono di un livello: senza questo passo i repo parcheggiati li' dentro (es. MirrorHR_Set/
+# MirrorHR, che possiede i worktree sotto ~/GitHub/worktrees/MirrorHR/completion-.../*) restano
+# invisibili — e con loro tutti i worktree che possiedono, ovunque vivano davvero.
 _discover_repos() {
   local d name sub sname
   for d in "$GH_HOME"/*/; do
     [ -d "$d" ] || continue
     d="${d%/}"; name="$(basename "$d")"
-    [ "$d" = "$WT_HOME" ] && continue   # location 1 stessa: la scandisce gia' worktree-sweep.sh
+    [ "$d" = "$WT_HOME" ] && continue   # location 1 stessa, non un repo
     if _is_repo_dir "$d"; then
       printf '%s\t%s\n' "$name" "$d"
       continue
     fi
+    # Un .git (file, non cartella: gia' escluso da _is_repo_dir sopra) qui significa "e' un
+    # worktree collegato di un altro repo" — la sua famiglia si scopre gia' interrogando QUEL
+    # repo, ovunque viva (_wt_registry). Non e' un contenitore: non scendere dentro a cercarci
+    # repo annidati, sarebbe solo guardare dentro un checkout di lavoro altrui.
+    [ -e "$d/.git" ] && continue
     for sub in "$d"/*/; do
       [ -d "$sub" ] || continue
       sub="${sub%/}"; sname="$(basename "$sub")"
@@ -97,9 +89,10 @@ _discover_repos() {
   done
 }
 
-# _location_dirs <repo-path> — le tre convenzioni RELATIVE al repo (la quarta e' globale sotto
-# $WT_HOME e la scandisce gia' worktree-sweep.sh). Stampa "<etichetta>\t<path>" per quelle che
-# esistono davvero — niente falsi positivi su repo che non le usano.
+# _location_dirs <repo-path> — le tre convenzioni RELATIVE al repo, usate ORA SOLO dalla fase B
+# (caccia agli orfani) in worktree-sweep.sh: ogni worktree VERO, anche dentro queste cartelle,
+# si trova gia' via _wt_registry, indipendentemente da dove vive. Stampa "<etichetta>\t<path>"
+# per quelle che esistono davvero — niente falsi positivi su repo che non le usano.
 _location_dirs() {
   local repo="$1"
   [ -d "$repo/worktrees" ] && printf 'repo/worktrees\t%s/worktrees\n' "$repo"
@@ -107,83 +100,144 @@ _location_dirs() {
   [ -d "$repo/.claude/worktrees" ] && printf 'repo/.claude/worktrees\t%s/.claude/worktrees\n' "$repo"
 }
 
-# _verdict_at <wt-path> <repo-path> <repo-name> — come _verdict di worktree-sweep.sh ma prende
-# il repo per PATH: i repo annidati sotto una cartella contenitore non si risolvono per nome
-# (_repo_path guarda solo $HOME/GitHub/<nome> o il registro). Stessa logica di sicurezza:
-# esclusione dura prima di tutto, poi cartella in uso, poi orfana (vuota si toglie, altrimenti
-# si tiene e si dice), poi card in corso, sporca, non integrata.
-_verdict_at() {
-  local wt="$1" repo="$2" name="$3" branch dirty
-  _wt_hard_exclude "$wt" && { echo "KEEP: MirrorBuddy — Roberto ci lavora ora con un altro agente, mai toccare"; return 0; }
-  case "$PWD/" in "$wt"/*) echo "KEEP: e' la cartella in cui stai lavorando adesso"; return 0 ;; esac
-  if [ ! -d "$wt" ]; then echo "REMOVE"; return 0; fi
-  if ! _is_worktree_root "$wt"; then
-    if [ -z "$(ls -A "$wt" 2>/dev/null)" ]; then echo "REMOVE"; else
-      echo "KEEP: cartella orfana (git non la conosce), non vuota — $(ls -A "$wt" 2>/dev/null | wc -l | tr -d ' ') elementi"
-    fi
-    return 0
-  fi
-  _wt_locked "$wt" && { echo "KEEP: lockato (un agente potrebbe averci ancora sessione aperta)"; return 0; }
+# _wt_registry <repo-path> — interroga IL REGISTRO DI GIT (`worktree list --porcelain`), non il
+# filesystem: un record per worktree collegato, "<path>\t<HEAD-sha>\t<branch>\t<locked>\t
+# <prunable>". Il checkout principale (o l'entry "bare" per un repo in layout bare) resta nel
+# flusso — e' compito del chiamante scartarlo confrontando il path col repo stesso. "branch" e'
+# "HEAD" per una HEAD staccata e "BARE" per l'entry bare stessa, mai vuoto (un branch vuoto
+# romperebbe `git branch -d ""` piu' avanti).
+_wt_registry() {
+  git -C "$1" worktree list --porcelain 2>/dev/null | awk '
+    function flush() {
+      if (path != "") printf "%s\t%s\t%s\t%s\t%s\n", path, head, branch, locked, prunable
+      path=""; head=""; branch="HEAD"; locked="0"; prunable="0"
+    }
+    /^worktree /{ flush(); path=substr($0,10) }
+    /^HEAD /{ head=substr($0,6) }
+    /^branch /{ b=substr($0,8); sub(/^refs\/heads\//,"",b); branch=b }
+    /^bare$/{ branch="BARE" }
+    /^locked/{ locked="1" }
+    /^prunable/{ prunable="1" }
+    END{ flush() }
+  '
+}
+
+# _wt_verdict <wt-path> <repo-path> <head-oid> <branch> <locked> <prunable> -> "PRUNE" |
+# "REMOVE" | "KEEP: <perche'>". Il repo e' gia' NOTO (viene dalla riga del registro, non da un
+# nome da risolvere), quindi non c'e' piu' bisogno di distinguere "trovato per nome" da "trovato
+# per path" come nella versione precedente (_verdict vs _verdict_at): un'unica funzione basta.
+_wt_verdict() {
+  local wt="$1" repo="$2" oid="$3" branch="$4" locked="$5" prunable="$6" dirty wt_real pwd_real
+  _wt_hard_exclude "$repo" "$wt" && { echo "KEEP: MirrorBuddy — Roberto ci lavora ora con un altro agente, mai toccare"; return 0; }
+  # Confronto sul percorso FISICO (vedi _realpath): un worktree lockato dentro proprio QUESTO
+  # checkout deve sopravvivere anche se $PWD e $wt arrivano da forme diverse dello stesso posto.
+  wt_real="$(_realpath "$wt")" || wt_real="$wt"
+  pwd_real="$(_realpath "$PWD")" || pwd_real="$PWD"
+  case "$pwd_real/" in "$wt_real"/*) echo "KEEP: e' la cartella in cui stai lavorando adesso"; return 0 ;; esac
+  [ "$prunable" = "1" ] && { echo "PRUNE"; return 0; }
+  [ "$locked" = "1" ] && { echo "KEEP: lockato (un agente potrebbe averci ancora sessione aperta)"; return 0; }
   _owned_by_doing_card "$wt" && { echo "KEEP: appartiene a una card in corso"; return 0; }
   dirty="$(git -C "$wt" status --porcelain 2>/dev/null | grep -c . || true)"
   [ "${dirty:-0}" -gt 0 ] && { echo "KEEP: $dirty file non salvati"; return 0; }
-  [ -n "$repo" ] || { echo "KEEP: non trovo il repo principale di $name"; return 0; }
-  branch="$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
-  _branch_integrated "$repo" "$branch" "$wt" || { echo "KEEP: $branch ha lavoro non ancora integrato"; return 0; }
+  _branch_integrated "$repo" "$oid" "$branch" || { echo "KEEP: $branch ha lavoro non ancora integrato"; return 0; }
   echo "REMOVE"
 }
 
-# _scan_extra_locations <apply> <only> — le convenzioni 2/3/4 per ogni repo scoperto, piu' i
-# registri "prunable" di git (la cartella e' gia' sparita: pulirli e' `git worktree prune`, non
-# una rm — non c'e' niente da perdere). Aggiorna n/rm/kept del chiamante: bash e' a scope
-# dinamico, quindi le variabili `local` di _sweep restano visibili (e modificabili) qui dentro
-# perche' NON le ridichiariamo locali — e' la stessa cosa che fa gia' _verdict con quelle sue.
-_scan_extra_locations() {
-  local apply="$1" only="$2" repo name label dir wt v prune_out
+# _scan_repo <repo-path> <repo-name> <apply> — un verdetto e una riga per OGNI worktree che
+# `git -C <repo-path> worktree list` conosce, OVUNQUE viva: e' cosi' che un fratello come
+# VirtualBPMFy27-hls2-scope o un nipote come copilot-worktrees/MirrorScopio/roberdan-... finisce
+# nel referto senza che nessuna delle quattro cartelle convenzionali venga nominata. Appende ogni
+# path VERO (risolto) al file $known, cosi' la fase B (caccia agli orfani) sa cosa NON e' orfano.
+# Aggiorna n/rm/kept del chiamante per scope dinamico — vedi la nota in _sweep. $known e' lo
+# stesso: dichiarata `local` in _sweep, mai in questo file di proposito (shellcheck non lo vede
+# attraverso il confine dinamico, da qui i disable qui sotto — non e' un refuso).
+# shellcheck disable=SC2154
+_scan_repo() {
+  local repo="$1" name="$2" apply="$3" repo_real path oid branch locked prunable path_real v
+  repo_real="$(_realpath "$repo")" || return 0
+  while IFS=$'\t' read -r path oid branch locked prunable; do
+    [ -n "$path" ] || continue
+    path_real="$(_realpath "$path")" || path_real="$path"   # prunable: la cartella non c'e' piu'
+    [ "$path_real" = "$repo_real" ] && continue              # il checkout principale, non un candidato
+    printf '%s\n' "$path_real" >> "$known"
+    n=$((n+1))
+    v="$(_wt_verdict "$path" "$repo" "$oid" "$branch" "$locked" "$prunable")"
+    case "$v" in
+      PRUNE)
+        if [ "$apply" = "1" ]; then
+          git -C "$repo" worktree prune -v >/dev/null 2>&1
+          rm=$((rm+1)); printf '  pulita (prunable)  %s\n' "$path"
+        else
+          rm=$((rm+1)); printf '  da pulire (prunable) %s\n' "$path"
+        fi ;;
+      REMOVE)
+        if [ "$apply" = "1" ]; then
+          # MAI una `rm -rf` di riserva: se git rifiuta (lock preso nel frattempo, submodule
+          # sporco...) e' un rifiuto da rispettare, non da scavalcare.
+          if git -C "$repo" worktree remove "$path" 2>/dev/null; then
+            rm=$((rm+1)); printf '  rimossa   %s\n' "$path"
+            case "$branch" in HEAD|BARE) ;; *) git -C "$repo" branch -d "$branch" >/dev/null 2>&1 ;; esac
+          else
+            printf '  NON rimossa (git ha rifiutato) %s\n' "$path"
+          fi
+        else
+          rm=$((rm+1)); printf '  da rimuovere %s\n' "$path"
+        fi ;;
+      *) kept=$((kept+1)); printf '  tenuta    %-58s %s\n' "$path" "$v" ;;
+    esac
+  done < <(_wt_registry "$repo")
+}
+
+# _orphan_check <path> <apply> — fase B: una cartella che SEMBRA un worktree per posizione (una
+# delle quattro convenzioni) ma che ne' e' una ne' ne contiene: git non la conosce affatto (es.
+# ~/GitHub/worktrees/MirrorHR/completion-20260906-f144e5a4/integration PRIMA che MirrorHR_Set
+# fosse scoperto come proprietario — ora quella entry ha gia' il suo verdetto vero da _scan_repo
+# e finisce nel file $known, quindi qui non ricompare). Una cartella che CONTIENE worktree veri
+# (il contenitore completion-20260906-f144e5a4 stesso) non e' mai chiamata orfana: i suoi figli
+# hanno gia' la loro riga, il contenitore e' solo un percorso, non un candidato.
+# shellcheck disable=SC2154
+_orphan_check() {
+  local wt="$1" apply="$2" wt_real
+  wt_real="$(_realpath "$wt")" || return 0
+  grep -qxF "$wt_real" "$known" 2>/dev/null && return 0        # e' un worktree vero: gia' segnalato
+  grep -qF "$wt_real/" "$known" 2>/dev/null && return 0        # CONTIENE worktree veri: non e' orfana
+  n=$((n+1))
+  if [ -z "$(ls -A "$wt" 2>/dev/null)" ]; then
+    if [ "$apply" = "1" ]; then
+      rmdir "$wt" 2>/dev/null && { rm=$((rm+1)); printf '  rimossa (orfana)  %s\n' "$wt"; } \
+        || printf '  NON rimossa (cartella orfana non vuota) %s\n' "$wt"
+    else
+      rm=$((rm+1)); printf '  da rimuovere (orfana) %s\n' "$wt"
+    fi
+  else
+    kept=$((kept+1))
+    printf '  tenuta    %-58s KEEP: cartella orfana (git non la conosce), non vuota — %s elementi\n' \
+      "$wt" "$(ls -A "$wt" 2>/dev/null | wc -l | tr -d ' ')"
+  fi
+}
+
+# _scan_orphans <apply> <only> — le stesse quattro cartelle convenzionali di prima, ma solo per
+# trovare cartelle che _scan_repo non ha gia' spiegato (vedi _orphan_check).
+_scan_orphans() {
+  local apply="$1" only="$2" d name repo dir wt
+  for d in "$WT_HOME"/*/; do
+    [ -d "$d" ] || continue
+    name="$(basename "${d%/}")"
+    [ -n "$only" ] && [ "$name" != "$only" ] && continue
+    for wt in "$d"*/; do
+      [ -d "$wt" ] || continue
+      _orphan_check "${wt%/}" "$apply"
+    done
+  done
   while IFS=$'\t' read -r name repo; do
     [ -n "$repo" ] || continue
     [ -n "$only" ] && [ "$name" != "$only" ] && continue
-    while IFS=$'\t' read -r label dir; do
+    while IFS=$'\t' read -r _ dir; do   # 1o campo (l'etichetta della convenzione) non serve qui
       [ -n "$dir" ] || continue
       for wt in "$dir"/*/; do
         [ -d "$wt" ] || continue
-        wt="${wt%/}"; n=$((n+1))
-        v="$(_verdict_at "$wt" "$repo" "$name")"
-        if [ "$v" = "REMOVE" ]; then
-          if [ "$apply" = "1" ]; then
-            # MAI una `rm -rf` di riserva: se git rifiuta (es. lock preso da un agente dopo il
-            # verdetto, o submodule non pulito) e' un rifiuto da rispettare, non da scavalcare.
-            if _is_worktree_root "$wt"; then
-              git -C "$repo" worktree remove "$wt" 2>/dev/null
-            else
-              rmdir "$wt" 2>/dev/null || true
-            fi
-            [ -d "$wt" ] && printf '  NON rimossa (git ha rifiutato) %s [%s]\n' "$wt" "$label" \
-              || { rm=$((rm+1)); printf '  rimossa   %s [%s]\n' "$wt" "$label"; }
-          else
-            rm=$((rm+1)); printf '  da rimuovere %s [%s]\n' "$wt" "$label"
-          fi
-        else
-          kept=$((kept+1)); printf '  tenuta    %-58s %s [%s]\n' "$wt" "$v" "$label"
-        fi
+        _orphan_check "${wt%/}" "$apply"
       done
     done < <(_location_dirs "$repo")
-    prune_out="$(git -C "$repo" worktree list --porcelain 2>/dev/null | awk '
-      /^worktree /{p=$2} /^prunable/{print p}')"
-    [ -n "$prune_out" ] || continue
-    while IFS= read -r wt; do
-      [ -n "$wt" ] || continue
-      n=$((n+1))
-      # La cartella prunable non esiste piu' (e' il senso di "prunable"), quindi l'esclusione
-      # si controlla sul REPO — tutte le voci di questo giro appartengono allo stesso $repo.
-      if _wt_hard_exclude "$repo"; then
-        kept=$((kept+1)); printf '  tenuta    %-58s %s\n' "$wt" "KEEP: MirrorBuddy — mai toccare, nemmeno il registro git"
-      elif [ "$apply" = "1" ]; then
-        git -C "$repo" worktree prune -v >/dev/null 2>&1
-        rm=$((rm+1)); printf '  pulita (prunable)  %s [git worktree list]\n' "$wt"
-      else
-        rm=$((rm+1)); printf '  da pulire (prunable) %s [git worktree list]\n' "$wt"
-      fi
-    done <<< "$prune_out"
   done < <(_discover_repos)
 }
