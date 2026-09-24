@@ -612,6 +612,13 @@ including a text-only request with no media files to produce. Loading craft
 guidance does not authorize rendering, spending or publishing; keep the result
 inside the requested scope. If unavailable, read `skills/film-director/skill.md`.
 
+**Native enforcement is bounded, not universal.** When installed and active, the
+Copilot/Claude callbacks enforce recognized explicit Italian/English video and Apple UI
+requests: successful skill loading or a full canonical read, otherwise an explicit incomplete
+result with at most two continuations. Pause/cancel and ordinary requests remain free.
+They do not prove that guidance was followed or classify every paraphrase. Activation
+prerequisites and measured positive/negative cases: [`eval/README.md`](eval/README.md#native-activation-boundaries).
+
 **Route to a name the host actually declares.** Ask the host for its skill list and match the
 **declared skill name**; never infer availability from a directory prefix, a `gstack:` namespace
 or the fact that a name appears below. Most of these routes come from **gstack, which is

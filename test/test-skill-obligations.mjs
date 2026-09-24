@@ -169,6 +169,37 @@ test("real Claude callback adapter emits native block and success-only fallback 
     assert.deepEqual(invoke({ hook_event_name: "Stop", stop_hook_active: true }), {});
 });
 
+test("native continuation keeps inherited observers alive until its terminal end", async (t) => {
+    const f = fixture(t);
+    let ended = 0;
+    const hooks = withSkillObligations({
+        onSessionEnd: () => { ended++; },
+    }, { ...f, sessionId: () => "session-1", notify: async () => {} });
+    await hooks.onUserPromptSubmitted({ prompt: video });
+    assert.equal((await hooks.onAgentStop({})).decision, "block");
+    await hooks.onSessionEnd({});
+    assert.equal(ended, 0, "a continuation must not stop inherited audit/bus observers");
+    await hooks.onPostToolUse({ toolName: "skill", toolArgs: { skill: "film-director" },
+        toolResult: { resultType: "success" } });
+    await hooks.onAgentStop({});
+    await hooks.onSessionEnd({});
+    assert.equal(ended, 1);
+    await hooks.onUserPromptSubmitted({ prompt: video });
+    for (let i = 0; i < RETRIES; i++) {
+        assert.equal((await hooks.onAgentStop({})).decision, "block");
+        await hooks.onSessionEnd({});
+        assert.equal(ended, 1);
+    }
+    await hooks.onAgentStop({});
+    await hooks.onSessionEnd({});
+    assert.equal(ended, 2, "exhausted retries still deliver terminal cleanup");
+    await hooks.onUserPromptSubmitted({ prompt: video });
+    await hooks.onAgentStop({});
+    await hooks.onUserPromptSubmitted({ prompt: "stop" });
+    await hooks.onSessionEnd({});
+    assert.equal(ended, 3, "user pause still delivers cleanup");
+});
+
 test("native Copilot composition enforces a skipped load, retains guards, and never starts its own model turn", async (t) => {
     const f = fixture(t), notices = [];
     let queueCalls = 0;

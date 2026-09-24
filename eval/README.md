@@ -128,6 +128,9 @@ also exercises the shared engine, registration and integration regressions.
 State contains public route IDs and fixed metadata, never prompt or tool content.
 Copilot emitted session-end callbacks between continuations in these probes;
 unmet obligations therefore survive that event rather than becoming false success.
+During a skill continuation, inherited Copilot audit and bus cleanup is deferred;
+it still runs after fulfillment, exhausted retries or a user pause. The real callback
+sequence reproduced premature cleanup before this integration fix.
 
 ## Fixture inventory vs. what's been run
 

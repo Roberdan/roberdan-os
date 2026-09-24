@@ -14,6 +14,7 @@ function argumentsOf(raw) {
 
 export function withSkillObligations(hooks, { root, home, sessionId, notify }) {
     const wrapped = { ...hooks };
+    let continuing = false;
     for (const [hook, event] of Object.entries(phases)) {
         wrapped[hook] = async (input = {}, invocation = {}) => {
             const sid = sessionId() || invocation.sessionId || input.sessionId;
@@ -21,6 +22,7 @@ export function withSkillObligations(hooks, { root, home, sessionId, notify }) {
                 (event === "prompt" && typeof input.prompt !== "string")) {
                 return hooks[hook]?.(input, invocation);
             }
+            if (event === "stop") continuing = false;
             let output;
             try {
                 output = await enforceSkillObligations({
@@ -42,8 +44,10 @@ export function withSkillObligations(hooks, { root, home, sessionId, notify }) {
                     event, status: output.status, receipts: output.receipts, blocks: output.blocks,
                 }) + "\n");
             }
-            if (output.block) { await notify(output.notice); return { decision: "block", reason: output.block }; }
+            if (output.block) { continuing = true; await notify(output.notice); return { decision: "block", reason: output.block }; }
             if (output.warning) { await notify(output.warning); return undefined; }
+            // The host emits end between retries; inherited cleanup would disable audit/bus.
+            if (event === "end" && continuing && output.status === "required") return undefined;
             const prior = await hooks[hook]?.(input, invocation);
             if (output.deny) return { ...prior, permissionDecision: "deny", permissionDecisionReason: output.deny };
             if (output.context) return { ...prior,
