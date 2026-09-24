@@ -105,6 +105,15 @@ rm -f "$RDA_HOME"/autosweep-*
 RDA_NO_AUTOSWEEP=1 bash -c "cd '$REPO' && bash '$WT' autosweep >/dev/null 2>&1"
 [ -d "$CLEAN4" ] && ok "RDA_NO_AUTOSWEEP=1 lo spegne davvero" || fail "ha pulito anche con RDA_NO_AUTOSWEEP=1"
 
+# autosweep gira DA SOLA, senza che nessuno la guardi: resta ristretta a $WT_HOME come sempre
+# stata, anche ora che il registro di git troverebbe worktree altrove (.claude/worktrees, un
+# fratello...) — decidere di quelli e' `kb wt --yes`, mai un job silenzioso.
+mkdir -p "$REPO/.claude/worktrees"
+git -C "$REPO" worktree add -q -b card/autokeep "$REPO/.claude/worktrees/autokeep" main
+rm -f "$RDA_HOME"/autosweep-*
+(cd "$REPO" && bash "$WT" autosweep >/dev/null 2>&1)
+[ -d "$REPO/.claude/worktrees/autokeep" ] && ok "autosweep non tocca worktree fuori da \$WT_HOME (pulita e integrata compresa)" || fail "autosweep ha rimosso una copia fuori da \$WT_HOME"
+
 # --- le altre tre convenzioni, i repo annidati in una cartella contenitore (WareHouse/
 # ParkingLot sulla macchina reale), le cartelle orfane, i prunable, e MirrorBuddy sempre tenuto.
 REPO3="$HOME/GitHub/demo3"; mkdir -p "$REPO3"
@@ -247,51 +256,9 @@ out9="$(cd "$TMP" && bash "$WT" sweep --yes --all 2>&1)"
 [ -d "$REPO3/.claude/worktrees/detached2" ] && ok "HEAD staccata con commit proprio tenuta in location (4)" || fail "RIMOSSA una HEAD staccata con lavoro non integrato — location (4)"
 case "$out9" in *"HEAD ha lavoro non ancora integrato"*) ok "dice PERCHE' tiene una HEAD staccata" ;; *) fail "non spiega perche' tiene una HEAD staccata" ;; esac
 
-# --- @thor F2 (card 260924-085105-3b): un worktree si trova dal REGISTRO di git, non da dove
-# "dovrebbe" vivere per convenzione. Misurato sulla macchina reale: MirrorHR_Set/MirrorHR
-# possiede 4 worktree due livelli sotto $WT_HOME/MirrorHR/ (prima: una riga "cartella orfana, N
-# elementi"), un fratello di VirtualBPMFy27 vive a ~/GitHub/VirtualBPMFy27-hls2-scope (mai in
-# nessuna delle 4 convenzioni), un worktree di ParkingLot/MirrorScopio vive dentro
-# ~/GitHub/copilot-worktrees/MirrorScopio/... (nidificato sotto una cartella che non e' un repo).
-
-# (a) nidificato DUE livelli sotto la convenzione (1): il contenitore non e' mai "orfano".
-NESTREPO="$HOME/GitHub/nestrepo"; mkdir -p "$NESTREPO"
-git -C "$NESTREPO" init -q -b main
-echo one > "$NESTREPO/f"; git -C "$NESTREPO" add f; git -C "$NESTREPO" commit -qm one
-git -C "$NESTREPO" worktree add -q -b nest/merged "$RDA_WORKTREES/nestrepo/contenitore/merged" main
-git -C "$NESTREPO" worktree add -q -b nest/unmerged "$RDA_WORKTREES/nestrepo/contenitore/unmerged" main
-echo z > "$RDA_WORKTREES/nestrepo/contenitore/unmerged/f"; git -C "$RDA_WORKTREES/nestrepo/contenitore/unmerged" commit -qam z
-
-# (b) sotto una cartella-stile-copilot-worktrees, nidificato due livelli, il repo altrove.
-COPREPO="$HOME/GitHub/coprepo"; mkdir -p "$COPREPO"
-git -C "$COPREPO" init -q -b main
-echo one > "$COPREPO/f"; git -C "$COPREPO" add f; git -C "$COPREPO" commit -qm one
-git -C "$COPREPO" worktree add -q -b cop/merged "$HOME/GitHub/copilot-worktrees/coprepo/session1" main
-
-# (c) fratello di primo livello, mai dentro nessuna delle quattro convenzioni.
-SIBREPO="$HOME/GitHub/sibrepo"; mkdir -p "$SIBREPO"
-git -C "$SIBREPO" init -q -b main
-echo one > "$SIBREPO/f"; git -C "$SIBREPO" add f; git -C "$SIBREPO" commit -qm one
-git -C "$SIBREPO" worktree add -q -b sib/unmerged "$HOME/GitHub/sibrepo-extra-scope" main
-echo z > "$HOME/GitHub/sibrepo-extra-scope/f"; git -C "$HOME/GitHub/sibrepo-extra-scope" commit -qam z
-
-out10="$(cd "$TMP" && bash "$WT" sweep --yes --all 2>&1)"
-
-[ -d "$RDA_WORKTREES/nestrepo/contenitore/merged" ] && fail "worktree nidificato 2 livelli sotto WT_HOME non rimosso" || ok "worktree nidificato 2 livelli sotto WT_HOME (pulito e integrato) rimosso dal registro di git"
-[ -d "$RDA_WORKTREES/nestrepo/contenitore/unmerged" ] && ok "worktree nidificato 2 livelli con lavoro non integrato tenuto, con la sua riga propria" || fail "RIMOSSO un worktree nidificato con lavoro non integrato"
-# Match sul path esatto seguito da spazio/a-capo (mai da uno slash, che introduce un figlio
-# vero): "orfana" compare gia' altrove nell'output (full-orphan, ancora presente), quindi un
-# semplice *contenitore*orfan* darebbe un falso "fallito" a distanza.
-CONTDIR="$RDA_WORKTREES/nestrepo/contenitore"
-case "$out10" in
-  *"$CONTDIR "*|*"$CONTDIR"$'\n'*) fail "il CONTENITORE (che ha worktree veri dentro) e' comparso come riga propria" ;;
-  *) ok "il contenitore con worktree veri dentro non compare mai come riga propria (mai orfano)" ;;
-esac
-[ -d "$HOME/GitHub/copilot-worktrees/coprepo/session1" ] && fail "worktree in stile copilot-worktrees (nidificato, repo altrove) non rimosso" || ok "worktree in stile copilot-worktrees trovato e rimosso via registro di git, non via scansione di cartelle"
-[ -d "$HOME/GitHub/sibrepo-extra-scope" ] && ok "worktree fratello di primo livello (mai in nessuna delle 4 convenzioni) tenuto: lavoro non integrato" || fail "RIMOSSO un worktree fratello con lavoro non integrato"
-case "$out10" in *"$HOME/GitHub/sibrepo-extra-scope"*) ok "il worktree fratello compare nel referto (trovato dal registro, non da una cartella nominata)" ;; *) fail "il worktree fratello non compare nel referto" ;; esac
-n_occ="$(grep -oF "$HOME/GitHub/sibrepo-extra-scope" <<<"$out10" | wc -l | tr -d ' ')"
-[ "$n_occ" -eq 1 ] && ok "il worktree fratello compare UNA sola volta (il suo .git-file non lo fa contare due volte come repo a se')" || fail "il worktree fratello compare $n_occ volte nel referto — doppio conteggio"
+# Le fixture per @thor F2 (worktree trovati dal registro di git in posti arbitrari: nidificati,
+# stile copilot-worktrees, fratelli di primo livello, repo nel kanban-registry) vivono in
+# test/test-worktree-registry.sh — questo file era gia' al limite delle 300 righe.
 
 REAL_WT_AFTER="$(ls -1d "$REAL_HOME/GitHub/worktrees"/*/ 2>/dev/null | sort)"
 [ "$REAL_WT_BEFORE" = "$REAL_WT_AFTER" ] && ok "la suite non ha toccato il parco vero delle copie di lavoro" \

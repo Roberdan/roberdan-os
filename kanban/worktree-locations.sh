@@ -65,15 +65,23 @@ _is_repo_dir() {
 # CONTENGONO (WareHouse, ParkingLot, MirrorHR_Set, copilot-worktrees sulla macchina reale) si
 # aprono di un livello: senza questo passo i repo parcheggiati li' dentro (es. MirrorHR_Set/
 # MirrorHR, che possiede i worktree sotto ~/GitHub/worktrees/MirrorHR/completion-.../*) restano
-# invisibili — e con loro tutti i worktree che possiedono, ovunque vivano davvero.
+# invisibili — e con loro tutti i worktree che possiedono, ovunque vivano davvero. Il REGISTRO
+# (kanban-registry, la stessa fonte di _repo_path in worktree.sh) copre quello che NEMMENO
+# questo trova: un repo fuori da ~/GitHub o annidato piu' di un livello. Deduplicato per path
+# FISICO — un repo trovato sia per convenzione sia per registro (il caso comune: quasi tutto il
+# registro vive gia' sotto ~/GitHub) non deve uscire due volte, o ogni suo worktree raddoppierebbe.
 _discover_repos() {
-  local d name sub sname
+  local d name sub sname r real seen
+  seen="$(mktemp 2>/dev/null)" || seen="${TMPDIR:-/tmp}/kb-wt-seen.$$"
+  : > "$seen"
+  trap 'rm -f "$seen"' RETURN
   for d in "$GH_HOME"/*/; do
     [ -d "$d" ] || continue
     d="${d%/}"; name="$(basename "$d")"
     [ "$d" = "$WT_HOME" ] && continue   # location 1 stessa, non un repo
     if _is_repo_dir "$d"; then
-      printf '%s\t%s\n' "$name" "$d"
+      real="$(_realpath "$d")" || real="$d"
+      grep -qxF "$real" "$seen" 2>/dev/null || { printf '%s\n' "$real" >> "$seen"; printf '%s\t%s\n' "$name" "$d"; }
       continue
     fi
     # Un .git (file, non cartella: gia' escluso da _is_repo_dir sopra) qui significa "e' un
@@ -84,9 +92,21 @@ _discover_repos() {
     for sub in "$d"/*/; do
       [ -d "$sub" ] || continue
       sub="${sub%/}"; sname="$(basename "$sub")"
-      _is_repo_dir "$sub" && printf '%s\t%s\n' "$sname" "$sub"
+      _is_repo_dir "$sub" || continue
+      real="$(_realpath "$sub")" || real="$sub"
+      grep -qxF "$real" "$seen" 2>/dev/null || { printf '%s\n' "$real" >> "$seen"; printf '%s\t%s\n' "$sname" "$sub"; }
     done
   done
+  if [ -f "${REGISTRY:-}" ]; then
+    while IFS= read -r r; do
+      [ -n "$r" ] || continue
+      case "$r" in \#*) continue ;; esac
+      [ -d "$r" ] || continue
+      _is_repo_dir "$r" || continue
+      real="$(_realpath "$r")" || real="$r"
+      grep -qxF "$real" "$seen" 2>/dev/null || { printf '%s\n' "$real" >> "$seen"; printf '%s\t%s\n' "$(basename "$r")" "$r"; }
+    done < "$REGISTRY"
+  fi
 }
 
 # _location_dirs <repo-path> — le tre convenzioni RELATIVE al repo, usate ORA SOLO dalla fase B
@@ -197,10 +217,27 @@ _scan_repo() {
 # hanno gia' la loro riga, il contenitore e' solo un percorso, non un candidato.
 # shellcheck disable=SC2154
 _orphan_check() {
-  local wt="$1" apply="$2" wt_real
+  local wt="$1" apply="$2" wt_real sub
   wt_real="$(_realpath "$wt")" || return 0
   grep -qxF "$wt_real" "$known" 2>/dev/null && return 0        # e' un worktree vero: gia' segnalato
   grep -qF "$wt_real/" "$known" 2>/dev/null && return 0        # CONTIENE worktree veri: non e' orfana
+  # Guardia di sicurezza: _discover_repos puo' comunque non trovare un repo (fuori da ~/GitHub,
+  # nel registro ma con un path rotto, annidato piu' di un livello...). Se QUESTA cartella o un
+  # suo figlio diretto ha un .git che git sa risolvere, non e' orfana — e' un repo/worktree
+  # vero che la scansione non ha raggiunto, non "git non lo conosce affatto".
+  if [ -e "$wt/.git" ] && git -C "$wt" rev-parse --git-common-dir >/dev/null 2>&1; then
+    n=$((n+1)); kept=$((kept+1))
+    printf '  tenuta    %-58s KEEP: repo/worktree registrato ma fuori dalla scansione (git lo conosce)\n' "$wt"
+    return 0
+  fi
+  for sub in "$wt"/*/; do
+    [ -d "$sub" ] || continue
+    if [ -e "$sub/.git" ] && git -C "$sub" rev-parse --git-common-dir >/dev/null 2>&1; then
+      n=$((n+1)); kept=$((kept+1))
+      printf '  tenuta    %-58s KEEP: contiene un repo/worktree registrato fuori dalla scansione\n' "$wt"
+      return 0
+    fi
+  done
   n=$((n+1))
   if [ -z "$(ls -A "$wt" 2>/dev/null)" ]; then
     if [ "$apply" = "1" ]; then

@@ -152,7 +152,7 @@ _sweep() {
 # prunable/orfane — mai lo ha fatto: resta compito esplicito di `kb wt --yes`.
 _autosweep() {
   [ "${RDA_NO_AUTOSWEEP:-0}" = "1" ] && return 0
-  local only stamp mins name repo repo_real path oid branch locked prunable path_real v
+  local only stamp mins name repo repo_real path oid branch locked prunable path_real v wt_home_real
   only="$(_scope)"
   [ -n "$only" ] || return 0          # fuori da un repo non si pulisce niente a sorpresa
   mins="${RDA_WT_AUTOSWEEP_MIN:-20}"
@@ -160,6 +160,13 @@ _autosweep() {
   mkdir -p "$RDA_HOME" 2>/dev/null || true
   if [ -f "$stamp" ] && [ -n "$(find "$stamp" -mmin "-$mins" 2>/dev/null)" ]; then return 0; fi
   : > "$stamp"
+  # Resta ristretta a $WT_HOME/<repo>/*, come SEMPRE stata: gira sola, senza guardarla, a ogni
+  # turno. Il resto del parco (le altre tre convenzioni, i fratelli arbitrari) e' un cambiamento
+  # di comportamento non richiesto da questa card — lo decide l'orchestratore con `kb wt --yes`,
+  # mai un job silenzioso. _discover_repos/_wt_registry servono comunque: sono l'unico modo
+  # corretto di sapere QUALI worktree appartengono al repo "only", ovunque il registro dica che
+  # vivono — il filtro sul path e' quello che li restringe di nuovo a $WT_HOME.
+  wt_home_real="$(_realpath "$WT_HOME")" || return 0
   while IFS=$'\t' read -r name repo; do
     [ "$name" = "$only" ] || continue
     repo_real="$(_realpath "$repo")" || continue
@@ -167,6 +174,7 @@ _autosweep() {
       [ -n "$path" ] || continue
       path_real="$(_realpath "$path")" || continue
       [ "$path_real" = "$repo_real" ] && continue
+      case "$path_real/" in "$wt_home_real"/*) ;; *) continue ;; esac
       v="$(_wt_verdict "$path" "$repo" "$oid" "$branch" "$locked" "$prunable")"
       if [ "$v" = "REMOVE" ] && git -C "$repo" worktree remove "$path" 2>/dev/null; then
         printf 'copia di lavoro non piu\ necessaria, rimossa: %s\n' "$path"
