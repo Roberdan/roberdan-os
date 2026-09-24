@@ -258,10 +258,7 @@ section "agent bus — messages, never execution (test/test-bus.sh)"
 if _suite test-bus; then ok "bus delivers durably, attributes, resolves citations to no more than they prove, and executes nothing"; else _suite_out test-bus; err "test-bus — see bash test/test-bus.sh"; fi
 
 section "agent bus — the doorbell rings, it never delivers (test/test-bus-doorbell.sh)"
-if _suite test-bus-doorbell; then ok "the PostToolUse doorbell announces a COUNT in the one dialect the model hears, leaks no body, consumes no mail, is silent at zero, and is wired nowhere that can continue a turn"; else _suite_out test-bus-doorbell; err "test-bus-doorbell — see bash test/test-bus-doorbell.sh"; fi
-
-section "agent bus — the doorbell only rings after Bash|Edit|Write, never on a read (test/test-bus-doorbell-matcher.sh)"
-if _suite test-bus-doorbell-matcher; then ok "the generated PostToolUse entry carries matcher 'Bash|Edit|Write', an old unmatched entry is upgraded in place (never duplicated), and the matcher excludes Read/Glob/Grep and substring look-alikes like TodoWrite/NotebookEdit"; else _suite_out test-bus-doorbell-matcher; err "test-bus-doorbell-matcher — see bash test/test-bus-doorbell-matcher.sh"; fi
+if _suite test-bus-doorbell && _suite test-bus-doorbell-matcher; then ok "the PostToolUse doorbell announces a COUNT in the one dialect the model hears, leaks no body, consumes no mail, is silent at zero, and is wired nowhere that can continue a turn, and rings only after Bash|Edit|Write"; else _suite_out test-bus-doorbell; _suite_out test-bus-doorbell-matcher; err "test-bus-doorbell(-matcher) — see bash test/test-bus-doorbell.sh and test-bus-doorbell-matcher.sh"; fi
 
 section "agent bus — the typed MCP surface (test/test-bus-mcp.sh)"
 if _suite test-bus-mcp; then ok "the MCP surface dispatches send/read/log only, refuses unknown tools, and stores shell metacharacters as inert data"; else _suite_out test-bus-mcp; err "test-bus-mcp — see bash test/test-bus-mcp.sh"; fi
