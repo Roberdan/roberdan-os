@@ -218,7 +218,7 @@ class History(unittest.TestCase):
         (self.root / "kanban").mkdir()
         for file in (ROOT / "bin").glob("telemetry*"):
             shutil.copyfile(file, self.root / "bin" / file.name)
-        for name in ("audit_schema.py", "audit_store.py"):
+        for name in ("audit_schema.py", "audit_store.py", "audit_skills.py", "audit_skill_names.json"):
             shutil.copyfile(ROOT / "kanban" / name, self.root / "kanban" / name)
         bus = Path(os.environ["RDA_BUS_HOME"]) / "PRIVATE_PROJECT"
         bus.mkdir(parents=True)

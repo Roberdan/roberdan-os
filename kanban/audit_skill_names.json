@@ -1,0 +1,23 @@
+{
+  "canonical": [
+    "apple-designer",
+    "auto-checkpoint",
+    "engineering-reference",
+    "film-director",
+    "focus-group",
+    "instagram-reel-preview",
+    "jev",
+    "linear-ui",
+    "long-running-jobs",
+    "model-selection-policy",
+    "premortem",
+    "problem-validation",
+    "review",
+    "roberdan-twin",
+    "ship",
+    "sync",
+    "verify-done"
+  ],
+  "compatibility": ["roberto-twin"],
+  "providers": ["docx", "make-pdf", "pdf", "pptx", "source-command-pdf", "xlsx"]
+}

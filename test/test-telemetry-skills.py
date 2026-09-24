@@ -58,6 +58,8 @@ class SkillTelemetry(unittest.TestCase):
     def event(self, session, skill=None, host="copilot", when=RECENT, event_type="tool.execution_start"):
         self.sequence += 1
         data = {"toolCallId": f"call-{self.sequence}", "toolName": "skill" if skill else "bash"}
+        if event_type in ("tool.execution_start", "PreToolUse"):
+            data["skillNamePolicy"] = "public_allowlist_v1"
         if skill:
             data["arguments"] = {"skill": skill}
         append(native(host, {"session_id": session, "id": f"event-{self.sequence}",
@@ -187,6 +189,23 @@ class SkillTelemetry(unittest.TestCase):
         self.assertEqual((row["candidate_sessions"], row["cohort_sessions"], row["uses_outside_cohort"]), (1, 0, 1))
         self.assertEqual(row["status"], "non misurabile")
         self.assertNotIn("1/0", self.output(self.report()))
+
+    def test_legacy_masked_names_never_produce_general_zero_or_an_opportunity_denominator(self):
+        append(native("copilot", {"session_id": "PRIVATE_legacy", "timestamp": RECENT,
+                                 "type": "tool.execution_start",
+                                 "data": {"toolCallId": "legacy", "toolName": "skill"}}))
+        self.file("PRIVATE_legacy", "/PRIVATE_file.mp4")
+        report = self.report()
+        film = self.row("film-director", report)
+        self.assertIsNone(film["observed_sessions"])
+        self.assertIsNone(film["opportunity"]["cohort_sessions"])
+        self.assertEqual(report["sources"]["audit"]["legacy_or_unmarked_sessions"], 1)
+        self.assertEqual(report["sources"]["audit"]["public_name_sessions"], 0)
+        self.event("PRIVATE_legacy")
+        mixed = self.report()
+        self.assertIsNone(self.row("film-director", mixed)["observed_sessions"])
+        self.assertEqual(mixed["sources"]["audit"]["legacy_or_unmarked_sessions"], 1)
+        self.assertEqual(mixed["sources"]["audit"]["public_name_sessions"], 1)
 
     def test_twin_declared_aliases_only_affect_identity_not_decision_rates(self):
         self.event("PRIVATE_twin", "roberto-twin")

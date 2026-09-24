@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import tempfile
 import time
@@ -20,6 +21,8 @@ class ClaudeAuditHooks(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="rda-audit-claude-")
         self.root = Path(self.temp.name)
         (self.root / "kanban").mkdir()
+        for filename in ("audit_skills.py", "audit_skill_names.json"):
+            shutil.copyfile(HOOK.parents[1] / "kanban" / filename, self.root / "kanban" / filename)
         self.log = self.root / "events.jsonl"
         self.core = self.root / "kanban" / "audit.py"
         self.env = dict(os.environ, RDA_OS=str(self.root), RDA_HOME=str(self.root / "home"))
@@ -82,7 +85,7 @@ class ClaudeAuditHooks(unittest.TestCase):
         self.invoke(dict(hook_event_name="SessionEnd", reason="PRIVATE"))
         events = self.events()
         self.assertEqual([e["type"] for e in events],
-                         ["SessionStart", "observer.unsupported", "observer.gap", "SessionEnd"])
+                         ["SessionStart", "observer.unsupported", "observer.unsupported", "observer.gap", "SessionEnd"])
         self.assertEqual(events[0]["data"]["model"], "claude-test-model")
         self.assertEqual(events[-1]["data"], {})
         self.assertNotIn("PRIVATE", json.dumps(events))
@@ -113,7 +116,7 @@ class ClaudeAuditHooks(unittest.TestCase):
         self.healthy()
         self.invoke(dict(hook_event_name="SessionStart"))
         self.assertEqual([e["type"] for e in self.events()],
-                         ["observer.gap", "SessionStart", "observer.unsupported"])
+                         ["observer.gap", "SessionStart", "observer.unsupported", "observer.unsupported"])
 
     def test_single_ingest_at_a_time_and_busy_observer_leaves_bounded_gap(self):
         state = self.root / "home/audit-observer"

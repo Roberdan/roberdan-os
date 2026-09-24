@@ -13,6 +13,7 @@ from telemetry_inventory import TelemetryError, inventory
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "kanban"))
 from audit_schema import AuditError, TOOL_START_TYPES, TWIN_SELECTORS
+from audit_skills import POLICY, public_skill_names
 from audit_store import read_events
 
 CRITERIA = {
@@ -38,6 +39,7 @@ def audit_observations(start, end, aliases):
     except AuditError as exc:
         raise TelemetryError("audit non disponibile: archivio non valido o non leggibile") from exc
     uses, observed, gaps, unknown, unrecognized = {}, set(), set(), 0, set()
+    named_coverage, legacy = set(), set()
     undated_gaps = 0
     for row in rows:
         if row.get("provenance") != "adapter_reported":
@@ -62,6 +64,10 @@ def audit_observations(start, end, aliases):
         tool, arguments = data.get("toolName", ""), data.get("arguments", {})
         if not isinstance(tool, str) or not isinstance(arguments, dict):
             raise TelemetryError("audit non disponibile: struttura dell'avvio non valida")
+        if data.get("skillNamePolicy") == POLICY:
+            named_coverage.add(key)
+        else:
+            legacy.add(key)
         if tool.lower() != "skill":
             continue
         name = arguments.get("skill")
@@ -71,9 +77,11 @@ def audit_observations(start, end, aliases):
             unrecognized.add(key)
         else:
             uses.setdefault(aliases[name], set()).add(key)
-    return uses, observed, {"status": "presente" if exists else "assente",
+    return uses, named_coverage - legacy, {"status": "presente" if exists else "assente",
                            "coverage": "parziale" if observed else "non osservata",
                            "observed_sessions": len(observed), "gap_sessions": len(gaps),
+                           "public_name_sessions": len(named_coverage),
+                           "legacy_or_unmarked_sessions": len(legacy),
                            "undated_events": unknown, "undated_gap_events": undated_gaps,
                            "unrecognized_skill_sessions": len(unrecognized)}
 
@@ -114,14 +122,20 @@ def build_report(root, days, now=None):
     start = now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp() - days * 86400
     catalog = inventory(root, (TWIN_SELECTORS,))
     uses, observed, audit = audit_observations(start, end, catalog["aliases"])
+    try:
+        public_names = public_skill_names()
+    except (OSError, ValueError) as exc:
+        raise TelemetryError("elenco pubblico dei nomi osservabili non disponibile") from exc
     candidates, files = file_candidates(start, end)
     results = []
     for skill in catalog["skills"]:
         name = skill["name"]
         invocations = uses.get(name, set())
-        measured = bool(observed) and (skill["installed"] or bool(invocations))
+        public = bool({name, *skill["aliases"]} & public_names)
+        measured = bool(invocations) or (bool(observed) and skill["installed"] and public)
         usage_reason = (None if measured else "installazione non osservata" if not skill["installed"]
-                        else "nessuna sessione osservata nell'audit nella finestra")
+                        else "nome fuori dall'elenco pubblico osservabile" if not public
+                        else "copertura dei nomi pubblici non osservata nella finestra")
         selectors = [selector for selector in (name, *skill["aliases"]) if selector in CRITERIA]
         criterion = tuple(dict.fromkeys(pattern for selector in selectors for pattern in CRITERIA[selector]))
         opportunity = {"criteria": list(criterion) if criterion else None,
@@ -132,7 +146,7 @@ def build_report(root, days, now=None):
             reason = files.get("reason")
             if files["status"] == "presente":
                 candidate = set().union(*(candidates[selector] for selector in selectors))
-                cohort = candidate & observed
+                cohort = candidate & (observed | invocations)
                 opportunity["candidate_sessions"] = len(candidate)
                 if measured:
                     opportunity.update(cohort_sessions=len(cohort),
@@ -144,7 +158,7 @@ def build_report(root, days, now=None):
         results.append({**skill, "observed_sessions": len(invocations) if measured else None,
                         "usage_reason": usage_reason, "opportunity": opportunity})
     return {"schema_version": 1, "unit": "host_session",
-            "cohort_definition": "Copilot session_files first_seen_at intersect audit native tool-start sessions",
+            "cohort_definition": "Copilot session_files first_seen_at intersect public-name-policy starts or named skill invocations",
             "window": {"days": days, "start_epoch": start, "end_epoch": end},
             "inventory": {"scopes": catalog["scopes"], "unnamed_definitions": catalog["unnamed_definitions"]},
             "sources": {"audit": audit, "session_files": files}, "skills": results}
@@ -160,12 +174,15 @@ def render(report):
           f"sessioni con lacune dichiarate: {audit['gap_sessions']}; eventi senza data: {audit['undated_events']}.")
     print(f"  Avvisi di lacuna senza data: {audit['undated_gap_events']}, non attribuibili alla finestra.")
     print(f"  Sessioni con invocazioni skill non riconciliate: {audit['unrecognized_skill_sessions']}.")
+    print(f"  Nomi pubblici: {audit['public_name_sessions']} sessioni con filtro dichiarato; "
+          f"{audit['legacy_or_unmarked_sessions']} precedenti/senza dichiarazione: assenze non misurabili.")
     print(f"  Metadati file: {files['status']}; " + (files.get("reason") or
           f"prime osservazioni senza data: {files['undated_files']}"))
     print("  Occasioni CANDIDATE: estensioni/percorso Remotion in session_files Copilot, prima osservazione nella finestra.")
-    print("  Rapporto: sessioni con invocazione / candidate con almeno un avvio osservato nell'audit, stessa finestra e host.")
+    print("  Rapporto: invocazioni / candidate con filtro pubblico dichiarato o invocazione nominativa, stessa finestra e host.")
     print("  Invocazione osservata = avvio nominativo riportato dall'adattatore, non prova di completamento.")
     print("  Copertura parziale: un avvio non prova osservazione completa; zero osservato NON significa mai usata.")
+    print("  Solo nomi pubblici approvati; nomi privati/sconosciuti omessi. I vecchi adattatori mascheravano le skill generali.")
     print("  File pertinenti non provano un bisogno; mancano attivita' senza file, altri host e dati prima dell'osservatore.")
     for skill in report["skills"]:
         usage = (f"{skill['observed_sessions']} sessioni con invocazione osservata"
