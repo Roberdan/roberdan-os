@@ -54,7 +54,7 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 
 ---
 
-## Aperti — 5 su 10
+## Aperti — 9 su 10
 
 | # | Cosa | Prova |
 |---|---|---|
@@ -63,6 +63,10 @@ esiste. Il racconto lungo dei 25 rilievi precedenti sta in git, fino a `ac56a98`
 | 29 | **`handoff/latest.md` è del 2026-08-19 (VirtualBPM, PR #108) e viene indicato a ogni sessione come "filo corrente"** da `context-inject.sh` | Header del file; il checkpoint `kb resume` dello stesso giorno dice altro (roberdan-os, PR #74/#75). Due fonti di "dove eravamo" in disaccordo, una vecchia di 26 giorni. **Condizione per la card:** si decide se l'handoff si aggiorna a ogni pausa o si toglie dall'iniezione |
 | 30 | **Peso del canone oltre i suoi stessi tetti** | `rules/best-practices.md` 236 righe (tetto dichiarato 200, sempre caricato); lettura prescritta per lavoro non banale ≈135 KB (AGENTS.md 38 KB, roberto-mode 17 KB, kanban/README 27 KB, loop-protocol 12 KB, best-practices 16 KB). 60% delle card chiuse (112/188) riguarda il sistema stesso. **Non misurato:** quanto questo rallenti davvero un agente. **Condizione per la card:** una sessione A/B con/senza lettura completa |
 | 31 | **Il precheck di `kb start` segnala "FORSE GIA' FATTA" su 2 parole in comune** e scrive `kb_start_audit` sulla stessa riga dell'ultimo avviso | Card `260913-213559`: 7 avvisi falsi positivi ("film-director" vs "Instagram Reel"), e la riga `...marcatorekb_start_audit: "at=..."`. **Condizione per la card:** un secondo caso di campo letto male per quella riga incollata |
+| 32 | **L'avvio di servizi esterni puo' bloccare una nuova sessione prima della prima risposta** (2026-09-24) | Due prove Copilot terminano con `Managed MCP policy settlement failed`; una registra anche Tavily non avviato per il blocco npm `EALLOWREMOTE`. Le prove locali di instradamento ripartono disabilitando quei servizi solo nel processo di prova, senza cambiare configurazione o protezioni. **Condizione per la card:** il problema ricorre in una sessione ordinaria; le prove isolate non certificano l'avvio di tutti i servizi esterni |
+| 33 | **La richiesta di un concept video solo testuale non attiva `film-director` nei campioni osservati** (2026-09-24) | Quattro sessioni completate su Copilot e Claude producono il concept senza invocare la skill, pur esposta. Canone e descrittore emesso dichiarano il trigger; la presenza e' verificabile ma non prova il comportamento. Altre due prove candidate Copilot non arrivano all'inferenza. **Condizione per la card:** Roberto autorizza una garanzia diversa per le skill obbligatorie; niente altri ritocchi di prosa presentati come soluzione |
+| 34 | **Gli eventi di discovery non dichiarano la versione del filtro dei nomi** (2026-09-24) | Il ramo `session.skills_loaded` dell'adattatore Copilot conserva solo nomi pubblici ma non `skillNamePolicy`. I conteggi attuali usano esclusivamente gli avvii, quindi non ne dipendono. **Condizione per la card:** si decide di misurare la copertura della discovery; non interpretare quei record come un catalogo completo |
+| 35 | **Le prove fresche mostrano notifiche del bus anche su lavoro non corrente** (2026-09-24) | Nelle esportazioni locali delle prove Apple e rilascio compaiono conteggi non letti su cinque card; soltanto una e' quella corrente. Non dimostra che le altre siano obsolete. **Condizione per la card:** verificare che i destinatari o le card non siano piu' attivi prima di modificare i filtri; `bus tidy` resta il controllo esistente |
 
 Il 2 agosto 2026 la lista e' passata da 19 rilievi aperti a zero: 13 chiusi da una
 decisione, 6 riparati con la loro card e la loro prova di mutazione. Il 26 e' nato dopo.

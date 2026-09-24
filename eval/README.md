@@ -64,7 +64,8 @@ mistakes the aspiration for a delivered capability):
 - Use **repeated trials** and ideally a **cross-family judge** to separate signal from variance and
   from same-family self-preference.
 
-Building that is future work; it is **not** built here. Tasks `13-release-confirm-ci` and
+Building that comparative harness is future work; it is **not** built here. The bounded
+activated-host probes below are not an A/B value study. Tasks `13-release-confirm-ci` and
 `14-resume-whole-plan` (added below) are execution-flavored precisely to make this visible: run
 under the current prepend harness they *may* show the same confound as the skill tasks (a
 procedural, agentic behavior flattened into one passive answer). If they lose, that is *consistent
@@ -75,6 +76,32 @@ skill has a formal invocation protocol the prepend flattens) than for `behavior/
 which genuinely are meant to reach a session as read context — so "prepend under-represents
 everything equally" is itself only partly true. Fixing the tasks (below) makes them more realistic;
 it does **not** fix the mechanism, and this PR does not claim to.
+
+## Bounded activated-host checks — 2026-09-24
+
+These checks exercise mechanisms, not the value of the whole system:
+
+| Surface | Evidence and boundary |
+|---|---|
+| Native skill recording | `test/test-audit-hooks.sh` includes both adapters through real SQLite into telemetry. Reviewed public names survive; unknown/private selectors and content do not. Discovery, starts, failures and Twin consultations remain different events. Restoring either old adapter independently makes the new regression fail. |
+| Coverage and history | `test/test-telemetry-skills.sh` excludes legacy/mixed masked-name sessions from general-skill zero counts and denominators. `test/test-telemetry-history.sh` refuses old/new policy comparisons rather than reporting a false improvement. |
+| Fresh Copilot routing | Real new Sonnet sessions selected `apple-designer` for an iPhone proposal and the canonical ship file for this project's release procedure. A negative case answered arithmetic and declined private-dossier forwarding without a tool call. Read-only tools were exposed; these are bounded selection observations, not unrestricted execution trials. |
+| Video routing — **failed** | Four completed samples across Copilot and Claude answered a text-only trailer concept without invoking `film-director`. Explicit source instructions and emitted descriptors did not establish automatic selection. Two additional Copilot candidate runs timed out during startup before inference and count as unmeasured, not passes or routing failures. |
+| Agent coordination | The actual implementation used an architect and an implementer with reciprocal, cited bus replies, including a newly found snapshot-policy integration dependency. A bus fixture alone would not establish this. |
+| Optional Jev | All four CLI preparation examples, guarded tests and an actual dry-run passed without increasing the existing request count. Live judgment, remote availability and usefulness were **not evaluated**; a dry-run is not a remote inference. |
+
+The audit uses a committed public-name policy, not arbitrary installed names.
+The local report explicitly separates new policy-marked coverage from legacy
+records; a selector omitted by an old adapter cannot be recovered retroactively.
+Names outside the public policy remain unobserved, not proof of non-use.
+
+Fresh-host startup also exposed external-service initialization failures before
+inference. Restricting a probe to local tools isolates routing, not those failures:
+the finding remains in `docs/findings.md`. No external-service policy was weakened.
+This matrix has a failed video-selection case; it is **not an all-pass system
+acceptance result**. No additional wording experiment is claimed as a fix.
+These few samples do not estimate routing reliability, establish that every
+skill is useful, or prove that the canon outperforms an unconfigured host.
 
 ## Fixture inventory vs. what's been run
 

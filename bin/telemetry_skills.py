@@ -132,10 +132,13 @@ def build_report(root, days, now=None):
         name = skill["name"]
         invocations = uses.get(name, set())
         public = bool({name, *skill["aliases"]} & public_names)
-        measured = bool(invocations) or (bool(observed) and skill["installed"] and public)
+        matching = {key for key in observed
+                    if any(scope in skill["scopes"] for scope in
+                           (f"installate-{key[0]}", f"progetto-{key[0]}"))}
+        measured = bool(invocations) or (bool(matching) and public)
         usage_reason = (None if measured else "installazione non osservata" if not skill["installed"]
                         else "nome fuori dall'elenco pubblico osservabile" if not public
-                        else "copertura dei nomi pubblici non osservata nella finestra")
+                        else "copertura dei nomi pubblici non osservata per l'host di installazione")
         selectors = [selector for selector in (name, *skill["aliases"]) if selector in CRITERIA]
         criterion = tuple(dict.fromkeys(pattern for selector in selectors for pattern in CRITERIA[selector]))
         opportunity = {"criteria": list(criterion) if criterion else None,
@@ -146,7 +149,7 @@ def build_report(root, days, now=None):
             reason = files.get("reason")
             if files["status"] == "presente":
                 candidate = set().union(*(candidates[selector] for selector in selectors))
-                cohort = candidate & (observed | invocations)
+                cohort = candidate & (matching | invocations)
                 opportunity["candidate_sessions"] = len(candidate)
                 if measured:
                     opportunity.update(cohort_sessions=len(cohort),
@@ -158,7 +161,7 @@ def build_report(root, days, now=None):
         results.append({**skill, "observed_sessions": len(invocations) if measured else None,
                         "usage_reason": usage_reason, "opportunity": opportunity})
     return {"schema_version": 1, "unit": "host_session",
-            "cohort_definition": "Copilot session_files first_seen_at intersect public-name-policy starts or named skill invocations",
+            "cohort_definition": "Copilot session_files first_seen_at intersect installed-host public-name-policy starts or named skill invocations",
             "window": {"days": days, "start_epoch": start, "end_epoch": end},
             "inventory": {"scopes": catalog["scopes"], "unnamed_definitions": catalog["unnamed_definitions"]},
             "sources": {"audit": audit, "session_files": files}, "skills": results}
@@ -170,12 +173,15 @@ def render(report):
     print("  Perimetro: " + "; ".join(f"{s['scope']}={s['status']}" for s in scopes))
     print(f"  Definizioni senza nome dichiarato: {report['inventory']['unnamed_definitions']} (non attribuibili).")
     audit, files = report["sources"]["audit"], report["sources"]["session_files"]
-    print(f"  Audit: {audit['status']}; sessioni con avvii osservati: {audit['observed_sessions']}; "
-          f"sessioni con lacune dichiarate: {audit['gap_sessions']}; eventi senza data: {audit['undated_events']}.")
-    print(f"  Avvisi di lacuna senza data: {audit['undated_gap_events']}, non attribuibili alla finestra.")
-    print(f"  Sessioni con invocazioni skill non riconciliate: {audit['unrecognized_skill_sessions']}.")
-    print(f"  Nomi pubblici: {audit['public_name_sessions']} sessioni con filtro dichiarato; "
-          f"{audit['legacy_or_unmarked_sessions']} precedenti/senza dichiarazione: assenze non misurabili.")
+    if audit["status"] != "presente":
+        print(f"  Audit: {audit['status']}; conteggi e copertura dei nomi pubblici non misurabili.")
+    else:
+        print(f"  Audit: {audit['status']}; sessioni con avvii osservati: {audit['observed_sessions']}; "
+              f"sessioni con lacune dichiarate: {audit['gap_sessions']}; eventi senza data: {audit['undated_events']}.")
+        print(f"  Avvisi di lacuna senza data: {audit['undated_gap_events']}, non attribuibili alla finestra.")
+        print(f"  Sessioni con invocazioni skill non riconciliate: {audit['unrecognized_skill_sessions']}.")
+        print(f"  Nomi pubblici: {audit['public_name_sessions']} sessioni con filtro dichiarato; "
+              f"{audit['legacy_or_unmarked_sessions']} precedenti/senza dichiarazione: assenze non misurabili.")
     print(f"  Metadati file: {files['status']}; " + (files.get("reason") or
           f"prime osservazioni senza data: {files['undated_files']}"))
     print("  Occasioni CANDIDATE: estensioni/percorso Remotion in session_files Copilot, prima osservazione nella finestra.")

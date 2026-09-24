@@ -3,6 +3,29 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.59.0 — 2026-09-24
+
+### Fixed
+
+- Native audit adapters preserve reviewed public skill selectors beyond Twin,
+  without collecting prompts, results or arbitrary private skill names. General
+  skill starts remain distinct from Twin invocations and consultations; old
+  filtered records cannot establish zero general-skill usage.
+- Canonical review/release routing uses declared namespaced skills where present
+  and explicit canonical-file fallbacks, not an unrelated same-named workflow.
+- Video instructions and generated descriptions explicitly name text-only
+  concepts and storyboards before production. Automatic selection is **not
+  fixed**: completed fresh-host samples skipped `film-director`. Declaring a
+  trigger is not evidence that a model follows it.
+
+### Changed
+
+- Integration evidence distinguishes native callback-to-telemetry fixtures,
+  fresh-host routing observations, real agent coordination and no-spend Jev
+  preparation. None establishes universal routing reliability or live Jev value.
+- Zero-usage evidence now requires observed coverage on the installation host;
+  coverage on a different host or an unscoped custom directory is insufficient.
+
 ## 2.58.0 — 2026-09-23
 
 ### Added
