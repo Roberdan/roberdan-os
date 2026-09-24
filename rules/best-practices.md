@@ -207,7 +207,7 @@ generation) and never type a version number from memory.
 
 **The single source of truth is the reviewed registry
 `skills/model-selection-policy/models.tsv`**, read through `bin/models.sh`:
-`bin/models.sh resolve opus` → `claude-opus-5` (Copilot), `--host claude` → the tier alias
+`bin/models.sh resolve opus` → `claude-opus-5.5` (Copilot), `--host claude` → the tier alias
 `opus`. A token the registry has not reviewed **does not resolve** — it is refused, not passed
 through, and it classes as `unknown`, which costs a written rationale exactly like `frontier`.
 The registry is a **snapshot of what a real CLI accepted**, never a claim that a model is

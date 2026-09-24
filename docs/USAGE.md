@@ -86,8 +86,10 @@ bin/models.sh snapshot
 
 It records supported options and policy classes, not prices or a guarantee that your account
 can access every entry. Check `/model` and the current delegation tool's model list when running
-a task. Baccio uses Astra on Copilot; its Claude Code model remains Opus. This is a configured
-choice, not a claim that Astra won a benchmark. Other specialist defaults remain explicit.
+a task. Baccio's Astra-vs-Opus trial (2026-09-05) concluded: it now runs Opus on both Copilot
+and Claude Code, like the other deciders. GPT-6 Astra remains available as an explicit
+cross-family second opinion via an interactive session (`copilot --model gpt-6-astra ...`,
+above); the launcher refuses a caller-supplied `--model` next to a declared one.
 
 To start a specialist with its declared model, effort, and context:
 
@@ -116,8 +118,9 @@ applying, then inspect `/subagents`; an existing session may retain its earlier 
 The fragment covers **both the nine custom agents and six built-ins**, including `explore`
 and `general-purpose`. Each uses the native `modelPolicy: required` setting, so the selected
 model is a requirement, not permission to substitute an older default. The built-in profiles
-live in `skills/model-selection-policy/delegation.tsv`: Sonnet 5 for exploration and bounded
-commands, Astra for broad implementation, Opus 5 for code review, research, and security review.
+live in `skills/model-selection-policy/delegation.tsv`: Sonnet 5 for exploration, bounded
+commands, general-purpose implementation, and research; Opus 5.5 for code review and security
+review.
 Change a profile or its `/subagents` setting deliberately when another current model is a
 better fit; a task cannot silently override a required selection.
 

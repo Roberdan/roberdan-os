@@ -8,7 +8,24 @@
 # do not trust it as fixed. Override the whole file with RDA_BENCH_MODELS=/path/to/table.tsv.
 #
 # Columns (TAB-separated): model_id  input_usd_per_mtok  output_usd_per_mtok
-# Lines starting with '#' and blank lines are ignored.
+# Lines starting with '#' and blank lines are ignored. Only these 3 columns are read — the
+# parser (eval/bench-run.sh aggregate_and_pareto) takes column[0..2] and ignores the rest, but
+# the DOCUMENTED format stays 3 columns; a Copilot premium multiplier or a cache price does not
+# fit it, so both are recorded here as comments instead of a silent 4th column.
+# The `claude-opus`/`claude-sonnet`/`claude-haiku` rows below are the ORIGINAL generic-family
+# rows: eval/test-model-bench.sh asserts on them by name in its committed-fixture check — do not
+# rename or remove them. The rows added 2026-09-24 use the current concrete registry ids instead.
 claude-opus	15.00	75.00
 claude-sonnet	3.00	15.00
 claude-haiku	0.80	4.00
+#
+# Added 2026-09-24 (Roberto, explicit promotion) — public list prices, per registry id, USD/MTok:
+#   cache-read prices (not a column here): opus-5.5 $0.20, gpt-6-astra $1.00
+#   cache prices (sonnet-5 only, not a column here): cache read $0.20, cache write $2.50
+#   gpt-6-astra: >272k input tokens DOUBLES the input/output prices below (not modeled here)
+#   Copilot premium multipliers observed (not a column here): Opus 15x, Astra 1x, Sonnet 1x
+claude-opus-5.5	4.00	20.00
+claude-sonnet-5	2.00	10.00
+claude-haiku-4.5	1.00	5.00
+claude-fable-5.1	10.00	50.00
+gpt-6-astra	10.00	50.00

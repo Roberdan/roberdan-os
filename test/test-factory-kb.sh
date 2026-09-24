@@ -510,10 +510,10 @@ CAPARGV2="$TMP/argv-opus.txt"
 env -i PATH="$FACM2/bin:/usr/bin:/bin" HOME="$HOME" \
   RDA_FACTORY="$FACM2" RDA_HANDOFF=/dev/null CAPTURE_ARGV="$CAPARGV2" \
   bash factory/run.sh >/dev/null 2>&1
-if [ -f "$CAPARGV2" ] && grep -A1 -x -- '--model' "$CAPARGV2" | grep -qx 'claude-opus-5'; then
+if [ -f "$CAPARGV2" ] && grep -A1 -x -- '--model' "$CAPARGV2" | grep -qx 'claude-opus-5.5'; then
   ok "task with model: opus gets --model opus"
 else
-  err "task with model: opus did not get --model claude-opus-5 (argv: $(cat "$CAPARGV2" 2>/dev/null | tr '\n' ' '))"
+  err "task with model: opus did not get --model claude-opus-5.5 (argv: $(cat "$CAPARGV2" 2>/dev/null | tr '\n' ' '))"
 fi
 
 section "factory: model policy — disallowed model value is clamped to sonnet with a WARN"

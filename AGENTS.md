@@ -104,7 +104,7 @@ a different model. Capability listings are not proof of comparative quality or p
 
 | Agent | Role | Class | Model |
 |---|---|---|---|
-| [`baccio`](agents/baccio.md) | Architect + coding | decider | Copilot: gpt-6-astra; Claude: opus |
+| [`baccio`](agents/baccio.md) | Architect + coding | decider | opus |
 | [`rex`](agents/rex.md) | Code + ecosystem review | executor | sonnet |
 | [`luca`](agents/luca.md) | Security (advisory) | decider | opus |
 | [`thor`](agents/thor.md) | QA / verify-done guardian — sole gate for `done` | executor | sonnet |
