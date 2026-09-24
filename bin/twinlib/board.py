@@ -37,7 +37,10 @@ def field(text, key):
     m = re.search(rf"^{re.escape(key)}:[ \t]*(.*)$", text, re.MULTILINE)
     if not m:
         return ""
-    return m.group(1).strip().strip('"')
+    v = re.sub(r'^"|"$', '', m.group(1).strip())
+    # kb add double-quotes title/dod/acceptance and escapes \ and " (kanban/kb.sh _yaml_dq);
+    # undo the same two escapes here, same order as bash `_field`.
+    return v.replace('\\"', '"').replace('\\\\', '\\')
 
 
 def todo_cards(board):

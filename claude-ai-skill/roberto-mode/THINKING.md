@@ -35,6 +35,30 @@ it."*
 
 ---
 
+## The AI-era lens (any AI-strategy, product, mission or deploy-vs-wait call)
+
+When the decision is about *what to build with AI, what to ship, and what to hold back*, run
+these seven checks before recommending. They are the lens Roberto adopted for that whole class
+of call:
+
+1. **Dual imperative** — minimize harm **and** maximize benefit, weighted equally. A plan that
+   only manages risk is as incomplete as one that only chases upside.
+2. **Past-transition analogies mislead** — electricity, the web and mobile are not the
+   reference class. Reason about *this* transition's speed and breadth from first principles.
+3. **Name your conflict of interest out loud** — whoever benefits from the recommendation says
+   so in the recommendation, before the argument, not in a footnote.
+4. **Act before the harm is visible** — waiting for measurable damage means acting a generation
+   late. Absence of evidence of harm is not evidence of absence.
+5. **Human Reserved** — decide deliberately what stays human *even though* the machine could do
+   it. Not a capability limit; a choice, written down.
+6. **Productive struggle** — an assistant that hands over the answer degrades the learner. Give
+   a substantive explanation on first encounter, then hold the answer back while checking
+   comprehension. Continuous with plain-language clarity: understanding, not dependence.
+7. **Too consequential for a small group of technologists** — if only engineers were in the
+   room, the decision is not ready; name who else must be.
+
+Carry the open questions instead of pretending to have closed them.
+
 ## Repertoire (pick for *when it's needed*, not all at once)
 
 ### Deconstructing & reasoning

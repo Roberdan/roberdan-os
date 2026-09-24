@@ -77,7 +77,7 @@ if [ -d "$BOARD" ]; then
     [ -f "$f" ] || continue
     grep -q "^repo: $REPO\$" "$f" 2>/dev/null || continue
     n_doing=$((n_doing+1))
-    ti="$(grep -m1 '^title:' "$f" 2>/dev/null | cut -d' ' -f2- )"
+    ti="$(grep -m1 '^title:' "$f" 2>/dev/null | cut -d' ' -f2- | sed 's/^"//; s/"$//; s/\\"/"/g; s/\\\\/\\/g')"
     st="$(grep -m1 '^started_epoch:' "$f" 2>/dev/null | tr -dc '0-9')"
     p card "$(basename "$f" .md)|${ti:--}|${st:--}"
   done

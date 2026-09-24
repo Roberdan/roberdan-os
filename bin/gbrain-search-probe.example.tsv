@@ -1,0 +1,2 @@
+gstack-code-roberdan-os-67e84638	hooks-bus-doorbell-sh	the doorbell hook that counts unread bus messages after a tool call
+gstack-code-roberdan-os-67e84638	kanban-worktree-sweep-sh	remove only worktrees that are merged and clean

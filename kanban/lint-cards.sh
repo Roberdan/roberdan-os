@@ -15,7 +15,7 @@ KB="${RDA_KANBAN:-${1:-$HOME/GitHub/roberdan-os/kanban}}"
 
 _field() {
   grep -m1 "^$2:" "$1" 2>/dev/null \
-    | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"[[:space:]]*\$//; s/[[:space:]]*\$//"
+    | sed "s/^$2:[[:space:]]*//; s/^\"//; s/\"[[:space:]]*\$//; s/[[:space:]]*\$//; s/\\\\\"/\"/g; s/\\\\\\\\/\\\\/g"
 }
 
 fail=0

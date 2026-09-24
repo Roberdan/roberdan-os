@@ -18,19 +18,19 @@ ok()      { printf "  ok: %s\n" "$1"; }
 # shellcheck source=test/lib-suites.sh
 . "$ROOT/test/lib-suites.sh"
 
-for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue \
+for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue test-kb-title-quote \
           test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery test-verify-done test-audit test-audit-hooks \
           test-kb-root-resolution test-kb-start-worktree-cause test-worktree-sweep test-worktree-registry test-junk-clean test-checkup test-twin-export-drift test-kb-top test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-bus-mutant-probes test-telemetry test-telemetry-skills test-telemetry-history test-skill-routing test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-bus-doorbell-matcher test-model-economy \
-          test-model-registry test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure test-twin-shadow \
-          test-drift test-copilot-instructions-drift test-links test-privacy test-plan-coverage test-optional-skills test-jev test-jev-routing test-publication-check test-film-preflight test-gbrain-recovery; do
+          test-model-registry test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure test-twin-shadow test-twin-learning test-portable-skills-drift test-twin-approve \
+          test-drift test-copilot-instructions-drift test-links test-privacy test-plan-coverage test-optional-skills test-jev test-jev-routing test-publication-check test-film-preflight test-gbrain-recovery test-system-health; do
   _spawn "$_s"
 done
 unset _s
 _spawn_serial_group test-sync-install test-copilot-adapter test-skill-name-collision test-apple-designer test-twin-install
-for _j in test-optional-skills test-jev test-jev-routing test-publication-check test-film-preflight test-gbrain-recovery; do if _suite "$_j"; then ok "$_j"; else _suite_out "$_j"; err "$_j failed"; fi; done; unset _j
+for _j in test-optional-skills test-jev test-jev-routing test-publication-check test-film-preflight test-gbrain-recovery test-system-health; do if _suite "$_j"; then ok "$_j"; else _suite_out "$_j"; err "$_j failed"; fi; done; unset _j
 # --- 1) Frontmatter lint (agenti, skill, card, schema federato) ---------------
 # Le quattro famiglie vivono in test/test-frontmatter.sh: il frontmatter e' il contratto fra un
 # file e chi lo carica, e un contratto rotto non fallisce rumorosamente — viene caricato lo
@@ -95,8 +95,8 @@ if _suite test-kb-diet; then ok "i tre freni rifiutano il caso cattivo E lascian
 # lo rende uno SPOSTAMENTO e non una RIMOZIONE e' una sola — cio' che nasce dopo lo scatto non
 # parte — ed e' asserita li' dentro.
 section "kanban — coda autorizzata (Roberto approva la lista, non le card una per una)"
-if _suite test-kb-queue; then ok "la coda cammina da sola E si ferma su cio' che e' nato dopo"; else err "test-kb-queue — see bash test/test-kb-queue.sh"; fi
-for _p in "test-worktree-sweep|lo spazzino toglie solo le copie di lavoro senza niente dentro, e dice perche' tiene le altre" "test-junk-clean|cache e temporanei: si toglie solo cio' che git dichiara rigenerabile, mai un .env ne' dati" "test-checkup|il controllo di sistema vede tutto e non tocca mai una card" "test-twin-export-drift|la skill twin esportata non resta indietro rispetto al canone" "test-kb-top|la finestrella di stato non inventa numeri e non paga comandi lenti mentre disegna" "test-audit|registro decisioni: integrita, provenienza, correlazione e privacy" "test-audit-hooks|osservazione nativa senza modificare le autorizzazioni" "test-twin-install|ingresso unico installato senza perdere copie locali" "test-twin-shadow|registro decisioni del twin: previsione nascosta, esito da kb start, accordo settimanale, nulla nel repo"; do if _suite "${_p%%|*}"; then ok "${_p#*|}"; else _suite_out "${_p%%|*}" | tail -25; err "${_p%%|*} — see bash test/${_p%%|*}.sh"; fi; done; unset _p
+if _suite test-kb-queue && _suite test-kb-title-quote; then ok "la coda cammina da sola E si ferma su cio' che e' nato dopo, e un title con ':' e '\"' resta YAML valido e torna identico"; else _suite_out test-kb-queue; _suite_out test-kb-title-quote; err "test-kb-queue / test-kb-title-quote — see bash test/test-kb-queue.sh and test/test-kb-title-quote.sh"; fi
+for _p in "test-worktree-sweep|lo spazzino toglie solo le copie di lavoro senza niente dentro, e dice perche' tiene le altre" "test-junk-clean|cache e temporanei: si toglie solo cio' che git dichiara rigenerabile, mai un .env ne' dati" "test-checkup|il controllo di sistema vede tutto e non tocca mai una card" "test-twin-export-drift|la skill twin esportata non resta indietro rispetto al canone" "test-kb-top|la finestrella di stato non inventa numeri e non paga comandi lenti mentre disegna" "test-audit|registro decisioni: integrita, provenienza, correlazione e privacy" "test-audit-hooks|osservazione nativa senza modificare le autorizzazioni" "test-twin-install|ingresso unico installato senza perdere copie locali" "test-twin-shadow|registro decisioni del twin: previsione nascosta, esito da kb start, accordo settimanale, nulla nel repo" "test-twin-learning|il twin impara dal registro: precedenti simili, valori solo proposti, Jev mai su card private" "test-portable-skills-drift|skill claude.ai e Cowork generate da una sola fonte, senza deriva" "test-twin-approve|approvazione in blocco: solo Roberto al terminale, una conferma, poi kb start normale per card"; do if _suite "${_p%%|*}"; then ok "${_p#*|}"; else _suite_out "${_p%%|*}" | tail -25; err "${_p%%|*} — see bash test/${_p%%|*}.sh"; fi; done; unset _p
 
 # Le tre domande da fare a una card PRIMA di eseguirla. La direzione che conta di piu' e' il
 # SILENZIO: un avviso che compare sempre e' rumore, e il giorno che dice il vero nessuno lo legge.
