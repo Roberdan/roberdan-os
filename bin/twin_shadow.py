@@ -6,6 +6,7 @@
     twin_shadow.py reconcile              catch approvals/vanished cards the hook missed
     twin_shadow.py decide --card C --choice X [--reason R] [--category K] [--source S]
     twin_shadow.py batch                  pending list sorted by the twin's advice (approves nothing)
+    twin_shadow.py approve [--except a,b] Roberto, at his terminal: kb start the twin's approve block
     twin_shadow.py agreement [--days N | --all]
     twin_shadow.py similar --card C       closest past decisions (what predict puts in the prompt)
     twin_shadow.py values                 PROPOSED values + conflict rules, never applied
@@ -19,7 +20,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from twinlib import agreement, board, host, jevobs, ledger, precedents, values  # noqa: E402
+from twinlib import agreement, board, bulk, host, jevobs, ledger, precedents, values  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -162,9 +163,13 @@ def cmd_batch(_args):
                   else "nessuna previsione")
         print(f"  • {card} ({repo}) — {title}\n      twin: {advice} · "
               f"{agreement.category_rate(history, cat)}")
-    print("Per approvare resta il tuo comando: kb start <id> --by roberto")
+    print("Per approvare: kb start <id> --by roberto, o tutto il blocco: twin-shadow.sh approve --except <id,...>")
     print("Le voci mostrate qui non contano piu' nell'accordo: le hai viste prima di decidere.")
     return 0
+
+
+def cmd_approve(args):
+    return bulk.run(ROOT, {c.strip() for c in (args.except_ids or "").split(",") if c.strip()})
 
 
 def cmd_similar(args):
@@ -220,6 +225,8 @@ def main(argv=None):
     s.add_argument("--category", choices=ledger.CATEGORIES)
     s.add_argument("--source", choices=ledger.SOURCES, default="override")
     sub.add_parser("batch")
+    s = sub.add_parser("approve")
+    s.add_argument("--except", dest="except_ids", default="")
     s = sub.add_parser("similar")
     s.add_argument("--card", required=True)
     sub.add_parser("values")
