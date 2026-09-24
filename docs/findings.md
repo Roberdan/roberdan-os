@@ -446,29 +446,26 @@ correzioni (l'ultima il 2026-09-24, vedi sotto).
 - **Corretto il 2026-09-24 (finding #36)** — `test/test-audit-hooks.sh`,
   `test_stuck_logger_is_killed_within_bound`: asseriva che l'intera invocazione
   dell'hook con un logger bloccato (`time.sleep(30)`) finisse sotto i 2 s,
-  mentre `hooks/audit.sh:89` uccide il logger dopo 1.5 s — i 2 s includevano
-  anche l'avvio dell'interprete/processo (0.3-0.6 s sotto carico), fallita in CI
-  a 2.017 s e 2.126 s. **Causa**: un budget fisso tarato su un'ipotesi, non su
-  una misura — la stessa famiglia delle due correzioni sopra. **Fix**: il test
-  misura ora un'invocazione equivalente con logger che risponde subito (stesso
-  evento, logger sano di `setUp`) e confronta con quella —
-  `stuck_cost < baseline + 1.5s + 0.25s` di margine di scheduling — piu' un
-  tetto di sanita' assoluto a 5 s (il timeout dell'hook registrato in
-  `bin/sync.sh`). Il timeout dell'hook resta 1.5 s, non toccato. Prova rossa
-  fatta due volte in copie scratch fuori dal repo: timeout portato a 3.0 s (resta
-  sotto i 5 s dell'harness) fa fallire la nuova asserzione relativa; kill rimosso
-  del tutto fa scadere il timeout di 5 s dell'harness stesso (`TimeoutExpired`).
-  20/20 esecuzioni dell'asserzione passano con la macchina sotto carico (6x
-  `yes` su 18 core).
+  budget che paga anche l'avvio di interprete/processo — fallita in CI a
+  2.017 s e 2.126 s. **Causa**: stesso bug delle due correzioni sopra, budget
+  fisso tarato su un'ipotesi. **Fix**: confronto con una baseline misurata (stesso
+  evento, logger che risponde subito) — `stuck_cost < baseline + 1.5s + 0.25s`
+  di margine — piu' un tetto di sanita' a 5 s. `hooks/audit.sh:89` (kill a
+  1.5 s) non toccato. Prova rossa in copie scratch fuori dal repo, mai
+  committate: timeout a 3.0 s fa fallire la nuova asserzione; kill rimosso fa
+  scadere il timeout di 5 s dell'harness. 20/20 sotto carico (6x `yes` su 18
+  core).
 - **NON corretto, e dichiarato** — la stessa validazione a 20 run sotto carico
-  ha riprodotto 1/20 il flake gia' noto di `test-audit-chain.sh`: "l'observer
-  Copilot non ha scritto nel registro reale". Il log mostra `[roberdan-os
-  audit] ingest_timeout` subito prima — cioe' l'ingest **reale** verso
-  `kanban/audit.py` (non un logger di test bloccato apposta) ha superato il
-  kill di 1.5 s sotto carico. E' la stessa famiglia di bug di #36 ma sul lato
-  Copilot/ingest reale, non sul test Claude qui sopra: fuori dallo scope di
-  questa card, non toccato. Diventa una card se ricorre: misurare la soglia
-  reale invece di allargare il timeout a occhio.
+  ha riprodotto 1/20 un flake diverso e gia' noto: `test-audit-chain.sh`,
+  "l'observer Copilot non ha scritto nel registro reale". Causa verificata nel
+  codice (non solo per adiacenza nel log): quel test usa l'observer Copilot
+  reale senza `runScript`/`report` iniettati (`test/test-audit-chain.sh:21-25`),
+  quindi il suo `write()` gira con `AUDIT_LIMITS.writeMs = 1000` ms
+  (`hooks/copilot/audit.mjs:5,131`) — un secondo, non gli 1.5 s di
+  `hooks/audit.sh` — e sotto carico l'ingest reale verso `kanban/audit.py` lo
+  ha superato. Stessa famiglia di bug di #36, ma sul writer Copilot, non su
+  quello Claude corretto qui: fuori scope per questa card, non toccato.
+  Diventa una card se ricorre.
 
 La regola che ne esce, e vale piu' delle tre correzioni: **un limite che puo'
 scattare sul caso sano non e' un margine di sicurezza, e' un rosso a caso.** E un
