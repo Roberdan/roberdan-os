@@ -49,9 +49,12 @@ else
 fi
 
 # --- executive response format — one wording, carried by every surface --------------------
-# The format lives, hand-maintained, in four places (no one generated from another):
-# behavior/roberto-mode.md (source), AGENTS.md (the gate line), .github/copilot-instructions.md
-# (the Copilot block), and the bin/sync.sh heredoc that generates the Copilot user file.
+# The format lives, hand-maintained, in three places, plus a fourth GENERATED from the last
+# one (card 260924-085105: .github/copilot-instructions.md is now bin/sync.sh's emit_copilot()
+# output byte-for-byte — test-copilot-instructions-drift.sh pins that — so it can no longer
+# drift on its own, only by the generator drifting from the other three):
+# behavior/roberto-mode.md (source), AGENTS.md (the gate line), and the bin/sync.sh heredoc
+# that generates the Copilot user file AND .github/copilot-instructions.md.
 # @rex flagged the drift risk: reword one, the others go stale silently. Anchor phrases that
 # define the format must appear in all four — reword the format and this goes red until every
 # copy is updated together.

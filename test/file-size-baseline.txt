@@ -207,16 +207,30 @@
 # denominatore c e, il referto dichiara cosa non sa, si contano righe senza
 # leggerne il contenuto, e --write puo solo aggiungere in coda a findings.
 # E resta in piedi, per la sesta volta: validate.sh si spezza, non si allarga.
+# 2026-09-24, ventunesima: +35 bin/sync.sh (654 -> 689), +2 test/validate.sh (315 -> 317).
+# Card 260924-085105: .github/copilot-instructions.md (tracciato, auto-caricato da GitHub
+# Copilot in questo repo) era andato alla deriva dal generatore — due paragrafi canonici
+# (twin, decisione prima del passaggio di mano) scritti a mano nel file tracciato erano
+# spariti dal generatore senza che nessun test se ne accorgesse. Le righe di sync.sh
+# restituiscono quel testo a emit_copilot() (una sola fonte, mai piu' una copia a mano) e
+# aggiungono la scrittura opt-in di .github/copilot-instructions.md via
+# RDA_SYNC_REPO_COPILOT (di proposito MAI il default: sync.sh gira senza controllo da
+# hooks/post-task-sync.sh e dentro le suite di test parallele che condividono questo
+# checkout — un default avrebbe fatto scrivere un file tracciato a caso da un test che non
+# lo sapeva). Le righe di validate.sh agganciano test/test-copilot-instructions-drift.sh,
+# il test che pin-na l'intero file (non le cinque frasi-ancora di test-canon-structure.sh)
+# contro l'output del generatore.
+# E resta in piedi, per la settima volta: validate.sh si spezza, non si allarga.
 1777 kanban/kb.sh
 1415 test/test-bus.sh
 1216 test/test-bus-mutants.sh
 1601 bus/bus.sh
-654 bin/sync.sh
+689 bin/sync.sh
 601 test/test-federated-kb.sh
 578 test/test-factory-kb.sh
 438 eval/test-eval-pipeline.sh
 446 test/test-kb-views.sh
 344 eval/report.sh
 377 test/test-copilot-adapter.sh
-315 test/validate.sh
+317 test/validate.sh
 712 hooks/copilot/extension.template.mjs
