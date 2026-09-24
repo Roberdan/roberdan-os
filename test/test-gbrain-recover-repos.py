@@ -257,7 +257,7 @@ class RecoveryTests(unittest.TestCase):
              patch.object(self.runner, "checkout", return_value=Path("/snapshot")) as checkout, \
              patch.object(self.runner, "source_for", return_value=("source", False)), \
              patch.object(self.runner, "refresh", return_value={"snapshot": "abc"}), \
-             patch.object(self.runner, "local_vectors") as vectors:
+             patch.object(self.runner, "local_vectors", return_value=0) as vectors:
             self.assertEqual(self.runner.run(), 0)
             checkout.assert_called_once()
             vectors.assert_called_once_with("source")

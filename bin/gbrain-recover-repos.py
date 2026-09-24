@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resumable conservative recovery: snapshot first, scoped imports, local vectors."""
+"""Conservative recovery; receipts include live indexed revisions before and after sync."""
 import argparse
 import fcntl
 import hashlib
@@ -318,6 +318,7 @@ class Recovery:
 
     def refresh(self, source, path, new):
         before = active_pages(source)
+        indexed_before = next((row["last_commit"] for row in sources() if row["id"] == source), None)
         revision = self.head(path)
         base = [GB, "sync", "--source", source, "--repo", path, "--no-pull",
                 "--strategy", "auto", "--no-embed", "--no-auto-embed"]
@@ -346,7 +347,9 @@ class Recovery:
         indexed = next((row for row in sources() if row["id"] == source), None)
         if not indexed or indexed["last_commit"] != revision:
             raise RuntimeError("BLOCKED: stored index revision does not match the managed checkout.")
-        return {"pages_before": len(before), "pages_after": len(after), "snapshot": revision}
+        return {"pages_before": len(before), "pages_after": len(after), "snapshot": revision,
+                "indexed_before": indexed_before, "indexed_after": indexed["last_commit"],
+                "sync_changed": indexed_before != revision or before != after or full}
 
     def local_vectors(self, source):
         with urllib.request.urlopen("http://localhost:11434/api/version", timeout=5) as response:
@@ -404,7 +407,7 @@ class Recovery:
                     row.update(self.refresh(source, path, new))
                     row["index_status"] = "verified"
                     self.save()
-                    self.local_vectors(source)
+                    row["embedded_chunks"] = self.local_vectors(source)
                     if record.get("local_path") and self.head(Path(record["local_path"])) != row["snapshot"]:
                         raise RuntimeError("Local HEAD changed during recovery; a fresh pass is required.")
                     row["status"] = "verified"

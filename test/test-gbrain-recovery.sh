@@ -4,3 +4,5 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PYTHONDONTWRITEBYTECODE=1
 python3 "$ROOT/test/test-gbrain-repo-audit.py"
 python3 "$ROOT/test/test-gbrain-recover-repos.py"
+python3 "$ROOT/test/test-gbrain-refresh-active.py"
+python3 "$ROOT/test/test-gbrain-periodic.py"

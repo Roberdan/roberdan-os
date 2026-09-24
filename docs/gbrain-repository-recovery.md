@@ -108,3 +108,13 @@ through another transport.
 Full command evidence and per-repository state are written atomically under the
 private state directory. The backup is retained. A reviewer PASS validates the
 implementation, not live coverage or the task's final completion gate.
+
+## Installed copy (2026-09-24)
+
+The launchd jobs run copies installed in `~/.local/libexec/gbrain-maintenance/`
+(`gbrain-recover-repos.py`, `gbrain-refresh-active.py`, `gbrain-repo-audit.py`), called by
+`~/.local/bin/gbrain-refresh-code` and `~/.local/bin/gbrain-embed-until-done`. Those copies had
+drifted ahead of this repository and were never committed. Since 2026-09-24 the repo holds
+them again, and `test/test-gbrain-periodic.py` covers them. Edit here, then copy to the installed
+location. `gbrain-refresh-active.py` accepts only reviewed `~/gbrain` revisions. v0.54.1.1
+(`31f257a0`) was added after a `pg_dump` backup, `gbrain apply-migrations`, and `gbrain doctor`.

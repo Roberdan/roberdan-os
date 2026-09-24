@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local-only active-repository refresh, or explicitly source-scoped embeddings."""
+"""Local-only refresh: report measured sync/vector changes separately from no-op checks."""
 import argparse
 import fcntl
 import importlib.util
@@ -46,7 +46,7 @@ def recovery_outcome(error):
 def embed_until_done(job, source, env, binary, *, passes=12):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", source):
         raise RuntimeError("Serve un identificatore di fonte esplicito e valido.")
-    previous, stalls = None, 0
+    previous, stalls, initial_missing = None, 0, None
     for attempt in range(passes + 1):
         preview = job.command("Verifica memorie " + source,
                               [binary, "embed", "--stale", "--source", source, "--dry-run"],
@@ -57,8 +57,10 @@ def embed_until_done(job, source, env, binary, *, passes=12):
         if not match:
             raise RuntimeError("Conteggio delle parti da indicizzare non riconoscibile: " + source)
         missing = int(match[1])
+        if initial_missing is None:
+            initial_missing = missing
         if missing == 0:
-            return
+            return initial_missing
         stalls = stalls + 1 if missing == previous else 0
         if stalls >= 2:
             raise RuntimeError(f"{source}: nessun progresso per due passaggi; restano {missing} parti.")
@@ -69,6 +71,34 @@ def embed_until_done(job, source, env, binary, *, passes=12):
                        [binary, "embed", "--stale", "--source", source], change=True,
                        env=env, cwd=Path.home() / ".gbrain", timeout=1800) is None:
             raise RuntimeError("Indicizzazione locale fallita: " + source)
+
+
+def verified_refresh_result(row, *, run_started=None):
+    required = {"sync_changed", "indexed_before", "indexed_after"}
+    if not required.issubset(row):
+        return ("RINVIATO",
+                "Ricevuta precedente senza misure prima/dopo; aggiornamento attuale non verificato.")
+    if run_started is not None and (
+            not isinstance(row.get("started"), (int, float)) or row["started"] < run_started):
+        return ("RINVIATO",
+                "Ricevuta di un recupero precedente; fonte non verificata in questo giro.")
+    changed = row["sync_changed"] or (row.get("embedded_chunks") or 0) > 0
+    detail = (f"Revisione indicizzata: {row['indexed_before'] or 'nessuna'} -> "
+              f"{row['indexed_after']}; zero parti da indicizzare.")
+    if changed:
+        return "ESEGUITO", "Memoria aggiornata. " + detail
+    return "INVARIATO", "Memoria gia allineata; nessun aggiornamento necessario. " + detail
+
+
+def report_recovery_results(job, records, state):
+    for record in records:
+        row = state["repos"].get(record["key"], {})
+        if row.get("status") == "verified":
+            outcome, detail = verified_refresh_result(row, run_started=state["started"])
+        else:
+            detail = row.get("error", "Recupero non completato.")
+            outcome = recovery_outcome(detail)
+        job.row(outcome, Path(record["local_path"]).name, detail)
 
 
 def main(argv=None):
@@ -149,7 +179,9 @@ def main(argv=None):
                             ["git", "-C", Path.home() / "gbrain", "status", "--porcelain"])
         reviewed = {"a6be012a3bcfac42e279630aedec5cda4a450e29",
                     "668b9bac302705f3bca0ae4792a49fab0a79a74e",
-                    "d13aa742fd68b71bfd6c98be3dda5813791f1d6c"}
+                    "d13aa742fd68b71bfd6c98be3dda5813791f1d6c",
+                    # v0.54.1.1, reviewed 2026-09-24 after pg_dump backup + migrations + doctor.
+                    "31f257a0a7b218b40e03d302bc6913c99f26f0ec"}
         if installed is None or installed.strip() not in reviewed or dirty != "":
             raise RuntimeError("Versione gbrain non ancora validata per questa manutenzione; nessuna modifica.")
         config = dependencies.configuration(job)
@@ -160,8 +192,9 @@ def main(argv=None):
             if args.embed_source:
                 if args.embed_source not in {source["id"] for source in recovery.sources()}:
                     raise RuntimeError("La fonte richiesta non esiste: " + args.embed_source)
-                embed_until_done(job, args.embed_source, env, recovery.GB)
-                job.row("ESEGUITO", args.embed_source, "Zero parti ancora da indicizzare con il modello locale.")
+                embedded = embed_until_done(job, args.embed_source, env, recovery.GB)
+                job.row("ESEGUITO" if embedded else "INVARIATO", args.embed_source,
+                        f"Parti indicizzate: {embedded}; zero parti ancora da indicizzare con il modello locale.")
             else:
                 manifest, excluded = scoped_manifest(manifest, recovery.sources(), set(args.blocked_source))
                 for path in excluded:
@@ -170,7 +203,7 @@ def main(argv=None):
 
                 class ManagedRecovery(recovery.Recovery):
                     def local_vectors(self, source):
-                        embed_until_done(job, source, self.env, recovery.GB)
+                        return embed_until_done(job, source, self.env, recovery.GB)
 
                 runner = ManagedRecovery(manifest, args.state_dir, args.backup,
                                          args.blocked_source, args.active_root,
@@ -179,14 +212,7 @@ def main(argv=None):
                 for key in ("DATABASE_URL", "GBRAIN_DATABASE_URL", "GBRAIN_SOURCE"):
                     runner.env.pop(key, None)
                 result = runner.run()
-                for record in recovery.plan(manifest):
-                    row = runner.state["repos"].get(record["key"], {})
-                    if row.get("status") == "verified":
-                        job.row("ESEGUITO", Path(record["local_path"]).name,
-                                "Memoria allineata alla versione Git attuale; zero parti da indicizzare.")
-                    else:
-                        error = row.get("error", "Recupero non completato.")
-                        job.row(recovery_outcome(error), Path(record["local_path"]).name, error)
+                report_recovery_results(job, recovery.plan(manifest), runner.state)
                 if result and not any(row["state"] in ("ERRORE", "RINVIATO") for row in job.rows):
                     raise RuntimeError("Il recupero non ha confermato il completamento.")
     except BlockingIOError:
