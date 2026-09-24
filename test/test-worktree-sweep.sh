@@ -251,7 +251,7 @@ case "$out7" in *"non ancora integrato"*) ok "dice PERCHE' tiene la copia con la
 # quelle sotto MirrorBuddy/worktrees/ — il git-common-dir la ricollega al repo comunque.
 mkdir -p "$RDA_WORKTREES/MirrorBuddy"
 git -C "$MB" worktree add -q -b card/mb-by-id "$RDA_WORKTREES/MirrorBuddy/mb-by-id" main
-out8="$(cd "$TMP" && bash "$WT" sweep --yes --all 2>&1)"
+(cd "$TMP" && bash "$WT" sweep --yes --all >/dev/null 2>&1)
 [ -d "$RDA_WORKTREES/MirrorBuddy/mb-by-id" ] && ok "MirrorBuddy escluso anche registrato altrove, per identita' di repo (git-common-dir)" || fail "RIMOSSA una copia di MirrorBuddy registrata sotto \$WT_HOME — la regola di sicurezza va per PATH soltanto"
 
 # --- HEAD staccata (`git worktree add --detach`): `rev-parse --abbrev-ref HEAD` restituisce la
@@ -260,7 +260,7 @@ out8="$(cd "$TMP" && bash "$WT" sweep --yes --all 2>&1)"
 # staccato con un commit proprio, mai integrato, risulterebbe sempre "integrato" per errore.
 # Una copia in ciascun posto che ha il proprio confronto di ramo: location (1) via _verdict,
 # location (4) via _verdict_at.
-DETACHED1="$(git -C "$REPO" worktree add --detach "$RDA_WORKTREES/demo/detached" main 2>&1 && printf '%s' "$RDA_WORKTREES/demo/detached")"
+git -C "$REPO" worktree add --detach -q "$RDA_WORKTREES/demo/detached" main
 echo d1 > "$RDA_WORKTREES/demo/detached/f"; git -C "$RDA_WORKTREES/demo/detached" commit -qam "mai integrato, HEAD staccata"
 git -C "$REPO3" worktree add --detach -q "$REPO3/.claude/worktrees/detached2" main
 echo d2 > "$REPO3/.claude/worktrees/detached2/f"; git -C "$REPO3/.claude/worktrees/detached2" commit -qam "mai integrato, HEAD staccata"
