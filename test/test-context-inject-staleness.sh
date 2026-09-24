@@ -74,5 +74,36 @@ card Q5
 inq Q5 && err "a headless run (factory/@thor) re-photographed the queue" || ok "a headless run (RDA_HEADLESS=1) never touches the queue photo"
 # (that the real Copilot extension SENDS this shape is asserted in test-copilot-adapter.sh § G2)
 
+echo "=== handoff/latest.md: dated from its own header (never mtime) as stale past 7 days ==="
+# Card 260924-085104: this pointer used to always tell the agent to read handoff/latest.md as
+# current, even weeks-old about a different repo — and a fresh `git`/worktree checkout resets a
+# tracked file's MTIME to "now" regardless of its content's real age, so the date has to come
+# from the file's own first line, never the filesystem. Reuses the $T/home fixture above.
+mkdir -p "$T/home/GitHub/roberdan-os/handoff"
+full_output() { (cd "$T/ciq" && printf '%s' "$1" | HOME="$T/home" RDA_KANBAN="$T/board" RDA_KANBAN_REGISTRY="$T/reg" bash "$HOOK" 2>/dev/null); }
+old_date="$(date -v-30d +%F 2>/dev/null || date -d '30 days ago' +%F)"
+fresh_date="$(date +%F)"
+
+printf '# Handoff — %s (test fixture)\n\nsome content\n' "$old_date" > "$T/home/GitHub/roberdan-os/handoff/latest.md"
+out="$(full_output '{"session_id":"hf-1","source":"startup"}')"
+if printf '%s\n' "$out" | grep -q "STALE" && printf '%s\n' "$out" | grep -q "$old_date"; then
+  ok "handoff/latest.md older than 7 days -> flagged STALE, with its own header date"
+else
+  err "old handoff/latest.md ($old_date, 30 days) was not flagged stale"
+fi
+printf '%s\n' "$out" | grep -q -- '- `.*handoff/latest.md` — current thread, decisions, open threads' \
+  && err "a 30-day-old handoff was still pointed to as current thread context" \
+  || ok "a stale handoff is not described as current thread context"
+
+printf '# Handoff — %s (test fixture)\n\nsome content\n' "$fresh_date" > "$T/home/GitHub/roberdan-os/handoff/latest.md"
+out2="$(full_output '{"session_id":"hf-2","source":"startup"}')"
+printf '%s\n' "$out2" | grep -q -- '- `.*handoff/latest.md` — current thread, decisions, open threads' \
+  && ok "handoff/latest.md dated today -> still pointed to as current thread context" \
+  || err "a same-day handoff was wrongly marked stale"
+printf '%s\n' "$out2" | grep -q "STALE" \
+  && err "a same-day handoff was flagged STALE" \
+  || ok "a same-day handoff is not flagged stale"
+rm -f "$T/home/GitHub/roberdan-os/handoff/latest.md"
+
 if [ "$fails" -eq 0 ]; then printf '\ntest-context-inject-staleness: ✅ ALL GREEN\n'; else printf '\ntest-context-inject-staleness: ❌ FAIL (see above)\n'; fi
 exit "$fails"
