@@ -10,6 +10,9 @@ import { withSkillObligations } from "../hooks/copilot/skill-obligations.mjs";
 const video = "Prepara soltanto un concept scritto di tre frasi per un trailer video di 15 secondi di un'app fittizia. Non produrre file, immagini o video e non chiamare servizi esterni.";
 const apple = "Descrivi in tre frasi una schermata iPhone accessibile per un timer fittizio.";
 const secret = "PRIVATE_SENTINEL_do_not_persist";
+const envelope = (body) => `Another Claude session sent a message:\n<agent-message from="acc791d99295da116">\n${body}\n</agent-message>`;
+const handback = envelope("[Subagent hand-back] Second flake fixed, same branch/PR #99. HEAD SHA: 8bb7176 ... Root cause (code-verified, not log-adjacency): `test-audit-chain.sh` runs the real Copilot observer with no `runScript`/`report` override, so its writer uses `hooks/copilot/audit.mjs`'s own `AUDIT_LIMITS.writeMs=1000ms` ... Proofs (fatto e provato): fresh 20/20 run ... Red proof in scratch copies (never committed): slow-only-on-close writer -> exactly one `retry:` then red on attempt 2 ...");
+const plainAgentMessage = envelope("VERDICT: PASS -- card 260924-085105-3, re-verified at 2a6b053 ... 4 MirrorHR sub-worktrees individually named ... 1 copilot-worktrees/MirrorScopio entry ... Mutation test (throwaway worktree of origin/main, removed after) ...");
 test("emitted mandatory skills contain the complete guidance, not just a pointer", {
     skip: !process.env.RDA_TEST_SKILL_EMISSION,
 }, () => {
@@ -57,6 +60,17 @@ test("native notifications do not create or clear a user's pending obligation", 
     await f.call("prompt", { prompt: video });
     await f.call("prompt", { prompt: "<system_notification>Agent finished.</system_notification>" });
     assert.match((await f.call("pre", { toolName: "bash" })).deny, /film-director/);
+});
+
+test("harness-delivered subagent hand-back envelope is a notification: no new obligation, pending one survives", async (t) => {
+    for (const prompt of [handback, plainAgentMessage]) {
+        const f = fixture(t);
+        assert.equal((await f.call("prompt", { prompt })).status, "notification");
+        assert.equal((await f.call("pre", { toolName: "bash" })).deny, undefined);
+        await f.call("prompt", { prompt: video });
+        assert.equal((await f.call("prompt", { prompt })).status, "notification");
+        assert.match((await f.call("pre", { toolName: "bash" })).deny, /film-director/);
+    }
 });
 
 test("native success alone fulfills the exact route; failure/discovery/wrong names never do", async (t) => {
@@ -184,6 +198,8 @@ test("real Claude callback adapter emits native block and success-only fallback 
     };
     const context = invoke({ hook_event_name: "UserPromptSubmit", prompt: video + secret });
     assert.match(context.hookSpecificOutput.additionalContext, /film-director/);
+    // A real hand-back arrives as a plain UserPromptSubmit, with no agent_id field.
+    assert.deepEqual(invoke({ hook_event_name: "UserPromptSubmit", prompt: handback }), {});
     assert.equal(invoke({ hook_event_name: "Stop", stop_hook_active: false }).decision, "block");
     invoke({ hook_event_name: "PostToolUse", agent_id: "child-1", tool_name: "Skill",
         tool_input: { skill: "film-director" } });

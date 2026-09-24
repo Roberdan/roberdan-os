@@ -11,7 +11,11 @@ export const ROUTES = Object.freeze({
 export const RETRIES = 2;
 const PAUSE = /^(?:stop|pause|pausa|fermati|metti in pausa|devo andare|vado|cancel|annulla)[.!?\s]*$/iu;
 const ACTION = /^\s*(?:(?:please|per favore)[,\s]+)?(?:prepara|crea|scrivi|descrivi|progetta|realizza|produci|rivedi|modifica|monta|create|write|describe|design|produce|make|review|edit|build)\b/iu;
-const NOTIFICATION = /^\s*<(?:task-notification|teammate-message|system[-_]notification|system[-_]reminder)\b/iu;
+// The harness-delivered subagent hand-back ("Another Claude session sent a message: <agent-message
+// from="..."> ...") is the same kind of notification, whether or not its body starts with
+// "[Subagent hand-back]"; matched only from the very start so a genuine user prompt that merely
+// quotes one elsewhere in its text still arms/keeps its own obligation.
+const NOTIFICATION = /^\s*(?:Another Claude session sent a message:\s*)?<(?:task-notification|teammate-message|system[-_]notification|system[-_]reminder|agent-message)\b/iu;
 const VIDEO = /\b(?:video|film|trailer|storyboard|animazione|animation|moving.image|motion.design|spot)\b|\.(?:mp4|mov)\b/iu;
 const APPLE = /\b(?:iphone|ipad|macos|ios|ipados|watchos|tvos|visionos|swiftui|uikit|appkit|apple.watch)\b/iu;
 const UI = /\b(?:ui|ux|schermat\w*|interfacci\w*|screen|interface|layout|view|app|application|applicazion\w*)\b/iu;

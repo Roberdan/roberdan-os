@@ -10,9 +10,21 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 - Recognize supported requests at the start of a direct instruction, not from
   action words buried in reports. Known native notification envelopes neither
   create nor clear user obligations; skill identifiers alone are not creative work.
+- Also recognize the harness-delivered subagent hand-back envelope ("Another
+  Claude session sent a message: <agent-message ...>") as a notification,
+  whether or not its body opens with "[Subagent hand-back]". A pending
+  obligation now survives it instead of being silently cleared.
 - Emit the complete primary guidance for the two mandatory native routes.
   A successful load now delivers the guidance, not just a pointer telling the
   model to read it later. Regression checks compare the entire canonical body.
+
+### Changed
+
+- `test-audit-skills.py`'s node/bash subprocess calls now record their own
+  diagnostics and retry the whole file once when every collected code is a
+  recognized transient contention timeout (matching `test-audit-chain.sh`'s
+  existing retry pattern); production timeouts (`AUDIT_LIMITS`, `audit.sh`'s
+  own budget) are unchanged.
 
 ## 2.59.1 — 2026-09-24
 
