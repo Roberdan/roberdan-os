@@ -113,8 +113,11 @@ skill is useful, or prove that the canon outperforms an unconfigured host.
 
 ### Native activation boundaries
 
-`bin/sync.sh --install` registers Claude command callbacks (Node is required)
-and generates the Copilot extension composition. The Copilot extension must
+`bin/sync.sh --install` generates Claude callback declarations (Node is required)
+and installs the Copilot extension composition. It does **not** merge callbacks
+into the real Claude settings. Review `bin/install-hooks.sh`'s dry-run before
+`--apply`, or selectively merge the release's callbacks if other generated hooks
+were separately declined; preserve unrelated user configuration. The Copilot extension must
 actually be enabled, approved and running; a discovered or failed extension is
 not enforcement. Headless project probes additionally needed
 `GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS=true` in the measured runtime. This is an

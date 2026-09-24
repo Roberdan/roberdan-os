@@ -169,6 +169,26 @@ test("real Claude callback adapter emits native block and success-only fallback 
     assert.deepEqual(invoke({ hook_event_name: "Stop", stop_hook_active: true }), {});
 });
 
+test("unrelated freeform tool results do not break ordinary native observation", async (t) => {
+    const f = fixture(t), notices = [];
+    let observed = 0;
+    const hooks = withSkillObligations({
+        onPostToolUse: () => { observed++; },
+    }, { ...f, sessionId: () => "session-1", notify: async (text) => notices.push(text) });
+    await hooks.onUserPromptSubmitted({ prompt: "Quanto fa 17 per 19?" });
+    await hooks.onPostToolUse({ toolName: "apply_patch", toolArgs: "*** Begin Patch\n*** End Patch",
+        toolResult: { resultType: "success" } });
+    assert.deepEqual(notices, []);
+    assert.equal(observed, 1, "ordinary tools must retain their existing callbacks");
+    await hooks.onUserPromptSubmitted({ prompt: video });
+    await hooks.onPostToolUse({ toolName: "apply_patch", toolArgs: "*** Begin Patch\n*** End Patch",
+        toolResult: { resultType: "success" } });
+    assert.deepEqual(notices, []);
+    assert.equal(observed, 2);
+    assert.equal((await hooks.onAgentStop({})).decision, "block",
+        "an unrelated success cannot fulfill required guidance");
+});
+
 test("native continuation keeps inherited observers alive until its terminal end", async (t) => {
     const f = fixture(t);
     let ended = 0;
