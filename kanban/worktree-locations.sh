@@ -218,24 +218,28 @@ _scan_repo() {
 # shellcheck disable=SC2154
 _orphan_check() {
   local wt="$1" apply="$2" wt_real sub pwd_real
+  wt_real="$(_realpath "$wt")" || return 0
+  # PRIMA di tutto: gia' segnalato da _scan_repo (fase A)? Allora niente altro, MAI — precede
+  # MirrorBuddy/cwd qui sotto apposta: un worktree vero dentro MirrorBuddy o quello in cui sei
+  # ora ha GIA' la sua riga dalla fase A, e ripeterla qui la duplicherebbe (misurato: la card
+  # gira nel proprio worktree, che la fase B rincontra per cartella).
+  grep -qxF "$wt_real" "$known" 2>/dev/null && return 0        # e' un worktree vero: gia' segnalato
+  grep -qF "$wt_real/" "$known" 2>/dev/null && return 0        # CONTIENE worktree veri: non e' orfana
   # _wt_verdict fa questi due controlli per ogni worktree VERO che passa da _scan_repo; una
-  # cartella orfana (fase B, mai passata da li') li salta del tutto se non li si ripete qui — e
-  # MirrorBuddy tiene proprio cartelle VUOTE sotto .claude/worktrees/ mentre un agente ci scrive
-  # dentro: senza questo controllo una `--yes` le rmdir'erebbe, contro la regola della card.
+  # cartella orfana (non ancora esclusa sopra) li salta del tutto se non li si ripete anche qui —
+  # e MirrorBuddy tiene proprio cartelle VUOTE sotto .claude/worktrees/ mentre un agente ci
+  # scrive dentro: senza questo controllo una `--yes` le rmdir'erebbe, contro la regola della card.
   case "$wt" in "$GH_HOME/MirrorBuddy/"*|"$WT_HOME/MirrorBuddy/"*)
     n=$((n+1)); kept=$((kept+1))
     printf '  tenuta    %-58s KEEP: MirrorBuddy — Roberto ci lavora ora con un altro agente, mai toccare\n' "$wt"
     return 0 ;;
   esac
-  wt_real="$(_realpath "$wt")" || return 0
   pwd_real="$(_realpath "$PWD")" || pwd_real="$PWD"
   case "$pwd_real/" in "$wt_real"/*)
     n=$((n+1)); kept=$((kept+1))
     printf '  tenuta    %-58s KEEP: e'"'"' la cartella in cui stai lavorando adesso\n' "$wt"
     return 0 ;;
   esac
-  grep -qxF "$wt_real" "$known" 2>/dev/null && return 0        # e' un worktree vero: gia' segnalato
-  grep -qF "$wt_real/" "$known" 2>/dev/null && return 0        # CONTIENE worktree veri: non e' orfana
   # Guardia di sicurezza: _discover_repos puo' comunque non trovare un repo (fuori da ~/GitHub,
   # nel registro ma con un path rotto, annidato piu' di un livello...). Se QUESTA cartella o un
   # suo figlio diretto ha un .git che git sa risolvere, non e' orfana — e' un repo/worktree

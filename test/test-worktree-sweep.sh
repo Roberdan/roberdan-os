@@ -82,6 +82,16 @@ CLEAN2="$(mk clean2)"
 CWDWT="$(mk cwdwt)"
 (cd "$CWDWT" && bash "$WT" sweep --yes >/dev/null 2>&1)
 [ -d "$CWDWT" ] && ok "non rimuove la copia in cui sei dentro" || fail "ha rimosso la copia in cui era dentro"
+# --all: _scope da dentro un worktree ha un suo bug pre-esistente (risolve al nome della
+# cartella, non del repo — fuori da questa card, gia' segnalato). --all lo aggira e lascia
+# esercitare cio' che qui conta davvero: fase A (_scan_repo) la trova come worktree vero, fase B
+# (caccia agli orfani) la incontra di nuovo per cartella — se la guardia cwd di _orphan_check
+# viene controllata PRIMA di "e' gia' in $known" invece che dopo, il motivo esce due volte (il
+# path stesso puo' comparire in due forme diverse, risolta e no — vedi $CWDWT_REAL altrove — per
+# questo il conteggio e' sul MOTIVO stampato, non sul path).
+out_cwd="$(cd "$CWDWT" && bash "$WT" sweep --yes --all 2>&1)"
+n_cwd="$(grep -c "KEEP: e. la cartella in cui stai lavorando adesso" <<<"$out_cwd")"
+[ "$n_cwd" -eq 1 ] && ok "\"la cartella in cui sei dentro\" compare UNA sola volta nel referto" || fail "\"la cartella in cui sei dentro\" compare $n_cwd volte — duplicata fra fase A e fase B"
 # --- ambito: dentro un progetto si guarda SOLO quel progetto ------------------------------
 REPO2="$HOME/GitHub/altro"; mkdir -p "$REPO2"
 git -C "$REPO2" init -q -b main; echo a > "$REPO2/f"; git -C "$REPO2" add f; git -C "$REPO2" commit -qm a
