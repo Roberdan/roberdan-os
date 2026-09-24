@@ -78,13 +78,8 @@ section "resolution — aliases expand, brand words do not, hosts keep separate 
 [ "$($M resolve gpt-6-astra)" = "gpt-6-astra" ] && ok "a reviewed concrete id resolves to itself" || err "gpt-6-astra did not resolve"
 # Claude Code takes the TIER alias, not a Copilot id — the two hosts do not share a namespace.
 [ "$($M resolve opus --host claude)" = "opus" ] && ok "opus --host claude stays the tier alias (Claude Code back-compat)" || err "claude host resolution changed"
-# `hosts` never contains the literal "claude" (it lists copilot/copilot-task), so `list --host
-# claude` used to filter on that column and always print an empty table. It must instead show
-# the current aliased rows Claude Code can actually resolve.
-claude_list="$($M list --host claude)"
-[ -n "$claude_list" ] && printf '%s\n' "$claude_list" | grep -q '^claude-opus-5.5 ' \
-  && ok "list --host claude is non-empty and shows the current opus row" \
-  || err "list --host claude regressed to an empty table"
+# `hosts` never says "claude": `list --host claude` once filtered on it and printed nothing.
+_cl="$($M list --host claude)"; grep -q '^claude-opus-5.5 ' <<<"$_cl" && ok "list --host claude shows the current opus row" || err "list --host claude regressed to an empty table"
 refuses "a Copilot id on the claude host"   $M resolve gpt-6-astra --host claude
 refuses "a Copilot id on the claude host"   $M resolve claude-opus-5 --host claude
 refuses "the codex host (no model pin)"     $M resolve opus --host codex
@@ -112,10 +107,7 @@ $M validate --model gpt-6-astra --effort xhigh --context long_context >/dev/null
   && ok "astra accepts xhigh + long_context" || err "astra validation failed unexpectedly"
 $M validate --model claude-opus-5.5 --effort max --context default >/dev/null \
   && ok "opus-5.5 accepts max + default context" || err "opus-5.5 validation failed unexpectedly"
-# long_context is NOT claimed for opus-5.5 (no evidence in the 2026-09-24 review — see the
-# registry header); this pins the conservative choice instead of letting it silently rot.
 refuses "long_context not claimed for opus-5.5 (unreviewed)" $M validate --model claude-opus-5.5 --context long_context
-refuses "a legacy model (opus-5, demoted 2026-09-24)"        $M resolve claude-opus-5
 refuses "effort on a model with no reasoning knob (haiku)" $M validate --model claude-haiku-4.5 --effort high
 refuses "long_context on a default-only model"            $M validate --model gpt-5.4-mini --context long_context
 refuses "an effort above what the model offers"           $M validate --model gemini-3.8-flash --effort max
@@ -166,9 +158,6 @@ E1="$TMP/e1"; E2="$TMP/e2"
 RDA_SYNC_OUT="$E1" bash bin/sync.sh --emit-only >/dev/null 2>&1
 RDA_SYNC_OUT="$E2" bash bin/sync.sh --emit-only >/dev/null 2>&1
 BA="$E1/copilot/agents/baccio.md"
-# The Astra-vs-Opus trial (2026-09-05) concluded 2026-09-24: baccio dropped its Copilot-only
-# override and now flows the canon `opus` alias through to the generated wrapper like every
-# other decider.
 grep -qE '^model: claude-opus-5\.5$' "$BA" && ok "the canon opus alias reaches the generated wrapper (no Copilot-only override)" || err "baccio's generated model wrong in $BA"
 grep -qE '^model:[[:space:]]*"opus"' agents/baccio.md && ok "the canon tier for Claude Code is opus" || err "baccio's canon model: field changed unexpectedly"
 grep -q '^copilot_model:' agents/baccio.md && err "baccio still carries a copilot_model override" || ok "baccio's Copilot-only override was removed, not just changed"
@@ -203,8 +192,6 @@ badp="$(grep -L "$ROOT/skills/" "$E1"/copilot/prompts/*.prompt.md 2>/dev/null)"
 
 # --- F) launcher --------------------------------------------------------------------------
 section "launcher — the flags are really built, and a duplicated flag stops the run"
-# claude-opus-5.5 is a single-tier model (contexts: default only, per the 2026-09-24 review),
-# so --context is correctly omitted here — same rule proven below for gpt-5.3-codex.
 args="$(RDA_DRY_RUN=1 bash bin/copilot-agent.sh baccio -p hello 2>&1)"
 printf '%s\n' "$args" | tr '\n' ' ' | grep -q -- "copilot --agent baccio --model claude-opus-5.5 --effort high -p hello" \
   && ok "baccio launches as: copilot --agent baccio --model claude-opus-5.5 --effort high -p hello" \

@@ -52,8 +52,6 @@ else
 fi
 if [ -f "$AGENTS/baccio.md" ]; then
   grep -qE '^tools: \[read, edit, execute, search, web\]$' "$AGENTS/baccio.md" && ok "baccio tools mapped (incl. Write->edit, WebSearch/WebFetch->web)" || err "baccio tools mapping wrong: $(grep -m1 '^tools:' "$AGENTS/baccio.md")"
-  # The Astra-vs-Opus trial (2026-09-05) concluded 2026-09-24: baccio dropped its Copilot-only
-  # override and now resolves the canon `opus` alias like every other decider.
   grep -qE '^model: claude-opus-5\.5$' "$AGENTS/baccio.md" && ok "baccio model resolved from the registry (canon opus alias, no Copilot-only override — per-host rules: test/test-model-registry.sh)" || err "baccio model mapping wrong: $(grep -m1 '^model:' "$AGENTS/baccio.md")"
 fi
 
