@@ -10,7 +10,10 @@
 # Non-destructive by construction:
 #   - additive: only ADDS roberdan-os hook entries that aren't already present
 #     (dedup by the hook command string) — never removes or reorders the user's
-#     own hooks (orca, gstack, etc.).
+#     own hooks (orca, gstack, etc.). The one exception is our OWN commands: if the
+#     canon snippet narrows a command's matcher across a release (e.g. bus-doorbell.sh
+#     moving off "*"), a stale roberdan-os entry is MOVED to the new matcher, not left
+#     behind and not duplicated. This never touches a command outside the snippet.
 #   - backup: writes ~/.claude/settings.json.bak-<ts> before any change.
 #   - idempotent: a second run is a no-op ("already wired").
 # Override the target for testing: RDA_CLAUDE_SETTINGS (default ~/.claude/settings.json).
@@ -75,6 +78,49 @@ hooks = settings.setdefault("hooks", {})
 def cmds(entry):
     return {norm(h.get("command", "")) for h in entry.get("hooks", [])}
 
+# Matcher the CANON snippet wants for each (event, command) pair — the source of
+# truth for "which tools this hook should run after". A command can move to a
+# narrower matcher across a release (e.g. bus-doorbell.sh from unmatched/"*" to
+# "Bash|Edit|Write"); an existing settings.json written under the old matcher
+# must be UPGRADED to the new one, not left stale and not duplicated.
+desired_matcher = {}
+for event, entries in snippet.items():
+    for entry in entries:
+        for h in entry.get("hooks", []):
+            nc = norm(h.get("command", ""))
+            if nc:
+                desired_matcher[(event, nc)] = entry.get("matcher")
+
+def matcher_key(m):
+    """None, "" and "*" all mean 'match every tool' to Claude Code — compare them as
+    equal so a command already on any 'match-all' spelling is never moved just because
+    the canon snippet happens to write that same meaning differently."""
+    return "*" if m in (None, "") else m
+
+upgraded = []
+touched_ids = set()
+for event, entries in hooks.items():
+    if event not in snippet:
+        continue  # not ours to touch — a foreign event stays exactly as found
+    for e in entries:
+        keep_hooks = []
+        for h in e.get("hooks", []):
+            nc = norm(h.get("command", ""))
+            want = desired_matcher.get((event, nc))
+            if (event, nc) in desired_matcher and matcher_key(e.get("matcher")) != matcher_key(want):
+                # This command is ours (it's in the canon snippet) and is sitting
+                # under a stale matcher. Drop it here — the add-pass below re-adds
+                # it under the entry with the canon matcher, so it moves instead
+                # of duplicating.
+                upgraded.append(nc)
+                touched_ids.add(id(e))
+                continue
+            keep_hooks.append(h)
+        e["hooks"] = keep_hooks
+    # Drop only entries THIS pass emptied — a pre-existing entry we never touched
+    # (however it got that way) is the user's own business, not ours to remove.
+    hooks[event] = [e for e in entries if e.get("hooks") or id(e) not in touched_ids]
+
 added = []
 for event, entries in snippet.items():
     existing = hooks.setdefault(event, [])
@@ -91,15 +137,22 @@ for event, entries in snippet.items():
         existing.append(keep)
         added.extend(sorted(new_cmds))
 
-if not added:
+if not added and not upgraded:
     print("install-hooks: ✅ already wired — nothing to add (idempotent no-op).")
     sys.exit(0)
 
-print("install-hooks: would add %d hook command(s):" % len(added))
-for c in added:
-    # show a short tail of the command for readability
-    tail = c.split("roberdan-os/")[-1] if "roberdan-os/" in c else c
-    print("  +", tail)
+if upgraded:
+    print("install-hooks: would move %d hook command(s) to their canon matcher:" % len(upgraded))
+    for c in sorted(set(upgraded)):
+        tail = c.split("roberdan-os/")[-1] if "roberdan-os/" in c else c
+        print("  ~", tail)
+
+if added:
+    print("install-hooks: would add %d hook command(s):" % len(added))
+    for c in added:
+        # show a short tail of the command for readability
+        tail = c.split("roberdan-os/")[-1] if "roberdan-os/" in c else c
+        print("  +", tail)
 
 if not apply:
     print("\n(dry-run) re-run with --apply to write it.")

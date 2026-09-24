@@ -260,7 +260,7 @@ EOF
   # so the context re-injects itself after a compaction too (2026 compaction-resilience).
   # PreCompact checkpoints durable state BEFORE the window is compressed; Stop keeps the
   # canonical always-on auto-checkpoint (AGENTS.md § Pause & Resume).
-  # PostToolUse `*` carries the bus doorbell: it prints HOW MANY messages are unread and
+  # PostToolUse "Bash|Edit|Write" (~0.55s/call, reads skip it) carries the bus doorbell: it prints HOW MANY messages are unread and
   # never what they say, inside a session that is already running. It is NOT on Stop on
   # purpose - a Stop hook that surfaces pending mail is one edit away from "if a message
   # is pending, continue the session", which is the mutation bus-protocol.md forbids.
@@ -282,8 +282,8 @@ EOF
     ],
     "PostToolUse": [
       { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "$RDA_OS/hooks/autofmt.sh", "timeout": 30 }] },
+      { "matcher": "Bash|Edit|Write", "hooks": [{ "type": "command", "command": "bash $RDA_OS/hooks/bus-doorbell.sh 2>/dev/null || true", "timeout": 5 }] },
       { "matcher": "*", "hooks": [
-          { "type": "command", "command": "bash $RDA_OS/hooks/bus-doorbell.sh 2>/dev/null || true", "timeout": 5 },
           { "type": "command", "command": "bash $RDA_OS/hooks/audit.sh", "timeout": 5 }
       ] }
     ],

@@ -315,8 +315,8 @@ runs=$(wc -l < "$COUNTER" | tr -d ' ')
   || err "chain ran $runs times for 3 rapid idles — expected 1 (dedup/throttle broken)"
 
 # F) Old hosts that never deliver onAgentStop still get an explicit idle warning.
-# The doorbell must run on every tool, including read-only tools.
-section "Claude parity — goal-gate in the idle chain, bus-doorbell on every tool"
+# The doorbell rings only after shell/write tools (Claude matcher "Bash|Edit|Write").
+section "Claude parity — goal-gate in the idle chain, bus-doorbell gated to write/shell tools"
 PAR_OS="$TMP/parity-os"; mkdir -p "$PAR_OS/hooks"
 GG="$TMP/parity-goalgate"; BD="$TMP/parity-doorbell"; : > "$GG"; : > "$BD"
 printf '#!/usr/bin/env bash\necho x >> "%s"\nexit 0\n' "$GG" > "$PAR_OS/hooks/goal-gate.sh"
@@ -327,16 +327,16 @@ import "./extension.mjs";
 const cfg = globalThis.__RDA_CFG;
 const idle = (globalThis.__H || {})["session.idle"];
 if (typeof idle === "function") { idle(); await new Promise((r) => setTimeout(r, 800)); }
-// A READ-ONLY tool: proves the doorbell is not gated behind the write-tool filter.
-await cfg.hooks.onPostToolUse({ toolName: "view", toolArgs: { path: "/tmp/x" }, workingDirectory: process.cwd() });
+await cfg.hooks.onPostToolUse({ toolName: "view", toolArgs: { path: "/tmp/x" }, workingDirectory: process.cwd() }); await new Promise((r) => setTimeout(r, 300));
+await cfg.hooks.onPostToolUse({ toolName: "bash", toolArgs: { command: "true" }, workingDirectory: process.cwd() });
 await new Promise((r) => setTimeout(r, 400));
 console.log("DONE");
 JS
 ( cd "$STAGE" && RDA_OS="$PAR_OS" node driver-parity.mjs >/dev/null 2>&1 )
 [ -s "$GG" ] && ok "goal-gate.sh runs in the Copilot idle chain (Claude Stop parity)" \
   || err "goal-gate.sh did NOT run on idle — Claude Stop chain includes it, Copilot must too"
-[ -s "$BD" ] && ok "bus-doorbell.sh runs on a READ-ONLY tool (Claude PostToolUse matcher '*')" \
-  || err "bus-doorbell.sh did NOT run on a read-only tool — doorbell is deaf outside write turns"
+rings="$(wc -l < "$BD" | tr -d ' ')"; [ "$rings" = "1" ] && ok "bus-doorbell.sh runs on a shell tool, stays silent on a read-only tool (Claude PostToolUse matcher 'Bash|Edit|Write')" \
+  || err "expected exactly 1 doorbell ring (shell tool only, read-only tool silent), got $rings"
 
 # G) SESSION IDENTITY — the defect @thor reproduced in round 1. goal-gate.sh and bus-doorbell.sh
 # both key their per-session state on `session_id` from stdin, falling back to the literal
@@ -355,7 +355,7 @@ import "./extension.mjs";
 const cfg = globalThis.__RDA_CFG;
 const idle = (globalThis.__H || {})["session.idle"];
 if (typeof idle === "function") { idle(); await new Promise((r) => setTimeout(r, 900)); }
-await cfg.hooks.onPostToolUse({ toolName: "view", toolArgs: { path: "/tmp/x" }, workingDirectory: process.cwd() });
+await cfg.hooks.onPostToolUse({ toolName: "bash", toolArgs: { command: "true" }, workingDirectory: process.cwd() });
 await cfg.hooks.onSessionEnd({ workingDirectory: process.cwd() });
 await new Promise((r) => setTimeout(r, 500));
 console.log("DONE");
