@@ -10,6 +10,18 @@ import { withSkillObligations } from "../hooks/copilot/skill-obligations.mjs";
 const video = "Prepara soltanto un concept scritto di tre frasi per un trailer video di 15 secondi di un'app fittizia. Non produrre file, immagini o video e non chiamare servizi esterni.";
 const apple = "Descrivi in tre frasi una schermata iPhone accessibile per un timer fittizio.";
 const secret = "PRIVATE_SENTINEL_do_not_persist";
+test("emitted mandatory skills contain the complete guidance, not just a pointer", {
+    skip: !process.env.RDA_TEST_SKILL_EMISSION,
+}, () => {
+    for (const name of ["film-director", "apple-designer"]) {
+        const canonical = readFileSync(new URL(`../skills/${name}/skill.md`, import.meta.url), "utf8")
+            .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "");
+        const emitted = readFileSync(join(process.env.RDA_TEST_SKILL_EMISSION,
+            "claude/skills", name, "SKILL.md"), "utf8");
+        assert.ok(emitted.includes(canonical), `${name}: native loading must deliver ALL canonical guidance`);
+    }
+});
+
 function fixture(t) {
     const base = mkdtempSync(join(tmpdir(), "rda-skill-obligation-"));
     t.after(() => rmSync(base, { recursive: true }));
@@ -31,7 +43,20 @@ test("actual text-only video and Apple UI requests create obligations, ordinary/
     assert.deepEqual(classify("Design an iPad UI and create a trailer video."), ["film-director", "apple-designer"]);
     for (const prompt of ["Quanto fa 17 per 19?", "Do not create a video.", "Non creare un video.",
         "Design a video-upload API backend.", "Build an iOS background sync app.",
+        "Report: review completata del test video; nessun lavoro creativo richiesto.",
+        "Review the test-audit-chain regression for film-director.",
+        "<task-notification>Write a storyboard for a product film.</task-notification>",
+        "<system_notification>Review this demo video.</system_notification>",
         "Spiega cosa significa film-director.", "stop", "annulla"]) assert.deepEqual(classify(prompt), [], prompt);
+});
+
+test("native notifications do not create or clear a user's pending obligation", async (t) => {
+    const f = fixture(t), prompt = "<task-notification>Write a trailer video.</task-notification>";
+    await f.call("prompt", { prompt });
+    assert.equal((await f.call("pre", { toolName: "bash" })).deny, undefined);
+    await f.call("prompt", { prompt: video });
+    await f.call("prompt", { prompt: "<system_notification>Agent finished.</system_notification>" });
+    assert.match((await f.call("pre", { toolName: "bash" })).deny, /film-director/);
 });
 
 test("native success alone fulfills the exact route; failure/discovery/wrong names never do", async (t) => {

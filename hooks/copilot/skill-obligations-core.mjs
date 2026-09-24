@@ -10,7 +10,8 @@ export const ROUTES = Object.freeze({
 });
 export const RETRIES = 2;
 const PAUSE = /^(?:stop|pause|pausa|fermati|metti in pausa|devo andare|vado|cancel|annulla)[.!?\s]*$/iu;
-const ACTION = /\b(?:prepara|crea|scrivi|descrivi|progetta|realizza|produci|rivedi|modifica|monta|create|write|describe|design|produce|make|review|edit|build)\b/iu;
+const ACTION = /^\s*(?:(?:please|per favore)[,\s]+)?(?:prepara|crea|scrivi|descrivi|progetta|realizza|produci|rivedi|modifica|monta|create|write|describe|design|produce|make|review|edit|build)\b/iu;
+const NOTIFICATION = /^\s*<(?:task-notification|teammate-message|system[-_]notification|system[-_]reminder)\b/iu;
 const VIDEO = /\b(?:video|film|trailer|storyboard|animazione|animation|moving.image|motion.design|spot)\b|\.(?:mp4|mov)\b/iu;
 const APPLE = /\b(?:iphone|ipad|macos|ios|ipados|watchos|tvos|visionos|swiftui|uikit|appkit|apple.watch)\b/iu;
 const UI = /\b(?:ui|ux|schermat\w*|interfacci\w*|screen|interface|layout|view|app|application|applicazion\w*)\b/iu;
@@ -19,8 +20,8 @@ const NEGATED = /\b(?:non|don't|do not|no need to)\s+(?:\w+\s+){0,2}(?:creare|cr
 // Bounded explicit Italian/English requests, not a semantic classifier of every paraphrase.
 export function classify(prompt) {
     if (typeof prompt !== "string" || prompt.length > 32768) throw Error("invalid_prompt");
-    if (PAUSE.test(prompt.trim())) return [];
-    const text = prompt.replace(NEGATED, "");
+    if (PAUSE.test(prompt.trim()) || NOTIFICATION.test(prompt)) return [];
+    const text = prompt.replace(NEGATED, "").replace(/\b(?:rdos-)?(?:film-director|apple-designer)\b/giu, "");
     if (!ACTION.test(text)) return [];
     const routes = [];
     const backend = /\b(?:backend|back.end|server|database|api|background.sync)\b/iu.test(text);
@@ -87,6 +88,9 @@ function receipt(input, state, root) {
 
 function transition(input, state, root) {
     if (input.event === "prompt") {
+        if (typeof input.prompt === "string" && NOTIFICATION.test(input.prompt)) {
+            return { state, output: { status: "notification" } };
+        }
         // Native stop feedback is a follow-up user message, not a new user request.
         if (pending(state).length && input.prompt === guidance(state, root)) return { state, output: {} };
         state = { ...empty(), required: classify(input.prompt), paused: PAUSE.test(input.prompt.trim()) };

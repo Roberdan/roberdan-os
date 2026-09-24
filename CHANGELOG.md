@@ -3,6 +3,17 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.59.2 — 2026-09-24
+
+### Fixed
+
+- Recognize supported requests at the start of a direct instruction, not from
+  action words buried in reports. Known native notification envelopes neither
+  create nor clear user obligations; skill identifiers alone are not creative work.
+- Emit the complete primary guidance for the two mandatory native routes.
+  A successful load now delivers the guidance, not just a pointer telling the
+  model to read it later. Regression checks compare the entire canonical body.
+
 ## 2.59.1 — 2026-09-24
 
 ### Fixed
