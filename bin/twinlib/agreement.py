@@ -57,9 +57,9 @@ def stats(records, days=None):
         if pairs:
             per_cat[cat] = _rate(pairs)
     overall = _rate([(r["twin_prediction"]["choice"], r["roberto_choice"]) for r in counted])
-    jev = _rate([(r["jev_prediction"]["choice"], r["roberto_choice"])
-                 for r in counted if isinstance(r.get("jev_prediction"), dict)])
-    return {"per_cat": per_cat, "overall": overall, "jev": jev, "skipped": skipped}
+    # Jev is never scored here: its twin profile gives separate signals, not a prediction of
+    # Roberto (ADR-0003), so the ledger keeps a `jev_observation`, not a choice.
+    return {"per_cat": per_cat, "overall": overall, "skipped": skipped}
 
 
 def category_rate(records, cat):
@@ -78,14 +78,14 @@ def render(records, days=7):
     n, hit = st["overall"]
     if n == 0:
         out.append("  nessuna decisione confrontabile: dati insufficienti")
+    if n < MIN_N:
+        out.append("  passo successivo: accendi le previsioni automatiche con "
+                   "touch ~/.roberdan-os/private/decisions/auto-predict (max 5 card per giro, "
+                   "tetto $0.05 a card), oppure lancia bin/twin-shadow.sh predict")
     else:
         for cat, (cn, chit) in st["per_cat"].items():
             out.append(_line(cat, cn, chit))
         out.append(_line("totale", n, hit))
-    jn, jhit = st["jev"]
-    if jn:
-        out.append("Jev — accordo con Roberto (solo voci pubbliche o sintetiche)")
-        out.append(_line("totale", jn, jhit))
     sk = st["skipped"]
     if any(sk.values()):
         out.append(

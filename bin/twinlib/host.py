@@ -21,6 +21,9 @@ risposta viene solo registrata e confrontata dopo con la sua scelta.
 Come decide Roberto:
 {lens}
 
+Casi simili gia' decisi da Roberto (registro locale, i piu' vicini per primi):
+{precedents}
+
 Card (progetto {repo}):
 {card}
 
@@ -42,8 +45,9 @@ def decision_lens(root):
     return (m.group(1).strip() if m else text[:1500])[:2000]
 
 
-def build_prompt(root, repo, card_text):
-    return PROMPT.format(lens=decision_lens(root), repo=repo or "?", card=card_text[:2500])
+def build_prompt(root, repo, card_text, precedents="(nessun caso simile nel registro)"):
+    return PROMPT.format(lens=decision_lens(root), repo=repo or "?", card=card_text[:2500],
+                         precedents=precedents[:1500])
 
 
 def _claude_argv(root):

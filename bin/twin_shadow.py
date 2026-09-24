@@ -7,6 +7,8 @@
     twin_shadow.py decide --card C --choice X [--reason R] [--category K] [--source S]
     twin_shadow.py batch                  pending list sorted by the twin's advice (approves nothing)
     twin_shadow.py agreement [--days N | --all]
+    twin_shadow.py similar --card C       closest past decisions (what predict puts in the prompt)
+    twin_shadow.py values                 PROPOSED values + conflict rules, never applied
 
 Ledger: local only (twinlib/ledger.py). The twin never approves: kb start --by roberto does.
 """
@@ -17,7 +19,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from twinlib import agreement, board, host, ledger  # noqa: E402
+from twinlib import agreement, board, host, jevobs, ledger, precedents, values  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -42,13 +44,26 @@ def cmd_predict(args):
         _col, text = board.read_card(bd, card)
         with ledger.locked() as records:
             rec = _open_record(records, bd, card, text)
-            if rec["twin_prediction"] or rec["roberto_choice"]:
+            if rec["roberto_choice"]:
                 continue
+            need_jev = not rec.get("jev_observation")
+            if rec["twin_prediction"] and not need_jev:
+                continue
+            similar = precedents.render(precedents.similar(
+                records, rec["category"], board.summary(text, card), exclude_id=rec["id"]))
+        if need_jev:  # outside the lock: a subprocess. Private cards never leave (jevobs.py).
+            obs = jevobs.observe(ROOT, text)
+            with ledger.locked() as records:
+                rec = ledger.find(records, ledger.record_id(bd, card))
+                if rec is not None:
+                    rec["jev_observation"] = obs
+                    if rec["twin_prediction"]:
+                        continue
         if asked >= args.max:
             missing += 1
             continue
         asked += 1
-        prompt = host.build_prompt(ROOT, board.field(text, "repo"), board.summary(text, card))
+        prompt = host.build_prompt(ROOT, board.field(text, "repo"), board.summary(text, card), similar)
         pred, why = host.ask(ROOT, prompt)
         with ledger.locked() as records:
             rec = ledger.find(records, ledger.record_id(bd, card))
@@ -152,6 +167,32 @@ def cmd_batch(_args):
     return 0
 
 
+def cmd_similar(args):
+    records = ledger.load()
+    for bd in board.boards(ROOT):
+        _col, text = board.read_card(bd, args.card)
+        if text:
+            cat = board.field(text, "category") or "altro"
+            print(precedents.render(precedents.similar(records, cat, board.summary(text, args.card))))
+            return 0
+    print(f"twin-shadow: nessuna card {args.card}", file=sys.stderr)
+    return 1
+
+
+def cmd_values(_args):
+    text, why = values.proposal(ledger.load(), ledger.now())
+    if text is None:
+        print(f"twin-shadow: {why}")
+        return 0
+    path = os.path.join(os.path.dirname(ledger.ledger_path(create=True)), "values-proposal.md")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    print(f"twin-shadow: proposta scritta in {path} — non applicata, identity/ intatto: approvi tu (gate #6)")
+    return 0
+
+
 def cmd_agreement(args):
     print(agreement.render(ledger.load(), None if args.all else args.days))
     return 0
@@ -179,6 +220,9 @@ def main(argv=None):
     s.add_argument("--category", choices=ledger.CATEGORIES)
     s.add_argument("--source", choices=ledger.SOURCES, default="override")
     sub.add_parser("batch")
+    s = sub.add_parser("similar")
+    s.add_argument("--card", required=True)
+    sub.add_parser("values")
     s = sub.add_parser("agreement")
     s.add_argument("--days", type=int, default=7)
     s.add_argument("--all", action="store_true")

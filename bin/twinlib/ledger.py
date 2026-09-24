@@ -135,7 +135,7 @@ def new_record(board, card, situation, category="altro", source="kb-pending"):
         "situation": situation[:200],
         "options": list(CHOICES),
         "twin_prediction": None,
-        "jev_prediction": None,
+        "jev_observation": None,
         "roberto_choice": None,
         "reason": None,
         "source": source,
