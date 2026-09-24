@@ -13,10 +13,12 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   filtered records cannot establish zero general-skill usage.
 - Canonical review/release routing uses declared namespaced skills where present
   and explicit canonical-file fallbacks, not an unrelated same-named workflow.
-- Video instructions and generated descriptions explicitly name text-only
-  concepts and storyboards before production. Automatic selection is **not
-  fixed**: completed fresh-host samples skipped `film-director`. Declaring a
-  trigger is not evidence that a model follows it.
+- Native Copilot and Claude callbacks enforce recognized explicit video and
+  Apple-interface requests, including text-only concepts. Successful native
+  skill loading or a full canonical read satisfies the obligation, with distinct
+  provenance. Missing guidance produces an explicit incomplete warning and at
+  most two automatic continuations; ordinary requests and pause/cancel remain free.
+  This replaces the failed wording-only approach, not every possible routing case.
 
 ### Changed
 
@@ -25,6 +27,9 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   preparation. None establishes universal routing reliability or live Jev value.
 - Zero-usage evidence now requires observed coverage on the installation host;
   coverage on a different host or an unscoped custom directory is insufficient.
+- Validation runs at most four suites concurrently by default, including the
+  serialized installation group. `RDA_VALIDATE_JOBS=1..32` changes that ceiling;
+  assertions, failure codes and test timeouts are not relaxed.
 
 ## 2.58.0 — 2026-09-23
 
