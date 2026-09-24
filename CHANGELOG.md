@@ -3,6 +3,17 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.59.1 — 2026-09-24
+
+### Fixed
+
+- Ignore unrelated freeform tool arguments when checking native guidance
+  receipts. The installed Copilot adapter previously attempted to parse patch
+  text as JSON, producing a false unavailable warning after ordinary edits.
+  Skill/read receipts remain strict and unrelated successes cannot fulfill them.
+- Clarify that Claude's generated callback declarations must also be merged
+  into its real settings; `sync.sh --install` alone does not perform that step.
+
 ## 2.59.0 — 2026-09-24
 
 ### Fixed

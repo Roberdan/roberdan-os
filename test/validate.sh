@@ -20,7 +20,7 @@ ok()      { printf "  ok: %s\n" "$1"; }
 
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue \
           test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery test-verify-done test-audit test-audit-hooks \
-          test-kb-root-resolution test-kb-start-worktree-cause test-worktree-sweep test-junk-clean test-checkup test-twin-export-drift test-kb-top test-nested-board-notice \
+          test-kb-root-resolution test-kb-start-worktree-cause test-worktree-sweep test-worktree-registry test-junk-clean test-checkup test-twin-export-drift test-kb-top test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-bus-mutant-probes test-telemetry test-telemetry-skills test-telemetry-history test-skill-routing test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-bus-doorbell-matcher test-model-economy \

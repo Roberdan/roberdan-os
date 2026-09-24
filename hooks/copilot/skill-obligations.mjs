@@ -27,7 +27,9 @@ export function withSkillObligations(hooks, { root, home, sessionId, notify }) {
             try {
                 output = await enforceSkillObligations({
                     host: "copilot", sessionId: sid, event, prompt: input.prompt,
-                    toolName: input.toolName, args: event === "post" ? argumentsOf(input.toolArgs) : undefined,
+                    toolName: input.toolName, args: event === "post" &&
+                        ["skill", "view", "read"].includes(String(input.toolName || "").toLowerCase())
+                        ? argumentsOf(input.toolArgs) : undefined,
                     // This native hook is success-only; an explicit non-success never fulfills.
                     success: event === "post" && Boolean(input.toolResult) &&
                         (input.toolResult.resultType === undefined || input.toolResult.resultType === "success"),

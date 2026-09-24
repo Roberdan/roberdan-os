@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # test/test-worktree-sweep.sh — lo spazzino rimuove SOLO cio' che non ha nulla da perdere.
 #
-# Il difetto che questo test chiude e' misurato, non ipotetico: il 2026-09-13 c'erano 99 copie
-# di lavoro vive sotto ~/GitHub/worktrees, di 4 repo diversi, nessuna chiusa da chi l'aveva
-# aperta. Uno spazzino che sbaglia in questa direzione cancella l'ultima copia di un lavoro,
-# quindi meta' di questo file verifica che RIFIUTI, non che rimuova.
+# Misurato, non ipotetico: il 2026-09-13 c'erano 99 copie vive sotto ~/GitHub/worktrees, di 4
+# repo, nessuna chiusa da chi l'aveva aperta. Uno spazzino che sbaglia in questa direzione
+# cancella l'ultima copia di un lavoro, quindi meta' di questo file verifica che RIFIUTI.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WT="$ROOT/kanban/worktree.sh"
@@ -12,19 +11,11 @@ FAILS=0
 ok()   { printf '  ok   — %s\n' "$1"; }
 fail() { printf '  FAIL — %s\n' "$1"; FAILS=$((FAILS+1)); }
 
-# Fotografia della cartella VERA delle copie di lavoro, presa PRIMA di dirottare HOME. Una
-# suite gira sulla macchina di Roberto: se sbaglia una variabile scrive nel suo parco vero, e
-# lo scopre lui guardando l'editor. E' successo il 2026-09-13 — una riga rimasta indietro
-# creava "$ROOT/../fake", cioe' ~/GitHub/worktrees/roberdan-os/fake, a ogni esecuzione.
+# Fotografia della cartella VERA delle copie di lavoro, presa PRIMA di dirottare HOME (scar
+# 2026-09-13: una variabile sbagliata scrisse nel parco vero). `-d`: l'ELENCO delle copie, non
+# il loro contenuto — senza, un file toccato da un'ALTRA sessione durante la corsa (misurato
+# 2026-09-22) faceva fallire questo controllo a caso.
 REAL_HOME="$HOME"
-# `-d`: l'ELENCO DELLE COPIE, non il loro contenuto. Senza, `ls -1 .../*/` elenca
-# i FILE dentro ogni copia di ogni progetto, e questo controllo — che dichiara di
-# accorgersi se la suite "ha creato o tolto" una copia — falliva perche' un'altra
-# sessione, su un altro progetto, aveva salvato un file mentre la suite girava.
-# Misurato il 2026-09-22: VirtualBPMFy27/glance-kpis-live/README.md, toccato da
-# chi ci stava lavorando in quel momento. Un controllo che accusa il lavoro di
-# qualcun altro e' un controllo che si impara a ignorare, e in una macchina dove
-# girano piu' sessioni insieme falliva a caso — cioe' nel modo piu' costoso.
 REAL_WT_BEFORE="$(ls -1d "$REAL_HOME/GitHub/worktrees"/*/ 2>/dev/null | sort)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 export HOME="$TMP/home"; mkdir -p "$HOME/GitHub"
@@ -91,7 +82,16 @@ CLEAN2="$(mk clean2)"
 CWDWT="$(mk cwdwt)"
 (cd "$CWDWT" && bash "$WT" sweep --yes >/dev/null 2>&1)
 [ -d "$CWDWT" ] && ok "non rimuove la copia in cui sei dentro" || fail "ha rimosso la copia in cui era dentro"
-
+# --all: _scope da dentro un worktree ha un suo bug pre-esistente (risolve al nome della
+# cartella, non del repo — fuori da questa card, gia' segnalato). --all lo aggira e lascia
+# esercitare cio' che qui conta davvero: fase A (_scan_repo) la trova come worktree vero, fase B
+# (caccia agli orfani) la incontra di nuovo per cartella — se la guardia cwd di _orphan_check
+# viene controllata PRIMA di "e' gia' in $known" invece che dopo, il motivo esce due volte (il
+# path stesso puo' comparire in due forme diverse, risolta e no — vedi $CWDWT_REAL altrove — per
+# questo il conteggio e' sul MOTIVO stampato, non sul path).
+out_cwd="$(cd "$CWDWT" && bash "$WT" sweep --yes --all 2>&1)"
+n_cwd="$(grep -c "KEEP: e. la cartella in cui stai lavorando adesso" <<<"$out_cwd")"
+[ "$n_cwd" -eq 1 ] && ok "\"la cartella in cui sei dentro\" compare UNA sola volta nel referto" || fail "\"la cartella in cui sei dentro\" compare $n_cwd volte — duplicata fra fase A e fase B"
 # --- ambito: dentro un progetto si guarda SOLO quel progetto ------------------------------
 REPO2="$HOME/GitHub/altro"; mkdir -p "$REPO2"
 git -C "$REPO2" init -q -b main; echo a > "$REPO2/f"; git -C "$REPO2" add f; git -C "$REPO2" commit -qm a
@@ -115,20 +115,25 @@ rm -f "$RDA_HOME"/autosweep-*
 RDA_NO_AUTOSWEEP=1 bash -c "cd '$REPO' && bash '$WT' autosweep >/dev/null 2>&1"
 [ -d "$CLEAN4" ] && ok "RDA_NO_AUTOSWEEP=1 lo spegne davvero" || fail "ha pulito anche con RDA_NO_AUTOSWEEP=1"
 
-# --- le altre tre convenzioni (<repo>/worktrees, <repo>/.worktrees, <repo>/.claude/worktrees),
-# i repo annidati in una cartella contenitore (tipo WareHouse/ParkingLot sulla macchina reale),
-# le cartelle orfane, i registri prunable di git, e MirrorBuddy che va SEMPRE tenuto anche se
-# altrimenti rimovibile — card 260924-085105-3: prima di questa sezione `kb wt` guardava solo
-# $RDA_WORKTREES/<repo>/*, cioe' la convenzione (1). Rosso prima di questo commit, verde dopo.
+# autosweep gira DA SOLA, senza che nessuno la guardi: resta ristretta a $WT_HOME come sempre
+# stata, anche ora che il registro di git troverebbe worktree altrove (.claude/worktrees, un
+# fratello...) — decidere di quelli e' `kb wt --yes`, mai un job silenzioso.
+mkdir -p "$REPO/.claude/worktrees"
+git -C "$REPO" worktree add -q -b card/autokeep "$REPO/.claude/worktrees/autokeep" main
+rm -f "$RDA_HOME"/autosweep-*
+(cd "$REPO" && bash "$WT" autosweep >/dev/null 2>&1)
+[ -d "$REPO/.claude/worktrees/autokeep" ] && ok "autosweep non tocca worktree fuori da \$WT_HOME (pulita e integrata compresa)" || fail "autosweep ha rimosso una copia fuori da \$WT_HOME"
+
+# --- le altre tre convenzioni, i repo annidati in una cartella contenitore (WareHouse/
+# ParkingLot sulla macchina reale), le cartelle orfane, i prunable, e MirrorBuddy sempre tenuto.
 REPO3="$HOME/GitHub/demo3"; mkdir -p "$REPO3"
 git -C "$REPO3" init -q -b main
 echo one > "$REPO3/f"; git -C "$REPO3" add f; git -C "$REPO3" commit -qm one
 
 mk3() { # mk3 <repo-dir> <loc-subdir> <name> — worktree su wt/<name>, ramo integrato in main
   local repo="$1" loc="$2" nm="$3"
-  local wt="$repo/$loc/$nm"   # riga a parte: sotto `set -u` un `local a=1 b=$a` legge $a
-                               # PRIMA che `local` lo definisca — bash espande gli argomenti
-                               # prima di eseguire il builtin, non riga per riga.
+  local wt="$repo/$loc/$nm"   # riga a parte: sotto `set -u`, `local a=1 b=$a` legge $a PRIMA
+                              # che `local` lo definisca (bash espande gli argomenti prima).
   mkdir -p "$(dirname "$wt")"
   git -C "$repo" worktree add -q -b "wt/$nm" "$wt" main
 }
@@ -141,8 +146,7 @@ echo x > "$REPO3/worktrees/dirty3/nuovo"
 mk3 "$REPO3" worktrees ahead3
 echo y > "$REPO3/worktrees/ahead3/f"; git -C "$REPO3/worktrees/ahead3" commit -qam ahead3
 
-# repo annidato dentro una cartella-contenitore (WareHouse, ParkingLot, MirrorHR_Set sulla
-# macchina reale non sono repo: sono cartelle CHE CONTENGONO repo)
+# repo annidato dentro una cartella-contenitore (non un repo essa stessa)
 mkdir -p "$HOME/GitHub/Contenitore"
 NESTED="$HOME/GitHub/Contenitore/nested"; mkdir -p "$NESTED"
 git -C "$NESTED" init -q -b main
@@ -185,13 +189,12 @@ case "$out4" in *prunable*) ok "segnala le registrazioni prunable di git" ;; *) 
 mk3 "$REPO3" worktrees merged4
 out5="$(cd "$TMP" && bash "$WT" sweep --all 2>&1)"
 [ -d "$REPO3/worktrees/merged4" ] && ok "senza --yes il referto non rimuove nella convenzione (2)" || fail "ha rimosso senza --yes nella convenzione (2)"
-case "$out5" in *"repo/worktrees"*) ok "il referto etichetta la convenzione trovata" ;; *) fail "il referto non etichetta la convenzione" ;; esac
+# Card 260924-085105-3b: il referto non etichetta piu' la CONVENZIONE (il worktree si trova dal
+# registro di git, non dalla cartella in cui vive), ma nomina sempre il PATH esatto trovato.
+case "$out5" in *"$REPO3/worktrees/merged4"*) ok "il referto nomina il path esatto trovato in convenzione (2)" ;; *) fail "il referto non nomina il path trovato" ;; esac
 
-# --- una cartella PIANA (senza .git suo) dentro <repo>/worktrees non e' un worktree: e'
-# semplicemente dentro l'albero di lavoro del repo principale. `git -C <cartella> rev-parse
-# --git-dir` risale ai genitori e trova comunque il .git del repo — senza _is_worktree_root il
-# verdetto sarebbe quello del REPO (pulito, su main -> REMOVE), non quello della cartella, e una
-# cartella con dati veri (mai versionati) finirebbe segnalata rimovibile per errore.
+# --- una cartella PIANA (senza .git suo, mai registrata da git) dentro <repo>/worktrees non e'
+# un worktree — deve restare "orfana", mai confusa con lo stato del repo che la contiene.
 mkdir -p "$REPO3/worktrees/plain-full"; echo dato > "$REPO3/worktrees/plain-full/f.txt"
 mkdir -p "$REPO3/.worktrees/plain-empty"
 out5b="$(cd "$TMP" && bash "$WT" sweep --yes --all 2>&1)"
@@ -199,9 +202,7 @@ out5b="$(cd "$TMP" && bash "$WT" sweep --yes --all 2>&1)"
 case "$out5b" in *"plain-full"*"orfana"*) ok "dice PERCHE' tiene la cartella piana (orfana)" ;; *) fail "non chiama 'orfana' la cartella piana con dati" ;; esac
 [ -d "$REPO3/.worktrees/plain-empty" ] && fail "cartella piana VUOTA non rimossa" || ok "cartella piana vuota rimossa (non ha niente da perdere)"
 
-# --- un worktree LOCKATO non si tocca, anche se pulito e integrato — Claude Code tiene il
-# lock mentre un agente ci gira dentro (docs/en/worktrees), e "0 file modificati" non e' prova
-# che l'agente abbia finito (rules/best-practices.md § No False Done).
+# --- un worktree LOCKATO non si tocca, anche pulito e integrato (§ No False Done).
 LOCKED="$(mk locked)"
 git -C "$REPO" worktree lock "$LOCKED"
 out6="$(cd "$TMP" && bash "$WT" sweep --yes --all 2>&1)"
@@ -210,9 +211,8 @@ git -C "$REPO" worktree unlock "$LOCKED" >/dev/null 2>&1 || true
 case "$out6" in *lockato*) ok "dice PERCHE' tiene un worktree lockato" ;; *) fail "non spiega perche' tiene un worktree lockato" ;; esac
 
 # --- "merged" non basta: se la PR merged non e' l'HEAD locale, c'e' lavoro non ancora pushato
-# dopo il merge — la card lo chiama esplicitamente "no unpushed commits". Il ramo non e'
-# discendenza diretta di main (per simulare uno squash-merge, che riscrive i commit), quindi
-# _branch_integrated deve passare da gh; un mock di gh risponde per nome di branch.
+# dopo il merge. Ramo non discendenza diretta di main (simula uno squash-merge) -> passa da gh;
+# un mock di gh risponde per nome di branch.
 SQREPO="$HOME/GitHub/demo5"; mkdir -p "$SQREPO"
 git -C "$SQREPO" init -q -b main
 echo one > "$SQREPO/f"; git -C "$SQREPO" add f; git -C "$SQREPO" commit -qm one
@@ -246,20 +246,16 @@ printf '#!/bin/sh\nexit 1\n' > "$TMP/bin/gh"; chmod +x "$TMP/bin/gh"   # riprist
 [ -d "$RDA_WORKTREES/demo5/mismatched" ] && ok "tenuta: HEAD ha un commit DOPO l'headRefOid della PR merged (mai pushato)" || fail "RIMOSSA una copia con lavoro dopo il merge mai pushato"
 case "$out7" in *"non ancora integrato"*) ok "dice PERCHE' tiene la copia con lavoro dopo il merge" ;; *) fail "non spiega perche' tiene la copia con lavoro dopo il merge" ;; esac
 
-# --- MirrorBuddy per IDENTITA' di repo, non solo per path: una copia registrata sotto la
-# convenzione (1) ($WT_HOME/MirrorBuddy/<card>, quella che usa kb) deve restare esclusa quanto
-# quelle sotto MirrorBuddy/worktrees/ — il git-common-dir la ricollega al repo comunque.
+# --- MirrorBuddy per IDENTITA' di repo, non solo per path: registrata sotto $WT_HOME (kb) deve
+# restare esclusa quanto sotto MirrorBuddy/worktrees/.
 mkdir -p "$RDA_WORKTREES/MirrorBuddy"
 git -C "$MB" worktree add -q -b card/mb-by-id "$RDA_WORKTREES/MirrorBuddy/mb-by-id" main
 (cd "$TMP" && bash "$WT" sweep --yes --all >/dev/null 2>&1)
 [ -d "$RDA_WORKTREES/MirrorBuddy/mb-by-id" ] && ok "MirrorBuddy escluso anche registrato altrove, per identita' di repo (git-common-dir)" || fail "RIMOSSA una copia di MirrorBuddy registrata sotto \$WT_HOME — la regola di sicurezza va per PATH soltanto"
 
-# --- HEAD staccata (`git worktree add --detach`): `rev-parse --abbrev-ref HEAD` restituisce la
-# stringa letterale "HEAD", e un ancestor-check fatto con "-C $repo" su quella stringa legge
-# l'HEAD del checkout PRINCIPALE (di solito main), non quello del worktree — un worktree
-# staccato con un commit proprio, mai integrato, risulterebbe sempre "integrato" per errore.
-# Una copia in ciascun posto che ha il proprio confronto di ramo: location (1) via _verdict,
-# location (4) via _verdict_at.
+# --- HEAD staccata (`git worktree add --detach`): un ancestor-check sul nome letterale "HEAD"
+# eseguito con "-C $repo" legge l'HEAD del checkout PRINCIPALE, non quello del worktree — una
+# HEAD staccata con un commit proprio, mai integrato, risulterebbe sempre "integrata" per errore.
 git -C "$REPO" worktree add --detach -q "$RDA_WORKTREES/demo/detached" main
 echo d1 > "$RDA_WORKTREES/demo/detached/f"; git -C "$RDA_WORKTREES/demo/detached" commit -qam "mai integrato, HEAD staccata"
 git -C "$REPO3" worktree add --detach -q "$REPO3/.claude/worktrees/detached2" main
@@ -269,6 +265,10 @@ out9="$(cd "$TMP" && bash "$WT" sweep --yes --all 2>&1)"
 [ -d "$RDA_WORKTREES/demo/detached" ] && ok "HEAD staccata con commit proprio tenuta in location (1)" || fail "RIMOSSA una HEAD staccata con lavoro non integrato — location (1)"
 [ -d "$REPO3/.claude/worktrees/detached2" ] && ok "HEAD staccata con commit proprio tenuta in location (4)" || fail "RIMOSSA una HEAD staccata con lavoro non integrato — location (4)"
 case "$out9" in *"HEAD ha lavoro non ancora integrato"*) ok "dice PERCHE' tiene una HEAD staccata" ;; *) fail "non spiega perche' tiene una HEAD staccata" ;; esac
+
+# Le fixture per @thor F2 (worktree trovati dal registro di git in posti arbitrari: nidificati,
+# stile copilot-worktrees, fratelli di primo livello, repo nel kanban-registry) vivono in
+# test/test-worktree-registry.sh — questo file era gia' al limite delle 300 righe.
 
 REAL_WT_AFTER="$(ls -1d "$REAL_HOME/GitHub/worktrees"/*/ 2>/dev/null | sort)"
 [ "$REAL_WT_BEFORE" = "$REAL_WT_AFTER" ] && ok "la suite non ha toccato il parco vero delle copie di lavoro" \
