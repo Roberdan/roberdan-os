@@ -211,6 +211,12 @@ else
   _metric claude null
 fi
 
+# --- 2b) USO REALE (T4): invocazioni osservate per gbrain/codegraph/graphify -
+# Diverso dalla sezione 2: qui non e' una menzione di testo, e' un avvio di tool
+# riportato dall'host stesso. Non si somma mai con le menzioni qui sopra.
+_hr "2b. Uso reale — invocazioni osservate (non menzioni) per gli strumenti di conoscenza"
+python3 -B "$ROOT/bin/telemetry_knowledge.py" --days "$GIORNI"
+
 # --- 3) OCCASIONI: quante volte sarebbe servito ------------------------------
 # LA PARTE CHE DI SOLITO MANCA. "Usato 20 volte" non risponde a niente finche'
 # non si sa su quante occasioni. Per un canale fra agenti l'occasione e'
