@@ -212,6 +212,15 @@ else
   printf '  (bin/telemetry.sh non raggiungibile da qui)\n'
 fi
 
+# --- 6) macchine virtuali Colima ferme e dimenticate -------------------------------------
+# Scar 2026-09-27: un disco Colima fermo, creato da un agente per un test isolato e mai
+# smontato, e' passato da 20GB a 192GB dentro le istantanee di RustyMacBackup — invisibile
+# fino a un giro manuale di `du`. Nessuno scope per progetto: un'istanza Colima non appartiene
+# a un repo (vedi vm-sweep.sh), gira sempre su tutte, come la sezione 5.
+_hr "6. Macchine virtuali Colima"
+VFLAGS=(); [ "$APPLY" = "1" ] && VFLAGS+=(--yes)
+bash "$DIR/vm-sweep.sh" sweep --stale-days "$FERME_GIORNI" ${VFLAGS[@]+"${VFLAGS[@]}"} | sed 's/^/  /'
+
 if [ "$APPLY" != "1" ]; then
   printf '\n\033[1mNiente e\x27 stato toccato.\033[0m Per applicare le pulizie proposte: kb checkup --yes\n'
 fi
