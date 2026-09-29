@@ -20,6 +20,31 @@ def load(name, path):
     return module
 
 
+LEGACY_REVIEWED = {"a6be012a3bcfac42e279630aedec5cda4a450e29",
+                   "668b9bac302705f3bca0ae4792a49fab0a79a74e",
+                   "d13aa742fd68b71bfd6c98be3dda5813791f1d6c",
+                   # v0.54.1.1, reviewed 2026-09-24 after pg_dump backup + migrations + doctor.
+                   "31f257a0a7b218b40e03d302bc6913c99f26f0ec"}
+
+
+def revision_is_proven(revision, home=None):
+    """A revision is trusted if reviewed by hand (legacy) or if the upgrader measured it.
+
+    The buongiorno upgrader writes status "verified" only after backup, migrations, schema,
+    doctor, embedder and a real search all passed, and binds it to this exact revision, so a
+    manual `git pull` to some other revision does not inherit the proof.
+    """
+    if revision in LEGACY_REVIEWED:
+        return True
+    path = (home or Path.home()) / ".roberdan-os/gbrain-upgrade/last-install.json"
+    try:
+        receipt = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return False
+    return (isinstance(receipt, dict) and receipt.get("status") == "verified"
+            and receipt.get("revision") == revision)
+
+
 def scoped_manifest(manifest, registered, denied):
     excluded, local = [], []
     for item in manifest["local"]:
@@ -177,12 +202,7 @@ def main(argv=None):
                                 ["git", "-C", Path.home() / "gbrain", "rev-parse", "HEAD"])
         dirty = job.command("Modifiche codice gbrain",
                             ["git", "-C", Path.home() / "gbrain", "status", "--porcelain"])
-        reviewed = {"a6be012a3bcfac42e279630aedec5cda4a450e29",
-                    "668b9bac302705f3bca0ae4792a49fab0a79a74e",
-                    "d13aa742fd68b71bfd6c98be3dda5813791f1d6c",
-                    # v0.54.1.1, reviewed 2026-09-24 after pg_dump backup + migrations + doctor.
-                    "31f257a0a7b218b40e03d302bc6913c99f26f0ec"}
-        if installed is None or installed.strip() not in reviewed or dirty != "":
+        if installed is None or dirty != "" or not revision_is_proven(installed.strip()):
             raise RuntimeError("Versione gbrain non ancora validata per questa manutenzione; nessuna modifica.")
         config = dependencies.configuration(job)
         with dependencies.ollama_for_operation(job, config, needed=True) as env:
