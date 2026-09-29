@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline regression tests; no production database, embeddings or worker startup."""
 import importlib.util
+import json
 from pathlib import Path
 import plistlib
 import tempfile
@@ -35,6 +36,20 @@ class RefreshTests(unittest.TestCase):
                     [{"id": "test", "last_commit": old}],
                     [{"id": "test", "last_commit": new}]]):
             return runner.refresh("test", Path("/unused"), False)
+
+    def test_revision_proof_comes_from_a_verified_receipt_bound_to_that_revision(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            receipt = home / ".roberdan-os/gbrain-upgrade/last-install.json"
+            receipt.parent.mkdir(parents=True)
+            self.assertFalse(periodic.revision_is_proven("f" * 40, home))
+            for status, revision, proven in (("verified", "f" * 40, True), ("unverified", "f" * 40, False),
+                                             ("verified", "e" * 40, False)):
+                receipt.write_text(json.dumps({"status": status, "revision": revision}))
+                self.assertIs(periodic.revision_is_proven("f" * 40, home), proven, (status, revision))
+            receipt.write_text("not json")
+            self.assertFalse(periodic.revision_is_proven("f" * 40, home))
+        self.assertTrue(periodic.revision_is_proven("31f257a0a7b218b40e03d302bc6913c99f26f0ec", home))
 
     def test_noop_records_live_revisions(self):
         row = self.refresh()
