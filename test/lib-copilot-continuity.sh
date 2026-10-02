@@ -5,6 +5,7 @@ CONT_OS="$TMP/continuity-os"; CONT_REPO="$TMP/continuity-repo"
 mkdir -p "$CONT_OS/hooks" "$CONT_OS/behavior" "$CONT_REPO/kanban/todo" "$CONT_REPO/kanban/done"
 git -C "$CONT_REPO" init -q
 cp "$ROOT/kanban/kb.sh" "$CONT_REPO/kanban/"
+cp "$ROOT/kanban/kb-resolve.sh" "$CONT_REPO/kanban/"
 cp "$ROOT/behavior/roberto-mode.md" "$CONT_OS/behavior/"
 cat > "$CONT_OS/hooks/goal-gate.sh" <<'SH'
 #!/usr/bin/env bash

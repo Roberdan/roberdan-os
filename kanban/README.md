@@ -20,7 +20,8 @@ kb edit <id>                         # fill Definition of Done + Acceptance + re
 kb start <id> --by roberto [--no-worktree "<why>"]      # GATE: todo->doing (+ the card's worktree)
 kb finish <id> --thor "<ev>" [--by <chi>] [--keep-worktree "<why>"]  # GATE: doing->done (worktree must be clean)
 kb pause "<next step>"               # lean per-repo checkpoint handoff/resume.md (overwritten;
-                                     #   a Stop hook runs `kb pause --auto` after every turn)
+                                     #   a Stop hook runs `kb pause --auto` in registered repos
+                                     #   or with explicit RDA_KANBAN, and skips unknown repos)
 kb pause --context '<JSON>'           # bounded recovery capsule (auto-checkpoint skill schema)
 kb resume --context                  # checkpoint only; no board/history enumeration
 kb resume [--done]                   # show checkpoint + live backlog | clear when resumed
@@ -327,6 +328,7 @@ them. See `docs/plan-2026-07-05-federated-kanban-multi-cli.md` for the full desi
 kb                 # inside a repo: that repo's board. Outside any repo: aggregated.
 kb all | kb g      # aggregated view across every registered board (cards tagged repo:)
 kb handoff         # per-repo handoff/latest.md (in a repo) or aggregated (outside)
+kb where           # selected board, resolution method, and unknown repository diagnostic
 kb init [repo]     # make a repo safe to hold cards — idempotent (see below)
 kb lint            # schema lint for the optional federated fields
 ```
@@ -340,6 +342,13 @@ scans **local history** for card blobs (pushed → **refuses**, human gate #4; l
 warning); installs a leak-check pre-commit hook. A raw `kanban/` dir made by hand is **not**
 discovered — only `kb init`'d boards are, so "discovered" ≡ "privacy-initialized". `kb init` does
 **not** make a repo runner-eligible (that is the separate, narrower `runner-allowlist`).
+
+Inside a registered linked worktree, `kb` always uses the primary checkout's board. Inside an
+unregistered repository, reads still show the aggregate board, but every command that can change
+cards, checkpoints, worktree attachments, migrations or queue authorization **refuses before
+touching the fallback board**. `kb where` makes the selection visible. Register the primary
+checkout with `kb init`, or set `RDA_KANBAN=/path/to/kanban` when choosing another board
+deliberately; an explicit override also remains eligible for automatic checkpoints.
 
 > roberdan-os's own `handoff/latest.md` is currently **tracked** canon-ish state; `kb init` **flags**
 > it and does **not** silently change that tracking (design §5 note). An untracked `latest.md` in a
