@@ -20,7 +20,7 @@ ok()      { printf "  ok: %s\n" "$1"; }
 
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue test-kb-title-quote \
           test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery test-verify-done test-audit test-audit-hooks \
-          test-kb-root-resolution test-kb-start-worktree-cause test-worktree-sweep test-worktree-registry test-junk-clean test-checkup test-vm-sweep test-twin-export-drift test-kb-top test-nested-board-notice \
+          test-kb-root-resolution test-kb-board-resolution test-kb-board-hostile test-kb-start-worktree-cause test-worktree-sweep test-worktree-registry test-junk-clean test-checkup test-vm-sweep test-twin-export-drift test-kb-top test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-bus-mutant-probes test-telemetry test-telemetry-skills test-telemetry-history test-skill-routing test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-bus-doorbell-matcher test-model-economy \
@@ -50,7 +50,7 @@ section "shellcheck (hooks + bin + test + eval + factory + dispatcher shims + li
 # factory/*.sh, the runner-shims and kanban/lint-cards.sh are security-sensitive (dispatcher
 # sandbox path) — kept in the gate, not just hand-checked (rex nit #1). kanban/kb.sh is
 # deliberately NOT globbed: it carries pre-existing SC1010/SC2010 warnings in untouched code.
-SHELLCHECK_TARGETS=(hooks/*.sh bin/*.sh test/*.sh eval/*.sh factory/*.sh factory/runner-shims/* kanban/lint-cards.sh kanban/dash.sh kanban/worktree.sh learn/*.sh ontology/*.sh bus/*.sh)
+SHELLCHECK_TARGETS=(hooks/*.sh bin/*.sh test/*.sh eval/*.sh factory/*.sh factory/runner-shims/* kanban/kb-resolve.sh kanban/lint-cards.sh kanban/dash.sh kanban/worktree.sh learn/*.sh ontology/*.sh bus/*.sh)
 if command -v shellcheck >/dev/null 2>&1; then
   if shellcheck -S warning "${SHELLCHECK_TARGETS[@]}"; then ok "shellcheck clean"; else err "shellcheck warning/error"; fi
 else
@@ -78,7 +78,7 @@ if _suite test-kb-board; then ok "board rendering green (one readable line per c
 section "kb \$ROOT resolution (symlinked install)"
 if _suite test-kb-root-resolution; then ok "\$ROOT survives symlinks; no phantom board"; else err "test-kb-root-resolution — see bash test/test-kb-root-resolution.sh"; fi
 if _suite test-kb-start-worktree-cause; then ok "kb start names the real worktree failure, never a false one"; else err "test-kb-start-worktree-cause — see bash test/test-kb-start-worktree-cause.sh"; fi
-
+. "$ROOT/test/validate-kb-safety.sh"
 # --- 6b4) kb done-gate must be mechanical, not honor-system -------------------
 # Pins both directions: forged evidence (rubber-stamps, fake SHAs) is refused, and
 # real evidence (resolvable SHA, test output, existing path) still passes. The gate
@@ -115,8 +115,8 @@ if _suite test-edge-only; then ok "nessun codice avvia Chrome/Chromium; il canon
 section "federated kanban (cwd-scoping, kb all/handoff, init, locks, dormant dispatcher)"
 # On failure, surface the test's own output (indented) instead of hiding it behind a "see …"
 # pointer — a failing gate must show the evidence, especially for CI-only failures.
-_suite test-federated-kb; _fedkb_out="$(_suite_out test-federated-kb)"
-if [ $? -eq 0 ]; then ok "federated kb + dispatcher gates green"; else
+if _suite test-federated-kb; then ok "federated kb + dispatcher gates green"; else
+  _fedkb_out="$(_suite_out test-federated-kb)"
   printf '%s\n' "$_fedkb_out" | grep -iE '===|ok:|err|FAIL|got:|outside=|inside=|rc=' | sed 's/^/    /'
   err "test-federated-kb failed (output above)"
 fi

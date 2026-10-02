@@ -22,7 +22,7 @@ REPO="$TMP/repo"; KB="$REPO/kanban"
 mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
 git -C "$TMP" init -q repo 2>/dev/null
 cp "$ROOT/kanban/kb.sh" "$KB/kb.sh"; chmod +x "$KB/kb.sh"
-for aux in precheck.sh thor-verify.sh lib.sh; do
+for aux in kb-resolve.sh precheck.sh thor-verify.sh lib.sh; do
   [ -f "$ROOT/kanban/$aux" ] && cp "$ROOT/kanban/$aux" "$KB/$aux"
 done
 export RDA_HOME="$TMP/home"; mkdir -p "$RDA_HOME"
@@ -133,7 +133,7 @@ REPO2="$TMP/repo2"; KB2="$REPO2/kanban"
 mkdir -p "$KB2/todo" "$KB2/doing" "$KB2/done"
 git -C "$TMP" init -q repo2 2>/dev/null
 cp "$ROOT/kanban/kb.sh" "$KB2/kb.sh"; chmod +x "$KB2/kb.sh"
-for aux in precheck.sh thor-verify.sh lib.sh; do
+for aux in kb-resolve.sh precheck.sh thor-verify.sh lib.sh; do
   [ -f "$ROOT/kanban/$aux" ] && cp "$ROOT/kanban/$aux" "$KB2/$aux"
 done
 _card2() { cat > "$KB2/todo/$1.md" <<CARD

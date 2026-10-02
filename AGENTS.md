@@ -456,8 +456,10 @@ Canonical cross-tool contract — every agent that reads this file honors it.
   thread and pending decision, not only the paused task. Human gates still apply on resume
   (`todo->doing` stays Roberto's, never auto-cross). Clear with **`kb resume --done`**.
 - **Always-on auto-save:** the `Stop` hook ([`hooks/auto-checkpoint.sh`](hooks/auto-checkpoint.sh))
-  runs `kb pause --auto` every turn — refreshes mechanical state, **preserves the human
-  next-step note**. Saves cannot wake an agent; a crash may skip the callback entirely.
+  runs `kb pause --auto` every turn in registered repositories, or when `RDA_KANBAN`
+  explicitly selects a board; it silently skips unregistered repositories rather than writing
+  to the fallback board. It refreshes mechanical state and **preserves the human next-step
+  note**. Saves cannot wake an agent; a crash may skip the callback entirely.
 
 **Autonomous continuation contract:** never promise ongoing work from a checkpoint or a
 written "next step". Before yielding unfinished authorized work, observe an executor covering

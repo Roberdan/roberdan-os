@@ -175,7 +175,8 @@ session start instant); open `kb pending` (or read the digest) for the PRs.
 
 ```
 kb pause "<next step>"   # write the lean per-repo checkpoint handoff/resume.md (overwritten,
-                         # gitignored); a Stop hook already runs `kb pause --auto` every turn
+                         # gitignored); a Stop hook runs `kb pause --auto` in registered repos
+                         # or with explicit RDA_KANBAN, and skips unknown repos
 kb resume                # print the pending checkpoint + the live backlog (todo + doing)
 kb resume --done         # clear the checkpoint once truly resumed
 ```

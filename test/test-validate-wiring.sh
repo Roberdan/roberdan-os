@@ -72,14 +72,46 @@ case "$(printf '%s' "$res" | tail -n +2)" in
   *) err "una suite fallita non torna rc=1: $(printf '%s' "$res" | tail -n +2)" ;;
 esac
 
-# 3) Ogni nome atteso dentro validate.sh e' davvero nella lista di lancio. Questo e' il
-#    controllo statico che avrebbe preso l'errore del 31 luglio prima di eseguirlo.
-# Solo nomi di suite vere (`test-...`): cosi' la prosa dei commenti che nomina _suite non
-# viene scambiata per una chiamata.
-awaited="$(grep -oE '_suite (test-[a-z0-9-]+)' "$V" | awk '{print $2}' | sort -u)"
+_collection_names() {
+  awk '{
+    sub(/[[:space:]]*#.*/, "")
+    if ($0 ~ /(^|[^_[:alnum:]])_suite[[:space:]]/) print
+  }' "$@" | grep -oE 'test-[a-z0-9-]+' | sort -u
+}
+
+# 3) Every real collection site must have a matching launch. A helper contributes
+# only when validate.sh actively sources it; reading detached helper files would
+# let a removed source line hide launched-but-ignored suites.
+collection_files=("$V")
+privacy_active=0
+while IFS= read -r helper; do
+  helper_path="$ROOT/test/$helper"
+  if [ ! -f "$helper_path" ]; then
+    err "modulo di validazione incluso ma assente: $helper"
+    continue
+  fi
+  collection_files+=("$helper_path")
+  [ "$helper" != "validate-privacy.sh" ] || privacy_active=1
+done < <(sed -n 's@^[[:space:]]*\.[[:space:]]*"\$ROOT/test/\(validate-[a-z0-9-]*\.sh\)".*@\1@p' "$V")
+awaited="$( {
+  _collection_names "${collection_files[@]}"
+  [ "$privacy_active" -eq 0 ] \
+    || awk -F'|' '/^[a-z-]+\|test-[a-z0-9-]+\|/{print $2}' "$ROOT/test/validate-privacy.sh"
+} | sort -u )"
 # Lanciate = i token test-* che compaiono nella lista del for e sulle righe _spawn*.
-have="$( { awk '/^for _s in /,/do$/' "$V"; grep -E '^_spawn(_serial_group)? ' "$V"; grep -E '^ *_spawn_serial_group ' "$V"; } \
+spawn_lines="$(awk '{
+  sub(/[[:space:]]*#.*/, "")
+  if ($0 ~ /(^|[^_[:alnum:]])_spawn(_serial_group)?[[:space:]]/) print
+}' "${collection_files[@]}")"
+have="$( { awk '/^for _s in /,/do$/' "$V"; printf '%s\n' "$spawn_lines"; } \
         | grep -oE 'test-[a-z0-9-]+' | sort -u )"
+bad_dynamic="$(printf '%s\n' "$spawn_lines" | grep -F '$' \
+  | grep -vE '^[[:space:]]*_spawn[[:space:]]+"\$_s"[[:space:]]*$' || true)"
+if [ -z "$bad_dynamic" ]; then
+  ok "gli spawn dinamici usano solo la lista dichiarata for _s"
+else
+  err "spawn dinamici non analizzabili:$bad_dynamic"
+fi
 missing=""
 for a in $awaited; do
   printf '%s\n' "$have" | grep -qx "$a" || missing="$missing $a"
@@ -89,6 +121,54 @@ if [ -z "$missing" ]; then
 else
   err "attese ma mai lanciate:$missing"
 fi
+
+# 4) The inverse matters just as much: a suite can be launched successfully and
+# never collected, leaving validate.sh green even when that child exits red.
+collected="$awaited"
+ignored=""
+for a in $have; do
+  printf '%s\n' "$collected" | grep -qx "$a" || ignored="$ignored $a"
+done
+if [ -z "$ignored" ]; then
+  ok "ogni suite lanciata in validate.sh viene anche raccolta nel verdetto"
+else
+  err "lanciate ma mai raccolte:$ignored"
+fi
+
+required="test-kb-board-resolution test-kb-board-hostile test-worktree-registry test-validate-wiring"
+missing_required=""
+for a in $required; do
+  printf '%s\n' "$have" | grep -qx "$a" \
+    && printf '%s\n' "$collected" | grep -qx "$a" \
+    || missing_required="$missing_required $a"
+done
+if [ -z "$missing_required" ]; then
+  ok "le suite di sicurezza kb restano obbligatorie, non ritirabili in blocco"
+else
+  err "suite di sicurezza kb mancanti dal contratto:$missing_required"
+fi
+
+swallowed="$(awk '{
+  sub(/[[:space:]]*#.*/, "")
+  if ($0 ~ /_suite[[:space:]].*(\|\|[[:space:]]*(true|:)|;[[:space:]]*true)/) print
+}' "${collection_files[@]}")"
+if [ -z "$swallowed" ]; then
+  ok "nessuna raccolta _suite puo' scartare il proprio fallimento con true"
+else
+  err "fallimenti _suite esplicitamente scartati:$swallowed"
+fi
+
+# A diagnostic-only mention must never satisfy the collection test.
+probe="$(mktemp "${TMPDIR:-/tmp}/validate-wiring-probe.XXXXXX")"
+trap 'rm -f "$probe"' EXIT
+printf '%s\n' '# _suite test-comment-only' '_suite_out test-output-only' > "$probe"
+if [ -z "$(_collection_names "$probe")" ]; then
+  ok "commenti e _suite_out non possono mascherare una suite ignorata"
+else
+  err "il parser considera ancora raccolti commenti o sole stampe diagnostiche"
+fi
+rm -f "$probe"
+trap - EXIT
 
 echo
 if python3 -B "$ROOT/test/test-validation-scheduling.py"; then

@@ -54,64 +54,20 @@ _in_registry() {
   done < <(_registry_repos)
   return 1
 }
-# Board resolution (gbrain-pin style, design §2b):
-#   RDA_KANBAN env  →  cwd's git repo IF it is roberdan-os itself OR registered
-#                   →  else roberdan-os's own board (today's default — additive).
-# KB_MATCHED=1: cwd resolved to a concrete recognized board (home or registered)
-# or RDA_KANBAN was set. KB_MATCHED=0: we fell back — so the default `view`
-# outside any recognized repo shows the aggregated board instead of home.
-KB_MATCHED=0
-KB=""
-# Assigns the globals KB + KB_MATCHED directly (NOT via command substitution —
-# a $(...) subshell would discard the KB_MATCHED assignment).
-_resolve_kb() {
-  # Compute the repo's OWN board first (registry-based), even when RDA_KANBAN is
-  # set, so an override that silently diverges from it can be flagged. This is
-  # the fix for the 2026-07-13 incident: a session exported RDA_KANBAN pointing
-  # at an unrelated directory, and every `kb` call for days afterward wrote real
-  # card content there instead of trading-os's own registered board — with zero
-  # warning, discovered only when the board looked stale days later.
-  local root common natural=""
-  root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-  if [ -n "$root" ] && { [ "$root" = "$ROOT" ] || _in_registry "$root"; }; then
-    natural="$root/kanban"
-  elif [ -n "$root" ]; then
-    common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-    [ -z "$common" ] || common="$(cd "$common" && pwd -P)"
-    # Linked worktrees share the registered repository's board, never a new empty board.
-    if [ "${common##*/}" = ".git" ]; then
-      root="${common%/.git}"
-      if [ "$root" = "$ROOT" ] || _in_registry "$root"; then natural="$root/kanban"; fi
-    fi
-  fi
-  if [ -n "${RDA_KANBAN:-}" ]; then
-    KB_MATCHED=1; KB="$RDA_KANBAN"
-    # A mismatch is only worth flagging when we're inside a repo that HAS its own
-    # resolvable board — outside any such repo there is nothing to diverge from
-    # (e.g. deliberate cross-repo aggregation use from a scratch directory).
-    if [ -n "$natural" ] && [ "$KB" != "$natural" ]; then
-      echo "kb: WARNING — RDA_KANBAN=$KB overrides this repo's own board ($natural)." >&2
-      echo "kb:   Writes will NOT land in the repo's board. Unset RDA_KANBAN to use it." >&2
-    fi
-    return 0
-  fi
-  if [ -n "$natural" ]; then
-    KB_MATCHED=1; KB="$natural"; return 0
-  fi
-  KB_MATCHED=0; KB="$ROOT/kanban"
-}
-_resolve_kb
-mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
+# shellcheck source=kanban/kb-resolve.sh
+. "$ROOT/kanban/kb-resolve.sh"
 cmd="${1:-view}"; [ $# -gt 0 ] && shift || true
+_guard_board_mutation "$cmd" "$@"
+mkdir -p "$KB/todo" "$KB/doing" "$KB/done"
 
 # portable mtime: GNU (-c) FIRST — on macOS it fails cleanly and falls through to BSD (-f); the
 # reverse order breaks on Linux, where `stat -f` (file-system, not mtime) prints garbage instead of failing (seen 2026-07-06).
 _mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; }
 # unique repo roots for aggregation: roberdan-os home first, then registry entries.
 _board_roots() {
-  printf '%s\n' "$ROOT"
+  printf '%s\n' "$HOME_REPO_ROOT"
   _registry_repos | while IFS= read -r r; do
-    [ -n "$r" ] && [ "$r" != "$ROOT" ] && printf '%s\n' "$r"
+    [ -n "$r" ] && [ "$r" != "$HOME_REPO_ROOT" ] && printf '%s\n' "$r"
   done
 }
 
@@ -132,10 +88,7 @@ _yaml_dq() { local s="${1//\\/\\\\}"; s="${s//\"/\\\"}"; printf '"%s"' "$s"; }
 # rimosso. La forma e' sempre quella: **si chiede a git DOVE guarda, non si deduce dal cwd**.
 # `--git-common-dir` punta sempre al `.git` del checkout principale, anche da un worktree.
 _repo_qui() {
-  local comune
-  comune="$(git rev-parse --git-common-dir 2>/dev/null)" || { basename "$PWD"; return; }
-  case "$comune" in /*) ;; *) comune="$PWD/$comune" ;; esac
-  basename "$(dirname "$comune")"
+  basename "${KB_CONTEXT_ROOT:-$PWD}"
 }
 # Shared regex for "bot authors" in PR views. Both kb.sh and tests consume this exact value.
 _PR_BOT_FILTER_RE='dependabot|renovate|github-actions|\[bot\]|-bot$'
@@ -418,6 +371,7 @@ usage() {
   echo ' view:'
   echo '  kb                            board + dashboard: inizio/durata delle DOING, durata+spesa+esito delle DONE'
   echo '  kb view                       lean board only (what the SessionStart hook injects)'
+  echo '  kb where                      selected board + resolution method'
   echo '  kb counts                     solo i tre totali (TO DO / DOING / DONE) — niente render'
   echo '  kb dash                       dashboard only (no box)'
   echo '  kb all | kb g                 AGGREGATED view across every registered board (cards tagged repo:)'
@@ -644,18 +598,18 @@ _pause() {
   fi
   # A card's linked worktree has its own revision; never stamp the shared checkout's HEAD.
   workroot="$root"
-  candidate="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-  common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-  candidate_common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  candidate="$(_kb_git rev-parse --show-toplevel 2>/dev/null || true)"
+  common="$(_kb_git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  candidate_common="$(_kb_git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
   [ -z "$common" ] || common="$(cd "$common" && pwd -P)"
   [ -z "$candidate_common" ] || candidate_common="$(cd "$candidate_common" && pwd -P)"
   if [ -n "$candidate" ] && [ -n "$common" ] &&
      [ "$candidate_common" = "$common" ]; then
     workroot="$candidate"
   fi
-  head="$(git -C "$workroot" rev-parse --short HEAD 2>/dev/null || echo '?')"
-  subj="$(git -C "$workroot" log -1 --format=%s 2>/dev/null || echo '?')"
-  dirty="$(git -C "$workroot" status --porcelain 2>/dev/null | grep -c . || true)"
+  head="$(_kb_git -C "$workroot" rev-parse --short HEAD 2>/dev/null || echo '?')"
+  subj="$(_kb_git -C "$workroot" log -1 --format=%s 2>/dev/null || echo '?')"
+  dirty="$(_kb_git -C "$workroot" status --porcelain 2>/dev/null | grep -c . || true)"
   dcard=""
   for f in "$KB/doing"/*.md; do
     [ -e "$f" ] || continue
@@ -768,8 +722,18 @@ _handoff() {
 # (MirrorBuddy / FightTheStroke) — federating those is a human decision. It only
 # scaffolds the repo path you pass (default: roberdan-os itself).
 _kb_init() {
-  local target="${1:-$ROOT}" root gi line f tracked_handoff=0
-  root="$(git -C "$target" rev-parse --show-toplevel 2>/dev/null || true)"
+  local target="${1:-$ROOT}" root common bare gitdir gi line f tracked_handoff=0
+  root="$(_kb_git -C "$target" rev-parse --show-toplevel 2>/dev/null || true)"
+  common="$(_kb_git -C "$target" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  bare="$(_kb_git -C "$target" rev-parse --is-bare-repository 2>/dev/null || true)"
+  gitdir="$(_kb_git -C "$target" rev-parse --absolute-git-dir 2>/dev/null || true)"
+  [ -z "$common" ] || common="$(cd "$common" && pwd -P)"
+  [ -z "$gitdir" ] || gitdir="$(cd "$gitdir" && pwd -P)"
+  if [ "$bare" = "true" ]; then
+    root="$gitdir"
+  elif [ "${common##*/}" = ".git" ]; then
+    root="${common%/.git}"
+  fi
   if [ -z "$root" ]; then echo "kb init: '$target' is not inside a git repo" >&2; return 1; fi
   echo "kb init: initializing federated board in $root"
 
@@ -784,7 +748,7 @@ _kb_init() {
   # is handoff/latest.md already TRACKED? roberdan-os tracks it as canon-ish live
   # state — design §5 note: do NOT silently change that tracking. When tracked we
   # FLAG it and leave gitignore/de-track/history-scan of it alone.
-  if git -C "$root" ls-files --error-unmatch handoff/latest.md >/dev/null 2>&1; then
+  if _kb_git -C "$root" ls-files --error-unmatch handoff/latest.md >/dev/null 2>&1; then
     tracked_handoff=1
   fi
 
@@ -793,7 +757,7 @@ _kb_init() {
   #    repo's history. A local exclude keeps kb init self-sufficient on any machine
   #    it runs on (unlike a global core.excludesfile) without touching shared git
   #    state. Shared across worktrees via the common git dir. Idempotent.
-  gi="$(git -C "$root" rev-parse --git-path info/exclude 2>/dev/null)"
+  gi="$(_kb_git -C "$root" rev-parse --git-path info/exclude 2>/dev/null)"
   case "$gi" in /*) ;; *) gi="$root/$gi";; esac
   mkdir -p "$(dirname "$gi")"; touch "$gi"
   # handoff/resume.md is the per-repo pause checkpoint `kb pause` writes — ephemeral,
@@ -811,15 +775,15 @@ _kb_init() {
 
   # 3) de-track already-committed CARD content (git rm --cached, keep working copy)
   local tracked
-  tracked="$(git -C "$root" ls-files "${card_paths[@]}" 2>/dev/null || true)"
+  tracked="$(_kb_git -C "$root" ls-files "${card_paths[@]}" 2>/dev/null || true)"
   if [ -n "$tracked" ]; then
     printf '%s\n' "$tracked" | while IFS= read -r f; do
-      [ -n "$f" ] && git -C "$root" rm --cached --quiet "$f" 2>/dev/null || true
+      [ -n "$f" ] && _kb_git -C "$root" rm --cached --quiet "$f" 2>/dev/null || true
     done
     echo "  de-tracked already-committed card content (working copies kept)"
   fi
-  if [ "$tracked_handoff" -eq 0 ] && git -C "$root" ls-files --error-unmatch handoff/latest.md >/dev/null 2>&1; then
-    git -C "$root" rm --cached --quiet handoff/latest.md 2>/dev/null || true
+  if [ "$tracked_handoff" -eq 0 ] && _kb_git -C "$root" ls-files --error-unmatch handoff/latest.md >/dev/null 2>&1; then
+    _kb_git -C "$root" rm --cached --quiet handoff/latest.md 2>/dev/null || true
     echo "  de-tracked handoff/latest.md"
   fi
 
@@ -828,11 +792,11 @@ _kb_init() {
   local -a scan_paths=("${card_paths[@]}")
   [ "$tracked_handoff" -eq 0 ] && scan_paths+=(handoff/latest.md)
   local hits pushed_hits="" local_hits="" sha
-  hits="$(git -C "$root" log --all --pretty=%H -- "${scan_paths[@]}" 2>/dev/null || true)"
+  hits="$(_kb_git -C "$root" log --all --pretty=%H -- "${scan_paths[@]}" 2>/dev/null || true)"
   if [ -n "$hits" ]; then
     while IFS= read -r sha; do
       [ -n "$sha" ] || continue
-      if [ -n "$(git -C "$root" branch -r --contains "$sha" 2>/dev/null)" ]; then
+      if [ -n "$(_kb_git -C "$root" branch -r --contains "$sha" 2>/dev/null)" ]; then
         pushed_hits="$pushed_hits $sha"
       else
         local_hits="$local_hits $sha"
@@ -845,7 +809,7 @@ EOF_SCAN
     {
       echo ""
       echo "kb init: REFUSED — card/handoff content is in PUSHED history (human gate #4):"
-      for sha in $pushed_hits; do git -C "$root" --no-pager log -1 --oneline "$sha"; done
+      for sha in $pushed_hits; do _kb_git -C "$root" --no-pager log -1 --oneline "$sha"; done
       echo "  This is deletion of already-published data — escalate to Roberto (git filter-repo"
       echo "  or repo recreate). kb init does NOT scrub published history automatically."
     } >&2
@@ -855,7 +819,7 @@ EOF_SCAN
     {
       echo ""
       echo "kb init: WARNING — card/handoff content in LOCAL-ONLY (un-pushed) commits:"
-      for sha in $local_hits; do git -C "$root" --no-pager log -1 --oneline "$sha"; done
+      for sha in $local_hits; do _kb_git -C "$root" --no-pager log -1 --oneline "$sha"; done
       echo "  git rm --cached de-tracks forward, but the blob REMAINS in local history."
       echo "  Do NOT push these branches; scrub (git filter-repo / rebase) before any push."
     } >&2
@@ -865,7 +829,7 @@ EOF_SCAN
   #    safety; --no-verify-bypassable, so NOT the runner's gate — design §2e#5).
   #    Idempotent — never clobber an existing leak-check hook.
   local hookdir hook
-  hookdir="$(git -C "$root" rev-parse --absolute-git-dir 2>/dev/null)/hooks"; hook="$hookdir/pre-commit"
+  hookdir="$(_kb_git -C "$root" rev-parse --absolute-git-dir 2>/dev/null)/hooks"; hook="$hookdir/pre-commit"
   mkdir -p "$hookdir"
   if [ -f "$hook" ] && grep -q 'leak-check' "$hook" 2>/dev/null; then
     echo "  pre-commit hook already runs leak-check (left as-is)"
@@ -1395,6 +1359,12 @@ case "$cmd" in
   view|board)                      # lean board only — what the SessionStart hook injects
     if [ "$KB_MATCHED" -eq 0 ]; then _board --all; else _board; fi
     ;;
+  where)
+    echo "board: $KB"
+    echo "resolution: $KB_RESOLUTION"
+    [ "$KB_RESOLUTION" = "explicit-override" ] \
+      || { [ -z "$KB_UNREGISTERED_ROOT" ] || echo "unregistered_repository: $KB_UNREGISTERED_ROOT"; }
+    ;;
   counts)  _counts ;;              # the three column totals ALONE (SessionStart hook)
   dash) _dash ;;                   # detail blocks alone (no box)
   migrate) _migrate "${1:-}" ;;    # backfill start times / list cards with no worktree (dry-run)
@@ -1412,7 +1382,7 @@ case "$cmd" in
   queue|coda) _queue "$@" ;;       # fotografa la lista di inizio sessione (autorizzazione permanente)
   next|prossima) _next "$@" ;;     # prende la prossima card della fotografia, senza chiedere
   bot-filter-regex) _pr_bot_filter_regex ;;
-  init) _kb_init "${1:-$ROOT}" ;;  # scaffold + privatize a repo's board (idempotent)
+  init) _kb_init "${1:-${KB_CONTEXT_ROOT:-$HOME_REPO_ROOT}}" ;;  # scaffold + privatize the durable checkout
   lint) RDA_KANBAN="$KB" bash "$ROOT/kanban/lint-cards.sh" ;;  # runner/human_gates schema lint
   dispatch) bash "$ROOT/factory/dispatch-runner.sh" "$@" ;;   # restricted external-CLI dispatcher (DORMANT — always refuses)
   all|g) _board --all ;;           # aggregated board across the registry (id + repo + summary)
