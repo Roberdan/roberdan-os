@@ -3,6 +3,26 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.59.3 — 2026-10-02
+
+### Added
+
+- Use `kb where` to see which durable board is active, how it was selected and
+  which repository identity controls writes.
+
+### Fixed
+
+- Keep linked worktrees on their primary repository's board. Unknown Git
+  repositories can still inspect aggregate state, but every board mutation now
+  fails closed unless `RDA_KANBAN` explicitly selects a board.
+- Prevent queue authorization, automatic checkpoints, migrations and `kb init`
+  from writing through hostile or misleading Git environments. Initialization
+  registers and protects the durable primary checkout rather than a disposable
+  linked worktree.
+- Make the release check count every launched test's real result, including
+  suites collected through validation helper files. A failing federated-board
+  test can no longer be accidentally reported as green.
+
 ## 2.59.2 — 2026-09-24
 
 ### Fixed
