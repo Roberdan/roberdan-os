@@ -150,6 +150,21 @@ class EmbeddingTests(unittest.TestCase):
             argv = call.args[1]
             self.assertEqual(argv[argv.index("--source") + 1], "test")
 
+    def test_transient_ollama_disconnect_is_retried(self):
+        job = Mock()
+        job.command.side_effect = [
+            "Would embed 3 stale chunks",
+            "Error embedding one: [embed(ollama:bge-m3)] Cannot connect to API: Unable to connect",
+            "embedded",
+            "Would embed 0 stale chunks",
+        ]
+        with patch.object(periodic.time, "sleep") as sleep:
+            self.assertEqual(periodic.embed_until_done(job, "test", {}, "/gbrain"), 3)
+        sleep.assert_called_once_with(5)
+        self.assertEqual(job.command.call_count, 4)
+        self.assertIn("ok", job.command.call_args_list[1].kwargs)
+        job.row.assert_called_once()
+
     def test_stalls_are_errors(self):
         job = Mock()
         job.command.side_effect = ["Would embed 3 stale chunks", "embedded",
@@ -180,6 +195,10 @@ class ScheduleTests(unittest.TestCase):
         for flag in ("--require-ac", "--blocked-source vault",
                      "--blocked-source gstack-code-roberdan-os-67e84638"):
             self.assertIn(flag, launcher)
+        self.assertIn("gbrain-upgrade/last-install.json", launcher)
+        self.assertIn('with_name("state.json")', launcher)
+        self.assertIn('GBRAIN_MAX_CHUNK_TOKENS="${GBRAIN_MAX_CHUNK_TOKENS:-1500}"', launcher)
+        self.assertNotIn("260920-active-validation", launcher)
 
     def test_exclusions_preserved(self):
         manifest = {"local": [{"path": "/a", "pin": "denied"}, {"path": "/b"}]}
