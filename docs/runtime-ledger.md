@@ -37,7 +37,7 @@ calendar fires.
 | `com.roberdan.copilot-log-sweep` | Copilot hygiene | calendar | supported, execution unproven | loaded and idle; no receipt configured |
 | `com.roberdan.buongiorno` | daily briefing | calendar | supported, execution unproven | loaded and idle; no receipt configured |
 | `com.roberdan.rustsweep` | Rust workspace hygiene | calendar | supported, execution unproven | loaded and idle; no receipt configured |
-| `com.roberdan.rusty-mac-backup` | machine backup | hourly + run-at-load | broken wiring | manifest label not loaded and plist missing; configured receipt is fresh |
+| `com.roberdan.rusty-mac-backup` | machine backup | hourly + run-at-load | broken wiring | manifest label not loaded and plist missing; configured receipt is stale |
 | `com.roberdan.tmux-autosave` | terminal recovery | every 900 s | supported, execution unproven | loaded and idle; no receipt configured |
 | `com.roberdan.virtualbpm-refresh` | VirtualBPM data refresh | calendar | supported, execution unproven | loaded and idle; no receipt configured |
 | `com.roberdan.virtualbpm-runner-watchdog` | VirtualBPM runner | every 180 s + run-at-load | supported, execution unproven | loaded and idle; no receipt configured |
