@@ -92,9 +92,38 @@ def embed_until_done(job, source, env, binary, *, passes=12):
         if attempt == passes:
             raise RuntimeError(f"{source}: limite di passaggi raggiunto; restano {missing} parti.")
         previous = missing
-        if job.command("Indicizzazione locale " + source,
-                       [binary, "embed", "--stale", "--source", source], change=True,
-                       env=env, cwd=Path.home() / ".gbrain", timeout=1800) is None:
+        transient_failure = False
+        for retry in range(4):
+            output = job.command("Indicizzazione locale " + source,
+                                 [binary, "embed", "--stale", "--source", source],
+                                 env=env, cwd=Path.home() / ".gbrain", timeout=1800, ok=(0, 1))
+            if output is None:
+                raise RuntimeError("Indicizzazione locale fallita: " + source)
+            exit_code = job.commands[-1].get("exit")
+            if exit_code not in (0, 1):
+                raise RuntimeError(
+                    f"Esito indicizzazione non riconoscibile ({exit_code}): {source}")
+            errors = [line.strip() for line in output.splitlines() if "Error embedding" in line]
+            if exit_code == 0 and not errors:
+                if transient_failure:
+                    job.row("ESEGUITO", "Ripresa indicizzazione " + source,
+                            "Ollama e tornato disponibile; indicizzazione ripresa automaticamente.")
+                break
+            transient = (
+                exit_code == 1
+                and bool(errors)
+                and all("Cannot connect to API" in line or "Unable to connect" in line
+                        for line in errors)
+            )
+            if transient and retry < 3:
+                transient_failure = True
+                time.sleep(5 * (retry + 1))
+                continue
+            diagnostics = errors or [
+                line.strip() for line in output.splitlines()[-8:] if line.strip()
+            ]
+            job.row("ERRORE", "Indicizzazione locale " + source,
+                    "\n".join(diagnostics) or f"codice {exit_code}")
             raise RuntimeError("Indicizzazione locale fallita: " + source)
 
 

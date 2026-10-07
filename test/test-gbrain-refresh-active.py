@@ -11,9 +11,23 @@ spec.loader.exec_module(refresh)
 
 
 class RefreshTests(unittest.TestCase):
-    def test_only_explicit_source_and_authoritative_zero_completes(self):
+    @staticmethod
+    def scripted_job(*responses):
         job = Mock()
-        job.command.side_effect = ["Would embed 2 stale chunks", "ok", "Would embed 0 chunks"]
+        job.commands = []
+        sequence = iter(responses)
+
+        def command(*_args, **_kwargs):
+            output = next(sequence)
+            job.commands.append({"exit": 0 if output is not None else 1})
+            return output
+
+        job.command.side_effect = command
+        return job
+
+    def test_only_explicit_source_and_authoritative_zero_completes(self):
+        job = self.scripted_job(
+            "Would embed 2 stale chunks", "ok", "Would embed 0 chunks")
         refresh.embed_until_done(job, "permitted", {}, "/gbrain")
         for call in job.command.call_args_list:
             self.assertIn("--source", call.args[1])
@@ -30,17 +44,15 @@ class RefreshTests(unittest.TestCase):
 
     def test_failure_is_not_swallowed(self):
         for responses in ([None], ["unknown"], ["Would embed 1 chunks", None]):
-            job = Mock()
-            job.command.side_effect = responses
+            job = self.scripted_job(*responses)
             with self.assertRaises(RuntimeError):
                 refresh.embed_until_done(job, "source", {}, "/gbrain")
 
     def test_stall_and_ceiling_are_failures(self):
-        job = Mock()
-        job.command.side_effect = ["Would embed 1 chunks", "ok"] * 3
+        job = self.scripted_job(*(["Would embed 1 chunks", "ok"] * 3))
         with self.assertRaisesRegex(RuntimeError, "nessun progresso"):
             refresh.embed_until_done(job, "source", {}, "/gbrain")
-        job.command.side_effect = ["Would embed 3 chunks", "ok", "Would embed 2 chunks"]
+        job = self.scripted_job("Would embed 3 chunks", "ok", "Would embed 2 chunks")
         with self.assertRaisesRegex(RuntimeError, "limite"):
             refresh.embed_until_done(job, "source", {}, "/gbrain", passes=1)
 

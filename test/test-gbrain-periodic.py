@@ -134,6 +134,20 @@ class RefreshTests(unittest.TestCase):
 
 
 class EmbeddingTests(unittest.TestCase):
+    @staticmethod
+    def scripted_job(*steps):
+        job = Mock()
+        job.commands = []
+        sequence = iter(steps)
+
+        def command(*_args, **_kwargs):
+            output, exit_code = next(sequence)
+            job.commands.append({"exit": exit_code})
+            return output
+
+        job.command.side_effect = command
+        return job
+
     def test_zero_chunks_does_not_run_embed(self):
         job = Mock()
         job.command.return_value = "Would embed 0 stale chunks"
@@ -142,19 +156,82 @@ class EmbeddingTests(unittest.TestCase):
         self.assertIn("--dry-run", job.command.call_args.args[1])
 
     def test_reports_measured_vector_change(self):
-        job = Mock()
-        job.command.side_effect = ["Would embed 3 stale chunks", "embedded",
-                                   "Would embed 0 stale chunks"]
+        job = self.scripted_job(
+            ("Would embed 3 stale chunks", 0),
+            ("embedded", 0),
+            ("Would embed 0 stale chunks", 0),
+        )
         self.assertEqual(periodic.embed_until_done(job, "test", {}, "/gbrain"), 3)
         for call in job.command.call_args_list:
             argv = call.args[1]
             self.assertEqual(argv[argv.index("--source") + 1], "test")
 
+    def test_transient_ollama_disconnect_is_retried(self):
+        disconnect = (
+            "Error embedding one: [embed(ollama:bge-m3)] "
+            "Cannot connect to API: Unable to connect"
+        )
+        job = self.scripted_job(
+            ("Would embed 3 stale chunks", 0),
+            (disconnect, 1),
+            ("embedded", 0),
+            ("Would embed 0 stale chunks", 0),
+        )
+        with patch.object(periodic.time, "sleep") as sleep:
+            self.assertEqual(periodic.embed_until_done(job, "test", {}, "/gbrain"), 3)
+        sleep.assert_called_once_with(5)
+        self.assertEqual(job.command.call_count, 4)
+        self.assertIn("ok", job.command.call_args_list[1].kwargs)
+        self.assertNotIn("change", job.command.call_args_list[1].kwargs)
+        job.row.assert_called_once()
+
+    def test_retry_exhaustion_is_error(self):
+        disconnect = ("Error embedding one: [embed(ollama:bge-m3)] "
+                      "Cannot connect to API: Unable to connect")
+        job = self.scripted_job(
+            ("Would embed 3 stale chunks", 0),
+            *((disconnect, 1) for _ in range(4)),
+        )
+        with patch.object(periodic.time, "sleep") as sleep, \
+                self.assertRaisesRegex(RuntimeError, "Indicizzazione locale fallita"):
+            periodic.embed_until_done(job, "test", {}, "/gbrain")
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [5, 10, 15])
+        job.row.assert_called_once()
+        self.assertEqual(job.row.call_args.args[0], "ERRORE")
+
+    def test_non_connectivity_failure_is_not_retried(self):
+        job = self.scripted_job(
+            ("Would embed 3 stale chunks", 0),
+            ("Error embedding one: invalid embedding dimensions", 1),
+        )
+        with patch.object(periodic.time, "sleep") as sleep, \
+                self.assertRaisesRegex(RuntimeError, "Indicizzazione locale fallita"):
+            periodic.embed_until_done(job, "test", {}, "/gbrain")
+        sleep.assert_not_called()
+        job.row.assert_called_once()
+        self.assertIn("invalid embedding dimensions", job.row.call_args.args[2])
+
+    def test_exit_one_without_chunk_error_is_not_success(self):
+        job = self.scripted_job(
+            ("Would embed 3 stale chunks", 0),
+            ("Projection recovery requires a working embedding provider.", 1),
+        )
+        with patch.object(periodic.time, "sleep") as sleep, \
+                self.assertRaisesRegex(RuntimeError, "Indicizzazione locale fallita"):
+            periodic.embed_until_done(job, "test", {}, "/gbrain")
+        sleep.assert_not_called()
+        job.row.assert_called_once_with(
+            "ERRORE", "Indicizzazione locale test",
+            "Projection recovery requires a working embedding provider.")
+
     def test_stalls_are_errors(self):
-        job = Mock()
-        job.command.side_effect = ["Would embed 3 stale chunks", "embedded",
-                                   "Would embed 3 stale chunks", "embedded",
-                                   "Would embed 3 stale chunks"]
+        job = self.scripted_job(
+            ("Would embed 3 stale chunks", 0),
+            ("embedded", 0),
+            ("Would embed 3 stale chunks", 0),
+            ("embedded", 0),
+            ("Would embed 3 stale chunks", 0),
+        )
         with self.assertRaisesRegex(RuntimeError, "nessun progresso"):
             periodic.embed_until_done(job, "test", {}, "/gbrain")
 
@@ -180,6 +257,10 @@ class ScheduleTests(unittest.TestCase):
         for flag in ("--require-ac", "--blocked-source vault",
                      "--blocked-source gstack-code-roberdan-os-67e84638"):
             self.assertIn(flag, launcher)
+        self.assertIn("gbrain-upgrade/last-install.json", launcher)
+        self.assertIn('with_name("state.json")', launcher)
+        self.assertIn('GBRAIN_MAX_CHUNK_TOKENS="${GBRAIN_MAX_CHUNK_TOKENS:-1500}"', launcher)
+        self.assertNotIn("260920-active-validation", launcher)
 
     def test_exclusions_preserved(self):
         manifest = {"local": [{"path": "/a", "pin": "denied"}, {"path": "/b"}]}
