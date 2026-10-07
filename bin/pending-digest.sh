@@ -7,8 +7,10 @@
 #   bin/pending-digest.sh            # notify only if there's something pending
 #   bin/pending-digest.sh --always   # write the digest + notify even if zero (for testing)
 #
-# Notification is best-effort (osascript on macOS; silently skipped elsewhere). The digest
-# file (RDA_HOME/pending-digest.txt) is always refreshed so `kb`/a fresh session can read it.
+# Notification is best-effort and goes ONLY through `avvisa` (tools/avvisa) so it never shows
+# up attributed to "Editor di script"/Terminal — if Avvisa isn't installed, the notification is
+# skipped (never osascript/display notification). The digest file (RDA_HOME/pending-digest.txt)
+# is always refreshed so `kb`/a fresh session can read it.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -90,10 +92,14 @@ twin="$(bash "$TWIN" agreement --days 7 2>/dev/null || echo "Twin — accordo co
 } > "$digest" 2>/dev/null || true
 
 if [ "$count" -gt 0 ] || [ "$always" -eq 1 ]; then
-  # macOS desktop notification (best-effort). Escape double quotes for osascript.
-  if command -v osascript >/dev/null 2>&1; then
-    msg="$count in attesa della tua approvazione — apri e fai: kb pending"
-    osascript -e "display notification \"${msg//\"/\\\"}\" with title \"roberdan-os · pending\"" >/dev/null 2>&1 || true
+  # Desktop notification via Avvisa ONLY (tools/avvisa) — argv-safe, no shell/AppleScript
+  # fallback. Best-effort: Avvisa missing just skips the notification with a visible warning.
+  AVVISA="${RDA_AVVISA_CMD:-avvisa}"
+  msg="$count in attesa della tua approvazione — apri e fai: kb pending"
+  if command -v "$AVVISA" >/dev/null 2>&1; then
+    "$AVVISA" --titolo "roberdan-os · pending" --testo "$msg" >/dev/null 2>&1 || true
+  else
+    echo "pending-digest: avvisa non disponibile — notifica saltata (vedi tools/README.md § avvisa)" >&2
   fi
   echo "pending-digest: $count pending → $digest (notified)" >&2
 else

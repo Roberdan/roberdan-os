@@ -216,6 +216,10 @@ if _suite test-install-hooks; then ok "install-hooks merge green (see bash test/
 section "approval inbox — kb pending + digest contract"
 if _suite test-pending; then ok "approval inbox green (see bash test/test-pending.sh)"; else err "test-pending — see bash test/test-pending.sh"; fi
 
+# --- 8e1) the digest notifies ONLY through Avvisa — never osascript/AppleScript ---
+section "pending-digest notification channel — Avvisa only, never osascript"
+if _suite test-pending-digest-avvisa; then ok "avvisa argv, no osascript fallback (see bash test/test-pending-digest-avvisa.sh)"; else err "test-pending-digest-avvisa — see bash test/test-pending-digest-avvisa.sh"; fi
+
 # --- 8e2) session-waste: flags a waste on synthetic traces AND stays SILENT on clean (the scar)
 section "session-waste — rilievi con impatto+rimedio, e silenzio quando non trova nulla"
 if _suite test-session-waste; then ok "session-waste flags a waste E tace su input pulito/vuoto"; else err "test-session-waste — see bash test/test-session-waste.sh"; fi
