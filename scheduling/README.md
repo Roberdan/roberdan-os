@@ -10,6 +10,10 @@ OS-level scheduler (fires even with Claude closed). Cron-swappable. See [`docs/a
 | `com.roberdan.rda-worktrees` | daily (03:10) | `kanban/worktree-sweep.sh sweep --yes` → rimuove le copie di lavoro che non hanno piu' niente dentro (log `/tmp/rda-worktrees.log`). La pulizia *a monte* gira gia' a ogni fine turno (`hooks/auto-checkpoint.sh` → `autosweep`, ambito: repo corrente): questo job e' la rete di sicurezza sui repo che nessuno ha aperto |
 | `com.roberdan.rda-pending-digest` | twice daily (09:00 + 18:00) | `bin/pending-digest.sh` → macOS notification + `~/.roberdan-os/pending-digest.txt` when something waits on Roberto (see `kb pending`) |
 
+## AC-only (battery is priority 1)
+
+Every shipped plist starts with `/bin/sh -c 'pmset ... "AC Power" || exit 0; exec "$0" "$@"'` and exits silently on battery, UPS or pmset error. `test/test-plist-ac-gate.sh` fails if any plist lacks the gate.
+
 ## Install
 
 ```sh

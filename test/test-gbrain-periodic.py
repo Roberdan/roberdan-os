@@ -253,9 +253,19 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(config["StartInterval"], 3 * 60 * 60)
         self.assertNotIn("StartCalendarInterval", config)
         self.assertFalse(config["RunAtLoad"])
+        # Background jobs run only on AC power (2026-10-07). The gate sits in
+        # front of the real command, as the on-ac wrapper or as the inline
+        # /bin/sh -c pmset form; either is required, then skipped here.
+        args = list(config["ProgramArguments"])
+        gated = False
+        if args and args[0].endswith("/on-ac"):
+            args, gated = args[1:], True
+        elif args[:2] == ["/bin/sh", "-c"] and len(args) > 2 and "AC Power" in args[2]:
+            args, gated = args[3:], True
+        self.assertTrue(gated, "the refresh must start only on AC power")
         launcher_path = next(
             Path(arg)
-            for arg in config["ProgramArguments"]
+            for arg in args
             if Path(arg).name == "gbrain-refresh-code"
         )
         launcher = launcher_path.read_text()

@@ -11,6 +11,9 @@
   <key>Label</key><string>com.roberdan.rda-pending-digest</string>
   <key>ProgramArguments</key>
   <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>/usr/bin/pmset -g ps 2>/dev/null | head -1 | grep -q "'AC Power'" || exit 0; exec "$0" "$@"</string>
     <string>/bin/bash</string>
     <string>-lc</string>
     <string>"$HOME/GitHub/roberdan-os/bin/pending-digest.sh"</string>
