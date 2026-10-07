@@ -51,5 +51,9 @@ read logs, environment values, command payloads, or private content.
 
 - Provider/source receipts:
   `~/.roberdan-os/archive/g0-provider-update-2026-10-07/`
+- G1 decision evidence:
+  [`capability ledger`](evidence/capability-ledger.tsv),
+  [`hook parity`](evidence/hook-parity.tsv), and
+  [`recovery matrix`](evidence/recovery-matrix.tsv).
 - Refresh this ledger from live metadata before using it for a removal decision.
 - A zero-byte receipt is wiring evidence only, not proof that useful work happened.
