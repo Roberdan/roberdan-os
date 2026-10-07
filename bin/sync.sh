@@ -119,12 +119,8 @@ without a recommendation. Bring one recommended next step, grounded in his expli
 preferences, with the strongest counterargument. Draft, not send, for anything external. Full
 contract: `AGENTS.md` § Decision before handoff.'
 
-# Copy the early safety contract from the canon verbatim. The markers make AGENTS.md the
-# single writer while keeping every provider projection independently safe under truncation.
-emit_safety_kernel() {
-  awk '/<!-- safety-kernel:begin -->/{f=1;next} /<!-- safety-kernel:end -->/{exit} f' \
-    "$ROOT/AGENTS.md"
-}
+# shellcheck source=bin/lib-provider-projections.sh
+. "$ROOT/bin/lib-provider-projections.sh"
 # Extracts a simple YAML frontmatter field (name:/description:) from a file.
 fm() { grep -m1 -E "^$2:" "$1" 2>/dev/null | sed -E "s/^$2:[[:space:]]*//; s/^[\"']//; s/[\"']$//"; }
 
@@ -179,30 +175,6 @@ copilot_tools_array() {
     if [ -z "$out" ]; then out="$mapped"; else out="$out, $mapped"; fi
   done
   printf '[%s]' "$out"
-}
-
-emit_global_agents_pointer() {
-  # Content of the thin AGENTS.md pointer installed OUTSIDE this repo (parent
-  # ~/GitHub, plus any AGENTS.md-native tool's global instructions dir: codex,
-  # opencode). Single source so every installed copy is byte-identical —
-  # never hand-copy this text elsewhere.
-  cat <<EOF
-# AGENTS.md → roberdan-os
-
-Thin pointer. Canonical behavior lives in \`AGENTS.md\` inside \`roberdan-os\`
-(\`~/GitHub/roberdan-os/AGENTS.md\`) — read that, do not duplicate it here.
-
-Working in any repo under \`~/GitHub\`, by default:
-- **Loop engineering** (autonomy, evidence-first, commit per phase, verified done) — code and business alike.
-- **Digital twin** kicks in automatically when the output is communication/decision "as Roberto" (draft-not-send for anything external).
-- Agents at the right moment: \`@thor\` (done-gate), \`@rex\` (review), \`@luca\` (security), \`@baccio\` (architecture), \`@socrates\` (first-principles), \`@wanda\` (loop).
-- Human gates are never automated (see \`roberdan-os/AGENTS.md#gate-umani\`).
-
-$(emit_safety_kernel)
-
-$EXEC_FORMAT_BLURB
-Full contract: \`roberdan-os/behavior/roberto-mode.md\` § Communicating with Roberto.
-EOF
 }
 
 emit_claude() {
@@ -435,44 +407,6 @@ EOF
       > "$d/extension/roberdan-os/extension.mjs"
     cp "$ROOT/hooks/copilot/"{context-recovery,audit,skill-obligations,skill-obligations-core}.mjs "$d/extension/roberdan-os/"
   fi
-}
-
-emit_codex() {
-  local d="$P/codex"
-  mkdir -p "$d"
-  # Codex's project-instruction budget is bounded. Emit an independently useful projection
-  # whose safety kernel is complete before any pointer, and keep it below the tested ceiling.
-  {
-    cat <<'EOF'
-# Codex instructions → roberdan-os
-
-This is the bounded Codex projection. The canonical source remains `AGENTS.md` in
-`roberdan-os`; read it for full operating detail after applying the safety kernel below.
-
-EOF
-    emit_safety_kernel
-    cat <<EOF
-
-$EXEC_FORMAT_BLURB
-
-$TWIN_BLURB
-
-Full canon: \`$ROOT/AGENTS.md\`.
-EOF
-  } > "$d/AGENTS.md"
-
-  cat > "$d/README.md" <<'EOF'
-# Codex → roberdan-os
-
-Codex reads `AGENTS.md` natively. `bin/sync.sh` generates a bounded global projection at
-`platforms/codex/AGENTS.md`; `--install` places it at `~/.codex/AGENTS.md`.
-
-Config snippet (if an explicit instructions file is needed):
-    codex --instructions "$RDA_OS/platforms/codex/AGENTS.md"
-EOF
-  # Same H1 expansion for the doc snippet — a copy-pasted command must be runnable.
-  sed "s|[\$]RDA_OS|$ROOT|g" "$d/README.md" > "$d/README.md.tmp" \
-    && mv "$d/README.md.tmp" "$d/README.md"
 }
 
 emit_hermes() {
