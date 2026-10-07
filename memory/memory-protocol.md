@@ -11,7 +11,7 @@ NOT live in per-tool silos. See [[ADR-0001]].
 | Staging | `~/.roberdan-os/learnings/inbox/*.md` | Per-session capture, no lock |
 | Index/recall | gbrain (semantic + keyword) | On-demand retrieval, never loaded whole into context |
 | Hot-core | `agent-learnings/_core.md` (≤20 lines) | The few truths loaded everywhere |
-| Private brain | **`~/.roberdan-os/private/brain/`** — gbrain source `default` (`people/ projects/ orgs/`) | Facts about clients, deals and open work, marked `visibility: private` |
+| Private brain | **`~/.roberdan-os/private/brain/`** — metadata path for gbrain source `default` | Local landing zone for private facts; indexing remains an explicit, separate action |
 
 **Why the private brain is a separate row and not "just the vault".** The vault is an
 Obsidian vault: it syncs to a cloud, and `memory-protocol` reserves it for `type:
@@ -24,7 +24,14 @@ its notes relative to the CWD — which that day was a **public** repo. A genera
 declared destination does not decline to write; it writes wherever it happens to be
 standing. See [`docs/privacy-leak-check.md`](../docs/privacy-leak-check.md).
 
-**Refresh it with `gbrain import`, never `gbrain sync`.** `sync` requires a git repo — and
+**Live truth, verified 2026-10-07:** source `default` now points to
+`~/.roberdan-os/private/brain/`, but still has zero indexed pages. The metadata repair used
+`gbrain sources set-path`; it did **not** read, import, sync or index private content. Treat
+the source as configured-but-empty until an explicit private-indexing decision is approved.
+Never infer that a valid path means the content is indexed or exposed safely through every
+client.
+
+**If private indexing is explicitly approved, refresh with `gbrain import`, never `gbrain sync`.** `sync` requires a git repo — and
 the private brain is deliberately outside one, so following gbrain's own
 `⚠ default: never synced — run gbrain sync` hint ends in a `git init` that undoes the whole
 point. `sync` also *reconciles* a directory against the source, so 3 files in front of 354
@@ -57,6 +64,11 @@ longer the source-of-truth.
    Check installed help before using version-specific flags; `--detail` is not supported by
    gbrain 0.50's search command. Missing MCP tools do not imply the CLI is unavailable.
 3. Greppable markdown as fallback until semantic recall is fixed.
+
+For code-index health, `bin/toolchain-doctor.sh` reads the source from `GBRAIN_SOURCE` or
+`.gbrain-source` and the known-positive symbol from `--symbol` or `.gbrain-canary`. It also
+runs a guaranteed-absent negative control. Missing controls or unparseable output are
+`inconclusive`, never a false claim that the index is broken.
 
 ## Decision recall: evidence, not permission
 

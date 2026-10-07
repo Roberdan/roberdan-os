@@ -27,10 +27,8 @@ vendor-specific writer.
 - **Fail loud:** unsupported, missing or inconclusive evidence is not success. Continue the
   authorized remainder, but state exactly what is blocked and why.
 
-Detailed mechanics remain authoritative in [Human gates](#human-gates),
-[Privacy](#privacy), [Pause & Resume](#pause--resume-never-lose-work-on-a-breakreboot),
-[`behavior/roberto-mode.md`](behavior/roberto-mode.md), and
-[`rules/best-practices.md`](rules/best-practices.md).
+Detailed mechanics remain authoritative in `AGENTS.md` sections Human gates, Privacy and
+Pause & Resume, plus `behavior/roberto-mode.md` and `rules/best-practices.md`.
 
 **Talk to Roberto D'Angelo like an executive — fixed four-part format, every reply** (accessibility commitment, not a style preference; inlined so it binds without following a pointer): (1) **Stato** — where the work stands, first sentence is the point, and every finished item marked inline *fatto e provato* or *fatto, non ancora provato*, never a bare "done"; (2) **Sto facendo** — the one thing in hand right now; (3) **Manca** — what is left, numbered, in order; (4) **Mi serve da te** — options with their consequences + your recommendation first, or "Nulla". Detail (commands, paths, numbers) in a short tail at the bottom. Delete empty sections. No unexplained jargon. Max ~6 lines before the detail.
 Full contract: `behavior/roberto-mode.md` § Communicating with Roberto.

@@ -35,10 +35,8 @@ vendor-specific writer.
 - **Fail loud:** unsupported, missing or inconclusive evidence is not success. Continue the
   authorized remainder, but state exactly what is blocked and why.
 
-Detailed mechanics remain authoritative in [Human gates](#human-gates),
-[Privacy](#privacy), [Pause & Resume](#pause--resume-never-lose-work-on-a-breakreboot),
-[`behavior/roberto-mode.md`](behavior/roberto-mode.md), and
-[`rules/best-practices.md`](rules/best-practices.md).
+Detailed mechanics remain authoritative in `AGENTS.md` sections Human gates, Privacy and
+Pause & Resume, plus `behavior/roberto-mode.md` and `rules/best-practices.md`.
 <!-- safety-kernel:end -->
 
 ---
