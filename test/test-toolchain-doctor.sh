@@ -15,15 +15,25 @@ printf 'source-fixture\n' > "$TMP/repo/.gbrain-source"
 
 cat > "$TMP/bin/gbrain" <<'SH'
 #!/usr/bin/env bash
-symbol="${2:-}"
+source_id=""
+symbol=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --source) source_id="${2:-}"; shift ;;
+    code-def) ;;
+    *) symbol="$1" ;;
+  esac
+  shift
+done
 case "${GBRAIN_STUB_MODE:-healthy}:$symbol" in
-  healthy:KnownCanary) printf '{"count":2}\n' ;;
-  healthy:__rda_gbrain_negative_control_9f4c0e__) printf '{"count":0}\n' ;;
-  missing:*) printf '{"count":0}\n' ;;
-  false-negative:KnownCanary) printf '{"count":1}\n' ;;
-  false-negative:__rda_gbrain_negative_control_9f4c0e__) printf '{"count":1}\n' ;;
+  healthy:KnownCanary) printf '{"source_id":"%s","scope":"single","count":2}\n' "$source_id" ;;
+  healthy:__rda_gbrain_negative_control_9f4c0e__) printf '{"source_id":"%s","scope":"single","count":0}\n' "$source_id" ;;
+  missing:*) printf '{"source_id":"%s","scope":"single","count":0}\n' "$source_id" ;;
+  false-negative:KnownCanary) printf '{"source_id":"%s","scope":"single","count":1}\n' "$source_id" ;;
+  false-negative:__rda_gbrain_negative_control_9f4c0e__) printf '{"source_id":"%s","scope":"single","count":1}\n' "$source_id" ;;
+  widened:*) printf '{"source_id":null,"scope":"all","count":4}\n' ;;
   malformed:*) printf 'not-json\n' ;;
-  *) printf '{"count":0}\n' ;;
+  *) printf '{"source_id":"%s","scope":"single","count":0}\n' "$source_id" ;;
 esac
 SH
 chmod +x "$TMP/bin/gbrain"
@@ -59,6 +69,11 @@ malformed="$(run_doctor malformed KnownCanary)"
 [ "$(printf '%s' "$malformed" | status_for)" = inconclusive ] \
   && ok "malformed command output => inconclusive" \
   || err "malformed output was not inconclusive: $malformed"
+
+widened="$(run_doctor widened KnownCanary)"
+[ "$(printf '%s' "$widened" | status_for)" = inconclusive ] \
+  && ok "cross-source widening => inconclusive, never a false ok" \
+  || err "widened result was trusted: $widened"
 
 no_canary="$(run_doctor healthy "")"
 [ "$(printf '%s' "$no_canary" | status_for)" = inconclusive ] \

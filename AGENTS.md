@@ -389,6 +389,7 @@ Self-**proposing** system, never self-**applying** on behavior. → [`docs/adr/0
 - **`evolve/`** — weekly Claude/Copilot/Codex changelog watcher → draft-only in `proposals/` → [`evolve/evolve-protocol.md`](evolve/evolve-protocol.md).
 
 Scheduling = **launchd** (fires even with Claude closed). Never auto-commit on `behavior/ rules/ agents/ AGENTS.md`.
+Live ownership, schedules and observed support state: [`docs/runtime-ledger.md`](docs/runtime-ledger.md).
 
 ## Skills
 

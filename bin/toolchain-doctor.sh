@@ -170,18 +170,19 @@ fi
 gbrain_count() {
   local symbol="$1" source="$2" raw
   if have timeout; then
-    raw=$(GBRAIN_SOURCE="$source" timeout 90 gbrain code-def "$symbol" 2>/dev/null) || return 2
+    raw=$(timeout 90 gbrain code-def --source "$source" "$symbol" 2>/dev/null) || return 2
   else
-    raw=$(GBRAIN_SOURCE="$source" gbrain code-def "$symbol" 2>/dev/null) || return 2
+    raw=$(gbrain code-def --source "$source" "$symbol" 2>/dev/null) || return 2
   fi
   printf '%s' "$raw" | python3 -c '
 import json,sys
 data=json.load(sys.stdin)
+expected=sys.argv[1]
 count=data.get("count")
-if not isinstance(count, int):
+if not isinstance(count, int) or data.get("scope") != "single" or data.get("source_id") != expected:
     raise SystemExit(2)
 print(count)
-' 2>/dev/null || return 2
+' "$source" 2>/dev/null || return 2
 }
 
 if ! have gbrain; then
