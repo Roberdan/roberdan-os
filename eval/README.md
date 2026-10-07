@@ -66,6 +66,14 @@ mistakes the aspiration for a delivered capability):
 
 Building that comparative harness is future work; it is **not** built here. The bounded
 activated-host probes below are not an A/B value study. Tasks `13-release-confirm-ci` and
+
+G1 now provides a narrower prerequisite:
+`eval/prepare-activated-arms.py --output <blind-dir> --mapping <operator-only-file>` builds
+blind, isolated A/B homes while keeping the de-blinding map outside the arm directory.
+The activated arm uses the real provider generation/install paths and Claude hook installer;
+the no-canon arm has the same empty host directories. A collapse control rejects structurally
+identical arms. This proves activation separation only: it still does not measure behavioral
+value, multi-turn outcomes, or Roberto's preference. Tasks `13-release-confirm-ci` and
 `14-resume-whole-plan` (added below) are execution-flavored precisely to make this visible: run
 under the current prepend harness they *may* show the same confound as the skill tasks (a
 procedural, agentic behavior flattened into one passive answer). If they lose, that is *consistent

@@ -1,0 +1,10 @@
+failure_mode	claude_code	copilot_cli	codex	evidence	limit
+manual-pause	kb pause contract	kb pause contract	canon discipline	test/test-context-recovery.sh	A saved checkpoint is not an executor
+turn-end	Stop auto-checkpoint	idle auto-checkpoint	no measured callback	hooks/auto-checkpoint.sh	A rejected or killed turn may skip the callback
+pre-compaction	PreCompact checkpoint	usage_info and compaction_start checkpoint	no measured callback	test/test-context-recovery.sh	Codex recovery remains execution unproven
+post-compaction	SessionStart reload	compaction_complete then bounded resume	AGENTS reread only	test/test-context-recovery.sh	Recovery output over the byte limit is rejected
+session-crash	no callback guarantee	no callback guarantee	no callback guarantee	AGENTS.md	Durable state may survive; continuation does not
+reboot	kb resume from disk	kb resume from disk	canon discipline	test/test-context-inject-staleness.sh	No host is assumed to restart itself
+quota-or-verifier-unavailable	task remains open	task remains open	task remains open	test/test-kb-done-gate.sh	Unavailable verifier is neither pass nor fail
+authorized-queue-remains	Stop may block	onAgentStop may block	manual resume	test/test-goal-gate.sh	Host restart caps and terminal conditions still apply
+integrated-worktree-cleanup	autosweep or explicit cleanup	autosweep or explicit cleanup	explicit cleanup	test/test-worktree-sweep.sh	Only clean integrated worktrees may be removed

@@ -1,0 +1,11 @@
+capability	claude_event	copilot_event	codex_event	blocking	implementation	behavioral_test	gap
+context-injection	SessionStart	onSessionStart	AGENTS discovery	no	hooks/context-inject.sh	test/test-context-inject-staleness.sh	Codex has instructions but no measured lifecycle callback
+edit-guard	PreToolUse Edit/Write	onPreToolUse edit	none	ask-or-deny	hooks/main-guard.sh	test/test-main-guard.sh	Codex enforcement is discipline-only
+shell-guard	PreToolUse Bash	onPreToolUse shell	none	ask-or-deny	hooks/bash-guard.sh	test/test-bash-guard.sh	Codex enforcement is discipline-only
+auto-checkpoint	PreCompact and Stop	usage_info; compaction_start; idle	none	no	hooks/auto-checkpoint.sh	test/test-context-recovery.sh	Codex recovery execution is unproven
+completion-gate	Stop	idle	none	no	hooks/verify-done.sh	test/test-verify-done.sh	Codex relies on canon and manual Thor invocation
+goal-gate	Stop	onAgentStop	none	yes	hooks/goal-gate.sh	test/test-goal-gate.sh	Codex cannot request native continuation here
+bus-doorbell	PostToolUse Bash/Edit/Write	onPostToolUse shell/edit	none	no	hooks/bus-doorbell.sh	test/test-bus-doorbell-matcher.sh	Codex has no measured doorbell callback
+bus-goodbye	SessionEnd	onSessionEnd	none	no	hooks/bus-bye.sh	test/test-bus-presence.sh	Crash or host kill skips every provider callback
+audit	SessionStart/End and tool lifecycle	all extension lifecycle callbacks	none	no	hooks/audit.sh	test/test-audit-hooks.sh	Codex lifecycle observation is unproven
+mandatory-skill-route	PreToolUse/PostToolUse/Stop	prompt/pre/post/stop/end	none	bounded-block	hooks/skill-obligations-config.mjs	test/test-skill-routing.sh	Codex receives prose route only
