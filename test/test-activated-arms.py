@@ -13,14 +13,24 @@ PREPARE = ROOT / "eval/prepare-activated-arms.py"
 
 with tempfile.TemporaryDirectory() as raw_tmp:
     output = Path(raw_tmp) / "arms"
+    mapping_path = Path(raw_tmp) / "operator-only-mapping.json"
     result = subprocess.run(
-        [str(PREPARE), "--output", str(output), "--seed", "fixture-seed"],
+        [
+            str(PREPARE),
+            "--output",
+            str(output),
+            "--mapping",
+            str(mapping_path),
+            "--seed",
+            "fixture-seed",
+        ],
         check=True,
         capture_output=True,
         text=True,
     )
     public = json.loads(result.stdout)
-    mapping = json.loads((output / "arm-mapping.json").read_text(encoding="utf-8"))
+    mapping = json.loads(mapping_path.read_text(encoding="utf-8"))
+    assert not (output / "arm-mapping.json").exists()
     assert public["status"] == "distinct"
     assert len(set(public["blind_ids"])) == 2
     assert set(mapping["mapping"].values()) == {"no-canon", "activated"}
@@ -46,7 +56,15 @@ with tempfile.TemporaryDirectory() as raw_tmp:
     assert active["github_projection"]
 
     rerun = subprocess.run(
-        [str(PREPARE), "--output", str(output), "--seed", "fixture-seed"],
+        [
+            str(PREPARE),
+            "--output",
+            str(output),
+            "--mapping",
+            str(mapping_path),
+            "--seed",
+            "fixture-seed",
+        ],
         check=False,
         capture_output=True,
         text=True,

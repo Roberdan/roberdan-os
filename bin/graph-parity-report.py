@@ -9,6 +9,7 @@ import os
 import secrets
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -112,15 +113,16 @@ def inspect(args: argparse.Namespace) -> dict[str, Any]:
         controls.append(control("bash-fallback", "ok", "gbrain-now-resolves-bash"))
 
     fresh_symbol = f"RdaFreshParity{secrets.token_hex(8)}"
-    fresh_file = repo / f"g1-fresh-{os.getpid()}.py"
-    try:
+    with tempfile.TemporaryDirectory(prefix="rda-g1-fresh-") as raw_tmp:
+        fresh_root = Path(raw_tmp)
+        fresh_file = fresh_root / "fresh.py"
         fresh_file.write_text(f"def {fresh_symbol}():\n    return True\n", encoding="utf-8")
-        fresh_rg = rg_has(args.rg, rf"^def {fresh_symbol}\(", "*.py", repo, env)
+        fresh_rg = rg_has(
+            args.rg, rf"^def {fresh_symbol}\(", "*.py", fresh_root, env
+        )
         fresh_count, fresh_trust = gbrain_count(
             args.gbrain, source, fresh_symbol, repo, env
         )
-    finally:
-        fresh_file.unlink(missing_ok=True)
     if not fresh_rg:
         controls.append(control("freshness", "broken", "rg-missed-fresh-file"))
     elif fresh_count is None:

@@ -68,7 +68,8 @@ Building that comparative harness is future work; it is **not** built here. The 
 activated-host probes below are not an A/B value study. Tasks `13-release-confirm-ci` and
 
 G1 now provides a narrower prerequisite:
-`eval/prepare-activated-arms.py --output <private-dir>` builds blind, isolated A/B homes.
+`eval/prepare-activated-arms.py --output <blind-dir> --mapping <operator-only-file>` builds
+blind, isolated A/B homes while keeping the de-blinding map outside the arm directory.
 The activated arm uses the real provider generation/install paths and Claude hook installer;
 the no-canon arm has the same empty host directories. A collapse control rejects structurally
 identical arms. This proves activation separation only: it still does not measure behavioral

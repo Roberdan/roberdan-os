@@ -110,15 +110,29 @@ def structure(home: Path) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--mapping", type=Path)
     parser.add_argument("--seed")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
     output = args.output.resolve()
+    mapping = (
+        args.mapping.resolve()
+        if args.mapping
+        else output.with_name(f"{output.name}.mapping.json")
+    )
+    if mapping == output or output in mapping.parents:
+        print("prepare-activated-arms: mapping must stay outside output", file=sys.stderr)
+        return 2
     if output.exists():
         if not args.force:
             print("prepare-activated-arms: output already exists", file=sys.stderr)
             return 2
         shutil.rmtree(output)
+    if mapping.exists():
+        if not args.force:
+            print("prepare-activated-arms: mapping already exists", file=sys.stderr)
+            return 2
+        mapping.unlink()
     output.mkdir(parents=True)
 
     ids = {"no-canon": arm_id(args.seed, "no-canon"), "activated": arm_id(args.seed, "activated")}
@@ -146,7 +160,7 @@ def main() -> int:
     ):
         print("prepare-activated-arms: activated arm is incomplete", file=sys.stderr)
         return 1
-    (output / "arm-mapping.json").write_text(
+    mapping.write_text(
         json.dumps(
             {
                 "blind_ids": list(ids.values()),
