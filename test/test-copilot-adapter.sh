@@ -42,6 +42,7 @@ emitted_agents=$(find "$AGENTS" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | t
 # frontmatter: description REQUIRED + quoted, tools mapped to aliases, model mapped
 if [ -f "$AGENTS/thor.md" ]; then
   grep -qE '^description: "' "$AGENTS/thor.md" && ok "thor description is a required quoted scalar" || err "thor description missing/unquoted"
+  grep -qE '^include-custom-instructions: true$' "$AGENTS/thor.md" && ok "thor opts into repository instructions" || err "thor does not inherit repository instructions"
   grep -qE '^tools: \[read, search, execute\]$' "$AGENTS/thor.md" && ok "thor tools mapped (Read,Grep,Glob,Bash -> read,search,execute deduped)" || err "thor tools mapping wrong: $(grep -m1 '^tools:' "$AGENTS/thor.md")"
   # Pin the EXACT id, not the family. `claude-sonnet-*` stayed green for three months while
   # the map still said 4.5 and Copilot had moved on — a prefix match cannot see staleness,

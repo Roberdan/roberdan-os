@@ -66,7 +66,7 @@
 #   Copilot 1.0.84-1 onAgentStop maps the existing queue gate to bounded native continuation.
 #   Idle/end remain advisory saves, not executors; older hosts without that callback only warn.
 #   No callback retracts a final message or survives runtime exit.
-# Global AGENTS.md pointer install (--install only): writes ~/.codex/AGENTS.md,
+# Global AGENTS.md projection/pointer install (--install only): writes ~/.codex/AGENTS.md,
 # ~/.config/opencode/AGENTS.md and ~/GitHub/AGENTS.md for tools DETECTED as
 # installed, never overwriting an existing file. RDA_POINTER_HOME overrides
 # $HOME (default $HOME) for isolated testing; RDA_FORCE_CODEX / RDA_FORCE_OPENCODE
@@ -118,6 +118,13 @@ sounding board plus adversarial check — for high-stakes calls) before returnin
 without a recommendation. Bring one recommended next step, grounded in his explicit
 preferences, with the strongest counterargument. Draft, not send, for anything external. Full
 contract: `AGENTS.md` § Decision before handoff.'
+
+# Copy the early safety contract from the canon verbatim. The markers make AGENTS.md the
+# single writer while keeping every provider projection independently safe under truncation.
+emit_safety_kernel() {
+  awk '/<!-- safety-kernel:begin -->/{f=1;next} /<!-- safety-kernel:end -->/{exit} f' \
+    "$ROOT/AGENTS.md"
+}
 # Extracts a simple YAML frontmatter field (name:/description:) from a file.
 fm() { grep -m1 -E "^$2:" "$1" 2>/dev/null | sed -E "s/^$2:[[:space:]]*//; s/^[\"']//; s/[\"']$//"; }
 
@@ -190,6 +197,8 @@ Working in any repo under \`~/GitHub\`, by default:
 - **Digital twin** kicks in automatically when the output is communication/decision "as Roberto" (draft-not-send for anything external).
 - Agents at the right moment: \`@thor\` (done-gate), \`@rex\` (review), \`@luca\` (security), \`@baccio\` (architecture), \`@socrates\` (first-principles), \`@wanda\` (loop).
 - Human gates are never automated (see \`roberdan-os/AGENTS.md#gate-umani\`).
+
+$(emit_safety_kernel)
 
 $EXEC_FORMAT_BLURB
 Full contract: \`roberdan-os/behavior/roberto-mode.md\` § Communicating with Roberto.
@@ -333,6 +342,8 @@ The canonical source of behavior is \`AGENTS.md\` in roberdan-os. Copilot reads 
 thin file: for the full behavior follow \`AGENTS.md\` (Behavior, Rules, Agents,
 Loop Protocol, Human gates).
 
+$(emit_safety_kernel)
+
 $EXEC_FORMAT_BLURB
 Full contract: \`behavior/roberto-mode.md\` § Communicating with Roberto.
 
@@ -391,6 +402,7 @@ EOF
       echo "description: $(yaml_dq "$adesc")"
       [ -n "$atools" ] && echo "tools: $atools"
       [ -n "$amodel" ] && echo "model: $amodel"
+      echo "include-custom-instructions: true"
       # Pass through invocation controls only when the canon declares them (future-proof;
       # Copilot defaults infer=true / user-invocable=true otherwise).
       [ -n "$(fm "$a" disable-model-invocation)" ] && echo "disable-model-invocation: $(fm "$a" disable-model-invocation)"
@@ -428,15 +440,35 @@ EOF
 emit_codex() {
   local d="$P/codex"
   mkdir -p "$d"
-  # Codex reads AGENTS.md natively: emit just a config note.
+  # Codex's project-instruction budget is bounded. Emit an independently useful projection
+  # whose safety kernel is complete before any pointer, and keep it below the tested ceiling.
+  {
+    cat <<'EOF'
+# Codex instructions → roberdan-os
+
+This is the bounded Codex projection. The canonical source remains `AGENTS.md` in
+`roberdan-os`; read it for full operating detail after applying the safety kernel below.
+
+EOF
+    emit_safety_kernel
+    cat <<EOF
+
+$EXEC_FORMAT_BLURB
+
+$TWIN_BLURB
+
+Full canon: \`$ROOT/AGENTS.md\`.
+EOF
+  } > "$d/AGENTS.md"
+
   cat > "$d/README.md" <<'EOF'
 # Codex → roberdan-os
 
-Codex reads `AGENTS.md` natively from the repo root. No wrapper needed: point Codex
-at the roberdan-os root (or symlink `AGENTS.md` into the target repo).
+Codex reads `AGENTS.md` natively. `bin/sync.sh` generates a bounded global projection at
+`platforms/codex/AGENTS.md`; `--install` places it at `~/.codex/AGENTS.md`.
 
 Config snippet (if an explicit instructions file is needed):
-    codex --instructions "$RDA_OS/AGENTS.md"
+    codex --instructions "$RDA_OS/platforms/codex/AGENTS.md"
 EOF
   # Same H1 expansion for the doc snippet — a copy-pasted command must be runnable.
   sed "s|[\$]RDA_OS|$ROOT|g" "$d/README.md" > "$d/README.md.tmp" \
@@ -628,7 +660,7 @@ if [ "$MODE" = "install" ]; then
     fi
   fi
 
-  # Global AGENTS.md pointer install — ONLY for tools detected as installed,
+  # Global AGENTS.md projection/pointer install — ONLY for tools detected as installed,
   # ONLY if the target doesn't already exist (never overwrite curated config).
   # RDA_POINTER_HOME overrides $HOME for isolated testing (default $HOME).
   # RDA_FORCE_CODEX / RDA_FORCE_OPENCODE (0|1) force detection for tests
@@ -638,13 +670,17 @@ if [ "$MODE" = "install" ]; then
   echo "--- global AGENTS.md pointer install (detected tools only, into $PTR_HOME) ---"
 
   install_agents_pointer() {
-    local target="$1" label="$2"
+    local target="$1" label="$2" source="${3:-}"
     if [ -e "$target" ]; then
       echo "SKIP $label: già presente in $target (mai overwrite)"
       return
     fi
     mkdir -p "$(dirname "$target")"
-    emit_global_agents_pointer > "$target"
+    if [ -n "$source" ]; then
+      cp "$source" "$target"
+    else
+      emit_global_agents_pointer > "$target"
+    fi
     echo "INSTALL $label: pointer scritto in $target"
   }
 
@@ -655,7 +691,7 @@ if [ "$MODE" = "install" ]; then
   elif [ -d "$PTR_HOME/.codex" ]; then codex_present=1
   fi
   if [ "$codex_present" -eq 1 ]; then
-    install_agents_pointer "$PTR_HOME/.codex/AGENTS.md" "codex"
+    install_agents_pointer "$PTR_HOME/.codex/AGENTS.md" "codex" "$P/codex/AGENTS.md"
   else
     echo "SKIP codex: $PTR_HOME/.codex non trovato (tool non installato)"
   fi

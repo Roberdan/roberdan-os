@@ -24,7 +24,7 @@ for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-bus-mutant-probes test-telemetry test-telemetry-skills test-telemetry-history test-skill-routing test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-bus-doorbell-matcher test-model-economy \
-          test-model-registry test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure test-twin-shadow test-twin-learning test-portable-skills-drift test-twin-approve \
+          test-model-registry test-tool-coverage test-frontmatter test-precommit-hook test-canon-structure test-provider-projections test-twin-shadow test-twin-learning test-portable-skills-drift test-twin-approve \
           test-drift test-copilot-instructions-drift test-links test-privacy test-plan-coverage test-optional-skills test-jev test-jev-routing test-publication-check test-film-preflight test-gbrain-recovery test-system-health; do
   _spawn "$_s"
 done
@@ -38,6 +38,7 @@ for _j in test-optional-skills test-jev test-jev-routing test-publication-check 
 if _suite test-frontmatter; then _suite_out test-frontmatter | grep -vE '^test-frontmatter:'; else _suite_out test-frontmatter; err "test-frontmatter — see bash test/test-frontmatter.sh"; fi
 # --- i cancelli umani sono numerati senza buchi e ogni puntatore ne dichiara il numero giusto -> test/test-canon-structure.sh
 if _suite test-canon-structure; then _suite_out test-canon-structure | grep -vE '^test-canon-structure:'; else _suite_out test-canon-structure; err "test-canon-structure — see bash test/test-canon-structure.sh"; fi
+if _suite test-provider-projections; then _suite_out test-provider-projections | grep -vE '^test-provider-projections:'; else _suite_out test-provider-projections; err "test-provider-projections — see bash test/test-provider-projections.sh"; fi
 section "canon guardrails"; if _suite test-canon-guardrails; then ok "cross-tool guardrails present"; else _suite_out test-canon-guardrails; err "test-canon-guardrails failed"; fi
 # --- i link markdown relativi puntano a qualcosa che esiste -> test/test-links.sh
 if _suite test-links; then _suite_out test-links | grep -vE '^test-links:'; else _suite_out test-links; err "test-links — see bash test/test-links.sh"; fi
