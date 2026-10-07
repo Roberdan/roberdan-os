@@ -17,20 +17,20 @@
 # Never installs or repairs anything: prints the exact command and lets a
 # human run it, same contract as doctor.sh.
 #
-# Exit codes: 0 = nothing broken, 1 = at least one silent failure found.
+# Exit codes: 0 = nothing proven broken, 1 = at least one silent failure found.
 #
 # Usage:
 #   bin/toolchain-doctor.sh            # human-readable report
 #   bin/toolchain-doctor.sh --quiet    # only problems
 #   bin/toolchain-doctor.sh --json     # machine-readable, for CI or a hook
-#   bin/toolchain-doctor.sh --symbol X # probe gbrain code-def with symbol X
+#   bin/toolchain-doctor.sh --symbol X # explicit source canary for gbrain code-def
 
 set -uo pipefail
 
 PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"
 
 MODE="report"
-SYMBOL="validateAuth"
+SYMBOL=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --json)   MODE="json" ;;
@@ -52,15 +52,17 @@ fi
 
 BROKEN=0
 DEGRADED=0
+INCONCLUSIVE=0
 JSON_ROWS=""
 
 # emit NAME STATUS DETAIL IMPACT FIX
-# status: ok | broken | degraded
+# status: ok | broken | degraded | inconclusive
 emit() {
   local name="$1" status="$2" detail="${3:-}" impact="${4:-}" fix="${5:-}"
   case "$status" in
     broken)   BROKEN=$((BROKEN+1)) ;;
     degraded) DEGRADED=$((DEGRADED+1)) ;;
+    inconclusive) INCONCLUSIVE=$((INCONCLUSIVE+1)) ;;
   esac
 
   if [ "$MODE" = json ]; then
@@ -78,6 +80,7 @@ emit() {
     ok)       mark="ok   "; colour="$C_OK" ;;
     broken)   mark="BROKE"; colour="$C_BAD" ;;
     degraded) mark="warn "; colour="$C_WARN" ;;
+    inconclusive) mark="?    "; colour="$C_WARN" ;;
     *)        mark="?    "; colour="$C_WARN" ;;
   esac
 
@@ -159,24 +162,70 @@ fi
 # gbrain embed used to NULL every tree-sitter metadata column on conflict
 # (garrytan/gbrain#3705, fixed 2026-08-01). The fix stops new damage but does
 # not repair indexes already wiped, and code-def just returns 0 results.
+#
+# A universal symbol is not a control: it turns "this repository does not define
+# validateAuth" into "the index is broken." The canary must be source-owned, supplied
+# with --symbol or a local .gbrain-canary file. A guaranteed-absent symbol is the
+# negative control. Parse/tool failures are inconclusive, never success-shaped zeroes.
+gbrain_count() {
+  local symbol="$1" source="$2" raw
+  if have timeout; then
+    raw=$(timeout 90 gbrain code-def --source "$source" "$symbol" 2>/dev/null) || return 2
+  else
+    raw=$(gbrain code-def --source "$source" "$symbol" 2>/dev/null) || return 2
+  fi
+  printf '%s' "$raw" | python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+expected=sys.argv[1]
+count=data.get("count")
+if not isinstance(count, int) or data.get("scope") != "single" or data.get("source_id") != expected:
+    raise SystemExit(2)
+print(count)
+' "$source" 2>/dev/null || return 2
+}
+
 if ! have gbrain; then
   emit "gbrain-symbols" degraded "gbrain not on PATH" \
     "semantic and symbol lookup unavailable; skills fall back to grep" \
     "install gbrain, expected at $HOME/.bun/bin/gbrain"
-elif [ ! -f .gbrain-source ]; then
-  emit "gbrain-symbols" degraded "no .gbrain-source pin in $(pwd)" \
-    "cannot tell which source to probe; run from a pinned worktree" \
-    "cd into a worktree pinned by /sync-gbrain --full"
 else
-  PIN=$(cat .gbrain-source)
-  CNT=$(timeout 90 gbrain code-def "$SYMBOL" 2>/dev/null \
-        | python3 -c 'import sys,json;print(json.load(sys.stdin).get("count",0))' 2>/dev/null || echo 0)
-  if [ "${CNT:-0}" -gt 0 ] 2>/dev/null; then
-    emit "gbrain-symbols" ok "code-def resolves on '$PIN' ($SYMBOL: $CNT)"
+  PIN="${GBRAIN_SOURCE:-}"
+  [ -n "$PIN" ] || [ ! -f .gbrain-source ] || PIN=$(tr -d '[:space:]' < .gbrain-source)
+  CANARY="$SYMBOL"
+  if [ -z "$CANARY" ] && [ -f .gbrain-canary ]; then
+    CANARY=$(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' .gbrain-canary | head -1 | tr -d '[:space:]')
+  fi
+
+  if [ -z "$PIN" ]; then
+    emit "gbrain-symbols" inconclusive "no explicit source (GBRAIN_SOURCE or .gbrain-source)" \
+      "a code-graph probe without a source can inspect the wrong corpus" \
+      "set GBRAIN_SOURCE or attach this worktree with: gbrain sources attach <id>"
+  elif [ -z "$CANARY" ]; then
+    emit "gbrain-symbols" inconclusive "source '$PIN' has no positive canary" \
+      "index health cannot be inferred from an arbitrary symbol returning zero" \
+      "run with --symbol <known-definition>, or add a local .gbrain-canary"
+  elif ! CNT=$(gbrain_count "$CANARY" "$PIN"); then
+    emit "gbrain-symbols" inconclusive "code-def output/command unusable for '$CANARY' on '$PIN'" \
+      "the probe produced no trustworthy count; index health is unknown" \
+      "run: gbrain code-def --source $PIN $CANARY"
   else
-    emit "gbrain-symbols" broken "code-def returns 0 for '$SYMBOL' on '$PIN'" \
-      "symbol metadata was wiped (gbrain#3705); code-refs still works so this reads as 'no results'" \
-      "gbrain reindex-code --source $PIN --force --yes   (--force is absent from gbrain --help)"
+    NEGATIVE="__rda_gbrain_negative_control_9f4c0e__"
+    if ! NEG_CNT=$(gbrain_count "$NEGATIVE" "$PIN"); then
+      emit "gbrain-symbols" inconclusive "negative control could not be parsed on '$PIN'" \
+        "the probe cannot distinguish a real zero from a command/schema failure" \
+        "run: gbrain code-def --source $PIN $NEGATIVE"
+    elif [ "$NEG_CNT" -ne 0 ] 2>/dev/null; then
+      emit "gbrain-symbols" inconclusive "negative control unexpectedly resolved on '$PIN' ($NEG_CNT)" \
+        "code-def results are not discriminating enough to judge index health" \
+        "inspect: gbrain code-def --source $PIN $NEGATIVE"
+    elif [ "$CNT" -gt 0 ] 2>/dev/null; then
+      emit "gbrain-symbols" ok "positive + negative controls pass on '$PIN' ($CANARY: $CNT; absent: 0)"
+    else
+      emit "gbrain-symbols" broken "known canary '$CANARY' returns 0 on '$PIN'; negative control returns 0" \
+        "the source-owned positive control disappeared; symbol lookup is not serving known data" \
+        "gbrain reindex-code --source $PIN --force --yes"
+    fi
   fi
 fi
 
@@ -195,11 +244,14 @@ else
 fi
 
 if [ "$MODE" = json ]; then
-  printf '{"broken":%d,"degraded":%d,"checks":[%s]}\n' "$BROKEN" "$DEGRADED" "$JSON_ROWS"
+  printf '{"broken":%d,"degraded":%d,"inconclusive":%d,"checks":[%s]}\n' \
+    "$BROKEN" "$DEGRADED" "$INCONCLUSIVE" "$JSON_ROWS"
 elif [ "$BROKEN" -gt 0 ]; then
-  printf '\n%s%d silent failure(s).%s %d degraded.\n\n' "$C_BAD" "$BROKEN" "$C_OFF" "$DEGRADED"
+  printf '\n%s%d silent failure(s).%s %d degraded, %d inconclusive.\n\n' \
+    "$C_BAD" "$BROKEN" "$C_OFF" "$DEGRADED" "$INCONCLUSIVE"
 else
-  printf '\n%snothing silently broken.%s %d degraded.\n\n' "$C_OK" "$C_OFF" "$DEGRADED"
+  printf '\n%snothing proven silently broken.%s %d degraded, %d inconclusive.\n\n' \
+    "$C_OK" "$C_OFF" "$DEGRADED" "$INCONCLUSIVE"
 fi
 
 [ "$BROKEN" -eq 0 ]

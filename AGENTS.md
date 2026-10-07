@@ -11,6 +11,34 @@
 by `roberto-mode`. `AGENTS.md` is the universal standard; `CLAUDE.md` and
 `copilot-instructions.md` are thin pointers to this file.
 
+<!-- safety-kernel:begin -->
+## Safety kernel — read before anything else
+
+This block is the minimum cross-tool contract. `bin/sync.sh` copies it verbatim into
+provider projections so safety does not depend on a pointer, a large context window, or a
+vendor-specific writer.
+
+- **Authority:** execute routine, recoverable work only inside the approved purpose,
+  destination, data and consequence. Memory and model advice are evidence, never permission.
+- **Privacy:** confidential material stays outside every git worktree under
+  `~/.roberdan-os/private/`. Never copy private memory into prompts, Jev, commits, bundles,
+  logs or public artifacts. A clean secret scan is not declassification.
+- **Recovery and proof:** multi-step work keeps durable state, commits per completed phase,
+  and empirical evidence that could have failed. A checkpoint records work; it does not
+  continue it. Only an observed live executor counts as ongoing work.
+- **Human gates:** explicit authorization is required for: (1) protected/security/release
+  merges to `main`; (2) force-push to `main`; (3) real spend, external messages or public
+  publication; (4) deletion of non-regenerable data; (5) strategic/product choices with
+  non-obvious trade-offs; (6) material published in Roberto's or Fight the Stroke's name;
+  (7) architectural changes to security, release, data-integrity or gate invariants; and
+  (8) review beyond the declared budget. No irreversible action without confirmation.
+- **Fail loud:** unsupported, missing or inconclusive evidence is not success. Continue the
+  authorized remainder, but state exactly what is blocked and why.
+
+Detailed mechanics remain authoritative in `AGENTS.md` sections Human gates, Privacy and
+Pause & Resume, plus `behavior/roberto-mode.md` and `rules/best-practices.md`.
+<!-- safety-kernel:end -->
+
 ---
 
 ## Behavior
@@ -361,6 +389,7 @@ Self-**proposing** system, never self-**applying** on behavior. → [`docs/adr/0
 - **`evolve/`** — weekly Claude/Copilot/Codex changelog watcher → draft-only in `proposals/` → [`evolve/evolve-protocol.md`](evolve/evolve-protocol.md).
 
 Scheduling = **launchd** (fires even with Claude closed). Never auto-commit on `behavior/ rules/ agents/ AGENTS.md`.
+Live ownership, schedules and observed support state: [`docs/runtime-ledger.md`](docs/runtime-ledger.md).
 
 ## Skills
 
@@ -664,58 +693,12 @@ not substitutes: use `kb` for the work state (always), and `context-save` only *
 the conversation. The [Pause & Resume](#pause--resume-never-lose-work-on-a-breakreboot) contract
 above is the one that binds.
 
-## GBrain Search Guidance (configured by /sync-gbrain)
-<!-- gstack-gbrain-search-guidance:start -->
+## GBrain search guidance
 
-GBrain is set up and synced on this machine. The agent should prefer gbrain
-over Grep when the question is semantic or when you don't know the exact
-identifier yet.
-
-**This worktree is pinned to a worktree-scoped code source** via the
-`.gbrain-source` file in the repo root (kubectl-style context).
-`gbrain code-def`, `code-refs`, `code-callers`, `code-callees`, `search`, and
-`query` from anywhere under this worktree route to that source by default —
-no `--source` flag needed (gbrain >= 0.41.38.0; on older gbrain the call-graph
-commands need `--source "$(cat .gbrain-source)"`). Conductor sibling worktrees
-of the same repo each have their own pin and their own indexed pages, so
-semantic results match the code on disk here.
-
-Call-graph queries (`code-callers`/`code-callees`) also need the graph to be
-built first — run `/sync-gbrain --dream` (or `--full`) if they return
-`count: 0`. This only works if this source's gbrain schema pack extracts code
-symbols; on a non-code-aware pack `--dream` completes but the graph stays empty
-and reports a WARN. `code-def`/`code-refs` need the same extraction.
-
-**Known limit in THIS repo (measured 2026-07-28, re-confirmed 2026-08-17):**
-bash chunks persist with `symbol_name: null`, so `code-def` / `code-callers` /
-`code-callees` return `count: 0` for every shell function here no matter how
-many `--dream` cycles run. Use `rg` for shell symbol lookup. Evidence and the
-ripgrep recipes: [`docs/investigations/2026-07-28-gbrain-bash-code-graph.md`](docs/investigations/2026-07-28-gbrain-bash-code-graph.md).
-
-Two indexed corpora available via the `gbrain` CLI:
-- This worktree's code (auto-pinned via `.gbrain-source`).
-- `~/.gstack/` curated memory (registered as `gstack-brain-<user>` source via
-  the existing federation pipeline).
-
-Prefer gbrain when:
-- "Where is X handled?" / semantic intent, no exact string yet:
-    `gbrain search "<terms>"` or `gbrain query "<question>"`
-- "Where is symbol Y defined?" / symbol-based code questions:
-    `gbrain code-def <symbol>` or `gbrain code-refs <symbol>`
-- "What calls Y?" / "What does Y depend on?":
-    `gbrain code-callers <symbol>` / `gbrain code-callees <symbol>`
-- "What did we decide last time?" / past plans, retros, learnings:
-    `gbrain search "<terms>" --source gstack-brain-<user>`
-
-Grep is still right for known exact strings, regex, multiline patterns, and
-file globs. Run `/sync-gbrain` after meaningful code changes; for ongoing
-auto-sync across all worktrees, run `gbrain autopilot --install` once per
-machine — gbrain's daemon handles incremental refresh on a schedule.
-
-Safety: don't run `/sync-gbrain` while `gbrain autopilot` is active — the
-orchestrator refuses destructive source ops when it detects a running autopilot
-to avoid racing it (#1734). Prefer registering user repos with `gbrain sources
-add --path <dir>` (no `--url`): URL-managed sources can auto-reclone, and the
-sync code walk for them requires an explicit `--allow-reclone` opt-in.
-
-<!-- gstack-gbrain-search-guidance:end -->
+`roberdan-os` owns this guidance; vendor skills never rewrite the canon. Scope every query to
+the source selected by `GBRAIN_SOURCE`, then the nearest `.gbrain-source`, then the documented
+fallback. Use gbrain for semantic intent and symbol/graph queries; use `rg` for exact strings,
+regex, globs and immediately fresh shell code. A zero symbol count is evidence only after a
+source-aware positive control succeeds; otherwise report `inconclusive`, never "broken".
+The measured Bash extraction limit and fallback recipes live in
+[`docs/investigations/2026-07-28-gbrain-bash-code-graph.md`](docs/investigations/2026-07-28-gbrain-bash-code-graph.md).

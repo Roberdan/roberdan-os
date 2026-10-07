@@ -115,6 +115,11 @@ if [ -f "$PTR_HOME/.codex/AGENTS.md" ]; then
   ok "codex AGENTS.md installed (~/.codex detected present)"
   grep -q "roberdan-os" "$PTR_HOME/.codex/AGENTS.md" && ok "codex AGENTS.md points at roberdan-os" \
     || err "codex AGENTS.md content missing roberdan-os pointer"
+  grep -q '^## Safety kernel' "$PTR_HOME/.codex/AGENTS.md" && ok "codex projection carries the safety kernel inline" \
+    || err "codex projection missing inline safety kernel"
+  codex_bytes="$(wc -c < "$PTR_HOME/.codex/AGENTS.md" | tr -d ' ')"
+  [ "$codex_bytes" -le 28672 ] && ok "codex projection is bounded ($codex_bytes bytes <= 28 KiB)" \
+    || err "codex projection exceeds 28 KiB ($codex_bytes bytes)"
 else
   err "expected $PTR_HOME/.codex/AGENTS.md to be installed (codex dir present)"
 fi
