@@ -208,17 +208,17 @@ else
   elif ! CNT=$(gbrain_count "$CANARY" "$PIN"); then
     emit "gbrain-symbols" inconclusive "code-def output/command unusable for '$CANARY' on '$PIN'" \
       "the probe produced no trustworthy count; index health is unknown" \
-      "run: GBRAIN_SOURCE=$PIN gbrain code-def $CANARY"
+      "run: gbrain code-def --source $PIN $CANARY"
   else
     NEGATIVE="__rda_gbrain_negative_control_9f4c0e__"
     if ! NEG_CNT=$(gbrain_count "$NEGATIVE" "$PIN"); then
       emit "gbrain-symbols" inconclusive "negative control could not be parsed on '$PIN'" \
         "the probe cannot distinguish a real zero from a command/schema failure" \
-        "run: GBRAIN_SOURCE=$PIN gbrain code-def $NEGATIVE"
+        "run: gbrain code-def --source $PIN $NEGATIVE"
     elif [ "$NEG_CNT" -ne 0 ] 2>/dev/null; then
       emit "gbrain-symbols" inconclusive "negative control unexpectedly resolved on '$PIN' ($NEG_CNT)" \
         "code-def results are not discriminating enough to judge index health" \
-        "inspect: GBRAIN_SOURCE=$PIN gbrain code-def $NEGATIVE"
+        "inspect: gbrain code-def --source $PIN $NEGATIVE"
     elif [ "$CNT" -gt 0 ] 2>/dev/null; then
       emit "gbrain-symbols" ok "positive + negative controls pass on '$PIN' ($CANARY: $CNT; absent: 0)"
     else
