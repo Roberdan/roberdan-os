@@ -19,7 +19,7 @@ ok()      { printf "  ok: %s\n" "$1"; }
 . "$ROOT/test/lib-suites.sh"
 
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue test-kb-title-quote \
-          test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery test-verify-done test-audit test-audit-hooks \
+          test-file-size-ratchet test-edge-only test-plist-ac-gate test-kb-precheck test-context-recovery test-verify-done test-audit test-audit-hooks \
           test-kb-root-resolution test-kb-board-resolution test-kb-board-hostile test-kb-start-worktree-cause test-worktree-sweep test-worktree-registry test-junk-clean test-checkup test-vm-sweep test-twin-export-drift test-kb-top test-nested-board-notice \
           test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-bus-mutant-probes test-telemetry test-telemetry-skills test-telemetry-history test-skill-routing test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
@@ -109,7 +109,7 @@ if _suite test-file-size-ratchet; then ok "nessun file nuovo nasce oltre 300 rig
 # Limite dichiarato: oggi qui non c'e' codice Playwright, quindi questo gate impedisce che il
 # primo che entrera' nasca su Chrome. PASS = "nessuno ha violato", non "abbiamo visto Edge".
 section "browser — Playwright parla con Edge, e se manca si ferma"
-if _suite test-edge-only; then ok "nessun codice avvia Chrome/Chromium; il canone impone il blocco e prevede l'eccezione"; else err "test-edge-only:"; _suite_out test-edge-only | sed 's/^/    /'; fi
+if _suite test-edge-only; then ok "nessun codice avvia Chrome/Chromium; il canone impone il blocco e prevede l'eccezione"; else err "test-edge-only:"; _suite_out test-edge-only | sed 's/^/    /'; fi if _suite test-plist-ac-gate; then ok "ogni LaunchAgent spedito parte solo a corrente (gate pmset fail-closed)"; else err "test-plist-ac-gate:"; _suite_out test-plist-ac-gate | sed 's/^/    /'; fi
 
 # --- 6c) federated kanban + dormant dispatcher --------------------------------
 section "federated kanban (cwd-scoping, kb all/handoff, init, locks, dormant dispatcher)"
