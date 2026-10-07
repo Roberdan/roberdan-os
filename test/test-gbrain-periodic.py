@@ -253,7 +253,17 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(config["StartInterval"], 3 * 60 * 60)
         self.assertNotIn("StartCalendarInterval", config)
         self.assertFalse(config["RunAtLoad"])
-        launcher = Path(config["ProgramArguments"][1]).read_text()
+        # Background jobs run only on AC power (2026-10-07). The gate sits in
+        # front of the real command, as the on-ac wrapper or as the inline
+        # /bin/sh -c pmset form; either is required, then skipped here.
+        args = list(config["ProgramArguments"])
+        gated = False
+        if args and args[0].endswith("/on-ac"):
+            args, gated = args[1:], True
+        elif args[:2] == ["/bin/sh", "-c"] and "AC Power" in args[2]:
+            args, gated = args[3:], True
+        self.assertTrue(gated, "the refresh must start only on AC power")
+        launcher = Path(args[1]).read_text()
         for flag in ("--require-ac", "--blocked-source vault",
                      "--blocked-source gstack-code-roberdan-os-67e84638"):
             self.assertIn(flag, launcher)
