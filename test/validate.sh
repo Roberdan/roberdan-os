@@ -21,7 +21,7 @@ ok()      { printf "  ok: %s\n" "$1"; }
 for _s in test-canon-guardrails test-factory-kb test-kb-views test-kb-board test-kb-done-gate test-kb-diet test-kb-queue test-kb-title-quote \
           test-file-size-ratchet test-edge-only test-kb-precheck test-context-recovery test-verify-done test-audit test-audit-hooks \
           test-kb-root-resolution test-kb-board-resolution test-kb-board-hostile test-kb-start-worktree-cause test-worktree-sweep test-worktree-registry test-junk-clean test-checkup test-vm-sweep test-twin-export-drift test-kb-top test-nested-board-notice \
-          test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-metaloop \
+          test-federated-kb test-leak-check test-directory-dump-check test-private-marker test-new-area-check test-fork-merge test-autofmt test-receipts test-install-hooks test-pending test-pending-digest-avvisa test-metaloop \
           test-evolve-declined test-evolve-watch test-review-budget test-bus test-bus-mcp test-bus-doorbell test-bus-presence test-bus-owed test-bus-mutant-probes test-telemetry test-telemetry-skills test-telemetry-history test-skill-routing test-g1-evidence test-bash-guard test-factory-guard test-factory-shim test-factory-engine test-main-guard test-context-inject-staleness test-validate-wiring test-evolve-sources test-kb-autothor \
           test-kb-autothor-board test-kb-autothor-dir test-kb-repo-path-agree test-session-waste test-goal-gate test-gh-shim test-bus-lock test-thor-verdict test-install-git-hooks test-install-hooks-dedup test-bus-doorbell-matcher test-model-economy \
           test-model-registry test-tool-coverage test-toolchain-doctor test-frontmatter test-precommit-hook test-canon-structure test-provider-projections test-twin-shadow test-twin-learning test-portable-skills-drift test-twin-approve \
@@ -212,15 +212,11 @@ if _suite test-receipts; then ok "receipt emitter green (see bash test/test-rece
 section "install-hooks — settings.json merge contract"
 if _suite test-install-hooks; then ok "install-hooks merge green (see bash test/test-install-hooks.sh)"; else err "test-install-hooks — see bash test/test-install-hooks.sh"; fi
 
-# --- 8e) approval inbox: kb pending aggregates + counts, digest writes without failing ---
+# --- 8e) approval inbox + digest: counts, write contract, Avvisa-only notification ---
 section "approval inbox — kb pending + digest contract"
-if _suite test-pending; then ok "approval inbox green (see bash test/test-pending.sh)"; else err "test-pending — see bash test/test-pending.sh"; fi
+if _suite test-pending && _suite test-pending-digest-avvisa; then ok "approval inbox + Avvisa-only notification green"; else _suite_out test-pending; _suite_out test-pending-digest-avvisa; err "test-pending / test-pending-digest-avvisa"; fi
 
-# --- 8e1) the digest notifies ONLY through Avvisa — never osascript/AppleScript ---
-section "pending-digest notification channel — Avvisa only, never osascript"
-if _suite test-pending-digest-avvisa; then ok "avvisa argv, no osascript fallback (see bash test/test-pending-digest-avvisa.sh)"; else err "test-pending-digest-avvisa — see bash test/test-pending-digest-avvisa.sh"; fi
-
-# --- 8e2) session-waste: flags a waste on synthetic traces AND stays SILENT on clean (the scar)
+# --- 8f) session-waste: flags a waste on synthetic traces AND stays SILENT on clean (the scar)
 section "session-waste — rilievi con impatto+rimedio, e silenzio quando non trova nulla"
 if _suite test-session-waste; then ok "session-waste flags a waste E tace su input pulito/vuoto"; else err "test-session-waste — see bash test/test-session-waste.sh"; fi
 
