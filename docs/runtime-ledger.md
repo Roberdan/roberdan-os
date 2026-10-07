@@ -58,5 +58,10 @@ read logs, environment values, command payloads, or private content.
 - Scheduled-job population and SLO inputs:
   [`job manifest`](evidence/job-slo.tsv); report with
   `python3 bin/job-slo-report.py`.
+- Source-scoped graph controls:
+  `python3 bin/graph-parity-report.py --json` compares a known Python symbol,
+  an impossible negative, the documented Bash-symbol gap, and immediate `rg` freshness.
+  The 2026-10-07 live run found that current gbrain now resolves the formerly missing
+  Bash `run_preflight` symbol; `rg` remains the immediate-freshness fallback.
 - Refresh this ledger from live metadata before using it for a removal decision.
 - A zero-byte receipt is wiring evidence only, not proof that useful work happened.
