@@ -107,4 +107,21 @@ for row in jobs:
             f"missing correctness probe {row['correctness_probe']}"
         )
 
+telemetry = read_tsv(
+    "docs/evidence/telemetry-coverage.tsv",
+    [
+        "area",
+        "source",
+        "unit",
+        "quality",
+        "current_coverage",
+        "honest_limit",
+        "proof",
+    ],
+)
+assert len({row["area"] for row in telemetry}) == len(telemetry), "duplicate telemetry area"
+assert any(row["quality"] == "unproven" for row in telemetry)
+for index, row in enumerate(telemetry, 2):
+    existing_paths(row["proof"], "telemetry-coverage.tsv", index)
+
 print("test-g1-evidence-ledgers: PASS")

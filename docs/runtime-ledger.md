@@ -55,6 +55,8 @@ read logs, environment values, command payloads, or private content.
   [`capability ledger`](evidence/capability-ledger.tsv),
   [`hook parity`](evidence/hook-parity.tsv), and
   [`recovery matrix`](evidence/recovery-matrix.tsv).
+- Telemetry coverage and explicit gaps:
+  [`telemetry matrix`](evidence/telemetry-coverage.tsv).
 - Scheduled-job population and SLO inputs:
   [`job manifest`](evidence/job-slo.tsv); report with
   `python3 bin/job-slo-report.py`.

@@ -1,0 +1,11 @@
+area	source	unit	quality	current_coverage	honest_limit	proof
+provider-cost	Copilot session store; Claude transcripts	host-model-window	measured	Copilot and Claude token/cost windows	Codex and ChatGPT cost attribution unavailable	bin/cost-report.sh;test/test-system-health.sh
+sessions	Copilot session store	session	measured	Session counts dates overlap and repositories	Other hosts are not normalized into this store	test/test-telemetry.sh
+tool-calls	Sanitized append-only audit	host-session-call	measured-partial	Start terminal success/failure where adapters observe them	Observer gaps and uninstrumented hosts remain unknown	test/test-audit-hooks.sh
+agents	Sanitized append-only audit	host-session-agent	measured-partial	Subagent start stop completion failure and public name	No complete cross-host cost/duration attribution yet	test/test-audit-hooks.sh
+skills	Audit plus session file metadata	host-session-skill	measured-partial	Public named invocations and candidate file-based opportunities	Zero is unknown outside declared adapter coverage; most skills lack opportunity criteria	test/test-telemetry-skills.sh;test/test-telemetry-positive-control.py
+bus	Append-only bus artifacts	message-thread-project-role	measured-exact	Messages recent window threads projects roles and hello presence	Message count is not outcome value	test/test-telemetry.sh
+scheduled-jobs	launchd metadata plus receipt stat	job	measured-partial	Explicit 16-job population liveness exit and configured receipt freshness	Correctness probes are listed but not run by the report	test/test-job-slo-report.py
+graph-retrieval	gbrain source-scoped result plus rg control	source-control	measured	Positive negative Bash parity and immediate freshness	One source/control run is not retrieval-quality coverage	test/test-graph-parity-report.py
+behavioral-value	Blind eval fixtures	task-pair	historical-confounded	One recorded prepend-based run	Harness is not activated multi-turn value evidence	eval/test-eval-pipeline.sh;test/test-activated-arms.py
+outcome-quality	No normalized source	outcome	unproven	None	No per-skill or per-agent business-quality attribution	docs/runtime-ledger.md
