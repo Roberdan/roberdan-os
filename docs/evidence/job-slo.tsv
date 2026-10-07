@@ -1,0 +1,17 @@
+label	owner	domain	plist	receipt_glob	max_age_seconds	correctness_probe
+com.roberdan.gbrain-jobs-window	gbrain	user	auto	-	0	bin/gbrain-search-probe.sh
+com.roberdan.gbrain-refresh-code	gbrain	user	auto	-	0	test/test-gbrain-refresh-active.py
+com.roberdan.gbrain-vault-sync	gbrain	user	auto	-	0	bin/gbrain-search-probe.sh
+com.roberdan.rda-factory	factory	user	auto	-	0	test/test-factory-engine.sh
+com.roberdan.rda-learn	learning-pipeline	user	auto	-	0	test/test-metaloop.sh
+com.roberdan.rda-evolve	provider-watcher	user	auto	-	0	test/test-evolve-watch.sh
+com.roberdan.rda-pending-digest	pending-digest	user	auto	$HOME/.roberdan-os/pending-digest.txt	50400	test/test-pending.sh
+com.roberdan.copilot-log-sweep	copilot-hygiene	user	auto	-	0	-
+com.roberdan.buongiorno	daily-briefing	user	auto	-	0	-
+com.roberdan.rustsweep	rust-hygiene	user	auto	-	0	-
+com.roberdan.rusty-mac-backup	machine-backup	user	auto	$HOME/.roberdan-os/state/receipts/RustyMacBackup/session.jsonl	7200	-
+com.roberdan.tmux-autosave	terminal-recovery	user	auto	-	0	-
+com.roberdan.virtualbpm-refresh	virtualbpm	user	auto	-	0	-
+com.roberdan.virtualbpm-runner-watchdog	virtualbpm	user	auto	-	0	-
+actions.runner.roberdan_microsoft-VirtualBPMFy27.roberto-mac-virtualbpm	github-actions	user	auto	-	0	-
+actions.runner.roberdan_microsoft-VirtualBPMFy27.roberto-mac-virtualbpm-2	github-actions	user	auto	-	0	-

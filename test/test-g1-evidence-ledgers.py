@@ -82,4 +82,29 @@ assert any(
     for row in recovery
 )
 
+jobs = read_tsv(
+    "docs/evidence/job-slo.tsv",
+    [
+        "label",
+        "owner",
+        "domain",
+        "plist",
+        "receipt_glob",
+        "max_age_seconds",
+        "correctness_probe",
+    ],
+)
+assert len(jobs) >= 10, "job SLO manifest is not an explicit system population"
+assert len({row["label"] for row in jobs}) == len(jobs), "duplicate job label"
+for row in jobs:
+    assert row["domain"] in {"user", "system"}
+    assert row["plist"] == "auto" or row["plist"].endswith(".plist")
+    assert row["max_age_seconds"].isdigit()
+    if row["receipt_glob"] == "-":
+        assert row["max_age_seconds"] == "0"
+    if row["correctness_probe"] != "-":
+        assert (ROOT / row["correctness_probe"]).exists(), (
+            f"missing correctness probe {row['correctness_probe']}"
+        )
+
 print("test-g1-evidence-ledgers: PASS")

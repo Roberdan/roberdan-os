@@ -55,5 +55,8 @@ read logs, environment values, command payloads, or private content.
   [`capability ledger`](evidence/capability-ledger.tsv),
   [`hook parity`](evidence/hook-parity.tsv), and
   [`recovery matrix`](evidence/recovery-matrix.tsv).
+- Scheduled-job population and SLO inputs:
+  [`job manifest`](evidence/job-slo.tsv); report with
+  `python3 bin/job-slo-report.py`.
 - Refresh this ledger from live metadata before using it for a removal decision.
 - A zero-byte receipt is wiring evidence only, not proof that useful work happened.
