@@ -109,7 +109,7 @@ if _suite test-file-size-ratchet; then ok "nessun file nuovo nasce oltre 300 rig
 # Limite dichiarato: oggi qui non c'e' codice Playwright, quindi questo gate impedisce che il
 # primo che entrera' nasca su Chrome. PASS = "nessuno ha violato", non "abbiamo visto Edge".
 section "browser — Playwright parla con Edge, e se manca si ferma"
-if _suite test-edge-only; then ok "nessun codice avvia Chrome/Chromium; il canone impone il blocco e prevede l'eccezione"; else err "test-edge-only:"; _suite_out test-edge-only | sed 's/^/    /'; fi if _suite test-plist-ac-gate; then ok "ogni LaunchAgent spedito parte solo a corrente (gate pmset fail-closed)"; else err "test-plist-ac-gate:"; _suite_out test-plist-ac-gate | sed 's/^/    /'; fi
+if _suite test-edge-only; then ok "nessun codice avvia Chrome/Chromium; il canone impone il blocco e prevede l'eccezione"; else err "test-edge-only:"; _suite_out test-edge-only | sed 's/^/    /'; fi; if _suite test-plist-ac-gate; then ok "ogni LaunchAgent spedito parte solo a corrente (gate pmset fail-closed)"; else err "test-plist-ac-gate:"; _suite_out test-plist-ac-gate | sed 's/^/    /'; fi
 
 # --- 6c) federated kanban + dormant dispatcher --------------------------------
 section "federated kanban (cwd-scoping, kb all/handoff, init, locks, dormant dispatcher)"
