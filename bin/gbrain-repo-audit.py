@@ -10,7 +10,7 @@ import sys
 from urllib.parse import urlparse
 
 PRUNE = {".git", "node_modules", ".venv", "venv", ".next", ".turbo", "target",
-         ".build", "Pods", ".gradle", "DerivedData", "graphify-out", ".codegraph",
+         ".build", "Pods", ".gradle", "DerivedData",
          "worktrees", "copilot-worktrees"}
 
 

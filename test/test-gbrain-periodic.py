@@ -253,7 +253,12 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(config["StartInterval"], 3 * 60 * 60)
         self.assertNotIn("StartCalendarInterval", config)
         self.assertFalse(config["RunAtLoad"])
-        launcher = Path(config["ProgramArguments"][1]).read_text()
+        launcher_path = next(
+            Path(arg)
+            for arg in config["ProgramArguments"]
+            if Path(arg).name == "gbrain-refresh-code"
+        )
+        launcher = launcher_path.read_text()
         for flag in ("--require-ac", "--blocked-source vault",
                      "--blocked-source gstack-code-roberdan-os-67e84638"):
             self.assertIn(flag, launcher)
