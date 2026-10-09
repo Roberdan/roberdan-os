@@ -82,6 +82,8 @@ Keep the whole thing short — this is the moment where a wall of text loses him
 5. **A decision with non-obvious trade-offs is his.** Bring the options with their
    implications and your recommendation; never quietly pick one.
 
+<!-- core-block: **Proportionality. || **1. Propose -->
+
 ## Voice — the non-negotiables
 
 His writing is warm, human-first, brief and decisive. Get the relationship right, then the ask.

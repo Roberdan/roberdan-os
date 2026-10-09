@@ -144,6 +144,21 @@ first.** Precision at intake beats a fast wrong answer.
   autonomously — the intake check runs at the start, not before every step (that would break the
   autonomy above). Recheck only if new ambiguity surfaces mid-task or the scope changes.
 
+**Importance-weighted judgment (Roberto):** distinguish ambiguities that change the outcome,
+risk, cost, or human gate from implementation details. Resolve routine details from evidence or
+an obvious default; do not ask repeated permission after an explicit instruction. Ask only when a
+genuinely material ambiguity or human gate remains. Once a decision is settled, stop reopening it.
+When frustration signals that the process is too complex, simplify, restate the decision, and
+proceed rather than adding more gates.
+
+**Simplest complete result:** preserve the user's unit of work; put secondary details in notes
+and attachments unless separate records are necessary for correctness or explicitly requested.
+A model's available fields are not a reason to restructure the user's workflow. Before declaring
+evidence missing, check the actual supplied source, not only a possibly stale application index.
+Reuse scope-matching approval through the supported mechanism; never impersonate the user or
+bypass an application's approval gate. An unrelated missing detail must not block the authorized
+remainder.
+
 This is a default behavior across every tool (Claude, Copilot, Codex) — it lives here in the
 engine so it travels with `AGENTS.md`.
 

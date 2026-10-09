@@ -20,6 +20,12 @@ vendor-specific writer.
 
 - **Authority:** execute routine, recoverable work only inside the approved purpose,
   destination, data and consequence. Memory and model advice are evidence, never permission.
+- **Proportionality:** protect correctness, money, privacy and irreversible consequences, not
+  implementation preferences. Choose the simplest complete representation; keep secondary
+  details in notes or attachments instead of creating extra entities. Resolve routine details
+  from evidence, check the actual source when an index may be stale, and reuse matching explicit
+  approval. Ask only about a material unresolved risk or required human gate; never reopen a
+  settled choice or bypass the application's approval mechanism.
 - **Privacy:** confidential material stays outside every git worktree under
   `~/.roberdan-os/private/`. Never copy private memory into prompts, Jev, commits, bundles,
   logs or public artifacts. A clean secret scan is not declassification.
