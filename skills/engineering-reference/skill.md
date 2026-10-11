@@ -41,7 +41,21 @@ They apply when you translate a plan into cards or write docs — not before.
 
 **Schema change**: migration in the same PR. Field addition → update ALL fixtures.
 
-**Coverage**: 80% business logic / 100% critical paths. Parameterized SQL.
+**Coverage**: no global % target; 100% branch on the repo's `.test-critical` paths. Parameterized SQL.
+
+**Where and when tests run** (rule: `rules/best-practices.md § Tests`; full template with per-stack
+commands, nightly, red-night procedure and anti-regrowth checks: `docs/testing-template.md`):
+
+| Layer | Runs | Budget |
+|---|---|---|
+| pre-commit | formatter + linter on staged files, secret/privacy scan — no tests | ≤ 10 s |
+| pre-push | typecheck + RELATED tests; full suite only if the escape list is touched (lockfile, test config, migrations/schema, shared harness/fixtures) | ≤ 90 s |
+| PR CI | typecheck, lint, build, related tests; full parallel suite only if a `.test-critical` glob matches the diff (or the repo has none) | ≤ 10 min |
+| nightly + `test:full` on request | full suite, parallel/sharded, `.test-budget` ratchet, weekly mutation run on critical paths | ≤ 15 min |
+
+**Shape**: a fix extends the existing test of that behaviour (table row, `it.each`, parametrised
+case); case tables and fixture data are exempt from the 300-line cap. A new test file needs a new
+behaviour or module, and its name says the behaviour, never the round.
 
 ## API Conventions
 
@@ -52,15 +66,18 @@ Pagination: `?page=1&limit=20` (max 100). Rate limit: 429 + headers. Auth: OAuth
 
 ## Local CI Before Push
 
-Before `git push` or PR creation, run the full local pipeline:
+Before `git push` or PR creation, run the local pipeline:
 
 1. Format: `cargo fmt --check` / `prettier --check` / `ruff format --check`
 2. Lint: `cargo clippy -- -D warnings` / `eslint` / `ruff check`
 3. Type-check: `cargo check` / `npx tsc --noEmit`
-4. Tests: `cargo test` / `npm test` / `pytest`
+4. Tests: RELATED tests only (`vitest related <files> --run` / `cargo test -p <crate>` / `pytest
+   <mapped modules>`; see `rules/best-practices.md` § Tests). The full suite runs nightly, on
+   request, or before merge when `.test-critical` is touched or the repo declares none.
 5. Build: `cargo build` / `npm run build`
 
-If any step fails, fix and re-run ALL checks. Do NOT push with known failures.
+If a step fails, fix it and re-run the failing step and the related tests. Do NOT push with known
+failures.
 
 ## Parallel streams (mechanics — the rule itself is in `rules/best-practices.md`)
 
@@ -83,7 +100,7 @@ You are autonomous on merges — but **only after careful evaluation**. Before m
 2. PR must be `mergeable=MERGEABLE` and `mergeStateStatus=CLEAN`.
 3. Diff must match the PR description (no surprises).
 4. **Every review comment must be properly resolved** — see § Review Comments below. No unresolved comments, no `requested-changes` reviews, no "resolved a cazzo".
-5. Local pipeline (fmt / lint / type-check / tests / build) must have run clean before push.
+5. Local pipeline (fmt / lint / type-check / related tests / build) must have run clean before push; the full suite is green on the PR (or on the last nightly) when a `.test-critical` path is touched or the repo declares none.
 6. Merge type is **merge commit only** — never squash, never rebase (preserves history; parallel agents depend on it).
 7. If the PR touches `main` branch protection, security policy, license, or release infrastructure → STOP and ask first.
 8. Force-pushes to `main` are ALWAYS forbidden without explicit user confirmation.
@@ -99,9 +116,9 @@ For each comment:
 1. **Read it fully.** Don't skim. Re-read if the intent is unclear.
 2. **Understand the underlying concern.** A nitpick on naming may be a deeper concern about the abstraction; a "did you consider X?" is asking for evidence, not approval.
 3. **Decide the right action**: fix the code, push back with reasoning, mark wontfix with explanation, or escalate to the user. Never silent-resolve.
-4. **Implement the fix correctly** — same rigor as fresh work: tests, types, conventional commit, no half-measures. Don't game the comment with a token edit.
+4. **Implement the fix correctly** — same rigor as fresh work: a case in the existing test of that behaviour (a new test file only for a new behaviour — never one per comment or round), types, conventional commit, no half-measures. Don't game the comment with a token edit.
 5. **Reply on the comment thread** explaining what you did and why, then mark it resolved. The reply is the audit trail; "fixed" alone is not enough.
-6. **Re-run the local pipeline** before pushing the fix — review fixes break things as often as fresh code.
+6. **Re-run the local pipeline** (related tests) before pushing the fix — review fixes break things as often as fresh code. Batch the fixes of one review round into one push.
 7. **If the reviewer is wrong**, say so respectfully with evidence (link to docs / code / tests). Conviction over agreeableness; the reviewer would rather be corrected than silently overruled.
 
 Never:
@@ -131,7 +148,9 @@ Install per-repo when relevant:
 | Hook | Blocks |
 |---|---|
 | `pre-commit` MainGuard | commits on `main` in main checkout |
-| `pre-commit` FileSizeGuard | new hand-written source/test files >300 lines; unjustified growth in oversized legacy files (technical artifacts exempt) |
+| `pre-commit` FileSizeGuard | new hand-written source/test files >300 lines; unjustified growth in oversized legacy files (technical artifacts exempt; in test files case tables and fixture data exempt) |
+| `pre-commit` TestNameLint | new test files named after a round, not a behaviour (`docs/testing-template.md` § Anti-regrowth) |
+| `pre-push` RelatedTests | typecheck + related tests only, ≤ 90 s; prints its wall time |
 | `pre-commit` SecretScan | commits containing API keys, tokens, passwords |
 | `commit-msg` CommitLint | non-conventional commit messages |
 

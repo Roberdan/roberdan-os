@@ -51,5 +51,37 @@ if grep -qF 'commits with files > 300 lines' "$REFERENCE"; then
   FAIL=1
 fi
 
+# Tests: budget, place, shape (ADR-0006, Roberto 2026-10-11). The new rules must be present,
+# and the six old phrases that made every fix a new test file and every push the whole suite
+# must not come back anywhere they used to live.
+require '## Tests: budget, place, shape' 'missing the Tests budget/place/shape section'
+require 'never the whole suite' 'missing the related-tests-only pre-push rule'
+require 'Batch related' 'missing the batching rule'
+require 'the whole repo is' 'missing the safe default for repos without .test-critical'
+require 'Extend before you add' 'missing the extend-before-add rule'
+require 'Prune monthly' 'missing the monthly pruning rule'
+require 'Never prune `.test-critical`' 'missing the critical-path pruning exemption'
+require '`.test-budget`' 'missing the ratchet rule'
+require 'case tables and' 'missing the case-table exemption from the 300-line cap'
+grep -qF 'Tests: extend, don' AGENTS.md || { printf 'FAIL: AGENTS.md lacks the tests pointer\n' >&2; FAIL=1; }
+[ -f docs/testing-template.md ] || { printf 'FAIL: docs/testing-template.md missing\n' >&2; FAIL=1; }
+
+forbid() {
+  local file="$1" pattern="$2" message="$3"
+  if grep -qF -- "$pattern" "$file"; then
+    printf 'FAIL: %s (%s)\n' "$message" "$file" >&2
+    FAIL=1
+  fi
+}
+forbid "$RULES" '| Write the test |' '"too simple to test" still answered with a new test'
+forbid agents/thor.md '**TDD** — tests present' 'thor gate 8 still asks only for tests present'
+forbid skills/verify-done/skill.md 'Coverage ≥ 80%' 'verify-done still has a global coverage target'
+forbid behavior/roberto-mode.md 'Coverage ≥ 80%' 'roberto-mode still has a global coverage target'
+forbid "$REFERENCE" '80% business logic' 'engineering-reference still has a global coverage target'
+forbid "$REFERENCE" 'run the full local pipeline' 'engineering-reference still runs everything before push'
+forbid "$REFERENCE" 're-run ALL checks' 'engineering-reference still re-runs everything'
+forbid skills/ship/skill.md 're-run all' 'ship still re-runs everything'
+forbid skills/review/skill.md '(tests, types, conventional commit)' 'review still fixes every comment with tests'
+
 bash "$ROOT/test/test-pre-completion-gate.sh" || FAIL=1
 exit "$FAIL"

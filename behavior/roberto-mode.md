@@ -279,7 +279,8 @@ Rule of thumb: if a sentence isn't the answer, an ask, or a change of plan, cut 
    - 0 compilation errors
    - 0 warnings (treated as errors)
    - 0 open technical debt
-   - Coverage ≥ 80% on business logic
+   - Related tests green (output shown); full suite only per
+     rules/best-practices.md § Tests — no global coverage % target
    - Docs updated if you changed APIs/interfaces
 
 6. SYNC the vault and in-repo docs

@@ -43,8 +43,9 @@ cheap predicate catches the majority of them.
 - [ ] 0 build errors
 - [ ] 0 warnings (treated as errors)
 - [ ] 0 technical debt left open
-- [ ] Coverage ≥ 80% on business logic, 100% on critical paths
-- [ ] Tests run — **output shown**, not described
+- [ ] Coverage: no global % target; 100% branch on `.test-critical` paths (`rules/best-practices.md § Tests`)
+- [ ] Related tests run — **output shown**, not described. Full suite only when a `.test-critical` path is touched or the repo declares none (then all is critical); otherwise cite the last green nightly SHA
+- [ ] The behaviour changed is pinned by a case in its existing test; a new test file only for a new behaviour
 - [ ] **Feature wired end-to-end** — reached from a live path (entry point → caller → feature), not just present on disk. Trace the path; a definition with no live caller is not done. See `rules/best-practices.md § Wired End-to-End`.
 - [ ] Docs updated if you changed an API/interface
 - [ ] Commit for every completed phase

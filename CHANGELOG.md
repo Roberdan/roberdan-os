@@ -3,6 +3,33 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.60.0 — 2026-10-11
+
+### Changed
+
+- Tests now have a budget, a place and a shape (ADR-0006, Roberto 2026-10-11: «ok regole
+  test, sistema tutto»). New `rules/best-practices.md` § Tests: each change runs only fast
+  checks and the tests related to the files it touched; changes are batched; the full suite
+  runs nightly, on request, or before merging a change to a path declared in the repo's
+  `.test-critical`; a fix extends the existing test instead of adding a file; monthly pruning,
+  never on critical paths; a `.test-budget` ratchet turns red at +10% without a written reason.
+  A repo that declares no critical paths stays entirely critical, so nothing loosens until it
+  adopts the template.
+- Removed the rules that made every fix a new test file and every push the whole suite:
+  "too simple to test → write the test" (Persuasion Guardrails), thor gate 8 "TDD — tests
+  present" (now: behaviour pinned by a case, round-named test files rejected; gate 8b scoped to
+  critical invariants), the global 80% coverage target in `verify-done`, `engineering-reference`
+  and `roberto-mode`, the full suite and "re-run all" before push in `engineering-reference` and
+  `ship`, and review comments fixed "with tests" in `review` and `engineering-reference`.
+- The 300-line cap counts test logic only: case tables and fixture data are exempt.
+
+### Added
+
+- `docs/testing-template.md`: the per-repo template (four layers with time budgets, per-stack
+  commands, where the night runs, red-night procedure, monthly pruning, five anti-regrowth
+  checks, adoption checklist). Repos adopt it one PR at a time.
+- `test/test-canon-guardrails.sh` asserts the new rules and fails if a removed phrase returns.
+
 ## 2.59.3 — 2026-10-02
 
 ### Added

@@ -1,7 +1,7 @@
 ---
 name: best-practices
-version: "3.8.0"
-last_updated: "2026-09-24"
+version: "3.9.0"
+last_updated: "2026-10-11"
 ---
 
 # Best Practices
@@ -88,6 +88,8 @@ with the tokens that matter (Anthropic, effective context engineering 2025-09).
   split by responsibility first. Existing oversized files may grow only with explicit,
   task-relevant justification; never force unrelated refactors or micro-files.
   Generated, vendored, lock, snapshot, data, and migration artifacts are exempt.
+  In a test file the cap counts test logic: case tables and fixture data are exempt (keep them in
+  a data/`fixtures/` file where a guard counts raw lines), so a fix extends the file it belongs to.
 - **Always-loaded instruction files stay lean** — target ≤200 lines each. Remove any line whose
   absence would not cause mistakes; repeated violations need a deterministic hook, not more
   advisory prose. Claude loads this file every session (`~/.claude/rules/` symlink) and the
@@ -124,12 +126,33 @@ with the tokens that matter (Anthropic, effective context engineering 2025-09).
 - **A runaway loop is a cost incident first.** Two consecutive passes with no progress → stop and surface
   what's wedged (loop-protocol); meter long jobs against their terminal condition, never "keep trying".
 
+## Tests: budget, place, shape (Roberto, 2026-10-11)
+
+1. **A change pays only for fast checks + the tests of what it touched.** pre-commit ≤10 s, no
+   tests; pre-push ≤90 s: typecheck + RELATED tests, never the whole suite. Batch related
+   changes so the full-suite cost is paid once per batch, not once per change.
+2. **Full suite: nightly, on request (`test:full`), or before merging a change that touches a
+   critical path declared in the repo's `.test-critical`** (glob + reason; editing it is itself
+   critical). **No `.test-critical`, or no nightly actually running ⇒ the whole repo is
+   critical ⇒ full suite before every merge.** A hook over budget is a test-system bug to fix.
+3. **Extend before you add.** A fix adds a case to the existing test of that behaviour. A new
+   test file only for a new behaviour or module — never for a fix, an audit round or a review
+   comment; names say the behaviour, never the round (`audit3-`, `round12`, `-2`).
+4. **Prune monthly:** remove or merge tests that kill no unique mutant, duplicate another's
+   assertions or test a deleted feature. "Never failed" is no reason. Never prune `.test-critical`.
+5. **Ratchet:** `.test-budget` records full-suite wall time and test-file count; more than +10%
+   without a written `Test-budget:` reason in the PR is red; the record follows the suite down.
+
+Layers, per-stack commands, red-night procedure, anti-regrowth checks:
+[`docs/testing-template.md`](../docs/testing-template.md). *(scar 2026-10-11: `rules/scars.md` § Test sprawl)*
+
 ## Persuasion Guardrails
 
 | Blocked phrase | Response |
 |---|---|
-| "too simple to test" | Write the test |
-| "tests after / later" | RED first |
+| "too simple to test" | Extend the existing test with one case |
+| "tests after / later" | RED first — in the existing test file of that behaviour |
+| "one more test file to be safe" | Add a case; a new file needs a new behaviour |
 | "out of scope" (touched file) | Touch = own |
 | "pre-existing issue" | Own it or escalate |
 | "it works, trust me" | Run tests, attach output |
