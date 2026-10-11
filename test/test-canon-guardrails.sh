@@ -83,5 +83,12 @@ forbid "$REFERENCE" 're-run ALL checks' 'engineering-reference still re-runs eve
 forbid skills/ship/skill.md 're-run all' 'ship still re-runs everything'
 forbid skills/review/skill.md '(tests, types, conventional commit)' 'review still fixes every comment with tests'
 
+# Proportionality (ADR-0007, Roberto 2026-10-11): the rule must stay in the kernel (it travels
+# into every wrapper), in roberto-mode and in the twin skill that the portable skills derive from.
+for f in AGENTS.md behavior/roberto-mode.md .github/skills/roberdan-twin/SKILL.md; do
+  grep -qF 'Proportionality' "$f" || { printf 'FAIL: %s lacks the proportionality rule\n' "$f" >&2; FAIL=1; }
+done
+grep -qF 'never reopen a' AGENTS.md || { printf 'FAIL: kernel proportionality lost "never reopen a settled choice"\n' >&2; FAIL=1; }
+
 bash "$ROOT/test/test-pre-completion-gate.sh" || FAIL=1
 exit "$FAIL"
