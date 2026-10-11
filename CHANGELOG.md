@@ -30,6 +30,11 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   checks, adoption checklist). Repos adopt it one PR at a time.
 - `test/test-canon-guardrails.sh` asserts the new rules and fails if a removed phrase returns.
 
+### Fixed
+
+- CI installs `ripgrep`: `test/test-graph-parity-report.py` runs the real `rg`, which the
+  Ubuntu runner lacks, so `validate` had been red on `main` since 2026-10-07.
+
 ## 2.59.3 — 2026-10-02
 
 ### Added
