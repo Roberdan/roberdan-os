@@ -3,6 +3,19 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.61.0 — 2026-10-11
+
+### Added
+
+- Proportionality rule (ADR-0007, Roberto 2026-10-11: «ok proporzionalità»). Protect
+  correctness, money, privacy and irreversible consequences, not implementation preferences;
+  simplest complete result; resolve routine details from evidence; reuse matching approval;
+  never reopen a settled choice; ask only for a material risk or a human gate. Lives in the
+  safety kernel (so the Copilot wrapper carries it), `behavior/roberto-mode.md` § Intake (one
+  merged paragraph, from the two of Copilot's commit e456180) and the twin skill, with the
+  claude.ai and Cowork skills regenerated from it. Proof (human gates, verify-done/thor,
+  ADR-0006) is explicitly not relaxed. `test/test-canon-guardrails.sh` checks it is present.
+
 ## 2.60.0 — 2026-10-11
 
 ### Changed
