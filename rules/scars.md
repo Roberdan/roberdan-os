@@ -1,7 +1,7 @@
 ---
 name: scars
-version: "1.0.0"
-last_updated: "2026-08-29"
+version: "1.1.0"
+last_updated: "2026-10-11"
 ---
 
 # Scars — the failures the rules are made of
@@ -83,6 +83,22 @@ pointed at (the `tool-coverage` gate in `test/validate.sh` exists to prove skill
 canon, not just exist); code that "looks wired but never ran" (an entire eval fixture class is
 named after this); a new env var or flag added to a script but never branched on, an agent file
 never referenced from `AGENTS.md`, a skill never symlinked into the tool's skills dir.
+
+## Test sprawl
+
+### Test sprawl — six rules that add tests, none that limit them (2026-10-11)
+
+Census of 2026-10-11 (`git ls-files` + grep across the active repos): casa-caccini, eleven days
+old, had 471 test files, about 45 new ones a day, 128 named after an audit round
+(`audit2-*`, `audit3-*`), and a pre-push hook that ran the whole serial suite in ~19 minutes.
+170 `fix:` commits in those eleven days had each added test files; the `audit3-*` commits cite
+one review message each. VirtualBPMFy27 grew `round3` … `round12` files the same way.
+Nobody was careless: the canon said "too simple to test → write the test", thor's gate 8 wanted
+tests visible in the diff, verify-done asked for 80% coverage, every review comment was to be
+fixed "with tests", the 300-line cap pushed each fix into a new file, and engineering-reference
+and ship ran the whole suite before every push. Six rules added tests or ran them all; none said
+where, when, how many or for how long. Agents obey literally. Roberto, 2026-10-11: «ok regole
+test, sistema tutto» — the rules in `rules/best-practices.md` § Tests and ADR-0006.
 
 ## How to use these
 

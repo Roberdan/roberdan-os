@@ -101,6 +101,9 @@ The two complementary hemispheres of the behavioral canon:
 
 - [`rules/constitution.md`](rules/constitution.md) — slim ethical root (8 articles: Identity Lock, Safety, Verification, Accessibility…).
 - [`rules/best-practices.md`](rules/best-practices.md) — canonical quality rules (code style, testing, merge discipline, security).
+- **Tests: extend, don't add; related tests per change, changes batched, full suite nightly or
+  on declared critical paths (none declared ⇒ all critical)** —
+  [`rules/best-practices.md` § Tests](rules/best-practices.md#tests-budget-place-shape-roberto-2026-10-11).
 
 ## Agents
 

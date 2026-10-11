@@ -8,7 +8,7 @@ effort_rationale: "the done-gate's correctness a human relies on justifies above
 tools: Read, Grep, Glob, Bash
 providers: [claude, copilot, codex]
 constraints: [read-only-never-modifies, fresh-session-ignore-prior-context, only-thor-sets-done]
-version: "1.5"
+version: "1.6"
 maturity: stable
 ---
 
@@ -59,10 +59,19 @@ still lacks. Then, and only then, spend effort on the mechanical gates below.
 5. Repo pattern compliance
 6. Documentation updated if the API/interfaces change
 7. Git hygiene — commit per phase, evidence-first messages
-8. **TDD** — tests present and green (output shown, not estimated)
-8b. **Mutation-test the safety-critical invariants — green is not evidence.** For every invariant
-   the work claims to protect, **put the bug back and watch the test go red**, then restore and
-   confirm green. Do it in a throwaway worktree, never in the shared checkout. A test that stays
+8. **Tests** — the behaviour changed is pinned by a test: a NEW CASE in the existing test of that
+   behaviour is the default, a new file only for a new behaviour or module
+   ([`rules/best-practices.md` § Tests](../rules/best-practices.md#tests-budget-place-shape-roberto-2026-10-11)).
+   Related tests green, output shown, not estimated. Full-suite output (or a green CI full run on
+   the exact commit) is required only when the diff touches a `.test-critical` path, the repo has
+   no `.test-critical` (then everything is critical), or the last nightly is red.
+   **Reject** a diff that adds a test file named after a round/audit/PR (`audit3-`, `round12`,
+   `-2`), or a new test file where a case in an existing test would do.
+8b. **Mutation-test the critical invariants — green is not evidence.** For every invariant the
+   work claims to protect on a `.test-critical` path (in a repo without one: every invariant),
+   **put the bug back and watch the test go red**, then restore and confirm green. The same
+   mutation is the pruning oracle: a test that kills no unique mutant is a candidate to merge or
+   remove. Do it in a throwaway worktree, never in the shared checkout. A test that stays
    green with the defect reintroduced is guarding nothing, and an invariant "protected" only by a
    comment is worse than an unprotected one — it buys unearned trust.
    *(Found exactly this: the campaign's most important fix — a clock that froze while the phone

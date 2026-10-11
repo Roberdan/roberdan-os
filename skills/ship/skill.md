@@ -13,10 +13,14 @@ Platform-independent ship workflow. No bypasses, no shortcuts.
 1. **Format** — `cargo fmt --check` / `prettier --check` / `ruff format --check`
 2. **Lint** — `cargo clippy -- -D warnings` / `eslint` / `ruff check`
 3. **Type-check** — `cargo check` / `npx tsc --noEmit`
-4. **Test** — `cargo test` / `npm test` / `pytest` (output shown)
+4. **Test** — RELATED tests only (`vitest related` / `cargo test -p <crate>` / `pytest <mapped
+   modules>`), output shown. The full suite runs nightly or on request, and before merge only
+   when a `.test-critical` path is touched or the repo declares none
+   (`rules/best-practices.md § Tests`).
 5. **Build** — `cargo build` / `npm run build`
 
-If a step fails: fix and **re-run all** checks. Never push with known failures.
+If a step fails: fix and re-run **the failing step and the related tests**. Never push with
+known failures.
 
 ## Sequence
 1. Dedicated branch (never work directly on `main`).
