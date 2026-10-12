@@ -1,8 +1,9 @@
 {
  "schema": 1,
  "component": "rex",
+ "role": "public-calibration",
  "synthetic": true,
- "note": "Synthetic public fixtures. Checks are predeclared and objective; reference fixes exist only to prove each defect check can pass. Fixtures are not evidence of any result.",
+ "note": "PUBLIC CALIBRATION ONLY. Checks and reference fixes are public in this repo and its git history, so any agent that can read the repo can read the answers. These cases exercise the pilot pipeline and readiness; they never support a blinded with/without effect claim. Effect claims need a private operator-supplied holdout oracle (bin/impact_review.py pilot prepare --cases <private file>).",
  "cases": [
   {
    "id": "d01-last-n",

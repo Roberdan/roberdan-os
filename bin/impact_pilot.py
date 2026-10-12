@@ -1,10 +1,11 @@
-"""Monthly Rex pilot: fixed synthetic cases, blind arms, rigorous result ingestion.
+"""Monthly Rex pilot: fixed cases, blind arms, sealed oracle, rigorous result ingestion.
 
-This module never calls a model. `prepare` fixes cases, seed, repetitions, model and
-limits before any result exists; `claim` is the one-shot consume guard that hands the
-operator the exact command for one slot; `ingest` validates operator receipts against
-the manifest, re-runs the predeclared objective check itself and reads Rex activation
-from the slot's own native event log; `status` aggregates without inventing scores.
+This module never calls a model. `prepare` fixes oracle, seed, repetitions, model and
+limits before any result exists and probes the read-scope sandbox; `claim` is the one-shot
+consume guard that hands the operator the exact sandboxed command for one slot; `ingest`
+validates receipts, re-runs the sealed check on the submitted AND on the final files, and
+reads Rex activation from the slot's own native event log; `status` keeps objective
+outcomes, the agent's self-declared verdict and the claim scope apart.
 """
 from datetime import datetime, timezone
 import json
@@ -13,8 +14,9 @@ from pathlib import Path
 import random
 import re
 import subprocess
-import tempfile
 
+import impact_oracle
+from impact_oracle import run_check
 from impact_store import ImpactError, digest, impact_home, load_evidence, parse_time, write_private, secure_dir
 from telemetry_native import read_records
 
@@ -33,33 +35,13 @@ before finishing, verify your claim with an executed check and state the evidenc
 (verify-done discipline, the @thor gate).
 {review}"""
 RECEIPT_KEYS = {"schema", "pilot_id", "slot", "model", "timeout_s", "prompt_sha256", "started_at",
-                "ended_at", "timing_source", "exit_code", "timed_out"}
+                "ended_at", "timing_source", "exit_code", "timed_out", "sandbox_profile_sha256"}
+SCOPES = {"public-calibration": "solo-calibrazione", "compromised": "compromesso",
+          "private-holdout": "holdout-privato"}
 
 
 def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def load_cases(root=ROOT):
-    data = json.loads((root / "eval/rex-pilot/cases.json").read_text(encoding="utf-8"))
-    cases = data["cases"]
-    if len(cases) != 10 or len({c["id"] for c in cases}) != 10:
-        raise ImpactError("casi del pilota: servono 10 casi con id distinti")
-    if not {c["kind"] for c in cases} == {"defect", "clean"}:
-        raise ImpactError("casi del pilota: servono casi con difetto e casi senza difetto")
-    return cases
-
-
-def run_check(code, workspace):
-    with tempfile.TemporaryDirectory() as tmp:
-        sealed = Path(tmp) / "check.py"
-        sealed.write_text("import os, sys\nsys.path.insert(0, os.getcwd())\n" + code, encoding="utf-8")
-        try:
-            result = subprocess.run(["python3", "-B", "-E", "-s", str(sealed)], cwd=workspace,
-                                    capture_output=True, timeout=30, check=False)
-        except subprocess.TimeoutExpired:
-            return False, None, None
-        return result.returncode == 0, result.returncode, digest(result.stdout + result.stderr)
 
 
 def pilot_dir(pilot_id):
@@ -68,7 +50,7 @@ def pilot_dir(pilot_id):
     return impact_home() / "pilots" / pilot_id
 
 
-def prepare(month, model, repetitions=1, seed=None, timeout_s=900, root=ROOT):
+def prepare(month, model, repetitions=1, seed=None, timeout_s=900, oracle=None, root=ROOT):
     if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month or ""):
         raise ImpactError("pilota: mese atteso AAAA-MM")
     if not 1 <= repetitions <= 5 or not 60 <= timeout_s <= 7200:
@@ -82,13 +64,16 @@ def prepare(month, model, repetitions=1, seed=None, timeout_s=900, root=ROOT):
     if base.exists():
         raise ImpactError("pilota gia' preparato: manifest, seme e selezione non si riscrivono")
     seed = seed or pilot_id
-    cases = load_cases(root)
+    role, cases = impact_oracle.load(oracle)
+    impact_oracle.baseline(cases)  # every check must discriminate the submitted files
     rng = random.Random(seed)
     blind = {c: f"arm-{digest(f'{seed}:{c}')[:10]}" for c in CONDITIONS}
-    secure_dir(base / "sealed" / "checks")
+    secure_dir(base / "sealed" / "profiles")
+    sealed = [{k: c[k] for k in ("id", "kind", "files", "check")} for c in cases]  # no fix copied
+    sealed_text = json.dumps({"role": role, "cases": sealed}, indent=1, sort_keys=True) + "\n"
+    write_private(base / "sealed/oracle.json", sealed_text)
     slots = []
     for case in cases:
-        write_private(base / "sealed/checks" / f"{case['id']}.py", case["check"])
         for condition in CONDITIONS:
             prompt = PROMPT.format(files=", ".join(sorted(case["files"])), intent=case["intent"],
                                    review=REVIEW if condition == "with-rex" else "")
@@ -97,15 +82,21 @@ def prepare(month, model, repetitions=1, seed=None, timeout_s=900, root=ROOT):
                 for name, text in case["files"].items():
                     write_private(base / "arms" / slot / "workspace" / name, text)
                 write_private(base / "arms" / slot / "prompt.md", prompt)
-                slots.append({"slot": slot, "case": case["id"], "kind": case["kind"],
-                              "repetition": rep, "prompt_sha256": digest(prompt)})
+                profile = impact_oracle.profile(base / "arms" / slot)
+                write_private(base / "sealed/profiles" / (slot.replace("/", "__") + ".sb"), profile)
+                slots.append({"slot": slot, "case": case["id"], "kind": case["kind"], "repetition": rep,
+                              "prompt_sha256": digest(prompt), "profile_sha256": digest(profile)})
+    first = slots[0]["slot"]
+    enforced = impact_oracle.probe(base / "sealed/profiles" / (first.replace("/", "__") + ".sb"),
+                                   base / "arms" / first / "prompt.md", base / "sealed/oracle.json")
     rng.shuffle(slots)
     write_private(base / "sealed/mapping.json", json.dumps(
         {v: k for k, v in blind.items()}, indent=1, sort_keys=True) + "\n")
     manifest = {"schema": 1, "pilot_id": pilot_id, "month": month, "seed": seed,
                 "repetitions": repetitions, "model": model, "limits": {"timeout_s": timeout_s},
-                "selection": "tutti i 10 casi registrati, fissati prima di ogni risultato",
-                "case_registry_sha256": digest((root / "eval/rex-pilot/cases.json").read_bytes()),
+                "selection": f"tutti i {len(cases)} casi dell'oracolo, fissati prima di ogni risultato",
+                "oracle": {"role": role, "sha256": digest(sealed_text)},
+                "read_scope": "sandbox-exec verificato" if enforced else "non verificato",
                 "conditions": {"identical": ["casi, prompt base, modello, limiti, gate di sicurezza e @thor"],
                                "varies": "passo di revisione Rex attivato vs agente Rex assente"},
                 "slots": slots, "prepared_at": now_iso(), "state": "preparato-non-eseguito"}
@@ -142,9 +133,11 @@ def claim(pilot_id, slot):
     setup = ("copy RDA_PILOT_HOME_TEMPLATE into home/ and confirm a rex agent file is installed"
              if condition == "with-rex" else
              "copy RDA_PILOT_HOME_TEMPLATE into home/ and remove every agents/rex* file from that copy")
+    profile = base / "sealed/profiles" / (slot.replace("/", "__") + ".sb")
     text = (f"slot: {slot}\n1. cd \"{arm}\"; {setup}\n"
             f"2. cd workspace && HOME=\"{arm}/home\" RDA_PILOT_MODEL={manifest['model']} "
-            f"timeout {manifest['limits']['timeout_s']} $RDA_EVAL_AGENT_CMD < ../prompt.md\n"
+            f"timeout {manifest['limits']['timeout_s']} sandbox-exec -f \"{profile}\" "
+            "$RDA_EVAL_AGENT_CMD < ../prompt.md\n"
             "3. write receipt.json next to prompt.md with keys: " + ", ".join(sorted(RECEIPT_KEYS)) + "\n")
     write_private(base / "sealed/handoff" / (slot.replace("/", "__") + ".txt"), text)
     return text
@@ -169,7 +162,8 @@ def _receipt(arm, manifest, item):
     if not isinstance(receipt, dict) or set(receipt) != RECEIPT_KEYS or receipt["schema"] != 1:
         raise ImpactError(f"{item['slot']}: ricevuta con campi diversi da quelli attesi")
     expected = {"pilot_id": manifest["pilot_id"], "slot": item["slot"], "model": manifest["model"],
-                "timeout_s": manifest["limits"]["timeout_s"], "prompt_sha256": item["prompt_sha256"]}
+                "timeout_s": manifest["limits"]["timeout_s"], "prompt_sha256": item["prompt_sha256"],
+                "sandbox_profile_sha256": item["profile_sha256"]}
     for key, value in expected.items():
         if receipt[key] != value:
             raise ImpactError(f"{item['slot']}: ricevuta non corrisponde al manifest ({key})")
@@ -185,10 +179,10 @@ def _receipt(arm, manifest, item):
     return receipt, ended - started
 
 
-def ingest(pilot_id, root=ROOT):
+def ingest(pilot_id):
     manifest, base = _manifest(pilot_id), pilot_dir(pilot_id)
     mapping = json.loads((base / "sealed/mapping.json").read_text())
-    cases = {c["id"]: c for c in load_cases(root)}
+    cases = {c["id"]: c for c in json.loads((base / "sealed/oracle.json").read_text())["cases"]}
     results_path = base / "results.json"
     results = json.loads(results_path.read_text()) if results_path.exists() else {}
     for item in manifest["slots"]:
@@ -204,8 +198,10 @@ def ingest(pilot_id, root=ROOT):
             raise ImpactError(f"{item['slot']}: ricevuta cambiata dopo l'acquisizione")
         condition = mapping[item["slot"].split("/")[0]]
         activation, met = _activation(arm / "home", condition)
+        attempts = impact_oracle.oracle_references(arm / "home/.copilot/session-state")
         workspace, case = arm / "workspace", cases[item["case"]]
-        passed, code, output = run_check((base / "sealed/checks" / f"{case['id']}.py").read_text(), workspace)
+        pre = impact_oracle.pre_check(case)
+        post, code, output = run_check(case["check"], workspace) if workspace.is_dir() else (None, None, None)
         verdict_file = workspace / "VERDICT"
         verdict = verdict_file.read_text().strip().lower() if verdict_file.is_file() else "assente"
         changed = sum((workspace / n).read_text() != t if (workspace / n).is_file() else True
@@ -214,8 +210,10 @@ def ingest(pilot_id, root=ROOT):
                     and "__pycache__" not in p.parts and p.name not in case["files"])
         results[item["slot"]] = {
             "case": item["case"], "kind": item["kind"], "repetition": item["repetition"],
-            "condition": condition, "activation": activation, "condition_met": met,
-            "check_pass": passed, "check_exit": code, "check_output_sha256": output,
+            "condition": condition, "activation": activation, "oracle_access_attempts": attempts,
+            "condition_met": met and attempts == 0, "pre_check_pass": pre, "post_check_pass": post,
+            "outcome": impact_oracle.outcome(item["kind"], pre, post, changed + extra),
+            "check_exit": code, "check_output_sha256": output,
             "verdict": verdict if verdict in ("approve", "changes-needed") else "non valido",
             "files_changed": changed + extra, "agent_exit": receipt["exit_code"],
             "timed_out": receipt["timed_out"], "seconds": round(seconds, 3),
@@ -227,7 +225,7 @@ def ingest(pilot_id, root=ROOT):
 def status(pilot_id):
     base = pilot_dir(pilot_id)
     if not (base / "manifest.json").exists():
-        return {"pilot_id": pilot_id, "state": "non-preparato",
+        return {"pilot_id": pilot_id, "state": "non-preparato", "claim_scope": "nessuno",
                 "claim": "pilota non preparato: nessuna evidenza controllata su Rex"}
     manifest = _manifest(pilot_id)
     results = json.loads((base / "results.json").read_text()) if (base / "results.json").exists() else {}
@@ -235,47 +233,46 @@ def status(pilot_id):
     claimed = sum((base / "arms" / s["slot"] / ".claimed").is_dir() for s in slots)
     receipts = sum((base / "arms" / s["slot"] / "receipt.json").exists() for s in slots)
     valid = {k: v for k, v in results.items() if v["condition_met"]}
-    arms = {}
-    for condition in CONDITIONS:
-        rows = [v for v in valid.values() if v["condition"] == condition]
-        defect = [v for v in rows if v["kind"] == "defect"]
-        clean = [v for v in rows if v["kind"] == "clean"]
-        times = sorted(v["seconds"] for v in rows)
-        arms[condition] = {
-            "outcomes": len(rows), "check_pass": sum(v["check_pass"] for v in rows),
-            "defects_detected": f"{sum(v['verdict'] == 'changes-needed' for v in defect)}/{len(defect)}",
-            "false_positives_on_clean": f"{sum(v['verdict'] == 'changes-needed' for v in clean)}/{len(clean)}",
-            "regressions_on_clean": f"{sum(not v['check_pass'] for v in clean)}/{len(clean)}",
-            "files_changed": sum(v["files_changed"] for v in rows),
-            "agent_failures": sum(v["agent_exit"] != 0 or v["timed_out"] for v in rows),
-            "median_seconds": times[len(times) // 2] if times else None,
-            "timing_sources": sorted({v["timing_source"] for v in rows})}
+    arms = {c: impact_oracle.summarize([v for v in valid.values() if v["condition"] == c]) for c in CONDITIONS}
     pairs = {}
     for v in valid.values():
-        pairs.setdefault((v["case"], v["repetition"]), {})[v["condition"]] = v["check_pass"]
+        good = None if v["outcome"] == "ignoto" else v["outcome"] in ("corretto", "intatto", "modificato-ma-valido")
+        pairs.setdefault((v["case"], v["repetition"]), {})[v["condition"]] = good
     complete = [p for p in pairs.values() if len(p) == 2]
+    known = [p for p in complete if None not in p.values()]
     expected = len(slots) // 2
     adoption = {}
     for entry in load_evidence():
         if entry["task_id"].startswith(f"eval:{pilot_id}/") and entry["adoption"] != "unassessed":
             adoption[entry["adoption"]] = adoption.get(entry["adoption"], 0) + 1
+    role = manifest["oracle"]["role"]
+    scope = SCOPES["compromised" if role == "private-holdout" and manifest["read_scope"] != "sandbox-exec verificato"
+                   else role]
     state = ("preparato-non-eseguito" if not complete else
              "parziale" if len(complete) < expected else "completo")
-    claim_text = {"preparato-non-eseguito":
-                  "pilota NON eseguito: nessuna coppia valida; le 10 fixture non sono evidenza",
+    claim_text = {"preparato-non-eseguito": "pilota NON eseguito: nessuna coppia valida; le fixture non sono evidenza",
                   "parziale": f"parziale: {len(complete)}/{expected} coppie valide; le mancanti sono ignote, non pareggi",
-                  "completo": "contributo di Rex SOLO in queste condizioni (modello, limiti, casi sintetici); "
+                  "completo": "contributo di Rex SOLO in queste condizioni (modello, limiti, casi); "
                               "non superiorita' generale"}[state]
-    return {"pilot_id": pilot_id, "state": state, "claim": claim_text,
+    claim_text += {"solo-calibrazione": " | SOLO CALIBRAZIONE: oracolo pubblico (repo e storia git), "
+                                        "nessuna affermazione di effetto in cieco",
+                   "compromesso": " | COMPROMESSO: perimetro di lettura non verificato, nessuna affermazione "
+                                  "di effetto in cieco",
+                   "holdout-privato": " | holdout privato, perimetro di lettura verificato (stesso utente: "
+                                      "contenimento, non confine di sicurezza)"}[scope]
+    return {"pilot_id": pilot_id, "state": state, "claim_scope": scope, "claim": claim_text,
+            "oracle": manifest["oracle"], "read_scope": manifest["read_scope"],
             "coverage": {"selected_slots": len(slots), "claimed": claimed, "receipts": receipts,
                          "ingested": len(results), "condition_met": len(valid),
                          "condition_not_met": len(results) - len(valid),
+                         "oracle_access_attempts": sum(v["oracle_access_attempts"] for v in results.values()),
                          "receipts_not_ingested": receipts - len(results),
                          "matched_pairs": len(complete), "expected_pairs": expected},
             "arms": arms,
-            "pairs": {"with_better": sum(p["with-rex"] and not p["without-rex"] for p in complete),
-                      "without_better": sum(p["without-rex"] and not p["with-rex"] for p in complete),
-                      "ties": sum(p["with-rex"] == p["without-rex"] for p in complete)},
+            "pairs": {"metric": "esito oggettivo del controllo sigillato (non il VERDICT)",
+                      "with_better": sum(p["with-rex"] and not p["without-rex"] for p in known),
+                      "without_better": sum(p["without-rex"] and not p["with-rex"] for p in known),
+                      "ties": sum(p["with-rex"] == p["without-rex"] for p in known),
+                      "unknown": len(complete) - len(known)},
             "operator_adoption": adoption or "non misurato",
             "resources": "non misurato: le ricevute non portano consumi verificati"}
-

@@ -116,6 +116,7 @@ def build(root, end, days=7, pilot=None):
                       "reason": "nessun confronto controllato con/senza per questo componente"}
             if family == "agent" and name == "rex" and pilot is not None:
                 causal = {"status": pilot["state"], "claim": pilot["claim"],
+                          "claim_scope": pilot.get("claim_scope"),
                           "pilot_id": pilot.get("pilot_id")}
             components.append({
                 "kind": family, "name": name,

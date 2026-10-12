@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "bin"))
+import impact_oracle  # noqa: E402
 import impact_pilot  # noqa: E402
 import impact_review  # noqa: E402
 import impact_weekly  # noqa: E402
@@ -189,8 +191,20 @@ def model_id():
 
 
 class Pilot(Base):
+    def holdout(self, cases=None, mode=0o600, where=None):
+        cases = cases or [{"id": "h" + c["id"][:3], "kind": c["kind"], "intent": c["intent"],
+                           "files": {n: t + "\n# holdout variant\n" for n, t in c["files"].items()},
+                           "check": "# holdout variant\n" + c["check"]} for c in impact_oracle.load()[1]]
+        path = where or self.private / "holdout.json"
+        path.write_text(json.dumps({"cases": cases}))
+        os.chmod(path, mode)
+        return path
+
     def test_fixture_checks_discriminate(self):
-        for case in impact_pilot.load_cases():
+        role, cases = impact_oracle.load()
+        self.assertEqual(role, "public-calibration")
+        self.assertEqual(json.loads(impact_oracle.CALIBRATION.read_text())["role"], "public-calibration")
+        for case in cases:
             for files, expected in ((case["files"], case["kind"] == "clean"), (case.get("fix"), True)):
                 if files is None:
                     continue
@@ -198,15 +212,31 @@ class Pilot(Base):
                 work.mkdir(parents=True)
                 for name, text in files.items():
                     (work / name).write_text(text)
-                self.assertEqual(impact_pilot.run_check(case["check"], work)[0], expected, case["id"])
+                self.assertEqual(impact_oracle.run_check(case["check"], work)[0], expected, case["id"])
 
-    def run_slot(self, base, mapping, slot, case, activate=True, model=None):
+    def test_holdout_oracle_must_be_private_unseen_and_discriminating(self):
+        self.assertEqual(impact_oracle.load(self.holdout())[0], "private-holdout")
+        public = impact_oracle.load()[1]
+        same_files = [dict(c, id="h" + c["id"][:3], check="# new\n" + c["check"]) for c in public]
+        bad = {"esposta": self.holdout(cases=public, where=self.private / "exposed.json"),
+               "gia' esposta": self.holdout(cases=same_files, where=self.private / "same-files.json"),
+               "permessi": self.holdout(mode=0o644, where=self.private / "open.json"),
+               "~/.roberdan-os/private": self.holdout(where=self.tmp / "outside.json")}
+        for reason, path in bad.items():
+            with self.subTest(reason=reason):
+                self.assertRaisesRegex(ImpactError, reason, impact_oracle.load, path)
+        flipped = [dict(c, id="h" + c["id"][:3], kind="clean" if c["kind"] == "defect" else "defect",
+                        check="# v\n" + c["check"]) for c in public]
+        self.assertRaisesRegex(ImpactError, "non discrimina", impact_oracle.baseline, flipped)
+
+    def run_slot(self, base, mapping, slot, case, activate=True, model=None, fix=True, verdict=None):
         arm = base / "arms" / slot["slot"]
         condition = mapping[slot["slot"].split("/")[0]]
-        if case["kind"] == "defect":
+        if case["kind"] == "defect" and fix:
             for name, text in case["fix"].items():
                 (arm / "workspace" / name).write_text(text)
-        (arm / "workspace/VERDICT").write_text("changes-needed" if case["kind"] == "defect" else "approve")
+        verdict = verdict or ("changes-needed" if case["kind"] == "defect" else "approve")
+        (arm / "workspace/VERDICT").write_text(verdict)
         home = arm / "home/.copilot/session-state"
         self.event("tool.execution_start", "t1", CUR, home=home, toolName="bash")
         if condition == "with-rex" and activate:
@@ -217,7 +247,7 @@ class Pilot(Base):
                    "model": model or manifest["model"], "timeout_s": 900,
                    "prompt_sha256": slot["prompt_sha256"], "started_at": "2099-01-01T00:00:00Z",
                    "ended_at": "2099-01-01T00:05:00Z", "timing_source": "measured",
-                   "exit_code": 0, "timed_out": False}
+                   "exit_code": 0, "timed_out": False, "sandbox_profile_sha256": slot["profile_sha256"]}
         (arm / "receipt.json").write_text(json.dumps(receipt))
         return arm
 
@@ -234,10 +264,13 @@ class Pilot(Base):
         self.assertNotIn("with", names)
         for path in arms.rglob("*.py"):
             self.assertNotIn("assert", path.read_text())  # hidden checks stay sealed
+        self.assertNotIn('"fix"', (base / "sealed/oracle.json").read_text())  # reference fix never copied
         state = impact_pilot.status("rex-2026-10")
         self.assertEqual(state["state"], "preparato-non-eseguito")
         self.assertIn("NON eseguito", state["claim"])
-        cases = {c["id"]: c for c in impact_pilot.load_cases()}
+        self.assertEqual(state["claim_scope"], "solo-calibrazione")  # public answers are never a holdout
+        self.assertIn("SOLO CALIBRAZIONE", state["claim"])
+        cases = {c["id"]: c for c in impact_oracle.load()[1]}
         slots = manifest["slots"]
         first = slots[0]["slot"]
         self.assertRaisesRegex(ImpactError, "RDA_PILOT_CONFIRM_SPEND", impact_pilot.claim, "rex-2026-10", first)
@@ -245,6 +278,8 @@ class Pilot(Base):
         for slot in slots:
             impact_pilot.claim("rex-2026-10", slot["slot"])
         self.assertRaisesRegex(ImpactError, "consumato", impact_pilot.claim, "rex-2026-10", first)
+        handoff = (base / "sealed/handoff" / (first.replace("/", "__") + ".txt")).read_text()
+        self.assertIn("sandbox-exec -f", handoff)
         self.assertFalse(list(arms.rglob("handoff")))
         lost = next(s for s in slots if mapping[s["slot"].split("/")[0]] == "with-rex")
         for slot in slots:
@@ -255,7 +290,9 @@ class Pilot(Base):
         self.assertEqual(state["state"], "parziale")  # lost arm is unknown, never a tie
         self.assertEqual(state["coverage"]["matched_pairs"], 9)
         self.assertEqual(state["pairs"]["ties"], 9)
-        self.assertEqual(state["arms"]["without-rex"]["false_positives_on_clean"], "0/4")
+        self.assertEqual(state["arms"]["without-rex"]["objective"]["defects_fixed"], "6/6")
+        self.assertEqual(state["arms"]["without-rex"]["objective"]["clean_untouched"], "4/4")
+        self.assertEqual(state["claim_scope"], "solo-calibrazione")
         self.assertEqual(state["operator_adoption"], "non misurato")
         arm = base / "arms" / lost["slot"]
         (arm / "receipt.json").write_text((arm / "receipt.json").read_text().replace("05:00", "06:00"))
@@ -265,7 +302,7 @@ class Pilot(Base):
         manifest = impact_pilot.prepare("2026-10", model_id())
         base = self.private / "impact-review/pilots/rex-2026-10"
         mapping = json.loads((base / "sealed/mapping.json").read_text())
-        cases = {c["id"]: c for c in impact_pilot.load_cases()}
+        cases = {c["id"]: c for c in impact_oracle.load()[1]}
         os.environ["RDA_PILOT_CONFIRM_SPEND"] = "rex-2026-10"
         without = [s for s in manifest["slots"] if mapping[s["slot"].split("/")[0]] == "without-rex"]
         unclaimed = without[0]
@@ -286,6 +323,75 @@ class Pilot(Base):
         with redirect_stdout(io.StringIO()) as out:
             self.assertEqual(impact_review.main(["pilot", "status", "--pilot", "rex-2026-10"]), 0)
         self.assertEqual(json.loads(out.getvalue())["coverage"]["condition_not_met"], 2)
+
+    def test_objective_outcomes_are_not_the_verdict(self):
+        oracle = self.holdout()
+        public = {"h" + c["id"][:3]: c for c in impact_oracle.load()[1]}  # same files: public fix applies
+        manifest = impact_pilot.prepare("2026-10", model_id(), oracle=str(oracle))
+        base = self.private / "impact-review/pilots/rex-2026-10"
+        mapping = json.loads((base / "sealed/mapping.json").read_text())
+        os.environ["RDA_PILOT_CONFIRM_SPEND"] = "rex-2026-10"
+        by = {(mapping[s["slot"].split("/")[0]], s["case"]): s for s in manifest["slots"]}
+        plan = {("with-rex", "hd01"): {"fix": False},  # says changes-needed, leaves the bug
+                ("with-rex", "hc07"): {"verdict": "changes-needed"},  # declared FP, files untouched
+                ("without-rex", "hc08"): {"break": True},  # says approve, breaks the clean file
+                ("without-rex", "hd02"): {"drop": True}}  # repair evidence missing
+        for (condition, case_id), how in plan.items():
+            slot = by[(condition, case_id)]
+            impact_pilot.claim("rex-2026-10", slot["slot"])
+            arm = self.run_slot(base, mapping, slot, public[case_id], fix=how.get("fix", True),
+                                verdict=how.get("verdict"))
+            if how.get("break"):
+                (arm / "workspace/mod.py").write_text("raise SystemExit(3)\n")
+            if how.get("drop"):
+                for item in (arm / "workspace").iterdir():
+                    item.unlink()
+                (arm / "workspace").rmdir()
+        for partner in (("without-rex", "hd01"), ("without-rex", "hc07"), ("with-rex", "hc08"), ("with-rex", "hd02")):
+            impact_pilot.claim("rex-2026-10", by[partner]["slot"])
+            self.run_slot(base, mapping, by[partner], public[partner[1]])
+        results = impact_pilot.ingest("rex-2026-10")
+        self.assertEqual(results[by[("with-rex", "hd01")]["slot"]]["outcome"], "non-corretto")
+        self.assertIs(results[by[("with-rex", "hd01")]["slot"]]["pre_check_pass"], False)
+        self.assertEqual(results[by[("without-rex", "hd02")]["slot"]]["outcome"], "ignoto")
+        state = impact_pilot.status("rex-2026-10")
+        rex, base_arm = state["arms"]["with-rex"], state["arms"]["without-rex"]
+        self.assertEqual(rex["objective"]["defects_fixed"], "1/2")
+        self.assertEqual(rex["self_declared"]["changes_needed_on_defect"], "2/2")
+        self.assertEqual(rex["self_declared"]["declared_but_not_fixed"], 1)
+        self.assertEqual(rex["self_declared"]["changes_needed_on_clean"], "1/2")
+        self.assertEqual(rex["objective"]["clean_untouched"], "2/2")  # declared FP is not an objective harm
+        self.assertEqual(base_arm["objective"]["clean_broken"], "1/2")  # approve verdict, objective break
+        self.assertEqual(base_arm["objective"]["defects_unknown"], "1/2")
+        self.assertEqual(state["pairs"]["unknown"], 1)  # missing evidence is never a tie or a pass
+        self.assertEqual(state["pairs"]["with_better"] + state["pairs"]["without_better"], 2)
+        expected = "holdout-privato" if manifest["read_scope"] == "sandbox-exec verificato" else "compromesso"
+        self.assertEqual(state["claim_scope"], expected)
+        manifest["read_scope"] = "non verificato"
+        (base / "manifest.json").write_text(json.dumps(manifest))
+        self.assertEqual(impact_pilot.status("rex-2026-10")["claim_scope"], "compromesso")
+        slot = by[("with-rex", "hc09")]
+        impact_pilot.claim("rex-2026-10", slot["slot"])
+        arm = self.run_slot(base, mapping, slot, public["hc09"])
+        self.event("tool.execution_start", "peek", CUR, home=arm / "home/.copilot/session-state",
+                   toolName="view", arguments={"path": str(base / "sealed/oracle.json")})
+        row = impact_pilot.ingest("rex-2026-10")[slot["slot"]]
+        self.assertEqual((row["oracle_access_attempts"], row["condition_met"]), (1, False))
+
+    @unittest.skipUnless(shutil.which("sandbox-exec"), "sandbox-exec non disponibile")
+    def test_sandbox_profile_blocks_oracle_and_fixtures(self):
+        oracle = self.holdout()
+        manifest = impact_pilot.prepare("2026-10", model_id(), oracle=str(oracle))
+        self.assertEqual(manifest["read_scope"], "sandbox-exec verificato")
+        base = self.private / "impact-review/pilots/rex-2026-10"
+        slot = manifest["slots"][0]["slot"]
+        profile = base / "sealed/profiles" / (slot.replace("/", "__") + ".sb")
+        read = lambda path: subprocess.run(["sandbox-exec", "-f", str(profile), "/bin/cat", str(path)],  # noqa: E731
+                                           capture_output=True).returncode
+        self.assertEqual(read(base / "arms" / slot / "prompt.md"), 0)
+        for forbidden in (oracle, base / "sealed/mapping.json", base / "sealed/oracle.json",
+                          impact_oracle.CALIBRATION):
+            self.assertNotEqual(read(forbidden), 0, forbidden.name)
 
 
 if __name__ == "__main__":

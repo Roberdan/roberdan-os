@@ -4,6 +4,7 @@
   bin/impact_review.py weekly [--end ISO] [--days 7] [--write] [--json]
   bin/impact_review.py evidence template | record < entry.json | import --file F
   bin/impact_review.py pilot prepare --month AAAA-MM --model ID [--repetitions N] [--seed S]
+                               [--oracle PRIVATE_FILE]   # holdout privato; senza = solo calibrazione
   bin/impact_review.py pilot claim --pilot rex-AAAA-MM --slot ARM/CASE-rK
   bin/impact_review.py pilot ingest|status --pilot rex-AAAA-MM [--write]
   bin/impact_review.py periodic [--now ISO]        # launchd entry point, idempotent
@@ -117,7 +118,7 @@ def main(argv=None):
     e.add_argument("action", choices=("template", "record", "import")), e.add_argument("--file", type=Path)
     p = sub.add_parser("pilot")
     p.add_argument("action", choices=("prepare", "claim", "ingest", "status"))
-    for flag in ("--month", "--model", "--seed", "--pilot", "--slot"):
+    for flag in ("--month", "--model", "--seed", "--pilot", "--slot", "--oracle"):
         p.add_argument(flag)
     p.add_argument("--repetitions", type=int, default=1), p.add_argument("--timeout-s", type=int, default=900)
     p.add_argument("--write", action="store_true")
@@ -151,8 +152,10 @@ def main(argv=None):
             if args.action == "prepare":
                 if not args.model:
                     raise ImpactError("prepare richiede --model scelto dal registro (nessun id predefinito)")
-                manifest = impact_pilot.prepare(args.month, args.model, args.repetitions, args.seed, args.timeout_s)
-                print(f"{manifest['pilot_id']}: {len(manifest['slots'])} slot preparati; stato {manifest['state']}")
+                manifest = impact_pilot.prepare(args.month, args.model, args.repetitions, args.seed,
+                                                args.timeout_s, args.oracle)
+                print(f"{manifest['pilot_id']}: {len(manifest['slots'])} slot preparati; stato {manifest['state']}; "
+                      f"oracolo {manifest['oracle']['role']}; perimetro di lettura {manifest['read_scope']}")
             elif args.action == "claim":
                 print(impact_pilot.claim(args.pilot, args.slot), end="")
             elif args.action == "ingest":

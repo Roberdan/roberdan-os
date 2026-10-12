@@ -186,25 +186,48 @@ bin/impact_review.py schedule --check-loaded                          # dry-run;
   value, an allowed unit (no currency) and a reference. One task counts once per component
   across its runs; conflicting outcomes for the same task are rejected. Linkage to an observed
   native run is reported: linked, unlinked (stale), not verifiable (another host).
-- **Rex pilot.** `eval/rex-pilot/cases.json`: 10 public synthetic cases, 6 with a defect and 4
-  clean (false positives are counted), each with a predeclared objective check. `prepare` fixes
-  cases, seed, repetitions, model (validated against the reviewed registry) and limits before any
-  result; arms have blind names, the mapping, hidden checks and handoffs stay outside them.
-  The two prompts differ only by the Rex review step; safety and @thor gates are identical.
-  `claim` is a one-shot consume guard that writes the exact handoff; **this repo never runs the
-  agent**. `ingest` rejects receipts that do not match the manifest, lack a claim, or changed after
-  ingestion; it re-runs the check itself and reads Rex activation from the slot's own native event
-  log (with-Rex: started and completed; without-Rex: verified absence; no log: unknown). Only
-  slots meeting their condition enter matched pairs; a lost arm stays unknown, never a tie.
+- **Rex pilot — calibration vs holdout.** `eval/rex-pilot/calibration-cases.json` holds 10
+  public synthetic cases (6 with a defect, 4 clean) with checks and reference fixes. Those answers
+  are public in this repo and its git history, so they are **calibration only**: they exercise the
+  pipeline and never support a blinded effect claim (`claim_scope: solo-calibrazione`). A blinded
+  claim needs `pilot prepare --oracle <file>`: an operator-supplied **private holdout** under
+  `~/.roberdan-os/private` (0600, outside git) whose ids, submitted files and checks match no public
+  case, and whose every check fails on a submitted defect and passes on a submitted clean case.
+  `prepare` fixes oracle digest, seed, repetitions, model (validated against the reviewed registry)
+  and limits before any result. Agent-visible inputs are only the workspace files and the prompt;
+  the oracle (checks, no reference fix), the blind mapping, profiles and handoffs stay in `sealed/`.
+- **Read scope, enforced and declared.** Each slot gets a macOS `sandbox-exec` profile that denies
+  reads of the whole private base except the slot itself, and of `eval/rex-pilot/` in every known
+  checkout; `prepare` proves it by reading an allowed and a forbidden file. The handoff wraps the
+  agent command in that profile and the receipt must carry its digest. If the probe fails (no
+  `sandbox-exec`, different OS) the read scope is `non verificato` and the claim is
+  `compromesso`. After the run, `ingest` also flags tool calls whose arguments name the oracle:
+  such a slot does not meet its condition. Same user, same machine: this is containment against
+  reading the answers, **not a security boundary**; a holdout once exposed must be replaced.
+- **Lifecycle.** The two prompts differ only by the Rex review step; safety and @thor gates are
+  identical. `claim` is a one-shot consume guard that writes the exact handoff; this repo never
+  runs the agent. `RDA_PILOT_CONFIRM_SPEND` is a discipline gate, not a spend authorization: it
+  records that someone typed the pilot id, and the spend decision stays Roberto's. `ingest`
+  rejects receipts that do not match the manifest or the sandbox profile, lack a claim, or changed
+  after ingestion; it reads Rex activation from the slot's own native event log (with-Rex: started
+  and completed; without-Rex: verified absence; no log: unknown).
+- **Objective outcome vs self-declaration.** `ingest` runs the sealed check on the files as
+  submitted and on the final workspace. A defect is `corretto` only if the check failed before and
+  passes after; a clean case is `intatto`, `modificato-ma-valido` or `rotto`. A missing workspace or
+  an undecidable check is `ignoto`, never a pass. The agent's `VERDICT` is reported apart as
+  `self_declared` (including `declared_but_not_fixed`); it never feeds the objective counts or the
+  pairs. Only slots meeting their condition enter matched pairs; a lost arm or an unknown outcome
+  stays unknown, never a tie.
 - **What a result can say.** Until receipts exist the status is `preparato-non-eseguito`: the
-  fixtures are not evidence. A complete pilot speaks to Rex's contribution under those
-  conditions (model, limits, synthetic cases), not general superiority. Quality, time (with its
-  source), corrections and operator adoption are reported separately; resources are not measured.
+  fixtures are not evidence. A complete holdout pilot speaks to Rex's contribution under those
+  conditions (model, limits, cases), not general superiority. Objective quality, time (with its
+  source), self-declared verdicts and operator adoption are reported separately; resources are not
+  measured.
 - **Schedule.** `scheduling/com.roberdan.rda-impact-review.plist` runs `periodic` from the persistent
   checkout (Monday 08:00, day 1 08:30): idempotent per week, locked, private receipts. A present
   plist is not a loaded job; activation happens only after integration on `main`.
-- **Limits.** Copilot native events only (other hosts: not observed). Blind names are a structural
-  separation, not a security boundary: the agent runs as the same user. No paid inference, judge
+- **Limits.** Copilot native events only (other hosts: not observed). Blind names and the sandbox
+  profile are containment, not a security boundary: the agent runs as the same user. No paid inference, judge
   or neutrality guarantee is implied.
 
 ### Native activation boundaries
@@ -532,7 +555,7 @@ the exact task/model set before doing anything.
 | `eval/report.sh` | aggregates verdicts into `eval/results/report.md` |
 | `eval/test-eval-pipeline.sh` | stub-mode end-to-end test of the whole pipeline; wired into `test/validate.sh` |
 | `eval/results/` | generated, gitignored |
-| `eval/rex-pilot/cases.json` | 10 synthetic Rex pilot cases with predeclared checks (no results; see § Impact review) |
+| `eval/rex-pilot/calibration-cases.json` | 10 public synthetic Rex calibration cases with checks (answers public: never a holdout; see § Impact review) |
 | `eval/bench-lib.sh` | shared helpers for the MODEL bench (reuses `eval/lib.sh`): difficulty grading, the one model-invocation seam, price/fixture locators |
 | `eval/bench-derive.sh` | derives tasks from REAL closed cards into a **gitignored** local dir (the deriver ships, the derived data does not) |
 | `eval/bench-run.sh` | the bench: dry-run (default) emits the Pareto table from fixtures with no spend; `--real --confirm-spend` runs for real |
