@@ -79,6 +79,23 @@ _collection_names() {
   }' "$@" | grep -oE 'test-[a-z0-9-]+' | sort -u
 }
 
+_has_suite() {
+  # An early grep match must not turn the producer's SIGPIPE into a missing suite.
+  grep -qxF -- "$2" <<< "$1"
+}
+
+large_membership="$(awk 'BEGIN {
+  print "test-kb-board-hostile"
+  for (i = 0; i < 50000; i++) print "test-synthetic-long-suite-" i
+}')"
+if _has_suite "$large_membership" test-kb-board-hostile \
+   && ! _has_suite "$large_membership" test-absent-suite; then
+  ok "una lista oltre il buffer della pipe conserva presenza e assenza senza SIGPIPE"
+else
+  err "la ricerca in una lista lunga altera il verdetto di presenza"
+fi
+unset large_membership
+
 # 3) Every real collection site must have a matching launch. A helper contributes
 # only when validate.sh actively sources it; reading detached helper files would
 # let a removed source line hide launched-but-ignored suites.
@@ -114,7 +131,7 @@ else
 fi
 missing=""
 for a in $awaited; do
-  printf '%s\n' "$have" | grep -qx "$a" || missing="$missing $a"
+  _has_suite "$have" "$a" || missing="$missing $a"
 done
 if [ -z "$missing" ]; then
   ok "ogni suite attesa in validate.sh compare anche fra quelle lanciate"
@@ -127,7 +144,7 @@ fi
 collected="$awaited"
 ignored=""
 for a in $have; do
-  printf '%s\n' "$collected" | grep -qx "$a" || ignored="$ignored $a"
+  _has_suite "$collected" "$a" || ignored="$ignored $a"
 done
 if [ -z "$ignored" ]; then
   ok "ogni suite lanciata in validate.sh viene anche raccolta nel verdetto"
@@ -138,8 +155,8 @@ fi
 required="test-kb-board-resolution test-kb-board-hostile test-worktree-registry test-validate-wiring"
 missing_required=""
 for a in $required; do
-  printf '%s\n' "$have" | grep -qx "$a" \
-    && printf '%s\n' "$collected" | grep -qx "$a" \
+  _has_suite "$have" "$a" \
+    && _has_suite "$collected" "$a" \
     || missing_required="$missing_required $a"
 done
 if [ -z "$missing_required" ]; then

@@ -35,6 +35,7 @@ class SkillTelemetry(unittest.TestCase):
             "HOME": str(self.base / "home"), "RDA_HOME": str(self.base / "rda"),
             "RDA_AUDIT_HOME": str(self.base / "audit"), "RDA_SESSION_STORE": str(self.db),
             "RDA_TELEMETRY_FINDINGS": str(self.base / "findings.md"),
+            "RDA_COPILOT_EVENT_HOME": str(self.base / "native-events"),
         })
         self.environment.start()
         self.addCleanup(self.environment.stop)

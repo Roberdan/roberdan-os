@@ -34,6 +34,7 @@ class History(unittest.TestCase):
             "RDA_AUDIT_HOME": str(self.root / "PRIVATE_AUDIT"),
             "RDA_CLAUDE_HISTORY": str(self.root / "PRIVATE_HISTORY"),
             "RDA_TELEMETRY_SKILL_DIRS": str(self.root / "PRIVATE_SKILLS"),
+            "RDA_COPILOT_EVENT_HOME": str(self.root / "PRIVATE_EVENTS"),
             "RDA_TELEMETRY_FINDINGS": str(self.findings)})
         self.env.start()
         self.addCleanup(self.env.stop)

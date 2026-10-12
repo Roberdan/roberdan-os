@@ -9,6 +9,7 @@ import sqlite3
 import sys
 
 from telemetry_inventory import TelemetryError, inventory
+from telemetry_native import observations as native_observations, render as render_native
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "kanban"))
@@ -126,6 +127,9 @@ def build_report(root, days, now=None):
         public_names = public_skill_names()
     except (OSError, ValueError) as exc:
         raise TelemetryError("elenco pubblico dei nomi osservabili non disponibile") from exc
+    native_uses, native_report = native_observations(start, end, catalog["aliases"], public_names)
+    for name, sessions in native_uses.items():
+        uses.setdefault(name, set()).update(sessions)
     candidates, files = file_candidates(start, end)
     results = []
     for skill in catalog["skills"]:
@@ -159,12 +163,16 @@ def build_report(root, days, now=None):
                           "nessuna occasione candidata nella coorte osservata" if not cohort else None)
         opportunity.update(status="misurabile" if reason is None else "non misurabile", reason=reason)
         results.append({**skill, "observed_sessions": len(invocations) if measured else None,
-                        "usage_reason": usage_reason, "opportunity": opportunity})
+                        "usage_reason": usage_reason, "opportunity": opportunity,
+                        "native_calls": native_report["skills"].get(name)})
     return {"schema_version": 1, "unit": "host_session",
-            "cohort_definition": "Copilot session_files first_seen_at intersect installed-host public-name-policy starts or named skill invocations",
+            "cohort_definition": "Copilot session_files first_seen_at intersect installed-host public-name-policy audit starts or named audit/native skill invocations; host-session union",
             "window": {"days": days, "start_epoch": start, "end_epoch": end},
             "inventory": {"scopes": catalog["scopes"], "unnamed_definitions": catalog["unnamed_definitions"]},
-            "sources": {"audit": audit, "session_files": files}, "skills": results}
+            "sources": {"audit": audit, "session_files": files,
+                        "copilot_native": native_report}, "skills": results,
+            "value": {"status": "non misurabile",
+                      "reason": "esiti tecnici non provano risultati accettati o utilita'"}}
 
 
 def render(report):
@@ -185,8 +193,8 @@ def render(report):
     print(f"  Metadati file: {files['status']}; " + (files.get("reason") or
           f"prime osservazioni senza data: {files['undated_files']}"))
     print("  Occasioni CANDIDATE: estensioni/percorso Remotion in session_files Copilot, prima osservazione nella finestra.")
-    print("  Rapporto: invocazioni / candidate con filtro pubblico dichiarato o invocazione nominativa, stessa finestra e host.")
-    print("  Invocazione osservata = avvio nominativo riportato dall'adattatore, non prova di completamento.")
+    print("  Rapporto: sessioni con invocazioni / candidate con filtro pubblico dichiarato o invocazione nominativa, stessa finestra e host.")
+    print("  Invocazione osservata = avvio nominativo audit o nativo; unione per host/sessione, non somma delle fonti.")
     print("  Copertura parziale: un avvio non prova osservazione completa; zero osservato NON significa mai usata.")
     print("  Solo nomi pubblici approvati; nomi privati/sconosciuti omessi. I vecchi adattatori mascheravano le skill generali.")
     print("  File pertinenti non provano un bisogno; mancano attivita' senza file, altri host e dati prima dell'osservatore.")
@@ -204,6 +212,8 @@ def render(report):
         if opportunity["criteria"]:
             detail += "; criterio: " + ", ".join(opportunity["criteria"])
         print(f"  {skill['name']}: {usage}; rapporto: {ratio}{detail}")
+    print("\n  Attivita' ed esiti tecnici — eventi Copilot nativi, separati dall'audit")
+    render_native(report["sources"]["copilot_native"])
 
 
 class Parser(argparse.ArgumentParser):

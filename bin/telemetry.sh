@@ -65,6 +65,7 @@ telemetry — quanto si usa ogni pezzo, su quante occasioni, e chi sa che esiste
   --write      aggiunge il referto datato a docs/findings.md
                RDA_TELEMETRY_FINDINGS cambia il file di destinazione
   RDA_TELEMETRY_SKILL_DIRS sostituisce le directory skill installate (separate da :).
+  RDA_COPILOT_EVENT_HOME sostituisce ~/.copilot/session-state per gli eventi nativi.
 
 Confronta i conteggi con l'ultimo referto scritto; --write conserva anche la
 misura strutturata nello stesso file. Delta non significa miglioramento o valore.
@@ -267,7 +268,7 @@ _copertura "bus"  'bus (hello|read|send|owed|who|tidy)|bus/bus[.]sh'
 _copertura "jev"  'bin/jev[.]py|jev evaluate|skills/jev'
 _copertura "twin" 'roberdan-twin|@twin'
 
-_hr "5. Skill — invocazioni osservate e occasioni candidate"
+_hr "5. Agenti e skill — invocazioni, esiti tecnici e occasioni candidate"
 python3 -B "$ROOT/bin/telemetry_skills.py" --root "$ROOT" --days "$GIORNI" --observation
 
 # --- 5) VERDETTO -------------------------------------------------------------
