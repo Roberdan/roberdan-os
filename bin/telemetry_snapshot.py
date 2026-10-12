@@ -8,6 +8,7 @@ import subprocess
 from datetime import datetime, timezone
 
 from telemetry_inventory import NAME, TelemetryError
+from telemetry_native import event_home
 
 SCHEMA = 1
 SEMANTICS = "observed-counts-v1"
@@ -19,7 +20,8 @@ REASONS = {
     "missing": "dati o osservazione mancanti",
     "empty": "nessuna occasione nella coorte osservata",
     "documents": "copertura di documenti, non bisogno della funzionalita'",
-    "cohort": "candidate Copilot intersecate con avvii audit: stessa finestra, host e sessioni",
+    "cohort": "candidate Copilot intersecate con avvii audit/nativi: stessa finestra, host e sessioni",
+    "technical": "esito tecnico degli stessi avvii osservati; non risultato accettato o valore",
 }
 GROUPS = {
     "bus": ("messages_total messages_recent threads projects roles hellos undated", "bus", "units"),
@@ -59,6 +61,7 @@ def paths(root):
         "claude-history": Path(os.environ.get("RDA_CLAUDE_HISTORY", str(home / ".claude/history.jsonl"))),
         "copilot": Path(os.environ.get("RDA_SESSION_STORE", str(home / ".copilot/session-store.db"))),
         "audit": Path(os.environ.get("RDA_AUDIT_HOME", str(rda / "private/audit"))) / "events.sqlite3",
+        "copilot-events": event_home(),
         "documents": project,
     }
     tokens = {key: digest([key, str(path.resolve())]) for key, path in sources.items()}
@@ -99,12 +102,12 @@ def build_snapshot(root, days, groups, skills):
 
     def add(key, value, source, unit="count", reason="descriptive", denominator=None, policy="v1"):
         scope = tokens.get(source)
-        if source.startswith("copilot-"):
+        if source in ("copilot-files", "copilot-mentions", "copilot-sessions"):
             scope = tokens["copilot"]
         elif source == "cohort":
-            scope = digest([tokens["audit"], tokens["copilot"], tokens["inventory"]])
+            scope = digest([tokens["audit"], tokens["copilot-events"], tokens["copilot"], tokens["inventory"]])
         elif source == "skill-audit":
-            scope = digest([tokens["audit"], tokens["inventory"]])
+            scope = digest([tokens["audit"], tokens["copilot-events"], tokens["inventory"]])
         metrics[key] = {"value": value, "source": source, "scope": scope, "unit": unit,
                         "policy": digest([SEMANTICS, policy]), "denominator": {
                             "value": denominator, "status": "misurabile" if denominator else "non misurabile",
@@ -126,6 +129,21 @@ def build_snapshot(root, days, groups, skills):
             "event" if field.endswith("events") else "host_session")
     files = skills["sources"]["session_files"]
     add("files.undated", files.get("undated_files"), "copilot-files")
+    native = skills["sources"].get("copilot_native")
+    if native is not None:
+        available = native["metadata"]["status"] == "presente"
+        for field, value in native["metadata"].items():
+            if type(value) is int:
+                add("native." + field, value if available else None, "copilot-events",
+                    policy="native-public-metadata-v1")
+        for family in ("agents", "skills"):
+            native_groups = {"total": native["totals"][family], **native[family]}
+            for name, counts in native_groups.items():
+                for field, value in counts.items():
+                    add(f"native-{family}:{name}:{field}", value if available else None,
+                        "copilot-events", reason="technical",
+                        denominator=counts["starts"] if field != "starts" and available else None,
+                        policy="native-start-cohort-v1")
     add("inventory.unnamed", skills["inventory"]["unnamed_definitions"], "inventory")
     for scope in skills["inventory"]["scopes"]:
         add("inventory." + scope["scope"], scope["definitions"], "inventory")
@@ -135,7 +153,7 @@ def build_snapshot(root, days, groups, skills):
             raise TelemetryError("nome skill non valido")
         opportunity = skill["opportunity"]
         add("skill:" + name + ":observed", skill["observed_sessions"], "skill-audit", "host_session", "need",
-            policy=["public-name-starts-v2", skills["cohort_definition"]])
+            policy=["public-name-audit-native-starts-v3", skills["cohort_definition"]])
         for field in ("candidate_sessions", "cohort_sessions", "invoked_in_cohort", "uses_outside_cohort"):
             value = opportunity[field]
             denominator = opportunity["cohort_sessions"] if field == "invoked_in_cohort" else None
@@ -143,7 +161,7 @@ def build_snapshot(root, days, groups, skills):
                       "empty" if field == "invoked_in_cohort" and not denominator else
                       "cohort" if field == "invoked_in_cohort" else "descriptive")
             add("skill:" + name + ":" + field, value, "cohort", "host_session", reason, denominator,
-                policy=["first-seen-file/public-name-start-intersection-v2",
+                policy=["first-seen-file/public-name-audit-native-intersection-v3",
                         skills["cohort_definition"], opportunity["criteria"]])
     return {"schema_version": SCHEMA, "days": days, "semantics": SEMANTICS,
             "observed_at": datetime.now(timezone.utc).isoformat(), "inventory_policy": inventory_policy,

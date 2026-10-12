@@ -104,6 +104,39 @@ The local report explicitly separates new policy-marked coverage from legacy
 records; a selector omitted by an old adapter cannot be recovered retroactively.
 Names outside the public policy remain unobserved, not proof of non-use.
 
+### Execution, accepted outcomes, and value
+
+`bin/telemetry.sh --giorni 7` also reads existing Copilot session event streams
+(`RDA_COPILOT_EVENT_HOME`, default `~/.copilot/session-state`). This is a read-only
+source, not another collector. It can recover dated, publicly named invocations
+when the adapter audit lacks timestamps. Audit coverage stays visible; unknown
+dates are never replaced with receipt time. Skill session counts use a
+host/session union, not a sum of sources. Native call counts remain separate.
+Event IDs deduplicate replays; tool-call IDs link starts to technical terminals.
+Repeated contradictory terminals remain unknown, and missing terminals remain
+unresolved. Failed/cancelled calls and starts without an attributable public name
+are retained in totals. Snapshot policies prevent comparing the expanded source
+with an older audit-only count as if it were an improvement.
+
+These counts prove activity and technical completion, not acceptance or value.
+The proposed bridge reuses each authorized card's acceptance criteria and
+existing evidence; it adds no gate, automatic score, new collector or schedule:
+
+| Layer | Evidence and denominator | What must not be inferred |
+|---|---|---|
+| Execution | Dated starts and linked technical terminals from the same observation window | Loading a skill or ending an agent is not a correct result. |
+| Attributable result | Exact session/worktree/card linkage; attributable executions divided by dated executions | Similar titles or repository membership do not prove attribution; unmatched work is unknown, not useless. |
+| Verified acceptance | Acceptance criteria plus an inspectable artifact and reproducible check; show verified, declared, failed and unmeasured outcomes separately for the same started-card cohort | A gate verdict, evidence string or reachable commit alone does not establish acceptance. Recent unfinished cards must not become failures. |
+| Sustained usefulness | A small, preselected sample of mature results checked for continued use and operator-confirmed usefulness; report useful/neutral/not useful with the actual sampled denominator | No revert is not proof of continued use. Different task difficulty and missing observations prevent causal comparisons. |
+
+The last three layers are a proposal, **not measured by this report**. An optional
+operator review of five randomly selected mature results per month could supply
+the usefulness signal; it is not installed or scheduled. Keep judgments with
+existing local task evidence, outside Git. Report aggregates only. Do not invent
+saved time or money, and do not rank agents by raw completion counts. A controlled,
+activated-host with/without comparison is needed to attribute a difference to a
+skill or the canon; observational telemetry cannot do that.
+
 Fresh-host startup also exposed external-service initialization failures before
 inference. Restricting a probe to local tools isolates routing, not those failures:
 the finding remains in `docs/findings.md`. No external-service policy was weakened.

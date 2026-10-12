@@ -32,6 +32,7 @@ with tempfile.TemporaryDirectory() as raw_tmp:
     store = tmp / "sessions.db"
     os.environ["RDA_AUDIT_HOME"] = str(audit)
     os.environ["RDA_SESSION_STORE"] = str(store)
+    os.environ["RDA_COPILOT_EVENT_HOME"] = str(tmp / "native-events")
 
     db = sqlite3.connect(store)
     db.execute(

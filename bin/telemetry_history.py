@@ -18,7 +18,8 @@ LIMIT = 2 * 1024 * 1024
 TOP = {"schema_version", "days", "semantics", "observed_at", "inventory_policy", "metrics"}
 FIELDS = {"value", "source", "scope", "unit", "policy", "denominator"}
 SOURCES = {"bus", "evolve", "claude-history", "copilot-sessions", "copilot-mentions",
-           "documents", "audit", "copilot-files", "inventory", "cohort", "skill-audit"}
+           "documents", "audit", "copilot-files", "inventory", "cohort", "skill-audit",
+           "copilot-events"}
 UNITS = {"count", "host_session", "message", "thread", "project", "role", "hello",
          "report", "line", "pair", "session", "turn", "flag", "document", "event"}
 
@@ -141,7 +142,7 @@ def render(current, changes):
     reasons = list(dict.fromkeys(change["reason"] for change in changes.values() if change["reason"]))
     groups = {}
     for key, metric in current["metrics"].items():
-        group, field = key.rsplit(":" if key.startswith("skill:") else ".", 1)
+        group, field = key.rsplit(":" if ":" in key else ".", 1)
         groups.setdefault(group, {})[field] = (metric, changes[key])
     for index, reason in enumerate(reasons, 1):
         affected = sum(any(change["reason"] == reason for _, change in fields.values()) for fields in groups.values())

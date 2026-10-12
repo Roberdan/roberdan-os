@@ -23,6 +23,7 @@ export RDA_HOME="$TMP/home" RDA_BUS_HOME="$TMP/bus"
 export RDA_SESSION_STORE="$TMP/store.db" RDA_CLAUDE_HISTORY="$TMP/history.jsonl"
 export RDA_TELEMETRY_DAYS=30
 export RDA_AUDIT_HOME="$TMP/audit" RDA_TELEMETRY_SKILL_DIRS="$TMP/installed"
+export RDA_COPILOT_EVENT_HOME="$TMP/events"
 unset RDA_TELEMETRY_FINDINGS
 export TELEMETRY_SQLITE
 TELEMETRY_SQLITE="$(command -v sqlite3)"
