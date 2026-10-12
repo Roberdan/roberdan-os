@@ -67,6 +67,9 @@ telemetry — quanto si usa ogni pezzo, su quante occasioni, e chi sa che esiste
   RDA_TELEMETRY_SKILL_DIRS sostituisce le directory skill installate (separate da :).
   RDA_COPILOT_EVENT_HOME sostituisce ~/.copilot/session-state per gli eventi nativi.
 
+Revisione d'impatto privata (settimanale + pilota Rex mensile, mai in --write):
+  bin/impact_review.py weekly   — vedi eval/README.md § Impact review.
+
 Confronta i conteggi con l'ultimo referto scritto; --write conserva anche la
 misura strutturata nello stesso file. Delta non significa miglioramento o valore.
 Non raccoglie niente: legge gli artefatti che esistono gia' (il registro del bus)
@@ -280,6 +283,8 @@ echo "  Questo referto misura USO e OCCASIONI. Non misura il valore, e non sa pe
 echo "  qualcosa non viene usato: la copertura qui sopra e' una causa CANDIDATA, la piu'"
 echo "  economica da escludere, non una spiegazione. Una funzionalita' ben documentata e"
 echo "  mai usata su molte occasioni e' un'altra storia, e va guardata da vicino."
+echo "  Esiti accettati e contributo causale: revisione privata separata,"
+echo "  bin/impact_review.py weekly (non entra mai in --write)."
 }
 
 REPORT="$(set -eE; trap '_fail "referto non disponibile: errore durante la lettura delle fonti"' ERR; _report)"

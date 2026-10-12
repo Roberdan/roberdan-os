@@ -9,6 +9,7 @@ OS-level scheduler (fires even with Claude closed). Cron-swappable. See [`docs/a
 | `com.roberdan.rda-factory` | nightly (01:00) — plist lives in [`factory/`](../factory/) | `factory/run.sh` (queued headless tasks) |
 | `com.roberdan.rda-worktrees` | daily (03:10) | `kanban/worktree-sweep.sh sweep --yes` → rimuove le copie di lavoro che non hanno piu' niente dentro (log `/tmp/rda-worktrees.log`). La pulizia *a monte* gira gia' a ogni fine turno (`hooks/auto-checkpoint.sh` → `autosweep`, ambito: repo corrente): questo job e' la rete di sicurezza sui repo che nessuno ha aperto |
 | `com.roberdan.rda-pending-digest` | twice daily (09:00 + 18:00) | `bin/pending-digest.sh` → macOS notification + `~/.roberdan-os/pending-digest.txt` when something waits on Roberto (see `kb pending`) |
+| `com.roberdan.rda-impact-review` | weekly (Mon 08:00) + monthly (day 1, 08:30) | `bin/impact_review.py periodic` → private weekly agent/skill impact report + Rex pilot status in `~/.roberdan-os/private/impact-review/` (idempotent, locked, never calls a model). Not loaded until activated from the integrated checkout: `bin/impact_review.py schedule --check-loaded` |
 
 ## AC-only (battery is priority 1)
 

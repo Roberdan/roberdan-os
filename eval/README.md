@@ -119,8 +119,8 @@ are retained in totals. Snapshot policies prevent comparing the expanded source
 with an older audit-only count as if it were an improvement.
 
 These counts prove activity and technical completion, not acceptance or value.
-The proposed bridge reuses each authorized card's acceptance criteria and
-existing evidence; it adds no gate, automatic score, new collector or schedule:
+The bridge reuses each authorized card's acceptance criteria and existing evidence;
+it adds no gate, automatic score or event collector (schedule: § Impact review):
 
 | Layer | Evidence and denominator | What must not be inferred |
 |---|---|---|
@@ -129,9 +129,9 @@ existing evidence; it adds no gate, automatic score, new collector or schedule:
 | Verified acceptance | Acceptance criteria plus an inspectable artifact and reproducible check; show verified, declared, failed and unmeasured outcomes separately for the same started-card cohort | A gate verdict, evidence string or reachable commit alone does not establish acceptance. Recent unfinished cards must not become failures. |
 | Sustained usefulness | A small, preselected sample of mature results checked for continued use and operator-confirmed usefulness; report useful/neutral/not useful with the actual sampled denominator | No revert is not proof of continued use. Different task difficulty and missing observations prevent causal comparisons. |
 
-The last three layers are a proposal, **not measured by this report**. An optional
-operator review of five randomly selected mature results per month could supply
-the usefulness signal; it is not installed or scheduled. Keep judgments with
+The last three layers are **not measured by `bin/telemetry.sh`**. They are now
+recorded and aggregated separately, privately, by `bin/impact_review.py`
+(§ Impact review below); `--write` of the telemetry report never includes them. Keep judgments with
 existing local task evidence, outside Git. Report aggregates only. Do not invent
 saved time or money, and do not rank agents by raw completion counts. A controlled,
 activated-host with/without comparison is needed to attribute a difference to a
@@ -154,6 +154,58 @@ mandatory-route emission now includes the complete canonical body, with an
 exact-content regression rather than a heading or invocation-count proxy.
 These few samples do not estimate routing reliability, establish that every
 skill is useful, or prove that the canon outperforms an unconfigured host.
+
+### Impact review — weekly report, private evidence, monthly Rex pilot
+
+`bin/impact_review.py` keeps three layers apart and never merges them into a score:
+
+| Layer | Source | Absent input means |
+|---|---|---|
+| Execution | Native Copilot events (`telemetry_native`), public roster only: the 9 agents in `agents/` and the 17 canonical public skills | `non osservabile`; zero starts with partial coverage is never "unused" |
+| Outcomes | Private evidence entries, schema-validated, each citing an artifact (`git:`, `private:`, `eval:`; `kb:` only for operator-declared) | `non misurato` |
+| Contribution | A controlled with/without pilot (Rex only, monthly) | `non misurato` for every other component |
+
+```bash
+bin/impact_review.py weekly [--end 2026-10-12T00:00:00Z] [--write]   # trailing 7 days ending at a fixed instant
+bin/impact_review.py evidence template                                # example entry
+bin/impact_review.py evidence record < entry.json                     # or: evidence import --file list.json
+bin/impact_review.py pilot prepare --month 2026-11 --model <id from bin/models.sh list>
+bin/impact_review.py pilot claim --pilot rex-2026-11 --slot <arm>/<case>-r1   # needs RDA_PILOT_CONFIRM_SPEND
+bin/impact_review.py pilot ingest --pilot rex-2026-11 ; bin/impact_review.py pilot status --pilot rex-2026-11
+bin/impact_review.py schedule --check-loaded                          # dry-run; never installs
+```
+
+- **Weekly.** The previous window has the same length and is shown only when both windows
+  come from the same present source with sessions; otherwise it says why not. Technical
+  success is never promoted to acceptance. Low use is never a removal signal.
+- **Evidence** lives only in `~/.roberdan-os/private/impact-review/` (dirs 0700, files 0600).
+  A destination outside that base, inside any git worktree or with open permissions is refused —
+  there is no fallback to `eval/results/`. `observed_at` is when the outcome occurred, not
+  when it was typed. Acceptance and adoption are `measured` or `operator-declared`, never
+  inferred from a closed card or a call. Repair work/time/resources need a finite non-negative
+  value, an allowed unit (no currency) and a reference. One task counts once per component
+  across its runs; conflicting outcomes for the same task are rejected. Linkage to an observed
+  native run is reported: linked, unlinked (stale), not verifiable (another host).
+- **Rex pilot.** `eval/rex-pilot/cases.json`: 10 public synthetic cases, 6 with a defect and 4
+  clean (false positives are counted), each with a predeclared objective check. `prepare` fixes
+  cases, seed, repetitions, model (validated against the reviewed registry) and limits before any
+  result; arms have blind names, the mapping, hidden checks and handoffs stay outside them.
+  The two prompts differ only by the Rex review step; safety and @thor gates are identical.
+  `claim` is a one-shot consume guard that writes the exact handoff; **this repo never runs the
+  agent**. `ingest` rejects receipts that do not match the manifest, lack a claim, or changed after
+  ingestion; it re-runs the check itself and reads Rex activation from the slot's own native event
+  log (with-Rex: started and completed; without-Rex: verified absence; no log: unknown). Only
+  slots meeting their condition enter matched pairs; a lost arm stays unknown, never a tie.
+- **What a result can say.** Until receipts exist the status is `preparato-non-eseguito`: the
+  fixtures are not evidence. A complete pilot speaks to Rex's contribution under those
+  conditions (model, limits, synthetic cases), not general superiority. Quality, time (with its
+  source), corrections and operator adoption are reported separately; resources are not measured.
+- **Schedule.** `scheduling/com.roberdan.rda-impact-review.plist` runs `periodic` from the persistent
+  checkout (Monday 08:00, day 1 08:30): idempotent per week, locked, private receipts. A present
+  plist is not a loaded job; activation happens only after integration on `main`.
+- **Limits.** Copilot native events only (other hosts: not observed). Blind names are a structural
+  separation, not a security boundary: the agent runs as the same user. No paid inference, judge
+  or neutrality guarantee is implied.
 
 ### Native activation boundaries
 
@@ -480,6 +532,7 @@ the exact task/model set before doing anything.
 | `eval/report.sh` | aggregates verdicts into `eval/results/report.md` |
 | `eval/test-eval-pipeline.sh` | stub-mode end-to-end test of the whole pipeline; wired into `test/validate.sh` |
 | `eval/results/` | generated, gitignored |
+| `eval/rex-pilot/cases.json` | 10 synthetic Rex pilot cases with predeclared checks (no results; see § Impact review) |
 | `eval/bench-lib.sh` | shared helpers for the MODEL bench (reuses `eval/lib.sh`): difficulty grading, the one model-invocation seam, price/fixture locators |
 | `eval/bench-derive.sh` | derives tasks from REAL closed cards into a **gitignored** local dir (the deriver ships, the derived data does not) |
 | `eval/bench-run.sh` | the bench: dry-run (default) emits the Pareto table from fixtures with no spend; `--real --confirm-spend` runs for real |
