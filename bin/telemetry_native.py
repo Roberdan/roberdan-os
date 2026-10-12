@@ -82,8 +82,8 @@ def project(raw, session, aliases, public):
             "success": success}
 
 
-def read_records(start, end, aliases, public):
-    home = event_home()
+def read_records(start, end, aliases, public, home=None):
+    home = event_home() if home is None else Path(home)
     metadata = {"status": "assente", "sessions": 0, "files": 0, "undated_events": 0,
                 "duplicate_events": 0, "partial_lines": 0, "orphan_terminals": 0}
     if not home.exists():

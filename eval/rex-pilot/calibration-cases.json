@@ -1,0 +1,117 @@
+{
+ "schema": 1,
+ "component": "rex",
+ "role": "public-calibration",
+ "synthetic": true,
+ "note": "PUBLIC CALIBRATION ONLY. Checks and reference fixes are public in this repo and its git history, so any agent that can read the repo can read the answers. These cases exercise the pilot pipeline and readiness; they never support a blinded with/without effect claim. Effect claims need a private operator-supplied holdout oracle (bin/impact_review.py pilot prepare --oracle <private file>).",
+ "cases": [
+  {
+   "id": "d01-last-n",
+   "kind": "defect",
+   "intent": "last_n(items, n) returns the last n items of a list, for n >= 1.",
+   "files": {
+    "mod.py": "def last_n(items, n):\n    return items[-n - 1:]\n"
+   },
+   "fix": {
+    "mod.py": "def last_n(items, n):\n    return items[-n:]\n"
+   },
+   "check": "import mod\nassert mod.last_n([1, 2, 3, 4], 2) == [3, 4]\nassert mod.last_n([1], 1) == [1]\n"
+  },
+  {
+   "id": "d02-mutable-default",
+   "kind": "defect",
+   "intent": "add_tag(tag, tags=None) returns a new list with the given tags plus tag; calls never share state.",
+   "files": {
+    "mod.py": "def add_tag(tag, tags=[]):\n    tags.append(tag)\n    return tags\n"
+   },
+   "fix": {
+    "mod.py": "def add_tag(tag, tags=None):\n    return list(tags or []) + [tag]\n"
+   },
+   "check": "import mod\nassert mod.add_tag('a') == ['a']\nassert mod.add_tag('b') == ['b']\nbase = ['x']\nassert mod.add_tag('y', base) == ['x', 'y'] and base == ['x']\n"
+  },
+  {
+   "id": "d03-adult-boundary",
+   "kind": "defect",
+   "intent": "is_adult(age) is True from age 18 inclusive.",
+   "files": {
+    "mod.py": "def is_adult(age):\n    return age > 18\n"
+   },
+   "fix": {
+    "mod.py": "def is_adult(age):\n    return age >= 18\n"
+   },
+   "check": "import mod\nassert mod.is_adult(18) is True\nassert mod.is_adult(17) is False\n"
+  },
+  {
+   "id": "d04-port-parse",
+   "kind": "defect",
+   "intent": "parse_port(text) returns an int port in 1..65535 and raises ValueError for anything else.",
+   "files": {
+    "mod.py": "def parse_port(text):\n    try:\n        return int(text)\n    except ValueError:\n        return 0\n"
+   },
+   "fix": {
+    "mod.py": "def parse_port(text):\n    port = int(text)\n    if not 1 <= port <= 65535:\n        raise ValueError(text)\n    return port\n"
+   },
+   "check": "import mod\nassert mod.parse_port('80') == 80\ntry:\n    mod.parse_port('x')\nexcept ValueError:\n    pass\nelse:\n    raise SystemExit('expected ValueError')\ntry:\n    mod.parse_port('0')\nexcept ValueError:\n    pass\nelse:\n    raise SystemExit('expected ValueError')\ntry:\n    mod.parse_port('70000')\nexcept ValueError:\n    pass\nelse:\n    raise SystemExit('expected ValueError')\n"
+  },
+  {
+   "id": "d05-average",
+   "kind": "defect",
+   "intent": "average(xs) returns the arithmetic mean as a float; an empty list raises ValueError.",
+   "files": {
+    "mod.py": "def average(xs):\n    return sum(xs) // len(xs)\n"
+   },
+   "fix": {
+    "mod.py": "def average(xs):\n    if not xs:\n        raise ValueError('empty')\n    return sum(xs) / len(xs)\n"
+   },
+   "check": "import mod\nassert mod.average([1, 2]) == 1.5\ntry:\n    mod.average([])\nexcept ValueError:\n    pass\nelse:\n    raise SystemExit('expected ValueError')\n"
+  },
+  {
+   "id": "d06-word-count",
+   "kind": "defect",
+   "intent": "count_words(text) counts whitespace-separated words case-insensitively.",
+   "files": {
+    "mod.py": "def count_words(text):\n    counts = {}\n    for word in text.split():\n        counts[word] = 1\n    return counts\n"
+   },
+   "fix": {
+    "mod.py": "def count_words(text):\n    counts = {}\n    for word in text.lower().split():\n        counts[word] = counts.get(word, 0) + 1\n    return counts\n"
+   },
+   "check": "import mod\nassert mod.count_words('a A b') == {'a': 2, 'b': 1}\n"
+  },
+  {
+   "id": "c07-clamp",
+   "kind": "clean",
+   "intent": "clamp(x, lo, hi) limits x to the closed range [lo, hi].",
+   "files": {
+    "mod.py": "def clamp(x, lo, hi):\n    return max(lo, min(x, hi))\n"
+   },
+   "check": "import mod\nassert mod.clamp(5, 0, 3) == 3\nassert mod.clamp(-1, 0, 3) == 0\nassert mod.clamp(2, 0, 3) == 2\n"
+  },
+  {
+   "id": "c08-slugify",
+   "kind": "clean",
+   "intent": "slugify(text) lowercases text and joins its whitespace-separated words with single hyphens.",
+   "files": {
+    "mod.py": "def slugify(text):\n    return '-'.join(text.lower().split())\n"
+   },
+   "check": "import mod\nassert mod.slugify('  Hello   World ') == 'hello-world'\nassert mod.slugify('') == ''\n"
+  },
+  {
+   "id": "c09-safe-div",
+   "kind": "clean",
+   "intent": "safe_div(a, b) returns a / b, or None when b is zero.",
+   "files": {
+    "mod.py": "def safe_div(a, b):\n    return None if b == 0 else a / b\n"
+   },
+   "check": "import mod\nassert mod.safe_div(1, 2) == 0.5\nassert mod.safe_div(1, 0) is None\n"
+  },
+  {
+   "id": "c10-dedupe",
+   "kind": "clean",
+   "intent": "dedupe(xs) removes duplicates keeping the first occurrence order.",
+   "files": {
+    "mod.py": "def dedupe(xs):\n    seen, out = set(), []\n    for x in xs:\n        if x not in seen:\n            seen.add(x)\n            out.append(x)\n    return out\n"
+   },
+   "check": "import mod\nassert mod.dedupe([3, 1, 3, 2, 1]) == [3, 1, 2]\nassert mod.dedupe([]) == []\n"
+  }
+ ]
+}

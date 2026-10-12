@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- impact review — weekly agent/skill report (Monday 08:00) + monthly Rex pilot status (day 1, 08:30).
+     Runs bin/impact_review.py periodic from the PERSISTENT checkout, never a per-card worktree.
+     Idempotent: an existing weekly report for the same window is not rewritten; a concurrent run
+     is refused by a lock. Reports and receipts go to ~/.roberdan-os/private/impact-review (0700/0600);
+     the log below carries only one status line. Never calls a model.
+     Dry-run / activation commands: bin/impact_review.py schedule. A present file is not a loaded job. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.roberdan.rda-impact-review</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>/usr/bin/pmset -g ps 2>/dev/null | head -1 | grep -q "'AC Power'" || exit 0; exec "$0" "$@"</string>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>exec python3 -B "$HOME/GitHub/roberdan-os/bin/impact_review.py" periodic</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Day</key><integer>1</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>30</integer></dict>
+  </array>
+  <key>StandardOutPath</key><string>/tmp/rda-impact-review.log</string>
+  <key>StandardErrorPath</key><string>/tmp/rda-impact-review.log</string>
+  <key>RunAtLoad</key><false/>
+</dict>
+</plist>
