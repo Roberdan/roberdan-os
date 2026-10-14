@@ -553,14 +553,7 @@ cat > "$TMP/lc2-leak-check.sh" <<'LEAKEOF'
 exit 0
 LEAKEOF
 chmod +x "$TMP/lc2-leak-check.sh"
-# A stub for the ABSOLUTE-PATH case. @rex walked through the PATH stubs twice by
-# spelling the binary /tmp/.../claude: an absolute path never consults PATH, so
-# no amount of names in the list above can see it. That evasion is caught by the
-# allowlist (check 45) instead - which is why it must normalise before matching,
-# and why these two checks are one boundary in two halves rather than belt and
-# braces. Both halves are now run-wide: hoisting only one left a seam exactly one
-# mutant wide, and an absolute path inside an untabled refusal branch walked
-# through it while the suite printed PASS.
+# Absolute paths bypass PATH stubs; the run-wide xtrace allowlist covers them.
 
 # REVISED 2026-09-22 after an @rex finding, and the finding is the argument for
 # this table existing at all: `hello`, `bye` and `owed` were added to bus.sh and
@@ -581,6 +574,12 @@ chmod +x "$TMP/lc2-leak-check.sh"
 # be gated exactly once and traced never.
 bus_paths() {
   cat <<PATHS
+team --repo $R --session team-A --host unknown --json
+team --repo $R --session team-B --host unknown --json
+team --repo $R --session team-A --status --json
+team --repo $R --session team-A --leave --json
+team --repo $R --session team-B --host invalid
+team --repo $R --session ../invalid --json
 send --repo $R --card $C --from implementer --to sol-gate --body-file $TMP/body.txt
 send --repo $R --card $C --from implementer --to sol-gate --kind verdict --body-file $TMP/body.txt
 send --repo $R --card $C --from implementer --to all --body-file $TMP/body.txt

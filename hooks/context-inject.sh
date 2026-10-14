@@ -24,6 +24,8 @@ if command -v jq >/dev/null 2>&1 && [ -n "$_stdin" ]; then
   _fresh="$(printf '%s' "$_stdin" | jq -r 'if .prompt_cache_likely_expired == false then "1" else "" end' 2>/dev/null || echo "")"
   if { [ "$_src" = "resume" ] || [ "$_src" = "fork" ]; } && [ -n "$_fresh" ]; then
     echo "## roberdan-os — resumed, cache still warm (context unchanged since last turn)"
+    printf '%s' "$_stdin" | bash "$(dirname "${BASH_SOURCE[0]}")/bus-coordination.sh" \
+      || echo "Bus coordination unavailable: continue only your own authorized task; do not assume leadership."
     exit 0
   fi
 fi
@@ -37,8 +39,9 @@ fi
 # sibling file has to be resolved the same way — otherwise a worktree would test its own
 # context-inject.sh against the MAIN CHECKOUT's lib file and never see its own changes.
 _ci_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=hooks/lib-context-cache.sh
+# shellcheck source=lib-context-cache.sh
 . "$_ci_dir/lib-context-cache.sh"
+_ci_cache="${_ci_cache:?context cache helper did not initialize its directory}"
 
 echo "## roberdan-os — session context (auto-injected)"
 # Approval inbox at the very top — a fresh session must SEE what's waiting on Roberto
@@ -78,7 +81,7 @@ if [ -f "$ROOT/handoff/resume.md" ]; then
   echo "  (full: \`kb resume\` · clear when resumed: \`kb resume --done\`)"
   echo
 fi
-echo "You are the orchestrator. For full context read (durable, not this chat):"
+echo "For full context read (durable, not this chat); bus team elects the shared coordinator:"
 # STALE HANDOFF, 2026-09-24 (card 260924-085104): this pointer used to tell every session to
 # read handoff/latest.md as current context even when it was weeks old, about a different repo
 # entirely. The file's own MTIME can't tell staleness apart from freshness here — a `git`
@@ -195,90 +198,10 @@ if [ -r "$_wt" ]; then
   fi
 fi
 
-# --- il bus: presentarsi, una volta, all'inizio ------------------------------
-# Roberto, 2026-09-22: "ogni sessione all'inizio deve presentarsi sul bus con un nome univoco
-# e dichiarare su che repo sta lavorando, senno come cazzo fanno a sapere chi sta facendo cosa?"
-#
-# Fino a oggi nessuno si presentava, e `bus who` rispondeva deducendo dall'ultimo messaggio
-# scritto: diceva "qualcuno e' passato di qui", mai "ci sono io, su questa card". Misurato sul
-# negozio vero: 167 messaggi, 31 conversazioni, 14 delle quali nessuno ha MAI aperto.
-#
-# Qui la presentazione avviene da sola. Tre limiti, dichiarati perche' sono veri:
-#  - un hook gira in un processo suo, quindi NON puo' esportare variabili nella sessione: il
-#    nome se lo deve ricordare l'agente, e per questo glielo scriviamo qui sotto in chiaro.
-#  - il ruolo predefinito e' `implementer` (chi lavora sulla card). Un agente che ne ha un altro
-#    lo dichiara da se' con `bus hello --as <ruolo>`; la seconda presentazione e' un altro record,
-#    non un conflitto.
-#  - nessun hook affidabile esiste per la FINE di una sessione, quindi il congedo resta un
-#    comando che l'agente esegue (`bus bye`). Una presenza mai chiusa resta dichiarata: per
-#    questo `bus who` la stampa accanto all'ultima attivita' osservata, mai al posto di quella.
-#
-# BACKGROUNDED, 2026-09-24 (card 260924-085104): `bus hello --arrival` alone measured ~2-2.5s
-# (bus/bus.sh belongs to another card — not this file's to speed up from the inside; it does
-# NOT use `timeout`, since killing it mid-write to the shared presence log could leave a
-# damaged line other sessions then can't parse). The role/session/repo this run announces are
-# already known right here without asking bus.sh anything, so that part prints instantly. The
-# real `bus hello --arrival` call still runs, for real, with its real side effect (the presence
-# record other sessions read) — just fully detached, so THIS run never waits on it. The "who
-# else / owed / unread" facts in that call's own output are the only part that genuinely can't
-# be known without asking it, so those come from the LAST such call's cached output (may be a
-# session or two behind — "dichiarazioni, non prove" already, per the comment above), not from
-# this run's own call, which by construction isn't back yet when this prints.
-if [ -r "$ROOT/bus/bus.sh" ] && command -v jq >/dev/null 2>&1; then
-  # Il nome del repo e' quello del CHECKOUT PRINCIPALE, mai quello della copia di lavoro.
-  # `kb start` apre una copia per ogni card (~/GitHub/worktrees/<repo>/<card-id>) ed e' li'
-  # che il canone dice di lavorare: dentro, `--show-toplevel` risponde <card-id>, e due agenti
-  # sullo stesso progetto ma su card diverse finivano in due bus diversi senza vedersi mai.
-  # `--git-common-dir` punta al .git PRINCIPALE da qualunque copia, quindi il suo genitore
-  # e' il progetto.
-  _bcommon="$(git -C "$PWD" rev-parse --git-common-dir 2>/dev/null || true)"
-  _btop=""
-  if [ -n "$_bcommon" ]; then
-    case "$_bcommon" in /*) : ;; *) _bcommon="$PWD/$_bcommon";; esac
-    _btop="$(cd "$_bcommon/.." 2>/dev/null && pwd || true)"
-  fi
-  [ -n "$_btop" ] || _btop="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
-  _brepo="$(basename "${_btop:-$PWD}")"
-  case "$_brepo" in
-    ''|.|..) _brepo="" ;;
-  esac
-  if [ -n "$_brepo" ]; then
-    _brole="${RDA_BUS_ROLE:-implementer}"
-    _bsess="${RDA_BUS_SESSION:-${_sid:-sess-$$}}"
-    # UNA CHIAMATA SOLA. Prima erano quattro (hello, who, owed, count) e ognuna e
-    # un processo nuovo con la sua validazione del ruolo: l apertura di una
-    # sessione era passata da 2,28s a 3,71s, cioe 1,4s pagati ogni volta che
-    # Roberto apre qualcosa. Questo file porta gia scritta la cicatrice dei 2,5s
-    # pagati all avvio. `--arrival` calcola le quattro risposte dove i dati sono
-    # gia aperti, e stampa solo FATTI: niente prosa scritta da un altro agente.
-    # Su ripresa/compattazione non ci si ripresenta — e la stessa sessione — ma il
-    # benvenuto si ristampa lo stesso, perche il contesto e andato e chi riprende
-    # deve sapere chi e. (Questa chiamata ora parte in sottofondo: vedi sopra.)
-    _bus_cache="$_ci_cache/bus-arrival-$_brepo"
-    case "$_src" in
-      resume|compact|fork)
-        _ci_bg "$_bus_cache" -- bash "$ROOT/bus/bus.sh" hello --repo "$_brepo" --as "$_brole" \
-          --session "$_bsess" --arrival ;;
-      *)
-        _ci_bg "$_bus_cache" -- bash "$ROOT/bus/bus.sh" hello --repo "$_brepo" --as "$_brole" \
-          --session "$_bsess" --doing "sessione aperta" --arrival ;;
-    esac
-    echo
-    printf '### 📻 Sul bus sei **@%s** (sessione `%s`, repo `%s`).\n' "$_brole" "$_bsess" "$_brepo"
-    printf '  Passalo ai tuoi sotto-agenti (con un nome di sessione LORO, non il tuo):\n'
-    printf '    export RDA_BUS_ROLE=%s RDA_BUS_SESSION=%s RDA_BUS_REPO=%s\n' "$_brole" "$_bsess" "$_brepo"
-    if [ -s "$_bus_cache" ]; then
-      # bus.sh's own --arrival output is always: header, "passalo ai sotto-agenti", export
-      # (lines 1-3, about WHOEVER ran the cached call — another session, discard, never
-      # reprint as if it were this one), then "chi altro / owed / unread" (the part worth
-      # keeping), then a final "Quando hai finito: bus bye" line (dropped here too — printed
-      # fresh below, with THIS run's own repo, not the cached one's).
-      sed -n '4,$p' "$_bus_cache" | sed '$d'
-    else
-      printf '  Nessuna istantanea in cache ancora (prima volta, o appena scaduta): `bus who --repo %s`\n' "$_brepo"
-    fi
-    printf '  Quando hai finito: `bus bye --repo %s` (senno risulti ancora qui a chi arriva dopo).\n' "$_brepo"
-  fi
+# Current per-session election, never another session's cached arrival.
+if [ -n "$_sid" ]; then
+  printf '%s' "$_stdin" | bash "$_ci_dir/bus-coordination.sh" \
+    || echo "Bus coordination unavailable: continue only your own authorized task; do not assume leadership."
 fi
 
 exit 0

@@ -38,6 +38,10 @@ sid="$(jq -r '.session_id // ""' <<<"$payload" 2>/dev/null | tr -cd 'A-Za-z0-9._
 RDA_OS="${RDA_OS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 BUS="$RDA_OS/bus/bus.sh"
 [ -f "$BUS" ] || exit 0
+if [ -n "$sid" ]; then
+  printf '%s' "$payload" | jq -c '.hook_event_name="SessionEnd"' \
+    | bash "$RDA_OS/hooks/bus-coordination.sh" || echo "bus coordination: departure failed" >&2
+fi
 
 # Il nome del repo e' quello del CHECKOUT PRINCIPALE, mai quello della copia di
 # lavoro per-card: stessa ragione, e stesso una-riga, di bus-doorbell.sh — dentro
@@ -64,6 +68,12 @@ BUS_HOME="${RDA_BUS_HOME:-${RDA_HOME:-$HOME/.roberdan-os}/bus}"
 # Se non c'e' modo di sapere chi era questa sessione, non si scrive niente: un
 # congedo a nome di un ruolo indovinato e' peggio di un congedo mancato.
 role="${RDA_BUS_ROLE:-}"
+if [ -n "$sid" ] && [ -s "$BUS_HOME/$repo/.presence.jsonl" ]; then
+  role="$(jq -rs --arg sid "$sid" 'map(select(.session == $sid)) | last.role // ""' \
+    "$BUS_HOME/$repo/.presence.jsonl")"
+  # Never withdraw a different session merely because it last wrote the shared identity file.
+  [ -n "$role" ] || exit 0
+fi
 if [ -z "$role" ]; then
   _d="$cwd"
   while [ -n "$_d" ] && [ "$_d" != "/" ]; do

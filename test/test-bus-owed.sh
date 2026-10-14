@@ -134,11 +134,9 @@ grep -q "prose-sess" <<<"$briefing" \
   || fail "the arrival briefing does not name the other session at all: then nobody learns who is here"
 grep -q "$PROSE" <<<"$briefing" \
   && fail "the arrival briefing carries another agent's own sentence into the context automatically"
-# Two greps, not one: the call is split across lines with a continuation, and a
-# single-line pattern would report the hook as broken while it works.
-grep -q 'bus.sh" hello' "$ROOT/hooks/context-inject.sh" \
-  && grep -q -- '--arrival' "$ROOT/hooks/context-inject.sh" \
-  || fail "hooks/context-inject.sh does not use the facts-only arrival briefing"
+# Automatic roots now use a synchronous structural team briefing, not cached hello output.
+grep -q 'bus-coordination.sh' "$ROOT/hooks/context-inject.sh" \
+  || fail "hooks/context-inject.sh does not use the facts-only team briefing"
 ok "the session-start briefing names who is here and carries none of their prose"
 
 # 3g. THE DOORBELL DOES NOT RING FOR MAIL NOBODY CAN ACT ON.
