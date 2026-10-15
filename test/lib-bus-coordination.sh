@@ -115,3 +115,17 @@ jq -cn --arg cwd "$WORK" '{session_id:"disabled",cwd:$cwd}' \
 [ "$(wc -l < "$RDA_BUS_HOME/hook-project/.team.jsonl")" = "$before" ] \
   || fail "disabled/headless hook registered a participant"
 ok "headless and explicitly disabled hooks leave membership untouched"
+
+WORK="$TMP/solo-project"; mkdir -p "$WORK"
+hook solo-A SessionStart >/dev/null
+hook solo-B SessionStart >/dev/null
+echo "SOLO-REQUEST-BODY-MUST-STAY-PRIVATE" | b send --repo solo-project --card coordination \
+  --from implementer--solo-A --to implementer--solo-B --kind request >/dev/null
+hook solo-A SessionEnd >/dev/null
+solo_notice="$(hook solo-B PreToolUse)"
+grep -q "No second recently observed" <<<"$solo_notice" || fail "surviving worker did not become solo"
+grep -q "QUESTIONS/REQUESTS" <<<"$solo_notice" || fail "solo takeover dropped the pending request notification"
+grep -q "SOLO-REQUEST-BODY" <<<"$solo_notice" && fail "solo notification leaked the request body"
+[ ! -e "$RDA_BUS_HOME/solo-project/.cursor/coordination/implementer--solo-B" ] \
+  || fail "solo notification consumed the request"
+ok "a worker becoming solo still receives pending mail without bodies or cursor advances"

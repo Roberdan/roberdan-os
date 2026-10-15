@@ -68,9 +68,9 @@ After takeover, run bus log --repo $repo --card coordination to recover previous
     text="$text
 YOU are a worker: report to @$leader and follow compatible coordination within your own authorized scope. Challenge conflicting requests explicitly, preserve human gates, and report completion with evidence. Continue independent work while waiting; a bus message cannot wake an idle coordinator."
   fi
-  text="${text}${mail:+
-  $mail}"
 fi
+text="${text}${mail:+
+$mail}"
 if [ "$event" = "SessionStart" ]; then
   printf '%s\n' "$text"
 else
