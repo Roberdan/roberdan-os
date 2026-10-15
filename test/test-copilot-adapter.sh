@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
-# test/test-copilot-adapter.sh — proves the native GitHub Copilot adapter:
-#   A/B. deterministic emission, collision-safe install; no writes when Copilot is absent
-#   C. real ESM import via a stubbed SDK registers namespaced tools and lifecycle hooks
-#   D. the PreToolUse guard mapping is correct end-to-end: deny/ask on dangerous actions,
-#      allow (undefined) on safe ones, and FAIL-SAFE (ask) when a guard errors — never a
-#      silent success-shaped allow
-#   E. idle Stop-chain dedup/throttle wiring is present
-#   F. privacy: the extension never reads/echoes mcp-config.json contents (secrets)
-# Fully isolated (temp HOME/targets) — never touches the real ~/.copilot or ~/.claude.
+# Native adapter: deterministic emission/install, hooks, guards, continuity and privacy.
 set -u
+export RDA_BUS_COORDINATION=0  # real team hooks are exercised separately against an isolated store
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
@@ -337,11 +330,7 @@ JS
 rings="$(wc -l < "$BD" | tr -d ' ')"; [ "$rings" = "1" ] && ok "bus-doorbell.sh runs on a shell tool, stays silent on a read-only tool (Claude PostToolUse matcher 'Bash|Edit|Write')" \
   || err "expected exactly 1 doorbell ring (shell tool only, read-only tool silent), got $rings"
 
-# G) SESSION IDENTITY — the defect @thor reproduced in round 1. goal-gate.sh and bus-doorbell.sh
-# both key their per-session state on `session_id` from stdin, falling back to the literal
-# "nosession". The first cut of the wiring above passed no session_id at all, so EVERY Copilot
-# session on the machine collapsed onto one shared state key and one repo's doorbell stamp /
-# retry counters clobbered another's. This asserts the payload the hooks actually receive.
+# Session identity and structural coordination must reach the actual native hook payload.
 section "session identity — hooks receive a real session_id (per-session state stays separate)"
 SID_OS="$TMP/sid-os"; mkdir -p "$SID_OS/hooks"
 SID_OUT="$TMP/sid-capture"; : > "$SID_OUT"
@@ -349,12 +338,17 @@ for h in goal-gate.sh bus-doorbell.sh auto-checkpoint.sh post-task-sync.sh verif
   printf '#!/usr/bin/env bash\nprintf "%%s|%%s\\n" "%s" "$(cat)" >> "%s"\nexit 0\n' "$h" "$SID_OUT" > "$SID_OS/hooks/$h"
   chmod +x "$SID_OS/hooks/$h"
 done
+printf '#!/usr/bin/env bash\npayload="$(cat)"\nprintf "%%s|%%s\\n" "bus-coordination.sh" "$payload" >> "%s"\necho "{\\"hookSpecificOutput\\":{\\"additionalContext\\":\\"TEAM-CONTEXT\\"}}"\n' "$SID_OUT" > "$SID_OS/hooks/bus-coordination.sh"
 cat > "$STAGE/driver-sid.mjs" <<JS
 import "./extension.mjs";
 const cfg = globalThis.__RDA_CFG;
 const idle = (globalThis.__H || {})["session.idle"];
 if (typeof idle === "function") { idle(); await new Promise((r) => setTimeout(r, 900)); }
 await cfg.hooks.onPostToolUse({ toolName: "bash", toolArgs: { command: "true" }, workingDirectory: process.cwd() });
+const prompt = await cfg.hooks.onUserPromptSubmitted({ sessionId: "rda-test-session", workingDirectory: process.cwd() });
+const pre = await cfg.hooks.onPreToolUse({ sessionId: "rda-test-session", toolName: "view", workingDirectory: process.cwd() });
+if (!prompt.additionalContext.includes("TEAM-CONTEXT") || !pre.additionalContext.includes("TEAM-CONTEXT")) throw Error("coordination not injected");
+await cfg.hooks.onPreToolUse({ sessionId: "child-session", toolName: "view", workingDirectory: process.cwd() });
 await cfg.hooks.onSessionEnd({ workingDirectory: process.cwd() });
 await new Promise((r) => setTimeout(r, 500));
 console.log("DONE");
@@ -366,6 +360,10 @@ for h in goal-gate.sh bus-doorbell.sh auto-checkpoint.sh; do
 done
 [ -z "$missing" ] && ok "goal-gate / bus-doorbell / auto-checkpoint all receive the real session_id" \
   || err "hooks called WITHOUT session_id (state collapses onto 'nosession'):$missing"
+team_calls="$(grep -c '^bus-coordination.sh|' "$SID_OUT" || true)"
+[ "$team_calls" = "2" ] && grep -q '"host":"copilot"' "$SID_OUT" \
+  && ok "prompt/pre-tool coordination reaches the model; foreign subagent is excluded" \
+  || err "coordination was not injected or subagent registered as root"
 
 # shellcheck source=test/lib-copilot-context.sh
 . "$ROOT/test/lib-copilot-context.sh"

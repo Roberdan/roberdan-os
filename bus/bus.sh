@@ -24,8 +24,7 @@
 #      visible, not a guarantee. The real guarantee is Roberto reading a random
 #      unannounced sample, which no channel-side filter can replace.
 #
-# Liveness is an OBSERVATION, not a declaration: derived from the last append and
-# the last read, so there are no leases to register, refresh, expire or GC.
+# Team election observes host callbacks, never permission or a new executor.
 #
 # The log is append-only and PERMANENT: the kanban records WHAT was decided, this
 # records WHY, and the why is what someone needs in month three.
@@ -42,6 +41,8 @@ REGISTRY="${RDA_KANBAN_REGISTRY:-$RDA_HOME/kanban-registry}"
 
 # shellcheck source=bus/bus-unread.sh
 . "$DIR/bus-unread.sh"
+# shellcheck source=bus/bus-team.sh
+. "$DIR/bus-team.sh"
 die() { echo "bus: $*" >&2; exit 1; }
 now() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
 
@@ -143,21 +144,11 @@ _write_identity_files() {
   printf '%s\n' "$session" > "$dir/.bus-session" 2>/dev/null || true
 }
 
-# The session id names an INSTANCE, never an addressee. Mail is addressed to
-# roles only, and this constraint is the reason the board could cut leases in
-# 2026-07 without cutting identity with them: nothing can be sent to a session,
-# so a message can never be stranded on a session that has gone away.
+# Mail is addressed to roles. Root teams use distinct implementer--SESSION aliases
+# so two workers never consume each other's cursor; ordinary roles remain unchanged.
 _ident_session() {
   local given="$1"
   [ -n "$given" ] || given="${RDA_BUS_SESSION:-}"
-  # THE SAME FILE FALLBACK AS THE ROLE, and leaving it out was a real ghost
-  # factory. @rex reproduced it: `hello` in one process invents
-  # `pid69092-...`, `bye` in the next process invents `pid69278-...`, the
-  # goodbye lands on a session nobody ever announced, and the first one stays
-  # DECLARED forever. That is precisely the sequence every agents/*.md teaches
-  # — hello in one command, bye in another — so the failure was not exotic, it
-  # was the documented path. The role had a file for this exact reason and the
-  # session did not; the asymmetry was the bug.
   #
   # BUT `hello` MUST NOT READ IT, which is why this takes an argument. A role is
   # a job description and inheriting it is right; a session name is an INSTANCE,
@@ -229,16 +220,18 @@ _assert_no_broadcast_manifest() {
 }
 
 _assert_role() {
-  local role="$1" file offenders
+  local role="$1" file offenders manifest
   _assert_no_broadcast_manifest
   [ "$role" != "$BROADCAST" ] \
     || die "'$BROADCAST' is a reserved addressee, not a role: you may send --to $BROADCAST, but nothing may act as it"
   role="$(_slug "role" "$role")"
-  file="$ROLES_DIR/$role.json"
+  manifest="$role"
+  case "$role" in implementer--*) _slug "session role" "${role#implementer--}" >/dev/null; manifest="implementer";; esac
+  file="$ROLES_DIR/$manifest.json"
   [ -f "$file" ] || die "role '$role' has no manifest at $file — an unmanifested role is not addressable"
   jq -e '.role and (.may|type=="array") and (.may_not|type=="array")' "$file" >/dev/null 2>&1 \
     || die "role '$role': manifest must carry .role, .may[] and .may_not[]"
-  [ "$(jq -r '.role' "$file")" = "$role" ] || die "role '$role': manifest .role disagrees with its filename"
+  [ "$(jq -r '.role' "$file")" = "$manifest" ] || die "role '$role': manifest .role disagrees with its filename"
   offenders="$(jq -r '.may[]' "$file" | grep -Ei "$HUMAN_GATED_RE" || true)"
   [ -z "$offenders" ] || die "role '$role' claims a human-gated capability: $(echo "$offenders" | tr '\n' ' ')"
 }
@@ -799,6 +792,7 @@ _cmd_count() {
       rf="${rf##*/}"
       roles="$roles ${rf%.json}"
     done
+    roles="$roles $(_team_roles "$repo")"
     if [ "$present" = "1" ]; then
       local here="" r
       # The reader's own role first: a session always counts as present to
@@ -807,7 +801,7 @@ _cmd_count() {
       while IFS= read -r r; do
         [ -n "$r" ] || continue
         case " $here " in *" $r "*) ;; *) here="$here $r";; esac
-      done < <(_declared_present "$(_presence_path "$repo")" 2>/dev/null | awk -F'\t' '{print $1}')
+      done < <( { _declared_present "$(_presence_path "$repo")" 2>/dev/null | awk -F'\t' '{print $1}'; _team_roles "$repo"; } )
       roles="$here"
     fi
   fi
@@ -1366,14 +1360,12 @@ _cmd_who() {
   repo="$(_slug "--repo" "$repo")"
   local dir="$BUS_HOME/$repo" f
   [ -d "$dir" ] || { echo "bus: no traffic for $repo."; return 0; }
-  # The whole report is assembled into a file and written out ONCE, at the end.
-  # `who` is a display command and its reader is allowed to stop reading — a
-  # `bus who | grep -q something` closes the pipe on its first match, and a
-  # command that dies of SIGPIPE mid-report under `set -e` turns a successful
-  # answer into a failed one. Found exactly that way: adding the declared block
-  # after the table gave the table a reader that was already gone.
+  # Assemble once so a display piped into grep cannot die mid-report of SIGPIPE.
   local report acts; report="$(mktemp)"; acts="$(mktemp)"
   {
+  if [ -s "$dir/.team.jsonl" ]; then
+    _cmd_team --repo "$repo" --session view --status
+  fi
   {
     for f in "$dir"/*.jsonl; do
       [ -e "$f" ] || continue
@@ -1522,6 +1514,8 @@ THE SHAPE OF A SESSION. Announce yourself, read, answer what you owe, say bye.
            announce this session. Prints shell assignments on stdout: eval them and
            --as/--from/--repo become optional for every later call, sub-agents included.
   bus bye  --repo R [--as ROLE] [--why "..."]        declare this session finished
+  bus team --repo R --session ID [--host claude|copilot] [--status|--leave] [--json]
+           observe a root session or inspect the elected coordinator; never starts an agent.
   bus send --repo R --card C --to ROLE|all [--from ROLE] [--kind request|verdict|note|question]
            [--re N] [--ref kb:<card>|git:<sha>] [--body-file F]   (body on stdin if no --body-file)
            --re N answers record #N of this thread, and is what clears it from `owed`.
@@ -1592,6 +1586,7 @@ case "${1:-}" in
   count) shift; _cmd_count "$@";;
   who)   shift; _cmd_who "$@";;
   hello) shift; _cmd_hello "$@";;
+  team)  shift; _cmd_team "$@";;
   bye)   shift; _cmd_bye "$@";;
   owed)  shift; _cmd_owed "$@";;
   tidy)  shift; _cmd_tidy "$@";;

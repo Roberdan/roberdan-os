@@ -114,7 +114,7 @@ function sessionId() {
 // are provider-neutral and parse these names directly.
 function hookPayload(cwd) {
     const sid = sessionId();
-    const payload = { cwd: cwd || process.cwd() };
+    const payload = { cwd: cwd || process.cwd(), host: "copilot" };
     if (sid) payload.session_id = sid;
     return JSON.stringify(payload);
 }
@@ -279,12 +279,7 @@ async function runStopChain(cwd) {
 
 // --- the bus doorbell (PostToolUse, every tool) ------------------------------
 
-// Ring, never deliver. hooks/bus-doorbell.sh prints its count as JSON on
-// `hookSpecificOutput.additionalContext` because that is the only channel Claude Code injects
-// next to a PostToolUse result. Copilot's onPostToolUse has no verified additionalContext
-// equivalent, so the text is surfaced through the same ephemeral session.log channel already
-// used by onPostToolUseFailure: the user and the model see the COUNT, and the message bodies
-// still only ever arrive through an explicit `bus read`. Never throws, never blocks.
+// Ring via the existing ephemeral log; bodies still require an explicit bus read.
 async function ringDoorbell(cwd) {
     try {
         const p = join(HOOKS, "bus-doorbell.sh");
@@ -301,11 +296,21 @@ async function ringDoorbell(cwd) {
             diag("ringDoorbell:parse", e);
             text = trimmed;
         }
+
         if (!text) return;
         await session.log(`[roberdan-os bus]\n${text}`, { level: "warning", ephemeral: true });
     } catch (e) {
         diag("ringDoorbell", e);
     }
+}
+
+async function coordinate(cwd, event) {
+    const p = join(HOOKS, "bus-coordination.sh");
+    if (!existsSync(p)) return "";
+    const payload = { ...JSON.parse(hookPayload(cwd)), hook_event_name: event, host: "copilot" };
+    const { code, stdout, stderr } = await runScript(p, JSON.stringify(payload), cwd);
+    if (code !== 0) { diag("coordinate", stderr || `exit ${code}`); return "Bus coordination unavailable: continue only your own authorized work; do not assume leadership."; }
+    return stdout.trim() ? String(JSON.parse(stdout).hookSpecificOutput?.additionalContext || "") : "";
 }
 
 // --- native tools ------------------------------------------------------------
@@ -544,7 +549,8 @@ const hooks = withSkillObligations({
         if (!existsSync(ci)) return undefined;
         // session_id + source (CLI 1.0.84-5 SessionStartHookInput) renew the queue on a NEW session only.
         const sid = String((input && input.sessionId) || sessionId() || "");
-        const stdin = sid ? JSON.stringify({ session_id: sid, source: String((input && input.source) || "") }) : "";
+        const stdin = sid ? JSON.stringify({ session_id: sid, source: String((input && input.source) || ""),
+            cwd: input && input.workingDirectory, host: "copilot" }) : "";
         const { stdout } = await runScript(ci, stdin, input && input.workingDirectory);
         const ctx = (stdout || "").trim();
         return ctx ? { additionalContext: ctx } : undefined;
@@ -557,7 +563,8 @@ const hooks = withSkillObligations({
         }
         const recovery = await contextRecovery.takeRecovery(contextRecovery.rememberDirectory(input));
         const format = execFormatInSystemMessage ? EXEC_FORMAT_TURN_REMINDER_SHORT : EXEC_FORMAT_TURN_REMINDER_FULL;
-        return { additionalContext: recovery ? `${format}\n${recovery}` : format };
+        const team = (!input.sessionId || input.sessionId === sessionId()) ? await coordinate(contextRecovery.rememberDirectory(input), "UserPromptSubmit") : "";
+        return { additionalContext: [format, recovery, team].filter(Boolean).join("\n") };
     },
 
     onPreToolUse: async (input) => {
@@ -568,7 +575,9 @@ const hooks = withSkillObligations({
         // path with a cwd mismatch would otherwise let main-guard resolve no repo and fail OPEN).
         const cwd = contextRecovery.rememberDirectory(input);
         const recovery = await contextRecovery.takeRecovery(cwd);
-        const finish = (decision) => recovery ? { ...decision, additionalContext: recovery } : decision;
+        const team = (!input.sessionId || input.sessionId === sessionId()) ? await coordinate(cwd, "PreToolUse") : "";
+        const context = [recovery, team].filter(Boolean).join("\n");
+        const finish = (decision) => context ? { ...decision, additionalContext: context } : decision;
         // Sensitive knowledge never leaves the machine: refuse host-native memory writes
         // outright. This is a hard deny (not "ask") because there is no legitimate case —
         // the durable store is the local vault, and a prompt would only invite a mistake.
@@ -633,21 +642,12 @@ const hooks = withSkillObligations({
     },
 
     onSessionEnd: async (input) => {
+        if (input && input.sessionId && input.sessionId !== sessionId()) return undefined;
         // Best effort on graceful exit; crashes may never deliver this callback.
         if (auditObserver) await auditObserver.stop();
         const p = join(HOOKS, "auto-checkpoint.sh");
         if (existsSync(p)) await runScript(p, hookPayload(input && input.workingDirectory), input && input.workingDirectory);
-        // Say goodbye on the agent bus, so whoever arrives next is not addressing
-        // a session that is gone. This is the counterpart of the `hello` that
-        // context-inject.sh writes at SessionStart, and it is deliberately wired
-        // HERE and not on onAgentStop/Stop: those fire at the end of every turn,
-        // and a session that declared itself finished after every turn would be a
-        // presence view made entirely of ghosts.
-        // BEST EFFORT, AND IT IS ONLY THAT: a crash, a kill or a closed lid never
-        // delivers this callback. So a declared presence that is never withdrawn
-        // is a normal state, which is exactly why `bus who` prints the
-        // declaration next to the last observed action instead of believing it.
-        // Claude runs the same script from its own SessionEnd (bin/sync.sh).
+        // Graceful departure releases leadership; Stop is only a turn boundary.
         const bye = join(HOOKS, "bus-bye.sh");
         if (existsSync(bye)) await runScript(bye, hookPayload(input && input.workingDirectory), input && input.workingDirectory);
         return undefined;

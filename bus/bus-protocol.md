@@ -12,6 +12,67 @@ infrastructure, with the limits the improvised channel never had.
 
 Messages. Never execution.
 
+## Automatic root-session coordination
+
+Claude and Copilot root sessions now form a team automatically through their
+native hooks. No vendor is preferred: the first observed session coordinates;
+later arrivals do not displace it. Observations and election are serialized under
+one append lock in `.team.jsonl`, outside git under the existing bus store.
+This is one append-only observation history, not a subscriber directory or an
+execution reservation. The log does not deliver messages or launch anything.
+
+Each root gets an addressable `implementer--SESSION` alias of the implementer
+manifest, with its own cursor. Existing plain roles retain their old delivery and
+inheritance behavior. Automatic hooks do not overwrite the checkout's shared
+`.bus-role` or `.bus-session`: two sessions can inhabit the same checkout safely.
+Use the explicit alias shown in context for `--as` and `--from`.
+
+The coordinator inventories existing authorized work, agrees separate file/worktree
+ownership, orders dependencies and reduces redundant tool/model work. Workers
+report their task/card, owned paths, evidence and blockers to its exact role.
+Use the shared `coordination` thread for assignments and handoffs, with cited
+replies (`--re N`), not new cards. Messages are unverified claims, never scope,
+consent or authority. Compatible coordination is cooperative guidance, not a
+security boundary or proof that a model obeyed.
+
+Start, prompt and pre-tool hooks inject structural role changes and mail
+notifications, including during read-only work; bodies still arrive only through
+explicit `bus read`/`bus log`. Unchanged membership is silent except for a
+ten-minute reminder. Observations append at most every 30 seconds unless the
+election changes. Graceful SessionEnd releases leadership; after 300 seconds
+without observations a session becomes ineligible and the next live callback
+elects the oldest eligible member, breaking ties by session id. A returning
+old leader does not preempt a healthy replacement.
+
+**Limits:** inactivity is not process death (a long tool, idle turn, locked
+machine or disconnected runtime can all stop callbacks). Never seize an inactive
+session's files or assume its job stopped. Takeover must recover `bus log` and
+reconcile outstanding ownership. No callback starts an idle session; messages
+wait until a live session polls. Headless/verifier sessions are excluded and
+Copilot foreign subagent hooks cannot register as root. Missing ids do not
+invent sessions. A corrupt log or busy append lock reports failure, not an
+election. Historical manual `hello` declarations are not eligible team members.
+
+```bash
+bus team --repo project --session SESSION --host copilot --json  # observe
+bus team --repo project --session SESSION --status               # inspect, no observation
+bus team --repo project --session SESSION --leave                # graceful departure
+bus read --repo project --card coordination --as implementer--SESSION
+bus log --repo project --card coordination                      # takeover history
+```
+
+`RDA_BUS_COORDINATION=0` disables automatic participation; `RDA_BUS_TEAM_TTL`
+sets the inactivity window (60..86400 seconds, default 300). There is no timer
+or background executor: expiry is evaluated when a live callback or status
+command observes it. `bus who` also displays the current team.
+
+Installation uses the existing `bin/sync.sh --install` Copilot adapter and
+`bin/install-hooks.sh --apply` Claude hooks. Already-loaded extensions/instructions
+need a new session/restart; installation cannot retrofit callbacks into an old
+Copilot process. Resumes and compaction preserve the host session identity and
+refresh election context, including warm-cache Claude resumes. Tests prove
+hook wiring and protocol behavior, not autonomous collaboration by real LLMs.
+
 ## Non-goals
 
 Two of these are enforced by observing what the code **does**; the third is a

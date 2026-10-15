@@ -196,4 +196,6 @@ grep -q "and what about the index" <<<"$inherited" \
   || fail "the unanswered question died with the session that ignored it"
 ok "an unanswered question is inherited by whoever plays that role next"
 
+# shellcheck source=test/lib-bus-coordination.sh
+. "$ROOT/test/lib-bus-coordination.sh"
 echo "PASS: test-bus-presence.sh"

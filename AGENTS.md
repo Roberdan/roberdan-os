@@ -156,6 +156,21 @@ a different model. Capability listings are not proof of comparative quality or p
 → [`bus/bus-protocol.md`](bus/bus-protocol.md) — the protocol, its properties and the limits
 it declares. `bus/bus.sh` is the whole implementation.
 
+**Automatic teams (Roberto, 2026-10-14).** When multiple root Claude/Copilot sessions
+are observed on the same project, `bus team` elects one coordinator. Keep its role
+stable until departure or inactivity; other sessions are workers, not competing
+orchestrators. Each gets its own `implementer--SESSION` bus role and cursor: use
+the explicit `--as`/`--from` from the hook, never another session's shared `.bus-role`.
+The coordinator inventories existing authorized tasks, agrees disjoint ownership,
+orders dependencies, reuses evidence and reduces redundant work. Workers report
+scope, worktrees/files, progress and blockers on `--card coordination`, replying
+with `--re N`; the coordinator checks answers and records handoffs on that thread.
+On takeover inspect `bus log --card coordination` and reconcile ownership before
+reassigning. Inactivity never means a job stopped or someone else's edits are free.
+Hooks observe only sessions already executing; the bus does not launch or wake
+them, expand authority or change the Thor/human gates. Details and installation:
+[`bus/bus-protocol.md`](bus/bus-protocol.md#automatic-root-session-coordination).
+
 **When two or more sessions work the same repo**, they talk through the bus instead of a
 human relaying them. **Announce yourself, read, answer what you owe, say when you leave** —
 in that order, every session, and it is four commands.
@@ -226,9 +241,9 @@ human-gated action. Two sessions claiming the *same* role share one cursor and s
 — now visibly, because `bus who` shows both sessions; for two workers, use two roles.
 
 Delivery stays opt-in: the doorbell reports a count, bodies arrive only through `read`, and
-`kb` does not know the bus exists. What changed on 2026-09-22 is that `context-inject.sh`
-**announces the session** at start and tells it which role it is — a presence record and a
-line of text, never a delivery: it carries no message, and nothing it writes can wake anyone.
+`kb` does not know the bus exists. At session start `context-inject.sh` **observes the root session** through `bus team`
+and tells it its unique role and the elected coordinator. Prompt/tool callbacks update
+observations and notify changes. They carry no message bodies and cannot wake anyone.
 
 **And the doorbell only rings for somebody who is there.** Roberto opened a session that day
 and got twelve lines of unread counts for four roles nobody was playing, on two cards already

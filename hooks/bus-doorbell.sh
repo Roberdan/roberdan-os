@@ -83,6 +83,11 @@ BUS_HOME="${RDA_BUS_HOME:-${RDA_HOME:-$HOME/.roberdan-os}/bus}"
 # (see hooks/context-inject.sh's `_bsess`). A `bye` after that hello withdraws
 # it, same as `bus who`'s own "declared present" reading.
 role="${RDA_BUS_ROLE:-}"
+if [[ "$sid" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] && [ -s "$BUS_HOME/$repo/.team.jsonl" ]; then
+  team_role="$(jq -rs --arg sid "$sid" 'map(select(.session == $sid)) | last.role // ""' \
+    "$BUS_HOME/$repo/.team.jsonl")"
+  [ -z "$team_role" ] || role="$team_role"
+fi
 _presence="$BUS_HOME/$repo/.presence.jsonl"
 if [ -z "$role" ] && [ -s "$_presence" ]; then
   role="$(jq -r --arg sid "$sid" 'select(.session == $sid) | [.event, .role] | @tsv' \

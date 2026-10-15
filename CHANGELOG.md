@@ -3,6 +3,31 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.62.0 — 2026-10-15
+
+### Added
+
+- Automatic repository teams for already-running Claude and Copilot root sessions.
+  `bus team` serializes observations and elects one sticky coordinator; graceful exit
+  or five minutes without a callback permits takeover at the next live callback.
+  Linked worktrees share a team. Headless/verifier sessions do not participate.
+- Per-session `implementer--SESSION` role aliases inherit the existing implementer
+  manifest but have independent mail cursors. The coordinator inventories authorized
+  work, agrees ownership and dependencies, reduces duplicate work and preserves
+  assignments on the `coordination` bus thread.
+- Native start/prompt/pre-tool/end wiring for both hosts. Role changes and mail
+  notifications reach the model even during read-only work; message bodies still
+  require an explicit, provenance-stamped read. Tests cover mixed-host concurrency,
+  independent mail delivery, takeover, isolation, native guidance and safety paths.
+
+### Changed
+
+- Session arrival is no longer read from another session's background cache, and
+  not every session is told it is the orchestrator. Coordination is observational:
+  it never launches or wakes agents, expands scope, moves cards or replaces human gates.
+  Existing loaded extensions need restart; inactivity is not proof a process has died
+  and never releases ownership of its worktree or jobs.
+
 ## 2.61.0 — 2026-10-11
 
 ### Added
