@@ -17,6 +17,17 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   54. Regression tests enforce the reduced parsing/stat costs alongside notification
   privacy and membership behavior. These are process counts, not a wall-time promise.
 
+### Fixed
+
+- Bus log locks left without a live owner (process killed between `mkdir` and the
+  owner stamp, or owner pid gone) are reclaimed after `RDA_BUS_LOCK_STALE_S` (default
+  10 s) under a serialized guard; a live owner is never reclaimed. Before, one orphan
+  lock made every `bus team` wait 10 s and time out the UserPromptSubmit hook. The team
+  observation does one `jq` pass inside the lock instead of about eight (#124).
+- Kanban worktree autosweep keeps worktrees younger than `RDA_WT_MIN_AGE_H` hours
+  (default 24): a branch created moments ago with no commits is an ancestor of `main`
+  and was removed as "integrated" seconds after creation (#123).
+
 ## 2.62.0 — 2026-10-15
 
 ### Added
