@@ -233,11 +233,13 @@ PERF_WORK="$TMP/doorbell-perf"; mkdir -p "$PERF_WORK" "$RDA_BUS_HOME/doorbell-pe
 for n in {1..32}; do : > "$RDA_BUS_HOME/doorbell-perf/thread-$n.jsonl"; done
 PERF_SHIMS="$TMP/perf-shims"; mkdir -p "$PERF_SHIMS"
 SPAWNS="$TMP/hook-spawns"
-for tool in stat jq sed; do
+for tool in stat jq sed tr basename; do
   printf '#!/bin/bash\nprintf "%%s\\n" %q >> "$HOOK_SPAWNS"\nexec %q "$@"\n' \
     "$tool" "$(command -v "$tool")" > "$PERF_SHIMS/$tool"
   chmod +x "$PERF_SHIMS/$tool"
 done
+printf '{"session":"perf","role":"implementer--perf","host":"claude","event":"observe","seen":1,"joined":1}\n' \
+  > "$RDA_BUS_HOME/doorbell-perf/.team.jsonl"
 perf_payload="$(jq -cn --arg cwd "$PERF_WORK/" '{session_id:"perf",cwd:$cwd}')"
 printf '%s' "$perf_payload" | RDA_BUS_ROLE=implementer bash "$HOOK" >/dev/null
 : > "$SPAWNS"
@@ -245,12 +247,12 @@ quiet="$(printf '%s' "$perf_payload" | HOOK_SPAWNS="$SPAWNS" PATH="$PERF_SHIMS:$
   RDA_BUS_ROLE=implementer bash "$HOOK")"
 [ -z "$quiet" ] || fail "unchanged performance fixture emitted context"
 [ "$(grep -c '^stat$' "$SPAWNS")" -le 3 ] || fail "unchanged hook spawns stat per thread"
-[ "$(grep -c '^jq$' "$SPAWNS")" -le 1 ] || fail "hook parses its payload more than once"
-grep -q '^sed$' "$SPAWNS" && fail "hook spawns sed to read its own stamp"
+[ "$(grep -c '^jq$' "$SPAWNS")" -le 1 ] || fail "hook parses its payload or .team.jsonl more than once when RDA_BUS_ROLE is set"
+grep -qE '^(sed|tr|basename)$' "$SPAWNS" && fail "hook spawns sed/tr/basename on the unchanged path"
 echo "CHANGED-BATCH-BODY-MUST-NOT-LEAK" | bash "$BUS" send --repo doorbell-perf \
   --card thread-31 --from sol-gate --to implementer --kind note >/dev/null
 changed="$(printf '%s' "$perf_payload" | RDA_BUS_ROLE=implementer bash "$HOOK")"
-grep -q "NOTES for @implementer" <<<"$changed" || fail "a changed thread in a later batch did not ring"
+grep -q "NOTES for @implementer" <<<"$changed" || fail "a changed thread in a later batch did not ring (or .team.jsonl overwrote RDA_BUS_ROLE)"
 grep -q "CHANGED-BATCH-BODY" <<<"$changed" && fail "batched signature leaked a message body"
 printf '#!/bin/bash\nif [ "$#" -gt 3 ]; then %q "$1" "$2" "$3"; exit 1; fi\nexec %q "$@"\n' \
   "$(command -v stat)" "$(command -v stat)" > "$PERF_SHIMS/stat"

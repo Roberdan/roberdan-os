@@ -44,7 +44,10 @@ without observations a session becomes ineligible and the next live callback
 elects the oldest eligible member, breaking ties by session id. A returning
 old leader does not preempt a healthy replacement.
 
-The shared hooks parse each payload/state once, read temporary stamps with shell
+The shared hooks and `bus team` parse each payload/state once with strict
+single-object validation (`jq -jse`), compute team election in a single `jq`
+pass, pass resolved session/repo identity from coordination to the doorbell,
+honour `RDA_BUS_ROLE` ahead of `.team.jsonl`, read temporary stamps with shell
 builtins and batch doorbell file metadata reads in groups of 16. Every live callback
 still checks the team and mailbox; no extra timer, daemon or stale-result cache is
 introduced. Notification edges, ten-minute reminders, provenance and cursors are

@@ -18,7 +18,7 @@
 # An unreadable owner counts as no owner, so only the age rule can reclaim it.
 # Honest limit: a recycled pid reads as alive, which errs on the safe side.
 _lock_stale_reason() {
-  local lock="$1" grace="${RDA_BUS_LOCK_STALE_S:-10}" pid mtime age
+  local lock="$1" grace="${RDA_BUS_LOCK_STALE_S:-10}" pid pid2 mtime mtime2 age
   [[ "$grace" =~ ^[0-9]+$ ]] || grace=10
   # `read`, not an assignment of the whole line: check 45 reads the traced
   # `pid='4242 at ...'` as a command named `at`.
@@ -26,11 +26,18 @@ _lock_stale_reason() {
   case "$pid" in
     ''|*[!0-9]*) ;;
     *) ps -p "$pid" >/dev/null 2>&1 && return 1
+       # Re-read after ps confirms pid is dead: if pid released the lock before
+       # exiting, owner is now gone or holds the next winner's pid.
+       { read -r _ pid2 _ < "$lock/owner"; } 2>/dev/null || pid2=""
+       [ "$pid2" = "$pid" ] || return 1
        printf 'its owner pid %s is gone' "$pid"; return 0;;
   esac
   mtime="$(date -r "$lock" +%s 2>/dev/null)" || return 1
   age=$(( $(date +%s) - mtime ))
   [ "$age" -ge "$grace" ] || return 1
+  { read -r _ pid2 _ < "$lock/owner"; } 2>/dev/null && [ -n "$pid2" ] && return 1
+  mtime2="$(date -r "$lock" +%s 2>/dev/null)" || return 1
+  [ "$mtime2" = "$mtime" ] || return 1
   printf 'it has no owner and is %ss old' "$age"
 }
 

@@ -37,35 +37,47 @@
 # A known role never rings about mail it sent itself — own-sent mail is not a debt.
 set -euo pipefail
 
-payload="$(cat 2>/dev/null || true)"
 command -v jq >/dev/null 2>&1 || exit 0
 
-{
-  IFS= read -r -d '' sid || sid=nosession
-  IFS= read -r -d '' cwd || cwd=""
-} < <(jq -j '[.session_id // "nosession", .cwd // ""][] |
-  (tostring | gsub("\u0000"; "")), "\u0000"' <<<"$payload" 2>/dev/null)
-[ -n "$cwd" ] && [ -d "$cwd" ] || cwd="$PWD"
+if [ -n "${RDA_DOORBELL_SID:-}" ] && [ -n "${RDA_DOORBELL_REPO:-}" ]; then
+  sid="$RDA_DOORBELL_SID"
+  repo="$RDA_DOORBELL_REPO"
+else
+  payload="$(cat 2>/dev/null || true)"
+  {
+    IFS= read -r -d '' sid || sid=nosession
+    IFS= read -r -d '' cwd || cwd=""
+  } < <(jq -jse '
+    if length == 1 and (.[0] | type) == "object" then .[0] | [
+      (if (.session_id // "nosession") | type == "string" then (.session_id // "nosession") else "nosession" end),
+      (if (.cwd // "") | type == "string" then (.cwd // "") else "" end)
+    ][] | gsub("\u0000"; ""), "\u0000"
+    else error("invalid_payload") end
+  ' <<<"$payload" 2>/dev/null)
+  [ -n "$cwd" ] && [ -d "$cwd" ] || cwd="$PWD"
 
-# The repo name is the same key `bus send --repo` uses: the checkout directory
-# name, not a path. Outside a git tree, the directory name is still the answer.
-#
-# IT IS THE MAIN CHECKOUT'S NAME, NEVER THE WORKTREE'S — and this was a real,
-# silent hole. `kb start` gives every card its own worktree
-# (~/GitHub/worktrees/<repo>/<card-id>), which is where the canon says the work
-# happens, and `--show-toplevel` there answers `<card-id>`. So this hook looked
-# for mail under a repo named after the card, found no such directory, and took
-# the fast path out: the doorbell was dead in exactly the place all the work is
-# done, and it looked perfectly healthy from outside. `--git-common-dir` points
-# at the MAIN `.git` from any worktree, so its parent is the project.
-top=""
-_common="$(git -C "$cwd" rev-parse --git-common-dir 2>/dev/null || true)"
-if [ -n "$_common" ]; then
-  case "$_common" in /*) : ;; *) _common="$cwd/$_common";; esac
-  top="$(cd "$_common/.." 2>/dev/null && pwd || true)"
+  # The repo name is the same key `bus send --repo` uses: the checkout directory
+  # name, not a path. Outside a git tree, the directory name is still the answer.
+  #
+  # IT IS THE MAIN CHECKOUT'S NAME, NEVER THE WORKTREE'S — and this was a real,
+  # silent hole. `kb start` gives every card its own worktree
+  # (~/GitHub/worktrees/<repo>/<card-id>), which is where the canon says the work
+  # happens, and `--show-toplevel` there answers `<card-id>`. So this hook looked
+  # for mail under a repo named after the card, found no such directory, and took
+  # the fast path out: the doorbell was dead in exactly the place all the work is
+  # done, and it looked perfectly healthy from outside. `--git-common-dir` points
+  # at the MAIN `.git` from any worktree, so its parent is the project.
+  top=""
+  _common="$(git -C "$cwd" rev-parse --git-common-dir 2>/dev/null || true)"
+  if [ -n "$_common" ]; then
+    case "$_common" in /*) : ;; *) _common="$cwd/$_common";; esac
+    top="$(cd "$_common/.." 2>/dev/null && pwd || true)"
+  fi
+  [ -n "$top" ] || top="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)"
+  _top="${top:-$cwd}"
+  _top="${_top%/}"
+  repo="${_top##*/}"
 fi
-[ -n "$top" ] || top="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)"
-repo="$(basename "${top:-$cwd}")"
 case "$repo" in ''|.|..) exit 0;; esac
 
 RDA_OS="${RDA_OS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -86,16 +98,16 @@ BUS_HOME="${RDA_BUS_HOME:-${RDA_HOME:-$HOME/.roberdan-os}/bus}"
 # (see hooks/context-inject.sh's `_bsess`). A `bye` after that hello withdraws
 # it, same as `bus who`'s own "declared present" reading.
 role="${RDA_BUS_ROLE:-}"
-if [[ "$sid" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] && [ -s "$BUS_HOME/$repo/.team.jsonl" ]; then
-  team_role="$(jq -rs --arg sid "$sid" 'map(select(.session == $sid)) | last.role // ""' \
-    "$BUS_HOME/$repo/.team.jsonl")"
+if [ -z "$role" ] && [[ "$sid" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] && [ -s "$BUS_HOME/$repo/.team.jsonl" ]; then
+  team_role="$(jq -rs --arg sid "$sid" 'map(select(type == "object" and .session == $sid)) | last.role // ""' \
+    "$BUS_HOME/$repo/.team.jsonl" 2>/dev/null || true)"
   [ -z "$team_role" ] || role="$team_role"
 fi
 _presence="$BUS_HOME/$repo/.presence.jsonl"
 if [ -z "$role" ] && [ -s "$_presence" ]; then
-  role="$(jq -r --arg sid "$sid" 'select(.session == $sid) | [.event, .role] | @tsv' \
+  role="$(jq -r --arg sid "$sid" 'select(type == "object" and .session == $sid) | [.event, .role] | @tsv' \
             "$_presence" 2>/dev/null \
-          | awk -F'\t' '$1=="hello"{r=$2} $1=="bye"{r=""} END{print r}')"
+          | awk -F'\t' '$1=="hello"{r=$2} $1=="bye"{r=""} END{print r}' || true)"
 fi
 
 # EDGE, NOT LEVEL. Comparing the log against the cursor would be a level: it
@@ -160,7 +172,7 @@ sig_of() {
 sig="$(sig_of)"
 
 STAMPDIR="${TMPDIR:-/tmp}/rda-bus-doorbell"
-mkdir -p "$STAMPDIR" 2>/dev/null || exit 0
+[ -d "$STAMPDIR" ] || mkdir -p "$STAMPDIR" 2>/dev/null || exit 0
 # The stamp is EPHEMERAL and carries no role: session id, a signature and a
 # timestamp. It is not a registration, it is not readable by delivery, and it
 # lives outside the bus store on purpose — liveness in this system is observed,
@@ -174,7 +186,7 @@ mkdir -p "$STAMPDIR" 2>/dev/null || exit 0
 # already announced and the 10-minute reminder timer restarts each time. The failure mode is
 # NOISE, not silence, which is exactly why it survives review — the hook still looks like it
 # works, and the edge it exists to produce has quietly become a level again.
-stamp="$STAMPDIR/$(printf '%s' "$sid" | tr -c 'A-Za-z0-9._-' '_').$(printf '%s' "$repo" | tr -c 'A-Za-z0-9._-' '_')"
+stamp="$STAMPDIR/${sid//[^A-Za-z0-9._-]/_}.${repo//[^A-Za-z0-9._-]/_}"
 prev_sig=""; prev_ts=0; prev_had=0
 if [ -f "$stamp" ]; then
   {

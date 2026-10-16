@@ -11,9 +11,16 @@ case "$payload" in *[!$' \t\r\n']*) ;; *) exit 0 ;; esac
   IFS= read -r -d '' event
   IFS= read -r -d '' cwd
   IFS= read -r -d '' host
-} < <(jq -j '[.session_id // "", .hook_event_name // "SessionStart",
-  .cwd // "", .host // "claude"][] |
-  (tostring | gsub("\u0000"; "")), "\u0000"' <<<"$payload")
+} < <(jq -jse '
+  if length != 1 or (.[0] | type) != "object" then error("invalid_payload")
+  else .[0] | [
+    .session_id // "",
+    .hook_event_name // "SessionStart",
+    .cwd // "",
+    .host // "claude"
+  ][] | if type == "string" then gsub("\u0000"; ""), "\u0000" else error("invalid_field") end
+  end
+' <<<"$payload")
 [ -n "$sid" ] || exit 0
 [ -n "$cwd" ] && [ -d "$cwd" ] || cwd="$PWD"
 root="${RDA_OS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -32,19 +39,19 @@ state="$(cd "$cwd" && bash "$bus" team --session "$sid" --host "$host" --json ${
   .mode, "\u0000", ([.coordinator, [.members[].session]] | tojson), "\u0000"' <<<"$state")
 mail=""
 if [ "$event" != "SessionStart" ]; then
-  ring="$(bash "$root/hooks/bus-doorbell.sh" <<<"$payload")"
+  ring="$(RDA_DOORBELL_SID="$sid" RDA_DOORBELL_REPO="$repo" bash "$root/hooks/bus-doorbell.sh")"
   [ -z "$ring" ] || mail="$(jq -r '.hookSpecificOutput.additionalContext // ""' <<<"$ring")"
 fi
 # A per-session ephemeral announcement stamp, NOT identity shared by all sessions in a checkout.
 stampdir="${TMPDIR:-/tmp}/rda-bus-coordination"
-mkdir -p "$stampdir"
+[ -d "$stampdir" ] || mkdir -p "$stampdir"
 stamp="$stampdir/$repo.$sid"
 previous=""; last=0; epoch="$(date +%s)"
 if [ -f "$stamp" ]; then
   {
     IFS= read -r previous || true
     IFS= read -r last || true
-  } < "$stamp"
+  } < "$stamp" 2>/dev/null || true
 fi
 [[ "$last" =~ ^[0-9]+$ ]] || last=0
 if [ "$event" != "SessionStart" ] && [ "$previous" = "$sig" ] && [ $((epoch - last)) -lt 600 ]; then

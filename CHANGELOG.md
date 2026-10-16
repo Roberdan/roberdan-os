@@ -3,6 +3,22 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.62.2 — 2026-10-16
+
+### Fixed
+
+- `_lock_stale_reason` re-verifies `$lock/owner` after `ps -p` confirms the owner exited, preventing a waiter from reclaiming a newly acquired lock when the previous owner exits right after releasing it.
+
+- Frontier adversarial hardening on the shared bus hooks (`@board`, `@luca`,
+  `@baccio`): `hooks/bus-coordination.sh` and `hooks/bus-doorbell.sh` validate
+  hook input as a single JSON object with string fields via `jq -jse` (rejecting
+  trailing garbage and non-string metadata), pass resolved session/repo identity
+  from coordination to the doorbell, honour `RDA_BUS_ROLE` ahead of `.team.jsonl`,
+  guard `.team.jsonl`/`.presence.jsonl` reads against corrupt lines, and replace
+  `basename`/`tr` spawns with Bash parameter expansion. Unchanged 32-thread
+  doorbell calls now launch 10 external commands instead of 48 (−79%); unchanged
+  coordination callbacks launch 23 instead of 54 (−57%, `jq` 24→7).
+
 ## 2.62.1 — 2026-10-16
 
 ### Changed
