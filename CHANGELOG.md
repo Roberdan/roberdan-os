@@ -7,6 +7,8 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
 
 ### Fixed
 
+- `_lock_stale_reason` re-verifies `$lock/owner` after `ps -p` confirms the owner exited, preventing a waiter from reclaiming a newly acquired lock when the previous owner exits right after releasing it.
+
 - Frontier adversarial hardening on the shared bus hooks (`@board`, `@luca`,
   `@baccio`): `hooks/bus-coordination.sh` and `hooks/bus-doorbell.sh` validate
   hook input as a single JSON object with string fields via `jq -jse` (rejecting
