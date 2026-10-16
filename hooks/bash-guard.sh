@@ -13,11 +13,12 @@ ask()  { jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",pe
 # closing delimiter and leaving <<< here-strings intact), strips quoted strings (data, not
 # command tokens), and normalizes whitespace. Uses \u0027 (valid JSON/jq escape), never \x27.
 {
-  IFS= read -r -d '' cmd || cmd=""
-  IFS= read -r -d '' cmd_nostr || cmd_nostr=""
-  IFS= read -r -d '' norm || norm=""
-} < <(jq -j '
-  (.tool_input.command // "" | if type == "string" then . else "" end) as $raw
+  IFS= read -r -d '' cmd
+  IFS= read -r -d '' cmd_nostr
+  IFS= read -r -d '' norm
+} < <(jq -jse '
+  if length != 1 or (.[0] | type) != "object" then error("invalid_payload")
+  else (.[0].tool_input.command // "" | if type == "string" then . else error("invalid_command") end) as $raw
   | ($raw | gsub("\u0000"; "")) as $clean
   | ($clean
      | split("\n")
@@ -31,7 +32,8 @@ ask()  { jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",pe
          else
            .out += [$line]
          end
-       ).out
+       )
+     | .out
      | join("\n")) as $no_heredoc
   | ($clean | gsub("\u0027[^\u0027]*\u0027|\"[^\"]*\""; "")) as $nostr
   | ($no_heredoc
@@ -40,6 +42,7 @@ ask()  { jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",pe
      | sub("^ "; "")
      | sub(" $"; "")) as $norm
   | $clean, "\u0000", $nostr, "\u0000", $norm, "\u0000"
+  end
 ')
 
 # 0) Invisible / bidi / control characters in the command tokens → refuse before classifying.
