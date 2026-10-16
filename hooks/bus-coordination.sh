@@ -1,40 +1,50 @@
 #!/usr/bin/env bash
 # Structural guidance only. Message bodies still require an explicit, stamped bus read.
 set -euo pipefail
-payload="$(cat)"
-command -v jq >/dev/null 2>&1 || { echo "bus coordination: jq is required" >&2; exit 1; }
 [ "${RDA_BUS_COORDINATION:-1}" = "1" ] || exit 0
 { [ "${RDA_HEADLESS:-0}" = "1" ] || [ "${RDA_IN_THOR_VERIFY:-0}" = "1" ]; } && exit 0
-sid="$(jq -r '.session_id // ""' <<<"$payload")"
+payload="$(cat)"
+command -v jq >/dev/null 2>&1 || { echo "bus coordination: jq is required" >&2; exit 1; }
+case "$payload" in *[!$' \t\r\n']*) ;; *) exit 0 ;; esac
+{
+  IFS= read -r -d '' sid
+  IFS= read -r -d '' event
+  IFS= read -r -d '' cwd
+  IFS= read -r -d '' host
+} < <(jq -j '[.session_id // "", .hook_event_name // "SessionStart",
+  .cwd // "", .host // "claude"][] |
+  (tostring | gsub("\u0000"; "")), "\u0000"' <<<"$payload")
 [ -n "$sid" ] || exit 0
-event="$(jq -r '.hook_event_name // "SessionStart"' <<<"$payload")"
-cwd="$(jq -r '.cwd // ""' <<<"$payload")"
 [ -n "$cwd" ] && [ -d "$cwd" ] || cwd="$PWD"
-host="$(jq -r '.host // "claude"' <<<"$payload")"
 root="${RDA_OS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 bus="$root/bus/bus.sh"
 args=()
 [ "$event" != "SessionEnd" ] || args=(--leave)
 state="$(cd "$cwd" && bash "$bus" team --session "$sid" --host "$host" --json ${args[@]+"${args[@]}"})"
 [ "$event" != "SessionEnd" ] || exit 0
-repo="$(jq -r '.repo' <<<"$state")"
-role="$(jq -r '.role' <<<"$state")"
-leader="$(jq -r '.coordinator_role' <<<"$state")"
-mode="$(jq -r '.mode' <<<"$state")"
+{
+  IFS= read -r -d '' repo
+  IFS= read -r -d '' role
+  IFS= read -r -d '' leader
+  IFS= read -r -d '' mode
+  IFS= read -r -d '' sig
+} < <(jq -j '.repo, "\u0000", .role, "\u0000", .coordinator_role, "\u0000",
+  .mode, "\u0000", ([.coordinator, [.members[].session]] | tojson), "\u0000"' <<<"$state")
 mail=""
 if [ "$event" != "SessionStart" ]; then
-  ring="$(printf '%s' "$payload" | bash "$root/hooks/bus-doorbell.sh")"
+  ring="$(bash "$root/hooks/bus-doorbell.sh" <<<"$payload")"
   [ -z "$ring" ] || mail="$(jq -r '.hookSpecificOutput.additionalContext // ""' <<<"$ring")"
 fi
 # A per-session ephemeral announcement stamp, NOT identity shared by all sessions in a checkout.
 stampdir="${TMPDIR:-/tmp}/rda-bus-coordination"
 mkdir -p "$stampdir"
 stamp="$stampdir/$repo.$sid"
-sig="$(jq -c '[.coordinator, [.members[].session]]' <<<"$state")"
 previous=""; last=0; epoch="$(date +%s)"
 if [ -f "$stamp" ]; then
-  previous="$(sed -n 1p "$stamp")"
-  last="$(sed -n 2p "$stamp")"
+  {
+    IFS= read -r previous || true
+    IFS= read -r last || true
+  } < "$stamp"
 fi
 [[ "$last" =~ ^[0-9]+$ ]] || last=0
 if [ "$event" != "SessionStart" ] && [ "$previous" = "$sig" ] && [ $((epoch - last)) -lt 600 ]; then

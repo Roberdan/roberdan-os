@@ -129,3 +129,40 @@ grep -q "SOLO-REQUEST-BODY" <<<"$solo_notice" && fail "solo notification leaked 
 [ ! -e "$RDA_BUS_HOME/solo-project/.cursor/coordination/implementer--solo-B" ] \
   || fail "solo notification consumed the request"
 ok "a worker becoming solo still receives pending mail without bodies or cursor advances"
+
+SHIMS="$TMP/coordination-shims"; mkdir -p "$SHIMS"
+SPAWNS="$TMP/coordination-spawns"
+for tool in jq sed cat; do
+  printf '#!/bin/bash\nprintf "%%s\\n" %q >> "$HOOK_SPAWNS"\nexec %q "$@"\n' \
+    "$tool" "$(command -v "$tool")" > "$SHIMS/$tool"
+  chmod +x "$SHIMS/$tool"
+done
+input="$(jq -cn --arg cwd "$WORK" \
+  '{session_id:"solo-B",cwd:$cwd,hook_event_name:"PreToolUse",host:"claude"}')"
+: > "$SPAWNS"
+quiet="$(printf '%s' "$input" | HOOK_SPAWNS="$SPAWNS" PATH="$SHIMS:$PATH" \
+  RDA_OS="$ROOT" RDA_BUS_COORDINATION=1 bash "$HOOK")"
+[ -z "$quiet" ] || fail "unchanged coordination emitted context under process tracing"
+[ "$(grep -c '^jq$' "$SPAWNS")" -le 16 ] || fail "coordination repeats payload/state parsing"
+grep -q '^sed$' "$SPAWNS" && fail "coordination spawns sed to read announcement stamps"
+: > "$SPAWNS"
+printf '%s' "$input" | HOOK_SPAWNS="$SPAWNS" PATH="$SHIMS:$PATH" RDA_OS="$ROOT" \
+  RDA_HEADLESS=1 bash "$HOOK" >/dev/null
+[ ! -s "$SPAWNS" ] || fail "excluded headless callback still reads/parses its payload"
+before="$(wc -l < "$RDA_BUS_HOME/solo-project/.team.jsonl")"
+for empty in "" $' \t\r\n'; do
+  printf '%s' "$empty" | RDA_OS="$ROOT" bash "$HOOK" >"$TMP/empty-out" 2>"$TMP/empty-err" \
+    || fail "empty hook input reported failure"
+  [ ! -s "$TMP/empty-out" ] && [ ! -s "$TMP/empty-err" ] \
+    || fail "empty hook input produced output"
+done
+printf 'not-json\n' | RDA_OS="$ROOT" bash "$HOOK" >/dev/null 2>"$TMP/invalid-hook" \
+  && fail "malformed hook metadata reported success"
+[ -s "$TMP/invalid-hook" ] || fail "malformed hook metadata failed without a diagnostic"
+[ "$(wc -l < "$RDA_BUS_HOME/solo-project/.team.jsonl")" = "$before" ] \
+  || fail "malformed metadata changed membership"
+WORK="$TMP/space"$'\n'"/whitespace-project"; mkdir -p "$WORK"
+hook whitespace-A SessionStart >/dev/null
+[ -s "$RDA_BUS_HOME/whitespace-project/.team.jsonl" ] \
+  || fail "combined payload parsing lost whitespace in cwd"
+ok "combined parsing cuts subprocesses, preserves whitespace and fails loudly on malformed input"

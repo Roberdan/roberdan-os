@@ -40,8 +40,11 @@ set -euo pipefail
 payload="$(cat 2>/dev/null || true)"
 command -v jq >/dev/null 2>&1 || exit 0
 
-sid="$(jq -r '.session_id // "nosession"' <<<"$payload" 2>/dev/null || echo nosession)"
-cwd="$(jq -r '.cwd // ""' <<<"$payload" 2>/dev/null || echo "")"
+{
+  IFS= read -r -d '' sid || sid=nosession
+  IFS= read -r -d '' cwd || cwd=""
+} < <(jq -j '[.session_id // "nosession", .cwd // ""][] |
+  (tostring | gsub("\u0000"; "")), "\u0000"' <<<"$payload" 2>/dev/null)
 [ -n "$cwd" ] && [ -d "$cwd" ] || cwd="$PWD"
 
 # The repo name is the same key `bus send --repo` uses: the checkout directory
@@ -111,10 +114,20 @@ fi
 # The flavour is decided ONCE, by asking `stat` to do the GNU thing on a path that
 # certainly exists, and the answer is a variable rather than a per-file `||` chain.
 if stat -c '%Y' . >/dev/null 2>&1; then
-  _stat_one() { stat -c '%Y %s %n' "$1" 2>/dev/null; }   # GNU / Linux
+  stat_args=(-c '%Y %s %n')   # GNU / Linux
 else
-  _stat_one() { stat -f '%m %z %N' "$1" 2>/dev/null; }   # BSD / macOS
+  stat_args=(-f '%m %z %N')   # BSD / macOS
 fi
+_stat_batch() {
+  local metadata f
+  if metadata="$(stat "${stat_args[@]}" "$@" 2>/dev/null)"; then
+    printf '%s\n' "$metadata"
+  else
+    for f in "$@"; do
+      stat "${stat_args[@]}" "$f" 2>/dev/null || printf '%s\n' "$f"
+    done
+  fi
+}
 
 # Same reasoning for the digest: `shasum` is Perl's and ships on macOS, `sha1sum`
 # is coreutils' and ships on Linux, and `cksum` is in POSIX. Any of the three is
@@ -126,10 +139,19 @@ fi
 
 sig_of() {
   local f out=""
+  local -a files=()
   for f in "$BUS_HOME/$repo"/*.jsonl "$BUS_HOME/$repo"/.cursor/*/*; do
     [ -e "$f" ] || continue
-    out="$out $(_stat_one "$f" || echo "$f")"
+    files+=("$f")
+    # Bound argv size while avoiding a separate process for every thread/cursor.
+    if [ "${#files[@]}" -eq 16 ]; then
+      out="$out $(_stat_batch "${files[@]}")"
+      files=()
+    fi
   done
+  if [ "${#files[@]}" -gt 0 ]; then
+    out="$out $(_stat_batch "${files[@]}")"
+  fi
   # A signature that came out empty must not be mistaken for "nothing changed":
   # an empty sig would compare equal to the empty first line of a missing stamp.
   # The literal marker makes that state distinguishable, and it rings once.
@@ -155,9 +177,11 @@ mkdir -p "$STAMPDIR" 2>/dev/null || exit 0
 stamp="$STAMPDIR/$(printf '%s' "$sid" | tr -c 'A-Za-z0-9._-' '_').$(printf '%s' "$repo" | tr -c 'A-Za-z0-9._-' '_')"
 prev_sig=""; prev_ts=0; prev_had=0
 if [ -f "$stamp" ]; then
-  prev_sig="$(sed -n 1p "$stamp" 2>/dev/null || true)"
-  prev_ts="$(sed -n 2p "$stamp" 2>/dev/null || echo 0)"
-  prev_had="$(sed -n 3p "$stamp" 2>/dev/null || echo 0)"
+  {
+    IFS= read -r prev_sig || true
+    IFS= read -r prev_ts || true
+    IFS= read -r prev_had || true
+  } < "$stamp" 2>/dev/null || true
 fi
 [[ "$prev_ts" =~ ^[0-9]+$ ]] || prev_ts=0
 now="$(date +%s)"

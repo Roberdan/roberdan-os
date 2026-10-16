@@ -3,6 +3,20 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.62.1 — 2026-10-16
+
+### Changed
+
+- Shared bus hooks parse each payload/state once and read their temporary stamps
+  with shell builtins. The doorbell batches file metadata reads in groups of 16
+  instead of spawning `stat` for every thread/cursor. Excluded headless/disabled
+  coordination callbacks exit before reading input. No daemon, dependency, skipped
+  observation or change to message delivery, election, reminders or safety checks.
+- Synthetic unchanged-state measurements: a 32-thread doorbell call launches 14
+  external commands instead of 48; a coordination callback launches 41 instead of
+  54. Regression tests enforce the reduced parsing/stat costs alongside notification
+  privacy and membership behavior. These are process counts, not a wall-time promise.
+
 ## 2.62.0 — 2026-10-15
 
 ### Added
