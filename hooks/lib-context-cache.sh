@@ -31,7 +31,14 @@ mkdir -p "$_ci_cache" 2>/dev/null || true
 # it, same as the existing autosweep line in context-inject.sh.
 _ci_bg() {
   local f="$1"; shift; [ "${1:-}" = "--" ] && shift
-  ( if "$@" > "$f.new.$$" 2>/dev/null; then mv -f "$f.new.$$" "$f"; else rm -f "$f.new.$$"; fi ) </dev/null >/dev/null 2>&1 &
+  local lock="$f.lock"
+  if ! mkdir "$lock" 2>/dev/null; then
+    [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] \
+      && rmdir "$lock" 2>/dev/null && mkdir "$lock" 2>/dev/null || return 0
+  fi
+  ( trap 'rm -f "$f.new.$$"; rmdir "$lock" 2>/dev/null || true' EXIT
+    if "$@" > "$f.new.$$" 2>/dev/null; then mv -f "$f.new.$$" "$f"; fi
+  ) </dev/null >/dev/null 2>&1 &
 }
 
 # _ci_stale <cache-file> <ttl-minutes> <anchor-path...> — true (0) when <cache-file> should be

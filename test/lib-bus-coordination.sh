@@ -143,7 +143,7 @@ input="$(jq -cn --arg cwd "$WORK" \
 quiet="$(printf '%s' "$input" | HOOK_SPAWNS="$SPAWNS" PATH="$SHIMS:$PATH" \
   RDA_OS="$ROOT" RDA_BUS_COORDINATION=1 bash "$HOOK")"
 [ -z "$quiet" ] || fail "unchanged coordination emitted context under process tracing"
-[ "$(grep -c '^jq$' "$SPAWNS")" -le 8 ] || fail "coordination repeats payload/state/election parsing"
+[ "$(grep -c '^jq$' "$SPAWNS")" -le 7 ] || fail "coordination repeats payload/state/election/.team.jsonl parsing"
 grep -q '^sed$' "$SPAWNS" && fail "coordination spawns sed to read announcement stamps"
 : > "$SPAWNS"
 printf '%s' "$input" | HOOK_SPAWNS="$SPAWNS" PATH="$SHIMS:$PATH" RDA_OS="$ROOT" \

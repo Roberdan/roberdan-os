@@ -17,11 +17,19 @@ ROOT="$HOME/GitHub/roberdan-os"
 # Claude Code, and Copilot's emulated chain, which calls this hook with empty stdin (see
 # hooks/copilot/extension.template.mjs onSessionStart: runScript(ci, "", ...)).
 _stdin="$(cat 2>/dev/null || true)"
-_src=""; _sid=""
+_src=""; _sid=""; _fresh=""
 if command -v jq >/dev/null 2>&1 && [ -n "$_stdin" ]; then
-  _src="$(printf '%s' "$_stdin" | jq -r '.source // ""' 2>/dev/null || echo "")"
-  _sid="$(printf '%s' "$_stdin" | jq -r '.session_id // ""' 2>/dev/null | tr -cd 'A-Za-z0-9._-' || echo "")"
-  _fresh="$(printf '%s' "$_stdin" | jq -r 'if .prompt_cache_likely_expired == false then "1" else "" end' 2>/dev/null || echo "")"
+  {
+    IFS= read -r -d '' _src || _src=""
+    IFS= read -r -d '' _sid || _sid=""
+    IFS= read -r -d '' _fresh || _fresh=""
+  } < <(jq -j '
+    [
+      (if (.source // "") | type == "string" then (.source // "") else "" end),
+      (if (.session_id // "") | type == "string" then (.session_id // "" | gsub("[^A-Za-z0-9._-]"; "")) else "" end),
+      (if .prompt_cache_likely_expired == false then "1" else "" end)
+    ][] | gsub("\u0000"; ""), "\u0000"
+  ' <<<"$_stdin" 2>/dev/null)
   if { [ "$_src" = "resume" ] || [ "$_src" = "fork" ]; } && [ -n "$_fresh" ]; then
     echo "## roberdan-os — resumed, cache still warm (context unchanged since last turn)"
     printf '%s' "$_stdin" | bash "$(dirname "${BASH_SOURCE[0]}")/bus-coordination.sh" \
@@ -185,7 +193,15 @@ fi
 # resta un comando che qualcuno digita, mai un effetto dell'apertura di una sessione.
 # La pulizia A MONTE invece parte qui in sottofondo (autosweep, solo il repo corrente): cio' che
 # e' stato integrato mentre non c'eri sparisce senza che nessuno debba ricordarsene.
-[ -r "$ROOT/kanban/worktree-sweep.sh" ] && ( bash "$ROOT/kanban/worktree-sweep.sh" autosweep >/dev/null 2>&1 & ) >/dev/null 2>&1
+[ -r "$ROOT/kanban/worktree-sweep.sh" ] && {
+  _as_lock="$_ci_cache/autosweep.lock"
+  if mkdir "$_as_lock" 2>/dev/null \
+     || { [ -n "$(find "$_as_lock" -maxdepth 0 -mmin +5 2>/dev/null)" ] && rmdir "$_as_lock" 2>/dev/null && mkdir "$_as_lock" 2>/dev/null; }; then
+    ( trap 'rmdir "$_as_lock" 2>/dev/null || true' EXIT
+      bash "$ROOT/kanban/worktree-sweep.sh" autosweep >/dev/null 2>&1
+    ) </dev/null >/dev/null 2>&1 &
+  fi
+}
 _wt="$ROOT/kanban/worktree.sh"
 if [ -r "$_wt" ]; then
   # --cached: LEGGE un numero gia' calcolato. Contarlo davvero costa ~10s, e un'attesa del

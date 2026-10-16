@@ -6,9 +6,9 @@
 set -euo pipefail
 
 [ "${RDA_ALLOW_MAIN_WRITES:-0}" = "1" ] && exit 0
+command -v jq >/dev/null 2>&1 || { echo "main-guard: jq is required" >&2; exit 2; }
 
-input="$(cat)"
-fp="$(printf '%s' "$input" | jq -r '.tool_input.file_path // ""')"
+fp="$(jq -r '.tool_input.file_path // ""')"
 # Decide on the RESOLVED path: a symlink named *.md pointing at source would otherwise
 # satisfy the meta/docs carve-out below. Same class as claude-code v2.1.251 (Read/Write/Edit
 # following a symlink swapped after the permission check). New file (Write case): no target
@@ -23,7 +23,12 @@ while [ -L "$fp" ] && [ "$_hops" -lt 10 ]; do
   _target="$(readlink "$fp")"
   case "$_target" in
     /*) fp="$_target" ;;
-    *) fp="$(dirname "$fp")/$_target" ;;
+    *)
+      case "$fp" in
+        */*) fp="${fp%/*}/$_target" ;;
+        *) fp="./$_target" ;;
+      esac
+      ;;
   esac
   _hops=$((_hops + 1))
 done
@@ -35,24 +40,31 @@ if [ -e "$fp" ]; then fp="$(/bin/realpath "$fp" 2>/dev/null || printf '%s' "$fp"
 _unresolved=""
 [ -L "$fp" ] && _unresolved=1
 
-lookup_dir=""
-if [ -n "$fp" ]; then
-  if [ -d "$fp" ]; then lookup_dir="$fp"; else lookup_dir="$(dirname "$fp")"; fi
-fi
-repo_root="$(git -C "${lookup_dir:-.}" rev-parse --show-toplevel 2>/dev/null || true)"
-[ -z "$repo_root" ] && exit 0
-
-branch="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
-
-# Carve-out: meta/docs editable on main (markdown, .claude/**, config, ADR). Skipped entirely
-# when the name never resolved (see _unresolved above) — no carve-out for a path this guard
-# could not pin down.
+# Carve-out: meta/docs editable on main (markdown, .claude/**, config, ADR). Checked after
+# symlink resolution so genuine docs skip spawning git altogether, while unresolved symlinks
+# never earn the carve-out.
 if [ -z "$_unresolved" ]; then
   case "$fp" in
     *.md|*/.claude/*|*/docs/*|*/.env.example|*/.gitignore)
       exit 0 ;;
   esac
 fi
+
+lookup_dir=""
+if [ -n "$fp" ]; then
+  if [ -d "$fp" ]; then
+    lookup_dir="$fp"
+  else
+    case "$fp" in
+      */*) lookup_dir="${fp%/*}"; [ -n "$lookup_dir" ] || lookup_dir="/" ;;
+      *) lookup_dir="." ;;
+    esac
+  fi
+fi
+repo_root="$(git -C "${lookup_dir:-.}" rev-parse --show-toplevel 2>/dev/null || true)"
+[ -z "$repo_root" ] && exit 0
+
+branch="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
 
 if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
   jq -cn --arg reason "MainGuard: writes on $branch are blocked. Create a worktree or a feature branch. Override: RDA_ALLOW_MAIN_WRITES=1 (emergency only)." '{
