@@ -44,6 +44,13 @@ without observations a session becomes ineligible and the next live callback
 elects the oldest eligible member, breaking ties by session id. A returning
 old leader does not preempt a healthy replacement.
 
+The shared hooks parse each payload/state once, read temporary stamps with shell
+builtins and batch doorbell file metadata reads in groups of 16. Every live callback
+still checks the team and mailbox; no extra timer, daemon or stale-result cache is
+introduced. Notification edges, ten-minute reminders, provenance and cursors are
+unchanged. `test-bus-doorbell.sh` and `test-bus-presence.sh` pin both behavior and
+the reduced external-command counts.
+
 **Limits:** inactivity is not process death (a long tool, idle turn, locked
 machine or disconnected runtime can all stop callbacks). Never seize an inactive
 session's files or assume its job stopped. Takeover must recover `bus log` and

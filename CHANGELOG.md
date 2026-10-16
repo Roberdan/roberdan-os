@@ -3,6 +3,32 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.62.1 — 2026-10-16
+
+### Changed
+
+- Shared bus hooks parse each payload/state once and read their temporary stamps
+  with shell builtins. The doorbell batches file metadata reads in groups of 16
+  instead of spawning `stat` for every thread/cursor. Excluded headless/disabled
+  coordination callbacks exit before reading input. No daemon, dependency, skipped
+  observation or change to message delivery, election, reminders or safety checks.
+- Synthetic unchanged-state measurements: a 32-thread doorbell call launches 14
+  external commands instead of 48; a coordination callback launches 41 instead of
+  54, measured before #124 removed more `jq` calls from `bus team`. Regression tests
+  enforce the reduced parsing/stat costs alongside notification privacy and membership
+  behavior. These are process counts, not a wall-time promise.
+
+### Fixed
+
+- Bus log locks left without a live owner (process killed between `mkdir` and the
+  owner stamp, or owner pid gone) are reclaimed after `RDA_BUS_LOCK_STALE_S` (default
+  10 s) under a serialized guard; a live owner is never reclaimed. Before, one orphan
+  lock made every `bus team` wait 10 s and time out the UserPromptSubmit hook. The team
+  observation does one `jq` pass inside the lock instead of about eight (#124).
+- Kanban worktree autosweep keeps worktrees younger than `RDA_WT_MIN_AGE_H` hours
+  (default 24): a branch created moments ago with no commits is an ancestor of `main`
+  and was removed as "integrated" seconds after creation (#123).
+
 ## 2.62.0 — 2026-10-15
 
 ### Added
