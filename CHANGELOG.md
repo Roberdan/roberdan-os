@@ -14,8 +14,9 @@ versioning: semver on the system's behavior/tooling (the paper has its own versi
   observation or change to message delivery, election, reminders or safety checks.
 - Synthetic unchanged-state measurements: a 32-thread doorbell call launches 14
   external commands instead of 48; a coordination callback launches 41 instead of
-  54. Regression tests enforce the reduced parsing/stat costs alongside notification
-  privacy and membership behavior. These are process counts, not a wall-time promise.
+  54, measured before #124 removed more `jq` calls from `bus team`. Regression tests
+  enforce the reduced parsing/stat costs alongside notification privacy and membership
+  behavior. These are process counts, not a wall-time promise.
 
 ### Fixed
 
