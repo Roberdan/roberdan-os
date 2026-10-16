@@ -22,6 +22,9 @@ export HOME="$TMP/home"; mkdir -p "$HOME/GitHub"
 export RDA_WORKTREES="$HOME/GitHub/worktrees"
 export RDA_HOME="$TMP/rdahome"
 export RDA_KANBAN_REGISTRY="$RDA_HOME/kanban-registry"; mkdir -p "$RDA_HOME"
+# Le copie di queste fixture nascono adesso: senza questo la guardia "creata da meno di 24h"
+# le terrebbe tutte. La guardia stessa e' provata a parte, col default (blocco "appena nata").
+export RDA_WT_MIN_AGE_H=0
 export GIT_CONFIG_GLOBAL="$TMP/gitconfig"
 git config -f "$GIT_CONFIG_GLOBAL" user.email t@t; git config -f "$GIT_CONFIG_GLOBAL" user.name t
 export PATH="$TMP/bin:$PATH"; mkdir -p "$TMP/bin"
@@ -114,6 +117,16 @@ CLEAN4="$(mk clean4)"
 rm -f "$RDA_HOME"/autosweep-*
 RDA_NO_AUTOSWEEP=1 bash -c "cd '$REPO' && bash '$WT' autosweep >/dev/null 2>&1"
 [ -d "$CLEAN4" ] && ok "RDA_NO_AUTOSWEEP=1 lo spegne davvero" || fail "ha pulito anche con RDA_NO_AUTOSWEEP=1"
+# --- appena nata: un ramo nuovo senza commit e' antenato di main, quindi "integrato" per git.
+# Il 2026-10-16 l'autosweep tolse 4 copie a secondi dalla creazione. Col default (24h) resta;
+# una volta vecchia (il .git retrodatato) torna rimovibile come prima.
+YOUNG="$(mk young)"; rm -f "$RDA_HOME"/autosweep-*
+(cd "$REPO" && env -u RDA_WT_MIN_AGE_H bash "$WT" autosweep >/dev/null 2>&1)
+[ -d "$YOUNG" ] && ok "autosweep non toglie una copia appena creata senza commit" || fail "autosweep ha tolto una copia appena nata"
+case "$(cd "$TMP" && env -u RDA_WT_MIN_AGE_H bash "$WT" sweep --all 2>&1)" in *"creata da meno di 24h"*) ok "dice PERCHE' tiene la copia appena nata" ;; *) fail "non spiega perche' tiene la copia appena nata" ;; esac
+touch -t 202001010000 "$YOUNG/.git"; rm -f "$RDA_HOME"/autosweep-*
+(cd "$REPO" && env -u RDA_WT_MIN_AGE_H bash "$WT" autosweep >/dev/null 2>&1)
+[ -d "$YOUNG" ] && fail "copia vecchia e integrata non tolta: la guardia ha bloccato tutto" || ok "passate le 24h la copia integrata torna rimovibile"
 
 # autosweep gira DA SOLA, senza che nessuno la guardi: resta ristretta a $WT_HOME come sempre
 # stata, anche ora che il registro di git troverebbe worktree altrove (.claude/worktrees, un

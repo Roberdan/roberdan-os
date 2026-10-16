@@ -143,9 +143,9 @@ _wt_registry() {
 }
 
 # _wt_verdict <wt-path> <repo-path> <head-oid> <branch> <locked> <prunable> -> "PRUNE" |
-# "REMOVE" | "KEEP: <perche'>". Il repo e' gia' NOTO (viene dalla riga del registro, non da un
-# nome da risolvere), quindi non c'e' piu' bisogno di distinguere "trovato per nome" da "trovato
-# per path" come nella versione precedente (_verdict vs _verdict_at): un'unica funzione basta.
+# "REMOVE" | "KEEP: <perche'>". Una copia nata da meno di RDA_WT_MIN_AGE_H ore (default 24,
+# eta' = il .git scritto da `git worktree add`) si tiene: un ramo appena nato e' antenato di
+# main e sembra "integrato" — l'autosweep toglieva copie appena create (2026-10-16).
 _wt_verdict() {
   local wt="$1" repo="$2" oid="$3" branch="$4" locked="$5" prunable="$6" dirty wt_real pwd_real
   _wt_hard_exclude "$repo" "$wt" && { echo "KEEP: MirrorBuddy — Roberto ci lavora ora con un altro agente, mai toccare"; return 0; }
@@ -159,6 +159,7 @@ _wt_verdict() {
   _owned_by_doing_card "$wt" && { echo "KEEP: appartiene a una card in corso"; return 0; }
   dirty="$(git -C "$wt" status --porcelain 2>/dev/null | grep -c . || true)"
   [ "${dirty:-0}" -gt 0 ] && { echo "KEEP: $dirty file non salvati"; return 0; }
+  [ -n "$(find "$wt/.git" -maxdepth 0 -mmin "-$(( ${RDA_WT_MIN_AGE_H:-24} * 60 ))" 2>/dev/null)" ] && { echo "KEEP: creata da meno di ${RDA_WT_MIN_AGE_H:-24}h"; return 0; }
   _branch_integrated "$repo" "$oid" "$branch" || { echo "KEEP: $branch ha lavoro non ancora integrato"; return 0; }
   echo "REMOVE"
 }

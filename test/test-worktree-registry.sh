@@ -22,6 +22,7 @@ export HOME="$TMP/home"; mkdir -p "$HOME/GitHub"
 export RDA_WORKTREES="$HOME/GitHub/worktrees"
 export RDA_HOME="$TMP/rdahome"
 export RDA_KANBAN_REGISTRY="$RDA_HOME/kanban-registry"; mkdir -p "$RDA_HOME"
+export RDA_WT_MIN_AGE_H=0   # fixture nate adesso: la guardia "meno di 24h" e' provata in test-worktree-sweep.sh
 export GIT_CONFIG_GLOBAL="$TMP/gitconfig"
 git config -f "$GIT_CONFIG_GLOBAL" user.email t@t; git config -f "$GIT_CONFIG_GLOBAL" user.name t
 export PATH="$TMP/bin:$PATH"; mkdir -p "$TMP/bin"
