@@ -39,7 +39,7 @@ state="$(cd "$cwd" && bash "$bus" team --session "$sid" --host "$host" --json ${
   .mode, "\u0000", ([.coordinator, [.members[].session]] | tojson), "\u0000"' <<<"$state")
 mail=""
 if [ "$event" != "SessionStart" ]; then
-  ring="$(RDA_DOORBELL_SID="$sid" RDA_DOORBELL_REPO="$repo" bash "$root/hooks/bus-doorbell.sh")"
+  ring="$(RDA_DOORBELL_SID="$sid" RDA_DOORBELL_REPO="$repo" RDA_BUS_ROLE="${RDA_BUS_ROLE:-$role}" bash "$root/hooks/bus-doorbell.sh")"
   [ -z "$ring" ] || mail="$(jq -r '.hookSpecificOutput.additionalContext // ""' <<<"$ring")"
 fi
 # A per-session ephemeral announcement stamp, NOT identity shared by all sessions in a checkout.

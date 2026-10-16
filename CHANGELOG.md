@@ -3,6 +3,24 @@
 All notable changes to roberdan-os. Format: [Keep a Changelog](https://keepachangelog.com);
 versioning: semver on the system's behavior/tooling (the paper has its own version).
 
+## 2.62.3 — 2026-10-16
+
+### Changed
+
+- `hooks/bash-guard.sh` and `hooks/main-guard.sh` fail closed (`exit 2`) if `jq`
+  is missing, eliminate `cat`/`sed`/`tr`/`dirname`/`grep` subprocesses on
+  ordinary calls (`bash-guard.sh` drops from 12 external processes to 1 `jq` on
+  ordinary ASCII commands; `main-guard.sh` skips `git` on resolved `.md`/docs
+  carve-outs), and close the closed-heredoc/`<<<`/`+refspec`/`-fu`/`git -C`
+  force-push bypasses in `bash-guard.sh`.
+- `hooks/lib-context-cache.sh` and `hooks/context-inject.sh` deduplicate
+  background `_ci_bg` and `autosweep` refreshes with per-target lock directories
+  and parse `SessionStart` metadata in one `jq` pass instead of three.
+- `hooks/bus-coordination.sh` passes the resolved `RDA_BUS_ROLE` to
+  `hooks/bus-doorbell.sh` so `.team.jsonl` is not re-parsed on every tool call
+  when `RDA_BUS_ROLE` is unset (`jq` count on unchanged coordination drops from
+  8 to 7).
+
 ## 2.62.2 — 2026-10-16
 
 ### Fixed

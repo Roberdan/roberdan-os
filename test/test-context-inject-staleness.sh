@@ -105,5 +105,17 @@ printf '%s\n' "$out2" | grep -q "STALE" \
   || ok "a same-day handoff is not flagged stale"
 rm -f "$T/home/GitHub/roberdan-os/handoff/latest.md"
 
+echo "=== _ci_bg lock deduplicates concurrent background refreshes ==="
+(
+  RDA_HOME="$T/bg-home" . "$ROOT/hooks/lib-context-cache.sh"
+  COUNT_FILE="$T/bg-runs"; : > "$COUNT_FILE"
+  slow_job() { echo 1 >> "$COUNT_FILE"; sleep 1; echo "ok"; }
+  _ci_bg "$_ci_cache/item" -- slow_job
+  _ci_bg "$_ci_cache/item" -- slow_job
+  wait
+  [ "$(wc -l < "$COUNT_FILE" | tr -d ' ')" = "1" ] && [ "$(cat "$_ci_cache/item" 2>/dev/null)" = "ok" ]
+) && ok "_ci_bg runs at most one background refresh per cache key at a time" \
+  || err "_ci_bg spawned duplicate concurrent background refreshes"
+
 if [ "$fails" -eq 0 ]; then printf '\ntest-context-inject-staleness: ✅ ALL GREEN\n'; else printf '\ntest-context-inject-staleness: ❌ FAIL (see above)\n'; fi
 exit "$fails"

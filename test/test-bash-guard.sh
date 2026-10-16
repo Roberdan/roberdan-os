@@ -52,7 +52,14 @@ echo
 echo "=== rule 1: force / no-verify push (the 2026-07 scar) ==="
 expect deny  "git push --force origin main"      "git push --force -> deny"
 expect deny  "git push -f origin main"           "git push -f -> deny"
+expect deny  "git push -fu origin main"          "git push -fu -> deny"
+expect deny  "git push origin +main"             "git push origin +main -> deny"
+expect deny  "git -C /tmp/repo push --force"     "git -C <dir> push --force -> deny"
 expect deny  "git push --no-verify"              "git push --no-verify -> deny"
+expect deny  $'git commit -F- <<\'EOF\'\ndocs\nEOF\ngit push --force origin main' \
+  "git push --force after closed heredoc -> deny"
+expect deny  "cat <<<hello && git push --force origin main" \
+  "git push --force after here-string (<<<) -> deny"
 expect allow "git push origin main"              "ordinary git push -> allowed"
 expect allow "git commit -m 'never use git push --force here'" \
   "the flag NAMED inside a quoted message -> allowed (message is data, not a command)"
@@ -84,6 +91,23 @@ expect allow "find . -path '*/node_modules/*' -prune"                      "find
 expect allow "find ~/Library/LaunchAgents -name 'com.roberdan.*'"          "find in a specific folder -> allowed"
 expect allow "ls / | head"                                                 "listing / (not a search) -> allowed"
 expect allow "echo 'never run find / on this Mac'"                         "find / inside a quoted message -> allowed"
+
+echo
+echo "=== subprocess budget on ordinary ASCII command ==="
+TMP_BG="$(mktemp -d)"
+trap 'rm -rf "$TMP_BG"' EXIT
+SHIMS_BG="$TMP_BG/shims"; mkdir -p "$SHIMS_BG"
+SPAWNS_BG="$TMP_BG/spawns"; : > "$SPAWNS_BG"
+for tool in cat jq sed tr grep; do
+  printf '#!/bin/bash\nprintf "%%s\\n" %q >> "$HOOK_SPAWNS"\nexec %q "$@"\n' \
+    "$tool" "$(command -v "$tool")" > "$SHIMS_BG/$tool"
+  chmod +x "$SHIMS_BG/$tool"
+done
+printf '{"tool_input":{"command":"git status --short && ls -la"}}' \
+  | HOOK_SPAWNS="$SPAWNS_BG" PATH="$SHIMS_BG:$PATH" bash "$GUARD" >/dev/null
+[ "$(wc -l < "$SPAWNS_BG" | tr -d ' ')" -le 1 ] \
+  && ok "ordinary ASCII command spawns only jq (no cat/sed/tr/grep)" \
+  || err "ordinary ASCII command spawned $(tr '\n' ' ' < "$SPAWNS_BG")"
 
 echo
 if [ "$fails" -eq 0 ]; then echo "test-bash-guard: PASS"; exit 0; fi

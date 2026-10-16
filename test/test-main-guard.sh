@@ -87,5 +87,17 @@ got="$(decide "$tmp/repo/lib.rs")"
 [ "$got" = "deny" ] && ok "lib.rs on main -> deny (unchanged behaviour)" \
   || err "lib.rs on main -> got '$got', expected deny"
 
+SHIMS_MG="$tmp/shims"; mkdir -p "$SHIMS_MG"
+SPAWNS_MG="$tmp/spawns"; : > "$SPAWNS_MG"
+for tool in cat git dirname; do
+  printf '#!/bin/bash\nprintf "%%s\\n" %q >> "$HOOK_SPAWNS"\nexec %q "$@"\n' \
+    "$tool" "$(command -v "$tool")" > "$SHIMS_MG/$tool"
+  chmod +x "$SHIMS_MG/$tool"
+done
+printf '{"tool_input":{"file_path":"%s"}}' "$tmp/repo/README.md" \
+  | HOOK_SPAWNS="$SPAWNS_MG" PATH="$SHIMS_MG:$PATH" bash "$GUARD" >/dev/null
+[ ! -s "$SPAWNS_MG" ] && ok "genuine .md carve-out spawns zero cat/git/dirname subprocesses" \
+  || err "genuine .md carve-out spawned: $(tr '\n' ' ' < "$SPAWNS_MG")"
+
 if [ "$fails" -eq 0 ]; then printf '\ntest-main-guard: ✅ ALL GREEN\n'; else printf '\ntest-main-guard: ❌ FAIL (see above)\n'; fi
 exit "$fails"
