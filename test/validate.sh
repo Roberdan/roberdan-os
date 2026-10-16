@@ -184,7 +184,7 @@ if _suite test-gh-shim; then ok "sceglie la cartella dal remote, il -R vince sul
 # --- 8b5) il lucchetto delle suite bus: un orfano si riusa, un vivo si rispetta. Due volte in
 # un giorno un lucchetto non rilasciato ha fatto uscire ROSSO un test innocente.
 section "lucchetto bus — un orfano si riusa, un proprietario vivo si rispetta"
-if _suite test-bus-lock; then ok "riusa il lucchetto di un processo morto, rifiuta quello di uno vivo, e aspetta prima di dichiarare orfano un lucchetto senza PID"; else _suite_out test-bus-lock; err "test-bus-lock — see bash test/test-bus-lock.sh"; fi
+if _suite test-bus-lock; then ok "riusa il lucchetto di un processo morto, rifiuta quello di uno vivo, e aspetta prima di dichiarare orfano un lucchetto senza PID — per le suite e per i log del bus, con una sola ripresa sotto contesa"; else _suite_out test-bus-lock; err "test-bus-lock — see bash test/test-bus-lock.sh"; fi
 
 # --- 8b6) come si legge il verdetto di @thor. Due volte in un giorno il gate ha rifiutato una
 # verifica RIUSCITA, e tutte e due le volte rilanciare identico e' bastato: la lezione peggiore.

@@ -1167,7 +1167,7 @@ grep -q 'café ✓ utf8' <<<"$u8" || fail "non-ASCII UTF-8 did not survive verba
 #     refusal branch passed the entire green suite and started a live agent.
 #     Every bus invocation in this file now goes through busrun, so this runs
 #     over the trace of the WHOLE suite. Extend deliberately, never idly.
-ALLOWED=" jq git date grep mkdir rmdir cp cat wc tail sort awk printf mktemp rm tr basename dirname sleep shasum iconv leak-check.sh "
+ALLOWED=" jq git date grep mkdir rmdir cp cat wc tail sort awk printf mktemp rm tr basename dirname sleep shasum iconv leak-check.sh ps mv "
 # NORMALISE BEFORE MATCHING. Two evasions were invisible to the old filter:
 #   /tmp/stubs/claude   - dropped entirely, because the word starts with '/'
 #   BUS_WAKE=1 claude   - the first word is the assignment, not the command

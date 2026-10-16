@@ -21,48 +21,50 @@ _team_roles() {
   _team_snapshot "$log" "$(date +%s)" "${RDA_BUS_TEAM_TTL:-300}" | jq -r '.members[].role'
 }
 
+# The result fields every caller prints, shared by the observe pass and --status.
+# shellcheck disable=SC2016  # jq variables, not shell ones
+_TEAM_RESULT_JQ='. + {repo:$repo,session:$session,role:$role,
+    coordinator_role: (if .coordinator=="" then "" else "implementer--" + .coordinator end),
+    mode: (if (.members|length) < 2 then "solo"
+           elif .coordinator == $session then "coordinator" else "worker" end)}'
+
+# Runs INSIDE the append lock, so it is one jq pass instead of eight: under a
+# load average of 49 each spawn cost ~0.1s, and every waiter queued behind them.
+# Line 1 is the record to append (null for none), line 2 the result.
 _team_observe() {
   local log="$1" repo="$2" session="$3" host="$4" event="$5" epoch="$6" ttl="$7"
-  local prior state joined seen role coordinator record
+  local out
   [ -e "$log" ] || : > "$log"
   _assert_readable_log "$log"
-  prior="$(jq -cs --arg s "$session" 'map(select(.session == $s)) | last // {}' "$log")"
-  joined="$(jq -r --argjson now "$epoch" '
-    if .event == "leave" or .joined == null then $now else .joined end' <<<"$prior")"
-  seen="$(jq -r '.seen // 0' <<<"$prior")"
-  role="implementer--$session"
-  _assert_role "$role"
-  record="$(jq -cn --arg session "$session" --arg role "$role" --arg host "$host" \
-    --arg event "$event" --argjson seen "$epoch" --argjson joined "$joined" \
-    '{session:$session,role:$role,host:$host,event:$event,seen:$seen,joined:$joined}')"
-  # Compute the election INCLUDING this observation, before appending its decision.
-  state="$( { cat "$log"; printf '%s\n' "$record"; } | jq -cs \
+  out="$(jq -cs --arg session "$session" --arg role "implementer--$session" \
+    --arg host "$host" --arg event "$event" --arg repo "$repo" \
     --argjson epoch "$epoch" --argjson ttl "$ttl" '
-      (.[-2].coordinator // "") as $leader
-      | reduce .[] as $e ({}; .[$e.session] = $e)
-      | [.[] | select(.event != "leave" and ($epoch - .seen) < $ttl)]
-      | sort_by(.joined, .session) as $members
+      (map(select(.session == $session)) | last // {}) as $prior
+      | ($prior.seen // 0) as $seen
+      | {session:$session, role:$role, host:$host, event:$event, seen:$epoch,
+         joined: (if $prior.event == "leave" or $prior.joined == null then $epoch
+                  else $prior.joined end)} as $record
+      # The election INCLUDES this observation, before its decision is appended.
+      | (. + [$record]) as $all
+      | ($all[-2].coordinator // "") as $leader
+      | ($all | reduce .[] as $e ({}; .[$e.session] = $e)
+         | [.[] | select(.event != "leave" and ($epoch - .seen) < $ttl)]
+         | sort_by(.joined, .session)) as $members
       | {members:$members, coordinator:
           (if any($members[]; .session == $leader) then $leader
-           else ($members[0].session // "") end)}
-    ')"
-  coordinator="$(jq -r '.coordinator' <<<"$state")"
-  # Observations at most every 30s, but departures and changed elections are immediate.
-  if [ "$event" = "leave" ] || [ $((epoch - seen)) -ge 30 ] \
-      || [ "$(jq -r '.coordinator // ""' <<<"$prior")" != "$coordinator" ]; then
-    jq -c --arg coordinator "$coordinator" --arg repo "$repo" \
-      '. + {repo:$repo,coordinator:$coordinator}' <<<"$record" >> "$log"
-  fi
-  _team_result "$state" "$repo" "$session" "$role"
+           else ($members[0].session // "") end)} as $state
+      # Observations at most every 30s; departures and changed elections are immediate.
+      | (if $event == "leave" or ($epoch - $seen) >= 30
+            or ($prior.coordinator // "") != $state.coordinator
+         then $record + {repo:$repo, coordinator:$state.coordinator} else null end),
+        ($state | '"$_TEAM_RESULT_JQ"')
+    ' "$log")"
+  [ "${out%%$'\n'*}" = "null" ] || printf '%s\n' "${out%%$'\n'*}" >> "$log"
+  printf '%s\n' "${out#*$'\n'}"
 }
 
 _team_result() {
-  jq -c --arg repo "$2" --arg session "$3" --arg role "$4" '
-    . + {repo:$repo,session:$session,role:$role,
-         coordinator_role: (if .coordinator=="" then "" else "implementer--" + .coordinator end),
-         mode: (if (.members|length) < 2 then "solo"
-                elif .coordinator == $session then "coordinator" else "worker" end)}
-  ' <<<"$1"
+  jq -c --arg repo "$2" --arg session "$3" --arg role "$4" "$_TEAM_RESULT_JQ" <<<"$1"
 }
 
 _cmd_team() {
@@ -98,6 +100,8 @@ _cmd_team() {
     # Do not register factory/verifiers or inherited one-shot subagents as coordinators.
     [ "${RDA_HEADLESS:-0}" != "1" ] && [ "${RDA_IN_THOR_VERIFY:-0}" != "1" ] \
       || die "team: headless/verifier sessions do not participate"
+    # Validated before the lock: it reads manifests, and the lock serializes every waiter.
+    _assert_role "implementer--$session"
     state="$(_with_lock "$log" _team_observe "$log" "$repo" "$session" "$host" "$event" "$epoch" "$ttl")"
   fi
   if [ "$json" = "1" ]; then

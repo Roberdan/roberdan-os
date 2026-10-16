@@ -43,6 +43,8 @@ REGISTRY="${RDA_KANBAN_REGISTRY:-$RDA_HOME/kanban-registry}"
 . "$DIR/bus-unread.sh"
 # shellcheck source=bus/bus-team.sh
 . "$DIR/bus-team.sh"
+# shellcheck source=bus/bus-lock.sh
+. "$DIR/bus-lock.sh"
 die() { echo "bus: $*" >&2; exit 1; }
 now() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
 
@@ -276,20 +278,23 @@ _presence_path() { printf '%s/%s/.presence.jsonl' "$BUS_HOME" "$1"; }
 
 # A durable log that interleaves two concurrent appends is not durable. Two 20KB
 # sends in parallel corrupted it in review, permanently - there is no GC and no
-# repair, so a corrupt thread is an unreadable thread forever.
+# repair, so a corrupt thread is unreadable forever. Stale locks: bus-lock.sh.
 _with_lock() {
   local log="$1"; shift
-  local lock="$log.lock" waited=0 tries="${RDA_BUS_LOCK_TRIES:-100}"
+  local lock="$log.lock" waited=0 tries="${RDA_BUS_LOCK_TRIES:-100}" owner
   mkdir -p "$(dirname "$log")"
+  # Stamped before mkdir: the ownerless window is one builtin write, no spawn.
+  owner="pid $$ at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   until mkdir "$lock" 2>/dev/null; do
     waited=$((waited + 1))
+    if [ $((waited % 10)) -eq 1 ] && _reclaim_stale_lock "$lock"; then continue; fi
     # A lock left behind by a killed send blocks this card forever, so say how
     # long it has been there and who left it: "remove it if stale" is useless
     # advice without the evidence needed to decide whether it is stale.
-    [ "$waited" -lt "$tries" ] || die "could not acquire the log lock $lock after $((waited / 10))s — held since $(_lock_age "$lock") by $(cat "$lock/owner" 2>/dev/null || echo 'an unknown process'); if that process is gone, remove the directory"
+    [ "$waited" -lt "$tries" ] || die "could not acquire the log lock $lock after $((waited / 10))s — held since $(_lock_age "$lock") by $(cat "$lock/owner" 2>/dev/null || echo 'an unknown process'), which is alive or too recent to judge stale"
     sleep 0.1
   done
-  printf 'pid %s at %s\n' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$lock/owner" 2>/dev/null || true
+  printf '%s\n' "$owner" > "$lock/owner" 2>/dev/null || true
   # Released with rm -f + rmdir rather than `rm -rf`: the log directory is
   # permanent by design and a recursive delete anywhere in this file is a
   # tripwire, so the lock is dismantled by name instead.
